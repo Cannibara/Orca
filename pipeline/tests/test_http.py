@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from orca.http import Client, FetchError, figi_client, sec_client, tiingo_client
+from orca.http import Client, FetchError, figi_client, fred_client, sec_client, tiingo_client
 
 
 class FakeTime:
@@ -368,3 +368,26 @@ def test_tiingo_client_requires_a_key(monkeypatch, value):
 
     with pytest.raises(RuntimeError, match="TIINGO_KEY"):
         tiingo_client()
+
+
+def test_fred_client_is_2_requests_per_second_with_no_special_headers():
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json={})
+
+    client = fred_client(httpx.MockTransport(handler), sleep=t.sleep, clock=t.clock)
+    for _ in range(3):
+        client.get("https://api.stlouisfed.org/fred/series/observations", series_id="DTB3")
+
+    assert t.sleeps == [pytest.approx(0.5)] * 2
+    assert "authorization" not in seen[0].headers
+    assert "x-openfigi-apikey" not in seen[0].headers
+
+
+def test_fetch_error_keeps_the_detail():
+    err = FetchError("https://example.test/a", 502, "bad gateway")
+    assert err.detail == "bad gateway"
+    assert FetchError("https://example.test/a", None).detail == ""

@@ -17,6 +17,7 @@ FIGI_JOBS_ANON = 10
 # Tiingo: the paid plan allows about 10,000 requests an hour (2.8 a second); 2.5 stays under it.
 # The environment variable TIINGO_RATE_PER_SEC overrides the default.
 TIINGO_RATE_DEFAULT = 2.5
+FRED_RATE_PER_SEC = 2.0  # a pipeline run makes one FRED request; this is a polite ceiling
 REQUEST_TIMEOUT = 30.0  # seconds
 
 
@@ -26,6 +27,7 @@ class FetchError(Exception):
     def __init__(self, url: str, status: int | None, detail: str = ""):
         self.url = url
         self.status = status
+        self.detail = detail
         shown = "network error" if status is None else f"HTTP {status}"
         message = f"{url}: {shown}"
         super().__init__(f"{message} ({detail})" if detail else message)
@@ -199,3 +201,13 @@ def _tiingo_rate() -> float:
     if not math.isfinite(rate) or rate <= 0:
         raise RuntimeError(f"TIINGO_RATE_PER_SEC must be a positive number, got {raw!r}")
     return rate
+
+
+def fred_client(
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> Client:
+    """Client for FRED: 2 requests/s, no headers. FRED takes its key only as a query parameter,
+    so the caller adds it to each request (see `orca.rf.fetch_tbill`)."""
+    return Client(FRED_RATE_PER_SEC, {}, transport=transport, sleep=sleep, clock=clock)
