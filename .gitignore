@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pipeline/.venv/
+
+# Pipeline data (lake and output dirs)
+data/
+pipeline/data/
