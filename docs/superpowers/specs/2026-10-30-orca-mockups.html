@@ -1,0 +1,945 @@
+<title>Orca Page Mockups</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one centred column, sticky app bar, sections stacked summary → detail. Deep-water neutrals, chart blue/orange carry the data. */
+:root{
+  --bg:#f2f6f6; --surface:#fcfdfd; --ink:#0c1a20; --ink2:#46555b; --muted:#5d6c72;
+  --line:#dbe3e4; --line2:#c3cfd1; --chip:#e6eef0; --accent:#1c5cab; --accent-ink:#ffffff;
+  --s1:#2a78d6; --s2:#eb6834; --pos:#2a78d6; --neg:#e34948; --band:rgba(42,120,214,.16);
+  --up:#006300; --down:#b3261e; --note-bg:#fff3d1; --note-ink:#523c00;
+  --tip-bg:#0c1a20; --tip-ink:#f2f6f6; --tip-muted:#b7c4c7;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1215; --surface:#101b1f; --ink:#e7eef0; --ink2:#b2c0c3; --muted:#93a2a6;
+    --line:#1f2e33; --line2:#2e4046; --chip:#18272c; --accent:#6da7ec; --accent-ink:#06121a;
+    --s1:#3987e5; --s2:#d95926; --pos:#3987e5; --neg:#e66767; --band:rgba(57,135,229,.2);
+    --up:#3cc23c; --down:#f08a84; --note-bg:#33290b; --note-ink:#f3dc9a;
+    --tip-bg:#e7eef0; --tip-ink:#0c1a20; --tip-muted:#46555b; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1215; --surface:#101b1f; --ink:#e7eef0; --ink2:#b2c0c3; --muted:#93a2a6;
+  --line:#1f2e33; --line2:#2e4046; --chip:#18272c; --accent:#6da7ec; --accent-ink:#06121a;
+  --s1:#3987e5; --s2:#d95926; --pos:#3987e5; --neg:#e66767; --band:rgba(57,135,229,.2);
+  --up:#3cc23c; --down:#f08a84; --note-bg:#33290b; --note-ink:#f3dc9a;
+  --tip-bg:#e7eef0; --tip-ink:#0c1a20; --tip-muted:#46555b; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--f-body)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-stretch:85%;text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:750;line-height:1.1}
+h2{font-size:22px;font-weight:700;line-height:1.2}
+h3{font-size:16px;font-weight:650}
+p{margin:0}
+.mono{font-family:var(--f-mono);font-weight:500;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.lede{color:var(--ink2);max-width:62ch}
+
+/* app bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar{display:flex;align-items:center;gap:20px;min-height:56px;flex-wrap:wrap;padding-block:6px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:8px}
+.brand svg{width:26px;height:26px}
+.nav{display:flex;gap:4px;flex-wrap:wrap}
+.nav a{padding:8px 12px;border-radius:8px;color:var(--ink2);text-decoration:none;font-weight:500;font-size:14px}
+.nav a[aria-current="page"]{background:var(--chip);color:var(--ink)}
+.mock{margin-top:14px;background:var(--note-bg);color:var(--note-ink);border-radius:8px;padding:8px 12px;font-size:13px}
+
+main{padding-block:24px 64px}
+.view{display:flex;flex-direction:column;gap:36px}
+.sec{display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.sec-head p{color:var(--ink2);font-size:14px;max-width:70ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+
+/* chips / tabs */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:500 13px/1 var(--f-body);padding:9px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.tab{font:600 14px/1 var(--f-body);padding:12px 14px;border:0;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;min-height:44px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .k{font-size:12.5px;color:var(--muted)}
+.tile .v{font-size:22px;font-weight:600;line-height:1.25}
+.tile .d{font-size:12.5px;color:var(--ink2)}
+
+/* fund header */
+.fhead{display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;gap:8px 18px;flex-wrap:wrap;color:var(--ink2);font-size:14px}
+.meta b{color:var(--ink);font-weight:600}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:9px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+thead th{font-size:12px;font-weight:600;color:var(--muted);background:var(--surface);position:sticky;top:0;letter-spacing:.02em}
+tbody tr:last-child td{border-bottom:0}
+tbody td{font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--chip)}
+th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;letter-spacing:inherit}
+th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
+.tick{display:inline-flex;align-items:center;gap:8px}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--ink2)}
+.pill.buy{background:color-mix(in srgb,var(--s1) 16%,transparent);color:var(--ink)}
+.pill.sell{background:color-mix(in srgb,var(--s2) 18%,transparent);color:var(--ink)}
+.cap{font-size:12.5px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500;padding-block:4px}
+details[open] summary{margin-bottom:8px}
+
+/* charts */
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.lk{width:16px;height:2px;border-radius:2px;display:inline-block}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.chart{width:100%;min-width:0}
+.chart svg{display:block;max-width:100%}
+.ax{fill:var(--muted);font:400 11px var(--f-body);font-variant-numeric:tabular-nums}
+.lab{fill:var(--ink2);font:500 12px var(--f-body)}
+.lab.sel{fill:var(--ink);font-weight:700}
+.val{fill:var(--ink);font:600 11.5px var(--f-body);font-variant-numeric:tabular-nums}
+.grid{stroke:var(--line);stroke-width:1}
+.base{stroke:var(--line2);stroke-width:1}
+.hit{fill:transparent;cursor:pointer;outline:none}
+.hit:focus-visible{stroke:var(--accent);stroke-width:2}
+.selbg{fill:var(--chip)}
+.mark{transition:opacity .12s}
+g.cat:hover .mark,g.cat:focus-within .mark{opacity:.82}
+@media (prefers-reduced-motion:reduce){.mark{transition:none}}
+.hint{font-size:13px;color:var(--ink2)}
+.hint b{color:var(--ink)}
+
+#tip{position:fixed;z-index:20;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.4;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+#tip .t{color:var(--tip-muted);font-size:11.5px;margin-bottom:2px}
+#tip .r{display:flex;align-items:center;gap:8px}
+#tip .r b{font-variant-numeric:tabular-nums}
+
+/* home */
+.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:end}
+.search{display:flex;gap:8px;flex-wrap:wrap}
+.search label{flex:1 1 100%;font-size:13px;color:var(--muted)}
+.search input{flex:1 1 220px;min-width:0;font:400 15px var(--f-body);padding:12px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);min-height:46px}
+.btn{font:600 14px var(--f-body);padding:12px 16px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;min-height:46px}
+.rule{font-size:13px;color:var(--ink2);background:var(--surface);border:1px dashed var(--line2);border-radius:10px;padding:10px 12px}
+
+/* methodology */
+.prose{max-width:72ch;display:flex;flex-direction:column;gap:22px}
+.prose section{display:flex;flex-direction:column;gap:8px}
+.prose p,.prose li{color:var(--ink2)}
+.prose ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.formula{font-family:var(--f-mono);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink);overflow-x:auto;white-space:pre}
+
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr}
+  .tile .v{font-size:19px}
+}
+</style>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="#home" aria-label="Orca home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 19c3-8 11-12 19-10 3 .8 5 2.6 7 5-2 0-3.4.6-4.6 1.8.9 2.4.3 5-2 6.6-3 2-7 1.6-10.4 0L9 25l.6-4C7 21.2 4.8 20.6 3 19z" fill="var(--ink)"/><path d="M19 17.5c1.6-.3 3 .2 3.8 1.4-1.4 1-3.2 1.1-4.8.5z" fill="var(--surface)"/><circle cx="22.5" cy="13" r="1.2" fill="var(--surface)"/></svg>
+      Orca
+    </a>
+    <nav class="nav" aria-label="Pages">
+      <a href="#home" data-nav="home">Home</a>
+      <a href="#fund" data-nav="fund">Fund page</a>
+      <a href="#position" data-nav="position">Position detail</a>
+      <a href="#method" data-nav="method">How it works</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap"><p class="mock" role="note">Mockup for layout review. Every fund name, trade and number on these pages is made up; tickers are real only so the tables read naturally.</p></div>
+
+<main class="wrap">
+
+<!-- ============ HOME ============ -->
+<section id="v-home" class="view" data-view="home">
+  <div class="hero">
+    <div class="sec">
+      <p class="eyebrow">13F filings, turned into results</p>
+      <h1>See how the big funds really did, stock by stock</h1>
+      <p class="lede">Quarterly SEC filings show what each fund owns. Orca estimates what they paid, what they made, and whether their sells were smart.</p>
+    </div>
+    <form class="search" id="searchForm" role="search">
+      <label for="q">Search a fund or manager</label>
+      <input id="q" name="q" type="search" placeholder="e.g. Kelpwood Partners" autocomplete="off">
+      <a class="btn" href="#fund">Open example fund</a>
+    </form>
+  </div>
+
+  <div class="sec">
+    <div class="tabs" role="tablist" aria-label="Home lists" id="homeTabs"></div>
+    <div id="homePanel" class="sec"></div>
+  </div>
+</section>
+
+<!-- ============ FUND ============ -->
+<section id="v-fund" class="view" data-view="fund" hidden>
+  <div class="fhead">
+    <p class="eyebrow">13F-HR · Period Q2 2026 · Filed 13 Aug 2026 · CIK 0000000000 (example)</p>
+    <h1>Kelpwood Partners</h1>
+    <div class="meta" id="fundMeta"></div>
+  </div>
+  <div class="sec">
+    <p class="eyebrow">Performance</p>
+    <div class="tiles" id="fundTiles"></div>
+    <p class="eyebrow">How they trade</p>
+    <div class="tiles" id="styleTiles"></div>
+    <p class="cap">All figures are 13F estimates built from quarter-end holdings, so risk numbers understate swings inside a quarter. Sharpe and Sortino use 3-month T-bill rates as the risk-free rate.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <div><h2>Gains vs inflows</h2></div>
+      <p>How much of the book's growth came from investment gains, and how much from net buying (money moved into stocks).</p>
+    </div>
+    <div class="panel sec">
+      <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Investment gains</span><span><i class="sw" style="background:var(--s2)"></i>Net inflows (net buying)</span></div>
+      <div class="chart" id="chFlows"></div>
+      <details><summary>Show the numbers</summary><div class="tbl-wrap" id="tblFlows"></div></details>
+    </div>
+    <p class="cap">Net inflows are a proxy: net buying of reported stocks, not investor money. Dividends are counted in returns but not in this bar.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <div><h2>Annual returns</h2></div>
+      <p class="hint" id="yearHint"></p>
+    </div>
+    <div class="panel sec">
+      <div class="chart" id="chReturns"></div>
+      <div class="chips" id="yearChips" aria-label="Pick a year"></div>
+      <details><summary>Show the numbers</summary><div class="tbl-wrap" id="tblReturns"></div></details>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <div><h2 id="contribTitle">What drove the year</h2></div>
+      <p>Each stock's P&amp;L that year as percentage points of the fund's return. Contributions add up to an approximate return, shown below.</p>
+    </div>
+    <div class="panel sec">
+      <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Added to return</span><span><i class="sw" style="background:var(--neg)"></i>Took away</span></div>
+      <div class="chart" id="chContrib"></div>
+      <p class="cap" id="contribSum"></p>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <div><h2>Every stock they've owned</h2></div>
+      <div class="chips" id="posFilter"></div>
+    </div>
+    <div class="tiles" id="posStats"></div>
+    <div class="tbl-wrap" id="tblPositions"></div>
+    <p class="cap">Click a row for the position detail. Prices are estimates: each quarter's trades are assumed at that quarter's volume-weighted average price.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <div><h2>What if they'd kept it</h2></div>
+      <p>For every stock they sold or trimmed: what it did afterwards, and what holding on would have earned.</p>
+    </div>
+    <div class="tiles" id="exitTiles"></div>
+    <div class="tbl-wrap" id="tblExits"></div>
+    <p class="cap">IRR uses mid-quarter trade dates and today's price for anything still held. "1y after" compares the stock with SPY over the 12 months after the sale.</p>
+  </div>
+</section>
+
+<!-- ============ POSITION ============ -->
+<section id="v-position" class="view" data-view="position" hidden>
+  <div class="fhead">
+    <a href="#fund" class="eyebrow" style="text-decoration:none">← Kelpwood Partners</a>
+    <h1 id="posTitle"></h1>
+    <div class="meta" id="posMeta"></div>
+  </div>
+  <div class="tiles" id="posTiles"></div>
+  <div class="sec">
+    <div class="sec-head"><div><h2>Price and estimated trades</h2></div><p>Dots sit at the quarter's volume-weighted price; the shaded bar is that quarter's low to high.</p></div>
+    <div class="panel sec">
+      <div class="legend"><span><i class="lk" style="background:var(--ink2)"></i>Weekly close</span><span><i class="dot" style="background:var(--s1)"></i>Buy (est. price)</span><span><i class="dot" style="background:var(--s2)"></i>Sell (est. price)</span><span><i class="sw" style="background:var(--band)"></i>Quarter low–high</span></div>
+      <div class="chart" id="chPrice"></div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-head"><div><h2>Shares held</h2></div><p>From each quarter's 13F, split-adjusted.</p></div>
+    <div class="panel"><div class="chart" id="chShares"></div></div>
+  </div>
+  <div class="sec">
+    <h2>Trades by quarter</h2>
+    <div class="tbl-wrap" id="tblTrades"></div>
+  </div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section id="v-method" class="view" data-view="method" hidden>
+  <div class="prose">
+    <div class="sec"><p class="eyebrow">Methodology</p><h1>How Orca estimates fund results</h1>
+      <p class="lede">Everything comes from public 13F filings plus daily stock prices. 13Fs only show what a fund held on the last day of each quarter, so trade prices, P&amp;L and returns are estimates.</p></div>
+    <section><h2>What a 13F covers</h2>
+      <ul><li>Long positions in US-listed stocks, ETFs and some options, as of quarter end.</li><li>No short positions, cash, bonds, non-US stocks or private holdings.</li><li>Filed up to 45 days after the quarter ends.</li></ul>
+      <p>So a fund's real return can differ a lot from the return of its 13F book.</p></section>
+    <section><h2>Trade prices</h2>
+      <p>We can't see trade dates, only the change in shares between quarter ends. All of a quarter's buying or selling is assumed to happen at that quarter's volume-weighted average price:</p>
+      <div class="formula">typical price = (high + low + close) ÷ 3
+quarter VWAP  = Σ(typical price × volume) ÷ Σ volume</div>
+      <p>The quarter's low and high are shown next to every estimate.</p></section>
+    <section><h2>P&amp;L per stock</h2>
+      <div class="formula">buy:  cost += shares bought × VWAP
+sell: realised += shares sold × (VWAP − avg cost)
+unrealised = shares held × latest price − cost
+total = realised + unrealised + dividends</div></section>
+    <section><h2>Fund returns</h2>
+      <div class="formula">quarter return = (end value − start value − net buying + dividends)
+                 ÷ (start value + ½ × net buying)
+year = the four quarters chained</div></section>
+    <section><h2>What if they'd kept it</h2>
+      <p>For every sale we track the stock's return from the estimated sale price to today and over the next 12 months, against SPY. "IRR if held" keeps the same buys but values every share bought at today's price.</p></section>
+    <section><h2>Not investment advice</h2>
+      <p>Orca is research software. Nothing here is a recommendation to buy or sell anything.</p></section>
+  </div>
+</section>
+</main>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+function S(tag, attrs, text){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+function E(tag, attrs, ...kids){ const e = document.createElement(tag); if (attrs) for (const k in attrs){ if (k === "class") e.className = attrs[k]; else if (k === "text") e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); } kids.forEach(k => { if (k == null) return; e.append(k instanceof Node ? k : document.createTextNode(String(k))); }); return e; }
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const MINUS = "−";
+function sgn(v){ return v > 0 ? "+" : v < 0 ? MINUS : ""; }
+function money(m, signed){ // m in $M
+  const a = Math.abs(m); let s;
+  if (a >= 1000) s = "$" + (a/1000).toFixed(a >= 10000 ? 1 : 2) + "B";
+  else if (a >= 10) s = "$" + Math.round(a) + "M";
+  else s = "$" + a.toFixed(1) + "M";
+  return (signed ? sgn(m) : (m < 0 ? MINUS : "")) + s;
+}
+function pct(v, d, signed){ d = d == null ? 1 : d; const s = Math.abs(v*100).toFixed(d) + "%"; return (signed === false ? (v < 0 ? MINUS : "") : sgn(v)) + s; }
+function pp(v){ return sgn(v) + Math.abs(v).toFixed(1) + " pts"; }
+function px(v){ return v == null ? "—" : "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2)); }
+function qLabel(q){ return "Q" + (q % 4 + 1) + " " + (2013 + Math.floor(q/4)); }
+function cls(v){ return v > 0 ? "up" : v < 0 ? "down" : ""; }
+function td(v, c){ return E("td", c ? {class:c} : null, v); }
+function signedTd(text, v){ return E("td", {class: cls(v)}, text); }
+function niceTicks(lo, hi, n){
+  if (lo === hi){ hi = lo + 1; }
+  const span = hi - lo, raw = span / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1,2,2.5,5,10].map(f => f*mag).find(s => span/s <= n) || 10*mag;
+  const t0 = Math.floor(lo/step)*step, t1 = Math.ceil(hi/step)*step, out = [];
+  for (let v = t0; v <= t1 + step*1e-9; v += step) out.push(Math.round(v/step)*step);
+  return out;
+}
+function barPath(x, w, yb, ye, round){
+  const h = Math.abs(ye - yb), r = round ? Math.min(4, w/2, h) : 0;
+  if (h < 0.5) return "";
+  if (ye < yb) return `M${x},${yb}V${ye+r}Q${x},${ye} ${x+r},${ye}H${x+w-r}Q${x+w},${ye} ${x+w},${ye+r}V${yb}Z`;
+  return `M${x},${yb}V${ye-r}Q${x},${ye} ${x+r},${ye}H${x+w-r}Q${x+w},${ye} ${x+w},${ye-r}V${yb}Z`;
+}
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function showTip(evt, title, rows, anchorEl){
+  tip.replaceChildren(E("div", {class:"t"}, title));
+  rows.forEach(r => { const row = E("div", {class:"r"}); if (r.color) row.append(E("i", {class:"lk", style:"background:" + r.color})); row.append(E("b", null, r.value), E("span", null, r.label || "")); tip.append(row); });
+  tip.hidden = false;
+  let x, y;
+  if (evt && evt.clientX != null && evt.type !== "focus"){ x = evt.clientX; y = evt.clientY; }
+  else { const b = (anchorEl || evt.target).getBoundingClientRect(); x = b.left + b.width/2; y = b.top; }
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = x + 14, top = y - h - 12;
+  if (left + w > window.innerWidth - 8) left = x - w - 14;
+  if (left < 8) left = 8;
+  if (top < 8) top = y + 16;
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+function hideTip(){ tip.hidden = true; }
+
+/* ---------- mock engine: prices + holdings → P&L ---------- */
+const W = 13, NOWQ = 54, LASTF = 53, NWEEK = (NOWQ + 1) * W;
+const TICK = [["NVDA","Nvidia","Tech"],["MSFT","Microsoft","Tech"],["AAPL","Apple","Tech"],["AVGO","Broadcom","Tech"],["GOOGL","Alphabet","Comm"],["META","Meta Platforms","Comm"],["NFLX","Netflix","Comm"],["AMZN","Amazon","Consumer"],["HD","Home Depot","Consumer"],["CMG","Chipotle","Consumer"],["COST","Costco","Staples"],["UNH","UnitedHealth","Health"],["LLY","Eli Lilly","Health"],["JPM","JPMorgan","Financials"],["V","Visa","Financials"],["BAC","Bank of America","Financials"],["XOM","Exxon Mobil","Energy"],["BTU","Peabody Energy","Energy"],["CAT","Caterpillar","Industrials"],["GE","GE Aerospace","Industrials"],["FCX","Freeport-McMoRan","Materials"],["NEE","NextEra","Utilities"],["PLD","Prologis","Real estate"],["TSLA","Tesla","Consumer"]];
+function series(seed, p0, mu, sig){
+  const r = mulberry32(seed), p = new Float64Array(NWEEK), v = new Float64Array(NWEEK);
+  let x = p0;
+  for (let i = 0; i < NWEEK; i++){ const z = (r()+r()+r()+r()-2)*Math.sqrt(3); x *= Math.exp(mu + sig*z); p[i] = x; v[i] = 0.5 + r(); }
+  return {p, v};
+}
+function qStats(s, q){
+  let pv = 0, vv = 0, lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < W; k++){ const i = q*W + k, pr = s.p[i]; pv += pr*s.v[i]; vv += s.v[i]; lo = Math.min(lo, pr*0.97); hi = Math.max(hi, pr*1.03); }
+  return {vwap: pv/vv, lo, hi, close: s.p[q*W + W - 1]};
+}
+const spy = series(99, 200, 0.0021, 0.019);
+const spyQ = q => spy.p[q*W + W - 1];
+
+const pos = TICK.map(([t, name, sec], i) => {
+  const r = mulberry32(1000 + i*77), R = (a, b) => a + (b - a)*r();
+  const s = series(500 + i*13, R(15, 260), R(-0.0018, 0.0032), R(0.02, 0.042));
+  let from = Math.floor(R(4, 46)), open = r() < 0.42;
+  if (t === "BTU"){ from = 32; open = true; }
+  if (t === "MSFT"){ from = 4; }
+  let to = open ? null : Math.min(LASTF, from + 3 + Math.floor(R(0, 16)));
+  if (to === LASTF) { to = null; }
+  const yld = R(0, 0.03), q0 = Math.max(0, from - 2);
+  const shares = new Float64Array(NOWQ + 1), trades = [], pnlQ = new Float64Array(NOWQ + 1), flowQ = new Float64Array(NOWQ + 1), divQ = new Float64Array(NOWQ + 1);
+  let sh = 0, cost = 0, realised = 0, buy$ = 0, buySh = 0, sell$ = 0, sellSh = 0, div = 0, lastCost = null;
+  const end = to == null ? LASTF : to;
+  for (let q = from; q <= NOWQ; q++){
+    const st = qStats(s, q); let d = 0;
+    if (q <= LASTF){
+      if (q === from) d = R(60, 300) / st.vwap;
+      else if (q === to) d = -sh;
+      else if (q < end || (to == null && q <= LASTF)){ const x = r(); if (x < 0.28) d = sh*R(0.15, 0.7); else if (x < 0.46) d = -sh*R(0.15, 0.45); }
+    }
+    const prevClose = q > 0 ? s.p[(q-1)*W + W - 1] : st.close;
+    const dv = sh * prevClose * yld / 4;
+    if (sh > 0 && q <= NOWQ) { div += dv; divQ[q] = dv; }
+    pnlQ[q] = sh*(st.close - prevClose) + d*(st.close - st.vwap) + (sh > 0 ? dv : 0);
+    if (d > 0){ cost += d*st.vwap; buy$ += d*st.vwap; buySh += d; }
+    if (d < 0){ const ac = cost/sh; realised += -d*(st.vwap - ac); cost += d*ac; sell$ += -d*st.vwap; sellSh += -d; lastCost = ac; }
+    if (d !== 0){ trades.push({q, type: q === from ? "New" : (d > 0 ? "Add" : (q === to ? "Exit" : "Trim")), d, px: st.vwap, lo: st.lo, hi: st.hi, after: sh + d}); flowQ[q] = d*st.vwap; }
+    sh += d; if (sh < 1e-9) sh = 0;
+    shares[q] = q <= LASTF ? sh : shares[LASTF];
+  }
+  const last = s.p[NWEEK - 1];
+  const unreal = sh > 0 ? sh*last - cost : 0;
+  const total = realised + unreal + div;
+  const hold = ((to == null ? LASTF : to) - from + 1) / 4;
+  return {t, name, sec, s, from, to, open: to == null, q0, shares, trades, pnlQ, flowQ, divQ,
+    invested: buy$, realised, unreal, div, total, pctRet: total / buy$,
+    entry: buy$/buySh, exit: sellSh ? sell$/sellSh : null, avgCost: sh > 0 ? cost/sh : lastCost, sh, last, hold};
+});
+
+/* fund-level aggregates */
+const qFirst = Math.min(...pos.map(p => p.from));
+const tNowG = NOWQ/4 + 0.25;
+pos.forEach(p => {
+  const fl = p.trades.map(t => ({t: t.q/4 + 0.125, v: -t.d*t.px})); if (p.sh > 0) fl.push({t: tNowG, v: p.sh*p.last});
+  p.irr = irr(fl);
+  const lt = p.trades[p.trades.length - 1], prev = lt.after - lt.d;
+  p.lastT = lt; p.lastPct = prev > 0 ? lt.d/prev : null; p.lastUsd = lt.d*lt.px;
+});
+const V = new Float64Array(NOWQ + 1), F = new Float64Array(NOWQ + 1), P = new Float64Array(NOWQ + 1), D = new Float64Array(NOWQ + 1), FB = new Float64Array(NOWQ + 1), FS = new Float64Array(NOWQ + 1);
+for (let q = 0; q <= LASTF; q++){
+  pos.forEach(p => { V[q] += p.shares[q] * qStats(p.s, q).close; F[q] += p.flowQ[q]; P[q] += p.pnlQ[q]; D[q] += p.divQ[q]; if (p.flowQ[q] > 0) FB[q] += p.flowQ[q]; else FS[q] -= p.flowQ[q]; });
+}
+const RQ = new Float64Array(NOWQ + 1);
+for (let q = qFirst + 1; q <= LASTF; q++){ const den = V[q-1] + 0.5*F[q]; RQ[q] = den > 0 ? P[q]/den : 0; }
+const years = [];
+for (let y = 2015; y <= 2026; y++){
+  const qs = []; for (let k = 0; k < 4; k++){ const q = (y - 2013)*4 + k; if (q <= LASTF && q > qFirst) qs.push(q); }
+  if (!qs.length) continue;
+  const chain = qs.reduce((a, q) => a*(1 + RQ[q]), 1) - 1;
+  const spyR = spyQ(qs[qs.length-1]) / spyQ(qs[0]-1) - 1;
+  const start = V[qs[0]-1], endV = V[qs[qs.length-1]];
+  let flow = 0, pnl = 0, dv = 0; qs.forEach(q => { flow += F[q]; pnl += P[q]; dv += D[q]; });
+  const cap = start + 0.5*flow;
+  years.push({y, label: qs.length < 4 ? y + " H1" : String(y), qs, ret: chain, spy: spyR, start, end: endV, flow, gains: pnl - dv, div: dv, cap});
+}
+let selYear = years.length - 2;
+
+/* ---------- router ---------- */
+const views = ["home", "fund", "position", "method"];
+let curPos = "BTU";
+function route(){
+  let v = (location.hash || "#home").slice(1); if (!views.includes(v)) v = "home";
+  document.querySelectorAll("[data-view]").forEach(s => s.hidden = s.dataset.view !== v);
+  document.querySelectorAll("[data-nav]").forEach(a => { if (a.dataset.nav === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  hideTip();
+  if (v === "home") renderHome();
+  if (v === "fund") renderFund();
+  if (v === "position") renderPosition();
+}
+window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(route, 150); });
+
+/* ---------- charts ---------- */
+function columnChart(host, o){
+  host.replaceChildren();
+  const Wd = Math.max(300, host.clientWidth), H = o.height || 260, m = {t:22, r:8, b:30, l:58};
+  const iw = Wd - m.l - m.r, ih = H - m.t - m.b;
+  let lo = 0, hi = 0;
+  o.cats.forEach((c, i) => {
+    if (o.stacked){ let a = 0, b = 0; o.series.forEach(s => { const v = s.values[i]; if (v >= 0) a += v; else b += v; }); hi = Math.max(hi, a); lo = Math.min(lo, b); }
+    else o.series.forEach(s => { hi = Math.max(hi, s.values[i]); lo = Math.min(lo, s.values[i]); });
+  });
+  const ticks = niceTicks(lo, hi, 5), t0 = ticks[0], t1 = ticks[ticks.length-1];
+  const Y = v => m.t + ih - (v - t0)/(t1 - t0)*ih;
+  const band = iw / o.cats.length;
+  const svg = S("svg", {viewBox:`0 0 ${Wd} ${H}`, width: Wd, height: H, role:"img", "aria-label": o.label});
+  ticks.forEach(t => { svg.append(S("line", {x1:m.l, x2:Wd - m.r, y1:Y(t), y2:Y(t), class: t === 0 ? "base" : "grid"})); svg.append(S("text", {x:m.l - 8, y:Y(t) + 4, "text-anchor":"end", class:"ax"}, o.yFmt(t))); });
+  const nS = o.stacked ? 1 : o.series.length;
+  const bw = Math.max(6, Math.min(24, (band*0.72 - (nS - 1)*2)/nS));
+  o.cats.forEach((c, i) => {
+    const g = S("g", {class:"cat"}), cx = m.l + band*i + band/2;
+    if (o.selected === i) g.append(S("rect", {x: m.l + band*i + 2, y: m.t - 18, width: band - 4, height: ih + 18, rx: 6, class:"selbg"}));
+    if (o.stacked){
+      const posIdx = o.series.map((s, k) => s.values[i] > 0 ? k : -1).filter(k => k >= 0), negIdx = o.series.map((s, k) => s.values[i] < 0 ? k : -1).filter(k => k >= 0);
+      let a = 0, b = 0;
+      o.series.forEach((s, k) => {
+        const v = s.values[i]; if (!v) return;
+        let from, to, outer;
+        if (v > 0){ from = a; to = a + v; a = to; outer = k === posIdx[posIdx.length - 1]; }
+        else { from = b; to = b + v; b = to; outer = k === negIdx[negIdx.length - 1]; }
+        let yb = Y(from), ye = Y(to);
+        if (from !== 0) yb += (v > 0 ? -2 : 2);
+        const d = barPath(cx - bw/2, bw, yb, ye, outer); if (d) g.append(S("path", {d, class:"mark", style:"fill:" + s.color}));
+      });
+    } else {
+      const gw = nS*bw + (nS - 1)*2;
+      o.series.forEach((s, k) => { const v = s.values[i], x = cx - gw/2 + k*(bw + 2); const d = barPath(x, bw, Y(0), Y(v), true); if (d) g.append(S("path", {d, class:"mark", style:"fill:" + s.color})); });
+    }
+    if (o.topLabel){ const tv = o.topLabel(i); if (tv) g.append(S("text", {x: cx, y: m.t - 6, "text-anchor":"middle", class:"val"}, tv)); }
+    g.append(S("text", {x: cx, y: H - 10, "text-anchor":"middle", class: "lab" + (o.selected === i ? " sel" : "")}, c));
+    const hit = S("rect", {x: m.l + band*i, y: m.t - 18, width: band, height: ih + 18 + m.b, class:"hit", tabindex: 0, role:"button", "aria-label": c + ": " + o.series.map(s => s.name + " " + o.tipFmt(s.values[i])).join(", ")});
+    const rows = () => o.series.map(s => ({color: s.color, value: o.tipFmt(s.values[i]), label: s.name})).concat(o.extraTip ? o.extraTip(i) : []);
+    hit.addEventListener("pointermove", e => showTip(e, c, rows()));
+    hit.addEventListener("focus", e => showTip(e, c, rows(), hit));
+    hit.addEventListener("pointerleave", hideTip); hit.addEventListener("blur", hideTip);
+    if (o.onSelect){ hit.addEventListener("click", () => o.onSelect(i)); hit.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); o.onSelect(i); } }); }
+    g.append(hit); svg.append(g);
+  });
+  host.append(svg);
+}
+
+function hbarChart(host, items, o){
+  host.replaceChildren();
+  const Wd = Math.max(300, host.clientWidth), row = 28, m = {t:8, r:64, b:24, l:64}, H = m.t + m.b + items.length*row;
+  let lo = Math.min(0, ...items.map(d => d.v)), hi = Math.max(0, ...items.map(d => d.v));
+  if (o.center){ const M = Math.max(Math.abs(lo), Math.abs(hi)) || 1; lo = -M; hi = M; }
+  const ticks = niceTicks(lo, hi, 5), t0 = ticks[0], t1 = ticks[ticks.length - 1];
+  const X = v => m.l + (v - t0)/(t1 - t0)*(Wd - m.l - m.r);
+  const svg = S("svg", {viewBox:`0 0 ${Wd} ${H}`, width: Wd, height: H, role:"img", "aria-label": o.label});
+  ticks.forEach(t => { svg.append(S("line", {x1:X(t), x2:X(t), y1:m.t, y2:H - m.b, class: t === 0 ? "base" : "grid"})); svg.append(S("text", {x:X(t), y:H - 6, "text-anchor":"middle", class:"ax"}, o.xFmt(t))); });
+  items.forEach((d, i) => {
+    const g = S("g", {class:"cat"}), yc = m.t + i*row + row/2, th = 16, x0 = X(0), x1 = X(d.v), r = Math.min(4, th/2, Math.abs(x1 - x0));
+    const color = d.v >= 0 ? "var(--pos)" : "var(--neg)";
+    let path;
+    if (x1 >= x0) path = `M${x0},${yc-th/2}H${x1-r}Q${x1},${yc-th/2} ${x1},${yc-th/2+r}V${yc+th/2-r}Q${x1},${yc+th/2} ${x1-r},${yc+th/2}H${x0}Z`;
+    else path = `M${x0},${yc-th/2}H${x1+r}Q${x1},${yc-th/2} ${x1},${yc-th/2+r}V${yc+th/2-r}Q${x1},${yc+th/2} ${x1+r},${yc+th/2}H${x0}Z`;
+    if (Math.abs(x1 - x0) > 0.5) g.append(S("path", {d: path, class:"mark", style:"fill:" + color}));
+    if (o.center) g.append(S("text", {x: d.v >= 0 ? x0 - 8 : x0 + 8, y: yc + 4, "text-anchor": d.v >= 0 ? "end" : "start", class:"lab"}, d.label));
+    else g.append(S("text", {x: m.l - 10, y: yc + 4, "text-anchor":"end", class:"lab"}, d.label));
+    g.append(S("text", {x: d.v >= 0 ? x1 + 6 : x1 - 6, y: yc + 4, "text-anchor": d.v >= 0 ? "start" : "end", class:"val"}, o.vFmt(d.v)));
+    const hit = S("rect", {x: 0, y: m.t + i*row, width: Wd, height: row, class:"hit", tabindex: 0, "aria-label": d.label + " " + o.vFmt(d.v)});
+    const rows = () => [{color, value: o.vFmt(d.v), label: "contribution"}].concat(d.extra || []);
+    hit.addEventListener("pointermove", e => showTip(e, d.label + " · " + d.sub, rows()));
+    hit.addEventListener("focus", e => showTip(e, d.label + " · " + d.sub, rows(), hit));
+    hit.addEventListener("pointerleave", hideTip); hit.addEventListener("blur", hideTip);
+    g.append(hit); svg.append(g);
+  });
+  host.append(svg);
+}
+
+function weekDate(i){ const d = new Date(Date.UTC(2013, 0, 4) + i*7*86400000); return d.toLocaleDateString("en-GB", {day:"numeric", month:"short", year:"numeric", timeZone:"UTC"}); }
+
+function priceChart(host, p){
+  host.replaceChildren();
+  const Wd = Math.max(300, host.clientWidth), H = 300, m = {t:14, r:14, b:30, l:52};
+  const i0 = p.q0*W, i1 = NWEEK - 1, iw = Wd - m.l - m.r, ih = H - m.t - m.b;
+  let lo = Infinity, hi = -Infinity;
+  for (let i = i0; i <= i1; i++){ lo = Math.min(lo, p.s.p[i]); hi = Math.max(hi, p.s.p[i]); }
+  p.trades.forEach(t => { lo = Math.min(lo, t.lo); hi = Math.max(hi, t.hi); });
+  const ticks = niceTicks(Math.max(0, lo*0.95), hi*1.02, 5), t0 = ticks[0], t1 = ticks[ticks.length - 1];
+  const X = i => m.l + (i - i0)/(i1 - i0)*iw, Y = v => m.t + ih - (v - t0)/(t1 - t0)*ih;
+  const svg = S("svg", {viewBox:`0 0 ${Wd} ${H}`, width: Wd, height: H, role:"img", "aria-label":"Weekly price with estimated trade prices"});
+  ticks.forEach(t => { svg.append(S("line", {x1:m.l, x2:Wd - m.r, y1:Y(t), y2:Y(t), class:"grid"})); svg.append(S("text", {x:m.l - 8, y:Y(t) + 4, "text-anchor":"end", class:"ax"}, "$" + t)); });
+  const y0 = Math.floor(p.q0/4) + 1, yN = Math.floor(NOWQ/4);
+  const step = Math.max(1, Math.ceil((yN - y0 + 1) / Math.max(2, Math.floor(iw/70))));
+  for (let y = y0; y <= yN; y += step){ const i = y*4*W; if (i < i0) continue; svg.append(S("text", {x: X(i), y: H - 10, "text-anchor":"middle", class:"ax"}, String(2013 + y))); }
+  svg.append(S("line", {x1:m.l, x2:Wd - m.r, y1:m.t + ih, y2:m.t + ih, class:"base"}));
+  p.trades.forEach(t => { const xi = X(t.q*W + 6); svg.append(S("rect", {x: xi - 4, y: Y(t.hi), width: 8, height: Math.max(2, Y(t.lo) - Y(t.hi)), rx: 4, style:"fill:var(--band)"})); });
+  let d = ""; for (let i = i0; i <= i1; i++) d += (i === i0 ? "M" : "L") + X(i).toFixed(1) + "," + Y(p.s.p[i]).toFixed(1);
+  svg.append(S("path", {d, fill:"none", style:"stroke:var(--ink2)", "stroke-width": 2, "stroke-linejoin":"round", "stroke-linecap":"round"}));
+  const cross = S("line", {y1:m.t, y2:m.t + ih, class:"base", visibility:"hidden"}), cdot = S("circle", {r: 4, style:"fill:var(--ink2);stroke:var(--surface)", "stroke-width": 2, visibility:"hidden"});
+  svg.append(cross, cdot);
+  const ov = S("rect", {x:m.l, y:m.t, width: iw, height: ih, fill:"transparent"});
+  ov.addEventListener("pointermove", e => {
+    const b = svg.getBoundingClientRect(), sx = (e.clientX - b.left) * (Wd / b.width);
+    const i = Math.max(i0, Math.min(i1, Math.round(i0 + (sx - m.l)/iw*(i1 - i0))));
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("visibility", "visible");
+    cdot.setAttribute("cx", X(i)); cdot.setAttribute("cy", Y(p.s.p[i])); cdot.setAttribute("visibility", "visible");
+    showTip(e, weekDate(i), [{color:"var(--ink2)", value: px(p.s.p[i]), label:"weekly close"}]);
+  });
+  ov.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); cdot.setAttribute("visibility", "hidden"); hideTip(); });
+  svg.append(ov);
+  p.trades.forEach(t => {
+    const buy = t.d > 0, c = S("circle", {cx: X(t.q*W + 6), cy: Y(t.px), r: 5, class:"hit-dot", tabindex: 0, style:"fill:" + (buy ? "var(--s1)" : "var(--s2)") + ";stroke:var(--surface);cursor:pointer", "stroke-width": 2, "aria-label": t.type + " " + qLabel(t.q) + " at about " + px(t.px)});
+    const hitc = S("circle", {cx: X(t.q*W + 6), cy: Y(t.px), r: 12, fill:"transparent"});
+    const rows = () => [{color: buy ? "var(--s1)" : "var(--s2)", value: px(t.px), label: "est. price (VWAP)"}, {value: px(t.lo) + " – " + px(t.hi), label:"quarter range"}, {value: sgn(t.d) + Math.abs(t.d).toFixed(2) + "M", label:"shares"}];
+    [c, hitc].forEach(el => { el.addEventListener("pointermove", e => showTip(e, t.type + " · " + qLabel(t.q), rows())); el.addEventListener("pointerleave", hideTip); });
+    c.addEventListener("focus", e => showTip(e, t.type + " · " + qLabel(t.q), rows(), c)); c.addEventListener("blur", hideTip);
+    svg.append(hitc, c);
+  });
+  host.append(svg);
+}
+
+function sharesChart(host, p){
+  host.replaceChildren();
+  const Wd = Math.max(300, host.clientWidth), H = 170, m = {t:12, r:14, b:30, l:52};
+  const qa = p.q0, qb = NOWQ, iw = Wd - m.l - m.r, ih = H - m.t - m.b;
+  const hi = Math.max(...Array.from(p.shares).slice(qa, qb + 1)) || 1;
+  const ticks = niceTicks(0, hi*1.05, 4), t1 = ticks[ticks.length - 1];
+  const X = q => m.l + (q - qa)/(qb + 1 - qa)*iw, Y = v => m.t + ih - v/t1*ih;
+  const svg = S("svg", {viewBox:`0 0 ${Wd} ${H}`, width: Wd, height: H, role:"img", "aria-label":"Shares held by quarter"});
+  ticks.forEach(t => { svg.append(S("line", {x1:m.l, x2:Wd - m.r, y1:Y(t), y2:Y(t), class: t === 0 ? "base" : "grid"})); svg.append(S("text", {x:m.l - 8, y:Y(t) + 4, "text-anchor":"end", class:"ax"}, t + "M")); });
+  let d = "", a = "";
+  for (let q = qa; q <= qb; q++){ const y = Y(p.shares[q]); d += (q === qa ? "M" + X(q) + "," + y : "V" + y) + "H" + X(q + 1); }
+  a = d + "V" + Y(0) + "H" + X(qa) + "Z";
+  svg.append(S("path", {d: a, style:"fill:var(--s1);fill-opacity:.1"}));
+  svg.append(S("path", {d, fill:"none", style:"stroke:var(--s1)", "stroke-width": 2, "stroke-linejoin":"round"}));
+  const y0 = Math.floor(qa/4) + 1, yN = Math.floor(qb/4), step = Math.max(1, Math.ceil((yN - y0 + 1)/Math.max(2, Math.floor(iw/70))));
+  for (let y = y0; y <= yN; y += step) svg.append(S("text", {x: X(y*4), y: H - 10, "text-anchor":"middle", class:"ax"}, String(2013 + y)));
+  const cross = S("line", {y1:m.t, y2:m.t + ih, class:"base", visibility:"hidden"}); svg.append(cross);
+  const ov = S("rect", {x:m.l, y:m.t, width: iw, height: ih, fill:"transparent"});
+  ov.addEventListener("pointermove", e => {
+    const b = svg.getBoundingClientRect(), sx = (e.clientX - b.left)*(Wd/b.width);
+    const q = Math.max(qa, Math.min(qb, Math.floor(qa + (sx - m.l)/iw*(qb + 1 - qa))));
+    const cx = (X(q) + X(q + 1))/2; cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    showTip(e, qLabel(q) + (q > LASTF ? " (no 13F yet)" : ""), [{color:"var(--s1)", value: p.shares[q].toFixed(2) + "M", label:"shares held"}]);
+  });
+  ov.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
+  svg.append(ov);
+  host.append(svg);
+}
+
+/* ---------- tables ---------- */
+function table(host, cols, rows, opt){
+  opt = opt || {};
+  const t = E("table"), thead = E("thead"), tr = E("tr");
+  cols.forEach((c, i) => {
+    const th = E("th", c.l ? {class:"l", scope:"col"} : {scope:"col"});
+    if (opt.sortable && c.key){ const b = E("button", {type:"button"}, c.h); if (opt.sort && opt.sort.key === c.key) b.setAttribute("data-dir", opt.sort.dir > 0 ? "↑" : "↓"); b.addEventListener("click", () => opt.onSort(c.key)); th.append(b); }
+    else th.textContent = c.h;
+    tr.append(th);
+  });
+  thead.append(tr); t.append(thead);
+  const tb = E("tbody");
+  rows.forEach(r => { const row = E("tr"); cols.forEach(c => row.append(c.cell(r))); if (opt.onRow){ row.className = "click"; row.tabIndex = 0; row.addEventListener("click", () => opt.onRow(r)); row.addEventListener("keydown", e => { if (e.key === "Enter") opt.onRow(r); }); } tb.append(row); });
+  t.append(tb); host.replaceChildren(t);
+}
+function tickCell(t, name){ const c = E("td", {class:"l"}); c.append(E("span", {class:"tick"}, E("span", {class:"mono"}, t), E("span", {class:"cap"}, name))); return c; }
+function tile(k, v, d, vClass){ return E("div", {class:"tile"}, E("span", {class:"k"}, k), E("span", {class:"v" + (vClass ? " " + vClass : "")}, v), d ? E("span", {class:"d"}, d) : null); }
+
+/* ---------- fund metrics for home ---------- */
+function annualised(q1, q2){ let x = 1; for (let q = q1; q <= q2; q++) x *= 1 + RQ[q]; const yrs = (q2 - q1 + 1)/4; return Math.pow(x, 1/yrs) - 1; }
+function spyAnn(q1, q2){ const yrs = (q2 - q1 + 1)/4; return Math.pow(spyQ(q2)/spyQ(q1 - 1), 1/yrs) - 1; }
+function maxDD(q1, q2){ let x = 1, peak = 1, dd = 0; for (let q = q1; q <= q2; q++){ x *= 1 + RQ[q]; peak = Math.max(peak, x); dd = Math.min(dd, x/peak - 1); } return dd; }
+function vol(q1, q2){ const a = []; for (let q = q1; q <= q2; q++) a.push(RQ[q]); const mu = a.reduce((s, v) => s + v, 0)/a.length; return Math.sqrt(a.reduce((s, v) => s + (v - mu)*(v - mu), 0)/a.length)*2; }
+const RFY = {2014:0.0003, 2015:0.0005, 2016:0.003, 2017:0.009, 2018:0.019, 2019:0.021, 2020:0.004, 2021:0.0005, 2022:0.02, 2023:0.05, 2024:0.05, 2025:0.042, 2026:0.038};
+const rfQ = q => (RFY[2013 + Math.floor(q/4)] || 0)/4;
+function perf(q1, q2){
+  const r = [], ex = [];
+  for (let q = q1; q <= q2; q++){ r.push(RQ[q]); ex.push(RQ[q] - rfQ(q)); }
+  const n = r.length, mean = a => a.reduce((s, v) => s + v, 0)/a.length;
+  const sd = a => { const m = mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m)*(v - m), 0)/(a.length - 1)); };
+  const downside = Math.sqrt(ex.reduce((s, v) => s + Math.min(0, v)*Math.min(0, v), 0)/n)*2;
+  const ann = annualised(q1, q2), dd = maxDD(q1, q2);
+  return {vol: sd(r)*2, sharpe: mean(ex)*4/(sd(ex)*2), sortino: downside > 0 ? mean(ex)*4/downside : null, ann, dd, calmar: dd < 0 ? ann/Math.abs(dd) : null, upQ: r.filter(v => v > 0).length/n};
+}
+const PERIODS = [{id:"1y", n:4, name:"1 year"}, {id:"3y", n:12, name:"3 years"}, {id:"5y", n:20, name:"5 years"}, {id:"max", n: LASTF - qFirst, name:"Since start"}];
+
+/* ---------- HOME ---------- */
+const HOME_TABS = ["Top funds", "Conviction moves", "Big wins & losses", "Just filed", "Crowded buys", "Best & worst calls"];
+let homeTab = 0, homePeriod = "3y", callsMode = "best", callsWin = "q";
+const FUNDS = ["Halyard Point Partners","Lanternfish Capital","Tern Harbor Equity","Saltglass Advisors","Brinestone Value","Driftbank Capital","Gullwing Investors","Seastack Asset Mgmt","Cobblereef Holdings","Orcinus Lane Capital","Undertow Partners"];
+function renderHome(){
+  const tabs = $("#homeTabs"); tabs.replaceChildren();
+  HOME_TABS.forEach((name, i) => { const b = E("button", {class:"tab", role:"tab", type:"button", "aria-selected": String(i === homeTab)}, name); b.addEventListener("click", () => { homeTab = i; renderHome(); }); tabs.append(b); });
+  const panel = $("#homePanel"); panel.replaceChildren();
+  const rng = mulberry32(42 + homeTab*7);
+  if (homeTab === 0){
+    const chips = E("div", {class:"chips"});
+    PERIODS.forEach(p => { const b = E("button", {class:"chip", type:"button", "aria-pressed": String(p.id === homePeriod)}, p.name); b.addEventListener("click", () => { homePeriod = p.id; renderHome(); }); chips.append(b); });
+    panel.append(chips, E("p", {class:"rule"}, "Who qualifies: 13F book ≥ $1B · ≥ 12 quarters filed · ≥ 4 positions · ≥ 80% of book priced · no banks, insurers, pensions or brokers. Index giants sit in a separate list."));
+    const per = PERIODS.find(p => p.id === homePeriod), q2 = LASTF, q1 = Math.max(qFirst + 1, q2 - per.n + 1);
+    const spyR = spyAnn(q1, q2);
+    const kel = {name:"Kelpwood Partners", link:true, book: V[LASTF], n: pos.filter(p => p.shares[LASTF] > 0).length, ret: annualised(q1, q2), dd: maxDD(q1, q2)}; kel.ra = kel.ret/Math.max(0.05, vol(q1, q2));
+    const r2 = mulberry32(7 + per.n);
+    const rows = FUNDS.map(n => { const ret = spyR + (r2() - 0.42)*0.22; const v = 0.12 + r2()*0.25; return {name:n, book: 1000 + r2()*24000, n: 4 + Math.floor(r2()*55), ret, dd: -(0.08 + r2()*0.4), ra: ret/v}; });
+    rows.push(kel); rows.sort((a, b) => b.ret - a.ret);
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"#", cell: r => td(rows.indexOf(r) + 1)},
+      {h:"Fund", l:true, cell: r => { const c = E("td", {class:"l"}); if (r.link) c.append(E("a", {href:"#fund"}, r.name)); else c.textContent = r.name; return c; }},
+      {h:"13F book", cell: r => td(money(r.book))},
+      {h:"Positions", cell: r => td(r.n)},
+      {h:"Return / yr", cell: r => signedTd(pct(r.ret), r.ret)},
+      {h:"Worst drop", cell: r => td(pct(r.dd, 0, false))},
+      {h:"Return per unit of risk", cell: r => td(r.ra.toFixed(2))}
+    ], rows);
+    panel.append(E("p", {class:"cap"}, "Only Kelpwood links to a page in this mockup."));
+  }
+  if (homeTab === 1){
+    panel.append(E("p", {class:"rule"}, "Funds: concentrated active managers (4–60 positions, top 10 ≥ 50% of book, book ≥ $500M). A move counts if it's a new position or add that takes the stock to ≥ 5% of the book, a weight jump of ≥ 3 points, or the exit of a ≥ 5% position."));
+    const data = [["Halyard Point Partners","CMG","New",8.2,8.2,52.4,0.11],["Lanternfish Capital","FCX","Add",11.5,4.9,41.8,-0.06],["Kelpwood Partners","BTU","Add",7.4,3.1,24.9,0.18],["Tern Harbor Equity","UNH","Exit",0,-9.6,312,-0.14],["Saltglass Advisors","AVGO","New",6.1,6.1,1288,0.09],["Brinestone Value","BAC","Add",14.8,3.8,44.2,0.03],["Gullwing Investors","NFLX","Exit",0,-6.3,1012,0.21]];
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"Fund", l:true, cell: r => E("td", {class:"l"}, r[0])},
+      {h:"Stock", l:true, cell: r => { const c = E("td", {class:"l"}); c.append(E("span", {class:"mono"}, r[1])); return c; }},
+      {h:"Move", l:true, cell: r => { const c = E("td", {class:"l"}); c.append(E("span", {class:"pill " + (r[2] === "Exit" ? "sell" : "buy")}, r[2])); return c; }},
+      {h:"Weight now", cell: r => td(r[3].toFixed(1) + "%")},
+      {h:"Change", cell: r => signedTd(pp(r[4]), r[4])},
+      {h:"Est. price", cell: r => td(px(r[5]))},
+      {h:"Since", cell: r => signedTd(pct(r[6]), r[6])}
+    ], data);
+    panel.append(E("p", {class:"cap"}, "Q2 2026 filings. \"Since\" = price change from the estimated trade price to today."));
+  }
+  if (homeTab === 2){
+    panel.append(E("p", {class:"rule"}, "Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds."));
+    const data = [["Seastack Asset Mgmt","NVDA",1240,0.31],["Halyard Point Partners","META",612,0.22],["Driftbank Capital","LLY",455,0.19],["Kelpwood Partners","BTU",188,0.27],["Cobblereef Holdings","TSLA",-530,-0.24],["Undertow Partners","UNH",-402,-0.29],["Brinestone Value","CMG",-171,-0.18]];
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"Fund", l:true, cell: r => E("td", {class:"l"}, r[0])},
+      {h:"Stock", l:true, cell: r => { const c = E("td", {class:"l"}); c.append(E("span", {class:"mono"}, r[1])); return c; }},
+      {h:"Quarter P&L", cell: r => signedTd(money(r[2], true), r[2])},
+      {h:"Stock move", cell: r => signedTd(pct(r[3]), r[3])}
+    ], data);
+  }
+  if (homeTab === 3){
+    panel.append(E("p", {class:"rule"}, "Newest 13F filings, each with its headline change."));
+    const data = [["Kelpwood Partners","13 Aug 2026","Q2 2026",V[LASTF],"Added BTU (+3.1 pts)"],["Tern Harbor Equity","12 Aug 2026","Q2 2026",8200,"Sold all UNH"],["Saltglass Advisors","11 Aug 2026","Q2 2026",3100,"New: AVGO 6.1%"],["Brinestone Value","8 Aug 2026","Q2 2026",12600,"Added BAC (+3.8 pts)"],["Gullwing Investors","5 Aug 2026","Q2 2026",2400,"Sold all NFLX"]];
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"Fund", l:true, cell: r => { const c = E("td", {class:"l"}); if (r[0] === "Kelpwood Partners") c.append(E("a", {href:"#fund"}, r[0])); else c.textContent = r[0]; return c; }},
+      {h:"Filed", cell: r => td(r[1])},
+      {h:"Period", cell: r => td(r[2])},
+      {h:"13F book", cell: r => td(money(r[3]))},
+      {h:"Headline change", l:true, cell: r => E("td", {class:"l"}, r[4])}
+    ], data);
+    panel.append(E("p", {class:"cap"}, "Needs the live filing reader (EDGAR daily index), not just the quarterly bulk files."));
+  }
+  if (homeTab === 4){
+    panel.append(E("p", {class:"rule"}, "Stocks bought by several concentrated active funds in the same quarter (Q2 2026)."));
+    const data = [["FCX","Freeport-McMoRan",5,1840,4.2],["AVGO","Broadcom",4,2210,5.1],["BTU","Peabody Energy",3,410,6.0],["BAC","Bank of America",3,960,7.7]];
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"Stock", l:true, cell: r => tickCell(r[0], r[1])},
+      {h:"Funds buying", cell: r => td(r[2])},
+      {h:"Total bought", cell: r => td(money(r[3]))},
+      {h:"Avg weight after", cell: r => td(r[4].toFixed(1) + "%")}
+    ], data);
+  }
+  if (homeTab === 5){
+    const chips = E("div", {class:"chips"});
+    [["best","Best calls"],["worst","Worst calls"]].forEach(([id, n]) => { const b = E("button", {class:"chip", type:"button", "aria-pressed": String(callsMode === id)}, n); b.addEventListener("click", () => { callsMode = id; renderHome(); }); chips.append(b); });
+    [["q","Last quarter's buys"],["y","Last 4 quarters' buys"]].forEach(([id, n]) => { const b = E("button", {class:"chip", type:"button", "aria-pressed": String(callsWin === id)}, n); b.addEventListener("click", () => { callsWin = id; renderHome(); }); chips.append(b); });
+    panel.append(chips, E("p", {class:"rule"}, "New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or Conviction moves. Stocks ≥ $300M market cap and ≥ $1 a share."));
+    const r3 = mulberry32((callsMode === "best" ? 3 : 4) + (callsWin === "q" ? 0 : 10));
+    const tick = [["NVDA","Seastack Asset Mgmt"],["FCX","Lanternfish Capital"],["BTU","Kelpwood Partners"],["META","Halyard Point Partners"],["TSLA","Cobblereef Holdings"],["CMG","Brinestone Value"],["AVGO","Saltglass Advisors"]];
+    const data = tick.map(([t, f]) => { const sinceEst = callsMode === "best" ? 0.25 + r3()*1.6 : -(0.15 + r3()*0.5); const sinceFile = sinceEst - (callsMode === "best" ? r3()*0.2 : -r3()*0.08); return {t, f, q: callsWin === "q" ? "Q2 2026" : qLabel(50 + Math.floor(r3()*4)), est: 20 + r3()*300, sinceEst, sinceFile}; });
+    data.sort((a, b) => callsMode === "best" ? b.sinceEst - a.sinceEst : a.sinceEst - b.sinceEst);
+    const host = E("div", {class:"tbl-wrap"}); panel.append(host);
+    table(host, [
+      {h:"Stock", l:true, cell: r => { const c = E("td", {class:"l"}); c.append(E("span", {class:"mono"}, r.t)); return c; }},
+      {h:"Fund", l:true, cell: r => E("td", {class:"l"}, r.f)},
+      {h:"Bought", cell: r => td(r.q)},
+      {h:"Est. buy price", cell: r => td(px(r.est))},
+      {h:"Price now", cell: r => td(px(r.est*(1 + r.sinceEst)))},
+      {h:"Since fund's buy", cell: r => signedTd(pct(r.sinceEst), r.sinceEst)},
+      {h:"Since 13F went public", cell: r => signedTd(pct(r.sinceFile), r.sinceFile)}
+    ], data);
+    panel.append(E("p", {class:"cap"}, "\"Since 13F went public\" starts on day 46 after quarter end: what a copier could still have caught."));
+  }
+}
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); location.hash = "#fund"; });
+
+/* ---------- FUND ---------- */
+let posFilter = "all", posSort = {key:"total", dir:-1};
+function renderFund(){
+  const held = pos.filter(p => p.shares[LASTF] > 0);
+  const liveVal = held.reduce((s, p) => s + p.sh*p.last, 0);
+  const meta = $("#fundMeta"); meta.replaceChildren(
+    E("span", null, "13F book ", E("b", null, money(V[LASTF]))),
+    E("span", null, "Live value ", E("b", null, money(liveVal))),
+    E("span", null, E("b", null, String(held.length)), " holdings"),
+    E("span", null, E("b", null, "96%"), " of book priced"),
+    E("span", null, "Tracked since ", E("b", null, qLabel(qFirst))));
+  const full = years.filter(y => y.qs.length === 4), y1 = full[0], yN = full[full.length - 1];
+  const ann = annualised(y1.qs[0], yN.qs[3]);
+  const turn = full.map(y => { let b = 0, s = 0, v = y.start; y.qs.forEach(q => { b += FB[q]; s += FS[q]; v += V[q]; }); v /= 5; return v > 0 ? Math.min(b, s)/v : 0; });
+  const avgTurn = turn.reduce((a, x) => a + x, 0)/turn.length;
+  const closedP = pos.filter(p => !p.open), avgHold = pos.reduce((a, p) => a + p.hold, 0)/pos.length, avgHoldClosed = closedP.reduce((a, p) => a + p.hold, 0)/Math.max(1, closedP.length);
+  const winners = pos.filter(p => p.total > 0).length;
+  const pf = perf(y1.qs[0], yN.qs[3]);
+  const bestY = full.reduce((a, b) => b.ret > a.ret ? b : a), worstY = full.reduce((a, b) => b.ret < a.ret ? b : a), upY = full.filter(y => y.ret > 0).length;
+  $("#fundTiles").replaceChildren(
+    tile("Return per year, " + y1.y + "–" + yN.y, pct(ann), "chained quarterly returns", cls(ann)),
+    tile("Sharpe ratio", pf.sharpe.toFixed(2), "return above T-bills ÷ volatility"),
+    tile("Sortino ratio", pf.sortino == null ? "—" : pf.sortino.toFixed(2), "same, counting only downside swings"),
+    tile("Volatility", pct(pf.vol, 1, false), "per year, from quarterly returns"),
+    tile("Max drawdown", pct(pf.dd, 1, false), "worst peak-to-trough at quarter ends", "down"),
+    tile("Calmar ratio", pf.calmar == null ? "—" : pf.calmar.toFixed(2), "return per year ÷ max drawdown"),
+    tile("Best / worst year", pct(bestY.ret, 0) + " / " + pct(worstY.ret, 0), bestY.label + " / " + worstY.label),
+    tile("Years positive", upY + " of " + full.length, "quarters positive: " + Math.round(pf.upQ*100) + "%"));
+  $("#styleTiles").replaceChildren(
+    tile("Portfolio turnover per year", Math.round(avgTurn*100) + "%", "of fund size · lesser of buys or sells"),
+    tile("Avg position hold length", avgHold.toFixed(1) + " yrs", "sold positions only: " + avgHoldClosed.toFixed(1) + " yrs"),
+    tile("Positions profitable", Math.round(winners/pos.length*100) + "%", winners + " of " + pos.length + " stocks ever held"));
+
+  columnChart($("#chFlows"), {cats: years.map(y => y.label), stacked:true, label:"Investment gains and net inflows by year",
+    series:[{name:"Investment gains", color:"var(--s1)", values: years.map(y => y.gains)}, {name:"Net inflows", color:"var(--s2)", values: years.map(y => y.flow)}],
+    yFmt: v => money(v), tipFmt: v => money(v, true), topLabel: i => money(years[i].end), extraTip: i => [{value: money(years[i].end), label:"end value"}], height: 270});
+  table($("#tblFlows"), [
+    {h:"Year", cell: y => E("td", {class:"l"}, y.label)}, {h:"Start value", cell: y => td(money(y.start))},
+    {h:"Investment gains", cell: y => signedTd(money(y.gains, true), y.gains)}, {h:"Net inflows", cell: y => signedTd(money(y.flow, true), y.flow)},
+    {h:"End value", cell: y => td(money(y.end))}, {h:"Dividends (in returns)", cell: y => td(money(y.div))}], years);
+
+  const pick = i => { selYear = i; renderFund(); };
+  columnChart($("#chReturns"), {cats: years.map(y => y.label), label:"Annual return vs SPY", selected: selYear, onSelect: pick,
+    series:[{name:"Kelpwood (13F estimate)", color:"var(--s1)", values: years.map(y => y.ret*100)}],
+    yFmt: v => v + "%", tipFmt: v => sgn(v) + Math.abs(v).toFixed(1) + "%", height: 260});
+  const chips = $("#yearChips"); chips.replaceChildren();
+  years.forEach((y, i) => { const b = E("button", {class:"chip", type:"button", "aria-pressed": String(i === selYear)}, y.label); b.addEventListener("click", () => pick(i)); chips.append(b); });
+  table($("#tblReturns"), [{h:"Year", cell: y => E("td", {class:"l"}, y.label)}, {h:"Return (13F estimate)", cell: y => signedTd(pct(y.ret), y.ret)}], years);
+
+  const Y = years[selYear];
+  $("#yearHint").replaceChildren(document.createTextNode("Click a year to see what drove it. Showing "), E("b", null, Y.label), document.createTextNode("."));
+  $("#contribTitle").textContent = "What drove " + Y.label;
+  const items = pos.map(p => { let pnl = 0, w = 0, n = 0; Y.qs.forEach(q => { pnl += p.pnlQ[q]; if (V[q] > 0){ w += p.shares[q]*qStats(p.s, q).close/V[q]; n++; } }); return {p, pnl, w: n ? w/n : 0}; }).filter(d => Math.abs(d.pnl) > 0.01);
+  items.forEach(d => { d.c = d.pnl / Y.cap * 100; });
+  items.sort((a, b) => b.c - a.c);
+  const chartItems = items.map(d => ({label: d.p.t, sub: d.p.name, v: d.c, extra: [{value: money(d.pnl, true), label:"P&L"}]}));
+  hbarChart($("#chContrib"), chartItems, {label:"Contribution to " + Y.label + " return by stock", xFmt: v => v + " pts", vFmt: v => pp(v), center: true});
+  const sumC = items.reduce((s, d) => s + d.c, 0);
+  $("#contribSum").textContent = "Contributions add up to " + pp(sumC) + ", an approximate return. The chained quarterly return for " + Y.label + " is " + pct(Y.ret) + ".";
+
+  /* positions */
+  const fc = $("#posFilter"); fc.replaceChildren();
+  [["all","All"],["open","Still held"],["closed","Sold"]].forEach(([id, n]) => { const b = E("button", {class:"chip", type:"button", "aria-pressed": String(posFilter === id)}, n); b.addEventListener("click", () => { posFilter = id; renderFund(); }); fc.append(b); });
+  const wins = pos.filter(p => p.total > 0), loss = pos.filter(p => p.total < 0);
+  const won = wins.reduce((s, p) => s + p.total, 0), lost = -loss.reduce((s, p) => s + p.total, 0);
+  const best = pos.reduce((a, b) => b.total > a.total ? b : a), worst = pos.reduce((a, b) => b.total < a.total ? b : a);
+  const mean = a => a.reduce((s, v) => s + v, 0)/Math.max(1, a.length);
+  $("#posStats").replaceChildren(
+    tile("Profitable", Math.round(wins.length/pos.length*100) + "%", wins.length + " of " + pos.length),
+    tile("Realised P&L", money(pos.reduce((s, p) => s + p.realised, 0), true), null, cls(pos.reduce((s, p) => s + p.realised, 0))),
+    tile("Unrealised P&L", money(pos.reduce((s, p) => s + p.unreal, 0), true), "at latest prices", cls(pos.reduce((s, p) => s + p.unreal, 0))),
+    tile("Avg winner / loser", pct(mean(wins.map(p => p.pctRet)), 0) + " / " + pct(mean(loss.map(p => p.pctRet)), 0)),
+    tile("$ won per $ lost", (won/Math.max(1, lost)).toFixed(2) + "×"),
+    tile("Best position", best.t, money(best.total, true)),
+    tile("Worst position", worst.t, money(worst.total, true)));
+  let list = pos.filter(p => posFilter === "all" || (posFilter === "open" ? p.open : !p.open));
+  const keyVal = {t: p => p.t, total: p => p.total, pctRet: p => p.pctRet, invested: p => p.invested, from: p => p.from, realised: p => p.realised, unreal: p => p.unreal,
+    irr: p => p.irr == null ? -9 : p.irr, lastPct: p => p.lastPct == null ? (p.lastT.d > 0 ? 9 : -9) : p.lastPct, lastUsd: p => p.lastUsd};
+  list = list.slice().sort((a, b) => { const f = keyVal[posSort.key], x = f(a), y = f(b); return (x > y ? 1 : x < y ? -1 : 0)*posSort.dir; });
+  table($("#tblPositions"), [
+    {h:"Stock", key:"t", l:true, cell: p => tickCell(p.t, p.name)},
+    {h:"Held", key:"from", cell: p => td(qLabel(p.from) + " → " + (p.open ? "now" : qLabel(p.to)))},
+    {h:"Avg cost", cell: p => td(px(p.entry))}, {h:"Current price", cell: p => td(px(p.last))}, {h:"Avg exit", cell: p => td(px(p.exit))},
+    {h:"Return", key:"pctRet", cell: p => signedTd(pct(p.pctRet, 0), p.pctRet)},
+    {h:"IRR", key:"irr", cell: p => p.irr == null ? td("—") : signedTd(pct(p.irr, 0), p.irr)},
+    {h:"Last change", key:"lastPct", cell: lastPctCell},
+    {h:"Last change $", key:"lastUsd", cell: p => signedTd(money(p.lastUsd, true), p.lastUsd)},
+    {h:"$ in", key:"invested", cell: p => td(money(p.invested))},
+    {h:"Realised", key:"realised", cell: p => signedTd(money(p.realised, true), p.realised)},
+    {h:"Unrealised", key:"unreal", cell: p => p.open ? signedTd(money(p.unreal, true), p.unreal) : td("—")},
+    {h:"Total P&L", key:"total", cell: p => signedTd(money(p.total, true), p.total)}
+  ], list, {sortable:true, sort: posSort, onSort: k => { posSort = {key:k, dir: posSort.key === k ? -posSort.dir : -1}; renderFund(); }, onRow: p => { curPos = p.t; location.hash = "#position"; }});
+
+  /* exits */
+  const tNow = NOWQ/4 + 0.25;
+  const exits = pos.filter(p => p.trades.some(t => t.d < 0)).map(p => {
+    const sells = p.trades.filter(t => t.d < 0), sold = sells.reduce((s, t) => s - t.d, 0);
+    const avgSell = sells.reduce((s, t) => s - t.d*t.px, 0)/sold;
+    const missed = sells.reduce((s, t) => s - t.d*(p.last - t.px), 0);
+    const lastSell = sells[sells.length - 1], q4 = Math.min(LASTF, lastSell.q + 4);
+    const oneY = qStats(p.s, q4).close/lastSell.px - 1, spy1 = spyQ(q4)/spyQ(lastSell.q) - 1;
+    const flowsA = p.trades.map(t => ({t: t.q/4 + 0.125, v: -t.d*t.px})); if (p.sh > 0) flowsA.push({t: tNow, v: p.sh*p.last});
+    const boughtSh = p.trades.filter(t => t.d > 0).reduce((s, t) => s + t.d, 0);
+    const flowsH = p.trades.filter(t => t.d > 0).map(t => ({t: t.q/4 + 0.125, v: -t.d*t.px})); flowsH.push({t: tNow, v: boughtSh*p.last});
+    return {p, sold, avgSell, missed, since: p.last/avgSell - 1, oneY, spy1, irrA: irr(flowsA), irrH: irr(flowsH), sells};
+  });
+  const early = exits.filter(e => e.missed > 0).reduce((s, e) => s + e.missed, 0), dodged = -exits.filter(e => e.missed < 0).reduce((s, e) => s + e.missed, 0);
+  const beat = exits.filter(e => e.oneY > e.spy1).length;
+  const buyR = [], sellR = [];
+  pos.forEach(p => p.trades.forEach(t => { const q4 = t.q + 4; if (q4 > LASTF) return; const r = qStats(p.s, q4).close/t.px - 1; (t.d > 0 ? buyR : sellR).push(r); }));
+  const bAvg = mean(buyR), sAvg = mean(sellR);
+  $("#exitTiles").replaceChildren(
+    tile("Sold too early", money(early), "gains missed after selling", "down"),
+    tile("Losses dodged", money(dodged), "drops avoided by selling", "up"),
+    tile("Sold stocks that beat SPY next year", Math.round(beat/exits.length*100) + "%", beat + " of " + exits.length + " sales"),
+    tile("Buys vs sells, next 12 months", pct(bAvg, 0) + " vs " + pct(sAvg, 0), (bAvg > sAvg ? "Sells were smart: " : "Sells were costly: ") + pp((bAvg - sAvg)*100) + " gap", cls(bAvg - sAvg)));
+  table($("#tblExits"), [
+    {h:"Stock", l:true, cell: e => tickCell(e.p.t, e.p.name)},
+    {h:"Status", l:true, cell: e => { const c = E("td", {class:"l"}); c.append(E("span", {class:"pill"}, e.p.open ? "Trimmed" : "Sold all")); return c; }},
+    {h:"Shares sold", cell: e => td(e.sold.toFixed(2) + "M")},
+    {h:"Avg cost", cell: e => td(px(e.p.entry))}, {h:"Current price", cell: e => td(px(e.p.last))}, {h:"Avg exit", cell: e => td(px(e.avgSell))},
+    {h:"Return", cell: e => signedTd(pct(e.p.pctRet, 0), e.p.pctRet)},
+    {h:"IRR actual", cell: e => e.irrA == null ? td("—") : signedTd(pct(e.irrA, 0), e.irrA)},
+    {h:"IRR if held", cell: e => e.irrH == null ? td("—") : signedTd(pct(e.irrH, 0), e.irrH)},
+    {h:"Last change", cell: e => lastPctCell(e.p)},
+    {h:"Last change $", cell: e => signedTd(money(e.p.lastUsd, true), e.p.lastUsd)},
+    {h:"Since sale", cell: e => signedTd(pct(e.since, 0), e.since)},
+    {h:"1y after", cell: e => signedTd(pct(e.oneY, 0), e.oneY)}, {h:"SPY 1y after", cell: e => td(pct(e.spy1, 0))},
+    {h:"$ missed / dodged", cell: e => E("td", {class: e.missed > 0 ? "down" : "up"}, (e.missed > 0 ? "missed " : "dodged ") + money(Math.abs(e.missed)))}
+  ], exits.sort((a, b) => b.missed - a.missed), {onRow: e => { curPos = e.p.t; location.hash = "#position"; }});
+}
+function lastPctCell(p){
+  const t = p.lastT, txt = t.type === "New" ? "New" : t.type === "Exit" ? "Sold all" : pct(p.lastPct, 0);
+  const c = E("td", {class: cls(t.d)}); c.append(document.createTextNode(txt + " "), E("span", {class:"cap"}, qLabel(t.q))); return c;
+}
+function irr(fl){
+  if (!fl.some(f => f.v > 0) || !fl.some(f => f.v < 0)) return null;
+  const t0 = Math.min(...fl.map(f => f.t)), npv = r => fl.reduce((s, f) => s + f.v/Math.pow(1 + r, f.t - t0), 0);
+  let a = -0.99, b = 10, fa = npv(a), fb = npv(b);
+  if (fa*fb > 0) return null;
+  for (let k = 0; k < 80; k++){ const c = (a + b)/2, fc = npv(c); if (fa*fc <= 0){ b = c; fb = fc; } else { a = c; fa = fc; } }
+  return (a + b)/2;
+}
+
+/* ---------- POSITION ---------- */
+function renderPosition(){
+  const p = pos.find(x => x.t === curPos) || pos[0];
+  $("#posTitle").replaceChildren(E("span", {class:"mono"}, p.t), document.createTextNode(" · " + p.name));
+  $("#posMeta").replaceChildren(E("span", null, "Sector ", E("b", null, p.sec)), E("span", null, "Held ", E("b", null, qLabel(p.from) + " → " + (p.open ? "now" : qLabel(p.to)))), E("span", null, "Latest price ", E("b", null, px(p.last))));
+  const tNow = NOWQ/4 + 0.25, fl = p.trades.map(t => ({t: t.q/4 + 0.125, v: -t.d*t.px})); if (p.sh > 0) fl.push({t: tNow, v: p.sh*p.last});
+  const r = irr(fl);
+  $("#posTiles").replaceChildren(
+    tile("Shares now", p.sh > 0 ? p.sh.toFixed(2) + "M" : "0", p.sh > 0 ? "worth " + money(p.sh*p.last) : "fully sold"),
+    tile("Avg cost", px(p.entry), "avg of estimated buy prices"),
+    tile("$ in", money(p.invested)),
+    tile("Total P&L", money(p.total, true), pct(p.pctRet, 0) + " on $ in · incl. " + money(p.div) + " dividends", cls(p.total)),
+    tile("IRR", r == null ? "—" : pct(r, 0), "mid-quarter trade dates", cls(r || 0)));
+  priceChart($("#chPrice"), p);
+  sharesChart($("#chShares"), p);
+  table($("#tblTrades"), [
+    {h:"Quarter", cell: t => E("td", {class:"l"}, qLabel(t.q))},
+    {h:"Move", l:true, cell: t => { const c = E("td", {class:"l"}); c.append(E("span", {class:"pill " + (t.d > 0 ? "buy" : "sell")}, t.type)); return c; }},
+    {h:"Shares", cell: t => signedTd(sgn(t.d) + Math.abs(t.d).toFixed(2) + "M", t.d)},
+    {h:"Est. price (VWAP)", cell: t => td(px(t.px))},
+    {h:"Quarter range", cell: t => td(px(t.lo) + " – " + px(t.hi))},
+    {h:"$ value", cell: t => td(money(Math.abs(t.d*t.px)))},
+    {h:"Shares after", cell: t => td(t.after.toFixed(2) + "M")}
+  ], p.trades);
+}
+
+route();
+})();
+</script>
