@@ -50,6 +50,6 @@ COVERAGE_WARN = 0.80  # warn below this share of book priced
 # 13F VALUE is in thousands before this filing date, dollars from it
 VALUE_DOLLARS_FROM = date(2023, 1, 3)
 
-# Storage
+# Storage (read from the environment at import time; tests monkeypatch the module attribute)
 LAKE_DIR = Path(os.environ.get("ORCA_LAKE_DIR", "data/lake"))
 OUT_DIR = Path(os.environ.get("ORCA_OUT_DIR", "data/out"))

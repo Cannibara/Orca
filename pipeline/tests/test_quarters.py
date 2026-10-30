@@ -27,5 +27,6 @@ def test_year_boundaries_and_round_trip():
 
 
 def test_invalid_quarter_rejected():
-    with pytest.raises(ValueError):
-        q_index(2020, 5)
+    for bad in (0, 5):
+        with pytest.raises(ValueError):
+            q_index(2020, bad)
