@@ -25,8 +25,8 @@ class Client:
     """GET / POST JSON at most `rate_per_sec` times a second, retrying transient failures.
 
     Retries network errors, 429 and 5xx, sleeping 2, 4, 8, 16 s (doubling) between tries.
-    Other 4xx responses raise FetchError at once. `sleep` and `clock` are injectable so
-    tests can run on a fake clock.
+    Any other non-2xx response (other 4xx, and 3xx: redirects are never followed) raises
+    FetchError at once. `sleep` and `clock` are injectable so tests can run on a fake clock.
     """
 
     def __init__(
@@ -49,7 +49,9 @@ class Client:
         self._http = httpx.Client(headers=headers, transport=transport, timeout=REQUEST_TIMEOUT)
 
     def get(self, url: str, **params) -> httpx.Response:
-        return self._request("GET", url, params=params)
+        # Merge params into any query already in the url; passing params={} to httpx
+        # would replace that query with nothing.
+        return self._request("GET", str(httpx.URL(url).copy_merge_params(params)))
 
     def post_json(self, url: str, body: object) -> httpx.Response:
         return self._request("POST", url, json=body)
@@ -76,9 +78,15 @@ class Client:
                 failure.__cause__ = err
             else:
                 status = response.status_code
-                if status < 400:
+                if 200 <= status < 300:
                     return response
-                failure = FetchError(url, status)
+                detail = ""
+                if 300 <= status < 400:
+                    # Redirects are not followed (hops would bypass the limiter and could
+                    # leak our headers to another host), so surface where it pointed.
+                    location = response.headers.get("location", "<no Location header>")
+                    detail = f"redirected to {location}; redirects are not followed"
+                failure = FetchError(url, status, detail)
                 if status != 429 and status < 500:
                     raise failure
             if attempt == self._max_retries:
@@ -92,7 +100,11 @@ def sec_client(
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> Client:
-    """Client for sec.gov: 10 requests/s and a User-Agent naming ORCA_CONTACT (SEC requires one)."""
+    """Client for sec.gov: 10 requests/s and a User-Agent naming ORCA_CONTACT (SEC requires one).
+
+    Create it once and share it: www.sec.gov and data.sec.gov count against one SEC rate
+    limit, so every SEC request must go through the same Client.
+    """
     contact = os.environ.get("ORCA_CONTACT", "").strip()
     if not contact:
         raise RuntimeError(

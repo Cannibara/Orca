@@ -204,3 +204,64 @@ def test_post_json_sends_body_and_extra_headers():
     assert json.loads(seen[0].content) == [{"idType": "ID_CUSIP", "idValue": "X"}]
     assert seen[0].headers["Content-Type"] == "application/json"
     assert seen[0].headers["X-OPENFIGI-APIKEY"] == "k"
+
+
+def test_get_keeps_query_already_in_url():
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200)
+
+    client = make_client(handler, t)
+
+    client.get("https://example.test/cgi-bin/browse-edgar?action=getcompany&CIK=1067983")
+
+    assert str(seen[0].url) == "https://example.test/cgi-bin/browse-edgar?action=getcompany&CIK=1067983"
+
+
+def test_get_merges_url_query_with_params():
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200)
+
+    client = make_client(handler, t)
+
+    client.get("https://example.test/cgi-bin/browse-edgar?action=getcompany", type="13F")
+
+    assert seen[0].url.path == "/cgi-bin/browse-edgar"
+    assert dict(seen[0].url.params) == {"action": "getcompany", "type": "13F"}
+
+
+def test_redirect_is_an_error_and_not_followed():
+    t = FakeTime()
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(301, headers={"Location": "https://www.sec.gov/x"})
+
+    client = make_client(handler, t)
+
+    with pytest.raises(FetchError) as exc:
+        client.get("https://sec.gov/x")
+
+    assert exc.value.status == 301
+    assert "https://www.sec.gov/x" in str(exc.value)
+    assert len(calls) == 1
+    assert t.sleeps == []
+
+
+def test_retries_pass_through_the_rate_limiter():
+    t = FakeTime()
+    statuses = iter([503, 200])
+    client = make_client(lambda request: httpx.Response(next(statuses)), t, rate_per_sec=25 / 60)
+
+    assert client.get("https://example.test/a").status_code == 200
+
+    # 2 s backoff refills 2 * 25/60 of a token; the limiter waits out the other 0.4 s.
+    assert t.sleeps == [2, pytest.approx(0.4)]
