@@ -93,16 +93,18 @@ def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
     return out
 
 
-def conviction_moves(snaps: list[FundSnapshot]) -> list[dict]:
+def conviction_moves(snaps: list[FundSnapshot], *, latest_q: int | None = None) -> list[dict]:
     """Big bets of concentrated active funds in their latest quarter, largest change first. Funds
-    that have not filed the latest quarter (`period_q` below the newest across `snaps`) are left
-    out.
+    whose `period_q` is not the latest quarter are left out.
+
+    `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
+    snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale.
 
     A new or add counts when the stock ends at CONVICTION_WEIGHT or more of the book, or gains
     CONVICTION_JUMP or more of it; an exit counts when the stock was CONVICTION_WEIGHT or more
     before. Trims never count. `change_pts` is the weight change in percentage points."""
     rows = []
-    for s in _latest(snaps):
+    for s in _latest(snaps, latest_q):
         if not _concentrated(s):
             continue
         for stock_id, t in s.trades_latest:
@@ -132,13 +134,17 @@ def conviction_moves(snaps: list[FundSnapshot]) -> list[dict]:
     return rows
 
 
-def wins_losses(snaps: list[FundSnapshot], n: int = 25) -> dict[str, list[dict]]:
+def wins_losses(
+    snaps: list[FundSnapshot], n: int = 25, *, latest_q: int | None = None
+) -> dict[str, list[dict]]:
     """The `n` biggest winning and losing positions of the latest quarter across the top-fund
     basics (any period, index giants included): {"wins": pnl > 0 largest first, "losses":
-    pnl < 0 most negative first}. Funds that have not filed the latest quarter (`period_q`
-    below the newest across `snaps`) are left out."""
+    pnl < 0 most negative first}. Funds whose `period_q` is not the latest quarter are left out.
+
+    `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
+    snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale."""
     wins, losses = [], []
-    for s in _latest(snaps):
+    for s in _latest(snaps, latest_q):
         if not _top_base(s):
             continue
         for stock_id, pnl in s.pnl_latest.items():
@@ -181,13 +187,15 @@ def just_filed(snaps: list[FundSnapshot], n: int = 50) -> list[dict]:
     return rows
 
 
-def crowded_buys(snaps: list[FundSnapshot]) -> list[dict]:
+def crowded_buys(snaps: list[FundSnapshot], *, latest_q: int | None = None) -> list[dict]:
     """Stocks that at least CROWDED_MIN_FUNDS distinct concentrated active funds bought (new or
     add) in the latest quarter: fund count, dollars bought and the funds' mean weight after.
-    Funds that have not filed the latest quarter (`period_q` below the newest across `snaps`)
-    are left out."""
+    Funds whose `period_q` is not the latest quarter are left out.
+
+    `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
+    snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale."""
     buyers: dict[int, dict[int, tuple[float, float]]] = {}  # stock -> fund -> (dollars, weight)
-    for s in _latest(snaps):
+    for s in _latest(snaps, latest_q):
         if not _concentrated(s):
             continue
         for stock_id, t in s.trades_latest:
@@ -216,6 +224,8 @@ def calls(
     latest_px: dict[int, float],
     px_on_filed: Callable[[int, date], float | None],
     window: str,
+    *,
+    latest_q: int | None = None,
 ) -> list[dict]:
     """Recent buys by top funds (index giants excluded: their inflow-driven adds would flood the
     list) and concentrated funds, ordered by the stock's move since the fund's estimated buy
@@ -224,20 +234,23 @@ def calls(
 
     A buy must be CALLS_MIN_WEIGHT or more of the book, in a stock with a known market cap of
     CALLS_MIN_MCAP or more and a known latest price of CALLS_MIN_PRICE or more. Window "q" keeps
-    buys of the latest quarter across `snaps`, "y" those of the latest four. A buy without a
-    positive est. price has no move to rank and is left out."""
+    buys of the latest quarter, "y" those of the latest four (never a later quarter, such as an
+    early filer's). A buy without a positive est. price has no move to rank and is left out.
+
+    `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
+    snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale."""
     if window not in ("q", "y"):
         raise ValueError(f"unknown window {window!r}")
-    if not snaps:
+    latest_q = _anchor(snaps, latest_q)
+    if latest_q is None:
         return []
-    latest_q = max(s.period_q for s in snaps)
     oldest_q = latest_q if window == "q" else latest_q - 3
     ranked = []
     for s in snaps:
         if not ((_top_base(s) and s.n_priced < GIANT_MIN_POSITIONS) or _concentrated(s)):
             continue
         for stock_id, q, est_price, weight_after, filed in s.buys_recent:
-            if q < oldest_q or weight_after < CALLS_MIN_WEIGHT or est_price <= 0:
+            if not oldest_q <= q <= latest_q or weight_after < CALLS_MIN_WEIGHT or est_price <= 0:
                 continue
             cap, price = mcap.get(stock_id), latest_px.get(stock_id)
             if cap is None or cap < CALLS_MIN_MCAP or price is None or price < CALLS_MIN_PRICE:
@@ -256,12 +269,19 @@ def calls(
     return [row for _, row in ranked]
 
 
-def _latest(snaps: list[FundSnapshot]) -> list[FundSnapshot]:
-    """The snapshots of the newest period across `snaps`; stale and late filers are left out."""
-    if not snaps:
-        return []
-    newest = max(s.period_q for s in snaps)
-    return [s for s in snaps if s.period_q == newest]
+def _anchor(snaps: list[FundSnapshot], latest_q: int | None) -> int | None:
+    """The latest quarter: `latest_q` when given, else the newest `period_q` among the snapshots
+    not excluded; None when there is none."""
+    if latest_q is not None:
+        return latest_q
+    periods = [s.period_q for s in snaps if not _excluded(s)]
+    return max(periods) if periods else None
+
+
+def _latest(snaps: list[FundSnapshot], latest_q: int | None) -> list[FundSnapshot]:
+    """The snapshots of the latest quarter; stale and early filers are left out."""
+    anchor = _anchor(snaps, latest_q)
+    return [s for s in snaps if s.period_q == anchor]
 
 
 def _excluded(s: FundSnapshot) -> bool:

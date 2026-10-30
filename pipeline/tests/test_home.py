@@ -191,7 +191,8 @@ def conviction_fund(fund_id=10, **kw) -> FundSnapshot:
     """A concentrated fund: 20 positions, top ten at 50%, $1B book. `weights_now` of the
     stocks under test are added to its spread."""
     now = spread(20) | kw.pop("now", {})
-    return snap(fund_id, "CONVICTION FUND", n_priced=20, book=1e9, weights_now=now, **kw)
+    name = kw.pop("name", "CONVICTION FUND")
+    return snap(fund_id, name, n_priced=20, book=1e9, weights_now=now, **kw)
 
 
 def test_conviction_rules():
@@ -424,15 +425,103 @@ def test_calls_thresholds_are_inclusive():
     assert [r["stock_id"] for r in rows] == [1]
 
 
-def test_calls_window_anchors_on_latest_period_across_snaps():
+def test_calls_window_anchors_on_latest_period_of_non_excluded_snaps():
     mcap, latest_px, _ = make_calls_inputs()
     buys = [(1, LATEST_Q, 10.0, 0.02, FILED), (7, LATEST_Q - 1, 10.0, 0.02, FILED)]
     fund = snap(1, buys_recent=buys)
-    late = snap(2, name="LATE FIRST BANK", period_q=LATEST_Q + 1)  # ineligible, but newest
+    late = snap(2, name="LATE FUND", book=1e6, period_q=LATEST_Q + 1)  # ineligible, but newest
     rows = calls([fund, late], mcap, latest_px, filed_price, "q")
     assert rows == []
     rows = calls([fund, late], mcap, latest_px, filed_price, "y")
     assert [r["stock_id"] for r in rows] == [7, 1]  # sorted by return since: 30/10 vs 15/10
+
+
+# --- the latest-quarter anchor -----------------------------------------------------------
+
+
+def season_snaps():
+    """Three current funds, each concentrated and top-eligible, all buying stock 7 and holding
+    a win and a loss; plus the market data that lets their buys through `calls`."""
+    current = [
+        conviction_fund(
+            fund_id,
+            now={7: 0.06},
+            trades_latest=[(7, trade("new", 100, 10.0))],
+            pnl_latest={7: 100.0 * fund_id, 8: -50.0 * fund_id},
+            buys_recent=[(7, LATEST_Q, 10.0, 0.06, FILED)],
+        )
+        for fund_id in (1, 2, 3)
+    ]
+    return current, {7: 1e9}, {7: 15.0}
+
+
+def early_filer(**kw) -> FundSnapshot:
+    """A fund that already filed a quarter that is not yet due."""
+    return conviction_fund(
+        9,
+        now={7: 0.06},
+        trades_latest=[(7, trade("new", 100, 10.0, q=LATEST_Q + 1))],
+        pnl_latest={7: 9999.0, 8: -9999.0},
+        buys_recent=[(7, LATEST_Q + 1, 10.0, 0.06, FILED)],
+        period_q=LATEST_Q + 1,
+        **kw,
+    )
+
+
+def all_lists(snaps, mcap, latest_px, **kw):
+    return {
+        "conviction": ids(conviction_moves(snaps, **kw)),
+        "crowded": [r["funds_buying"] for r in crowded_buys(snaps, **kw)],
+        "wins": ids(wins_losses(snaps, **kw)["wins"]),
+        "losses": ids(wins_losses(snaps, **kw)["losses"]),
+        "calls_q": ids(calls(snaps, mcap, latest_px, filed_price, "q", **kw)),
+        "calls_y": ids(calls(snaps, mcap, latest_px, filed_price, "y", **kw)),
+    }
+
+
+INTACT = {
+    "conviction": [1, 2, 3],
+    "crowded": [3],
+    "wins": [3, 2, 1],
+    "losses": [3, 2, 1],
+    "calls_q": [1, 2, 3],
+    "calls_y": [1, 2, 3],
+}
+
+
+def test_explicit_latest_q_keeps_the_lists_when_an_early_filer_is_ahead():
+    current, mcap, latest_px = season_snaps()
+    snaps = [*current, early_filer()]
+    assert all_lists(snaps, mcap, latest_px, latest_q=LATEST_Q) == INTACT
+    # without the anchor the early filer is taken for the newest quarter and the rest go stale
+    assert all_lists(snaps, mcap, latest_px)["conviction"] == [9]
+
+
+def test_fallback_anchor_ignores_excluded_funds():
+    current, mcap, latest_px = season_snaps()
+    flagged = early_filer(excluded=True)
+    bank = conviction_fund(
+        10, name="FIRST BANK", period_q=LATEST_Q + 2, trades_latest=[(7, trade("new", 100, 10.0))]
+    )
+    assert all_lists([*current, flagged, bank], mcap, latest_px) == INTACT
+
+
+def test_no_anchor_when_every_fund_is_excluded():
+    _, mcap, latest_px = season_snaps()
+    assert all_lists([early_filer(excluded=True)], mcap, latest_px) == {
+        "conviction": [],
+        "crowded": [],
+        "wins": [],
+        "losses": [],
+        "calls_q": [],
+        "calls_y": [],
+    }
+
+
+def test_calls_year_window_never_reaches_past_the_latest_quarter():
+    current, mcap, latest_px = season_snaps()
+    rows = calls([*current, early_filer()], mcap, latest_px, filed_price, "y", latest_q=LATEST_Q)
+    assert LATEST_Q + 1 not in {r["q"] for r in rows}
 
 
 def test_calls_empty_and_bad_window():
