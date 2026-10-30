@@ -29,7 +29,8 @@ def aggregate_fund(
     over that same segment). A quarter without positions is all zeros.
 
     The return is (end - start - net buying + dividends) / (start + net buying / 2), None for
-    the segment's first quarter and wherever the denominator is not positive."""
+    the segment's first quarter and wherever the start value or the denominator is not positive
+    (a book that was empty at the start of the quarter has no return to measure)."""
     quarters = range(segment_start_q, last_q + 1)
     end, buys, sells, market_move, trade_gains, dividends = (
         dict.fromkeys(quarters, 0.0) for _ in range(6)
@@ -50,7 +51,7 @@ def aggregate_fund(
         net_buying = buys[q] - sells[q]
         denominator = start + net_buying / 2
         ret = None
-        if q != segment_start_q and denominator > 0:
+        if q != segment_start_q and start > 0 and denominator > 0:
             ret = (end[q] - start - net_buying + dividends[q]) / denominator
         result.append(
             FundQuarter(
@@ -71,6 +72,10 @@ def aggregate_fund(
 
 
 def check_bridge(fq: FundQuarter) -> bool:
-    """Whether end = start + market move + net buying + trade gains, to one part in a million."""
+    """Whether end = start + market move + net buying + trade gains, to one part in a million of
+    the largest amount in the quarter. The scale includes the start value and the traded amount,
+    not just `end`: a book sold off completely ends at 0, yet its terms are billions of dollars
+    and rounding alone exceeds a tolerance of 1e-6."""
     gap = fq.end - (fq.start + fq.market_move + fq.net_buying + fq.trade_gains)
-    return abs(gap) <= 1e-6 * max(1.0, fq.end)
+    scale = max(1.0, abs(fq.end), abs(fq.start), fq.buys + fq.sells)
+    return abs(gap) <= 1e-6 * scale

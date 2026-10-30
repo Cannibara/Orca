@@ -92,13 +92,16 @@ def compute_position(
     invested = realised = dividends = bought_shares = sold_shares = sold_usd = 0.0
     exit_q = None
     for q in range(segment_start_q, last_q + 1):
+        reported = float(shares_by_q.get(q, 0.0))
+        if shares == 0 and reported == 0:
+            continue  # flat: no valuation needed
         prev_shares, prev_close = shares, close
         close = _valuation_close(px, q, implied_px)
         if close is None and prev_shares > 0:
             close = prev_close
-        shares = float(shares_by_q.get(q, 0.0)) if close is not None else 0.0
+        shares = reported if close is not None else 0.0
         if prev_shares == 0 and shares == 0:
-            continue
+            continue  # held but not yet priced: still outside the book
         delta = shares - prev_shares
         market_move = prev_shares * (close - prev_close) if prev_shares > 0 else 0.0
         quarter_px = px.get(q)
@@ -195,7 +198,9 @@ def _trade_price(
 ) -> float:
     """The price at which quarter `q`'s share change trades: the close for a first report, else
     the quarter's VWAP, else the last close before it, else the reported value per share. The
-    valuation close is the last resort, so a valued quarter always has a trade price."""
+    valuation close is the last resort, so a valued quarter always has a trade price: it is
+    reached by a stock with no market data whose fund reported no value that quarter (a gap in
+    `implied_px`), which trades at the position's previous valuation."""
     quarter_px = px.get(q)
     if first_report and quarter_px is not None and quarter_px.close is not None:
         return quarter_px.close

@@ -1,10 +1,16 @@
 import math
+import random
+from dataclasses import replace
 
 import pytest
 
 from orca.engine.fund import FundQuarter, aggregate_fund, check_bridge
 from orca.engine.position import PositionQuarter, PositionResult, compute_position
 from orca.quarter_px import QuarterPx
+
+
+def qpx(vwap, close, div_ps=0.0) -> QuarterPx:
+    return QuarterPx(vwap, None, None, close, div_ps, (None,) * 3)
 
 
 def pq(q, value, net_buying=0.0, market_move=0.0, trade_gain=0.0, dividends=0.0) -> PositionQuarter:
@@ -66,7 +72,21 @@ def test_first_quarter_is_all_buying_and_has_no_return():
 
 
 def test_return_none_when_denominator_not_positive():
-    # every position unpriced: nothing in the book in any quarter
+    # the stock is held throughout but unpriced in q10 and q11: nothing is in the book until it is
+    # priced in q12, so that quarter has no starting value and no return
+    px = {12: qpx(16, 13), 13: qpx(20, 21)}
+    shares = {10: 100, 11: 100, 12: 100, 13: 100}
+    p = compute_position(1, shares, px, segment_start_q=10, last_q=13, implied_px={})
+    quarters = aggregate_fund([p], segment_start_q=10, last_q=13)
+    assert [fq.q for fq in quarters] == [10, 11, 12, 13]
+    assert [(fq.start, fq.end) for fq in quarters] == [(0, 0), (0, 0), (0, 1300), (1300, 2100)]
+    assert [fq.ret for fq in quarters[:3]] == [None, None, None]  # q12: bought into an empty book
+    assert quarters[3].ret == pytest.approx(800 / 1300)
+    assert all(fq.ret is None or math.isfinite(fq.ret) for fq in quarters)
+    assert all(check_bridge(fq) for fq in quarters)
+
+
+def test_no_positions_means_empty_quarters_without_returns():
     quarters = aggregate_fund([], segment_start_q=10, last_q=12)
     assert [fq.q for fq in quarters] == [10, 11, 12]
     for fq in quarters:
@@ -144,6 +164,46 @@ def test_check_bridge_tolerance_floor_is_one_dollar_of_value():
     assert not check_bridge(fund_quarter(end=2e-6))
 
 
+def liquidated_book(n_positions: int) -> list:
+    """Positions bought at the q10 close and all sold in q11 at the q11 VWAP: a ~$25B book that
+    ends at exactly 0, built from awkward decimals so rounding does not cancel."""
+    rng = random.Random(1)
+    positions = []
+    for stock_id in range(n_positions):
+        shares = round(rng.uniform(1e4, 1e6), 3)
+        close10, close11, vwap11 = (round(rng.uniform(5, 300), 4) for _ in range(3))
+        px = {10: qpx(close10, close10), 11: qpx(vwap11, close11)}
+        p = compute_position(
+            stock_id, {10: shares}, px, segment_start_q=10, last_q=11, implied_px={}
+        )
+        positions.append(p)
+    return positions
+
+
+def test_bridge_holds_when_a_large_book_is_fully_liquidated():
+    fq = aggregate_fund(liquidated_book(300), segment_start_q=10, last_q=11)[1]
+    assert fq.start > 2e9 and fq.end == 0 and fq.sells > 2e9
+    # rounding alone exceeds an absolute 1e-6, so the tolerance must scale with the book
+    gap = fq.end - (fq.start + fq.market_move + fq.net_buying + fq.trade_gains)
+    assert abs(gap) > 1e-6
+    assert check_bridge(fq)
+
+
+def test_bridge_still_fails_when_a_large_book_is_off():
+    fq = aggregate_fund(liquidated_book(300), segment_start_q=10, last_q=11)[1]
+    assert not check_bridge(replace(fq, trade_gains=fq.trade_gains + 0.001 * fq.start))
+    assert not check_bridge(replace(fq, market_move=fq.market_move - 1e6))
+
+
+def test_check_bridge_scales_with_start_and_with_traded_amount():
+    sold_off = {"start": 3e9, "end": 0, "net_buying": -3e9, "buys": 0, "sells": 3e9}
+    assert check_bridge(fund_quarter(**sold_off, trade_gains=1e-3))
+    assert not check_bridge(fund_quarter(**sold_off, trade_gains=1e4))
+    churn = {"start": 0, "end": 0, "net_buying": 0, "buys": 3e9, "sells": 3e9}
+    assert check_bridge(fund_quarter(**churn, trade_gains=1e-3))
+    assert not check_bridge(fund_quarter(**churn, trade_gains=1e4))
+
+
 def test_engine_position_through_the_fund():
     shares = {10: 100, 11: 150, 12: 60, 13: 0}
     px = {
@@ -158,7 +218,7 @@ def test_engine_position_through_the_fund():
     assert [fq.end for fq in quarters] == pytest.approx([0, 1200, 2250, 780, 0])
     assert [fq.start for fq in quarters] == pytest.approx([0, 0, 1200, 2250, 780])
     assert all(check_bridge(fq) for fq in quarters)
-    assert [fq.ret for fq in quarters][:2] == [None, pytest.approx(200 / 500)]
+    assert [fq.ret for fq in quarters][:2] == [None, None]  # start value 0 in q9 and q10
     assert quarters[2].ret == pytest.approx((2250 - 1200 - 700 + 50) / (1200 + 350))
     assert quarters[4].ret == pytest.approx((0 - 780 + 1200) / (780 - 600))
     assert sum(fq.market_move + fq.trade_gains for fq in quarters) == pytest.approx(940)

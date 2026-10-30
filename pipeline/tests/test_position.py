@@ -145,11 +145,16 @@ def test_trade_price_falls_back_to_last_close_when_the_stock_stopped_trading():
     assert_quarters_bridge(r)
 
 
-def test_trade_price_falls_back_to_last_close_when_vwap_is_missing():
-    px = {10: qpx(10, 12), 11: qpx(None, 15)}
+def test_quarter_with_rows_but_no_close_is_valued_and_traded_at_the_last_close():
+    # trading days with no close: no prices, but the dividend is still paid
+    px = {10: qpx(10, 12), 11: qpx(None, None, div_ps=0.5)}
     shares = {10: 100, 11: 150}
     r = compute_position(1, shares, px, segment_start_q=9, last_q=11, implied_px={})
+    q11 = r.quarters[1]
     assert r.trades[1].px == 12  # last close before q11
+    assert q11.value == 1800 and q11.market_move == 0 and q11.trade_gain == 0
+    assert q11.dividends == 50 and r.dividends == 50
+    assert_quarters_bridge(r)
 
 
 def test_implied_price_prices_a_stock_without_market_data():
@@ -177,9 +182,10 @@ def test_never_priced_is_none():
     assert compute_position(1, SHARES, {}, segment_start_q=9, last_q=13, implied_px={}) is None
 
 
-def test_quarter_without_a_close_is_not_a_price():
-    px = {10: qpx(vwap=10, close=None)}
-    assert compute_position(1, {10: 100}, px, segment_start_q=9, last_q=10, implied_px={}) is None
+def test_quarters_without_a_close_are_not_a_price():
+    px = {10: qpx(None, None, div_ps=0.5), 11: qpx(None, None)}
+    shares = {10: 100, 11: 100}
+    assert compute_position(1, shares, px, segment_start_q=9, last_q=11, implied_px={}) is None
 
 
 def test_no_shares_is_none():
@@ -207,6 +213,35 @@ def test_an_unpriced_quarter_after_pricing_keeps_the_last_valuation():
     assert [t.type for t in r.trades] == ["new"]
     assert [pq.value for pq in r.quarters] == pytest.approx([800, 800, 1000])
     assert_quarters_bridge(r)
+
+
+def test_gap_in_implied_prices_trades_at_the_previous_valuation():
+    # no market data, and the fund reported no value in q11: the q11 add is priced at the q10 8.0
+    shares = {10: 100, 11: 150}
+    r = compute_position(1, shares, {}, segment_start_q=9, last_q=11, implied_px={10: 8.0, 12: 10})
+    assert [(t.type, t.q, t.px) for t in r.trades] == [("new", 10, 8.0), ("add", 11, 8.0)]
+    assert r.quarters[1].trade_gain == 0 and r.quarters[1].value == pytest.approx(1200)
+    assert_quarters_bridge(r)
+
+
+class CountingPx(dict):
+    """Prices that count lookups, to show how much work a long run of flat quarters costs."""
+
+    lookups = 0
+
+    def get(self, key, default=None):
+        self.lookups += 1
+        return super().get(key, default)
+
+
+def test_flat_quarters_are_not_valued():
+    # a long-dead stock: once exited, later quarters look up no prices
+    px = CountingPx({10: qpx(10, 10), 11: qpx(10, 10)})
+    compute_position(1, {10: 100}, px, segment_start_q=9, last_q=13, implied_px={})
+    lookups_with_two_flat_quarters = px.lookups
+    px.lookups = 0
+    compute_position(1, {10: 100}, px, segment_start_q=9, last_q=300, implied_px={})
+    assert px.lookups == lookups_with_two_flat_quarters
 
 
 def test_dividends_use_the_shares_held_at_the_start_of_the_quarter():
