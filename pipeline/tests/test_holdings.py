@@ -331,6 +331,13 @@ def test_same_accession_from_both_sources_keeps_only_the_bulk_filing(live_first)
     assert rows_of(out, "cusip", "shares") == [("AAA", 101.0), ("BBB", 201.0)]  # no duplicates
 
 
+def test_live_filings_with_untagged_raw_holdings_raise_instead_of_dropping_them():
+    live_filing = filing(A, date(2024, 2, 14), source="live")
+
+    with pytest.raises(ValueError, match="source"):
+        build_holdings(filings_frame(live_filing), raw_frame(raw(A, "AAA", 100)))
+
+
 def test_live_filing_is_used_until_bulk_has_it():
     live_filing = filing(A, date(2024, 2, 14), source="live")
     raws = with_source(raw_frame(raw(A, "AAA", 100)), "live")
@@ -389,8 +396,8 @@ def test_bulk_and_live_frames_concatenate_and_build(tmp_path):
     live_raw = parse_infotable_xml(info, live_acc, date(2024, 5, 15))
     live_filings = filings_frame(filing(live_acc, date(2024, 5, 15), q=Q + 1, source="live"))
 
-    assert bulk_filings.schema == live_filings.schema
-    assert bulk_raw.schema == live_raw.schema
+    assert bulk_filings.schema == live_filings.schema == FILINGS_SCHEMA
+    assert bulk_raw.schema == live_raw.schema == RAW_SCHEMA
 
     filings = pl.concat([bulk_filings, live_filings])
     raws = pl.concat([with_source(bulk_raw, "bulk"), with_source(live_raw, "live")])
@@ -530,3 +537,48 @@ def test_fill_gaps_of_nothing_has_the_usual_schemas():
     assert (filled.height, status.height) == (0, 0)
     assert filled.schema == HOLDINGS_SCHEMA
     assert status.schema == STATUS_SCHEMA
+
+
+# --- fill_gaps: filed quarters without usable rows --------------------------------------
+
+
+def filed_quarters_of(filings: pl.DataFrame) -> pl.DataFrame:
+    return select_reports(filings).select("cik", q="period")
+
+
+def test_filed_quarter_without_usable_rows_is_not_a_gap():
+    a, b, c = (f"0000000001-24-00001{i}" for i in range(3))
+    filings = filings_frame(
+        filing(a, date(2024, 2, 14), q=10),
+        filing(b, date(2024, 5, 14), q=11),  # chosen report whose rows are all <= 0
+        filing(c, date(2024, 8, 14), q=12),
+    )
+    raws = raw_frame(raw(a, "AAA", 100), raw(b, "AAA", 0), raw(b, "BBB", -5), raw(c, "AAA", 120))
+    holdings = build_holdings(filings, raws)
+
+    filled, status = fill_gaps(holdings, last_q=12, filed_quarters=filed_quarters_of(filings))
+
+    assert sorted(filled["q"].to_list()) == [10, 12]  # q11 not carried from q10
+    assert not filled["carried"].any()
+    assert segments_of(status) == [(10, 12)]
+    assert status["inactive"].to_list() == [False]
+
+
+def test_liquidated_fund_is_not_carried_forward():
+    a, b = "0000000001-24-000010", "0000000001-24-000011"
+    filings = filings_frame(filing(a, date(2024, 2, 14), q=10), filing(b, date(2024, 5, 14), q=11))
+    holdings = build_holdings(filings, raw_frame(raw(a, "AAA", 100), raw(b, "AAA", 0)))
+
+    filled, status = fill_gaps(holdings, last_q=12, filed_quarters=filed_quarters_of(filings))
+
+    assert filled["q"].to_list() == [10]  # nothing for q11 (filed, empty) or q12 (tail)
+    row = status.row(0, named=True)
+    assert (row["last_filed_q"], row["inactive"]) == (11, False)
+
+
+def test_without_filed_quarters_a_quarter_without_rows_counts_as_unfiled():
+    holdings = held_frame(held(CIK, 10), held(CIK, 12))
+
+    filled, _ = fill_gaps(holdings, last_q=12)  # same as before: q11 carried
+
+    assert filled.filter(pl.col("carried"))["q"].to_list() == [11]

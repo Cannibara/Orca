@@ -8,10 +8,8 @@ import polars as pl
 ORIGINAL_FORM = "13F-HR"
 AMENDMENT_FORM = "13F-HR/A"
 ORIGINAL, RESTATEMENT, NEW_HOLDINGS = "original", "restatement", "new_holdings"
-BULK = "bulk"
+BULK, LIVE = "bulk", "live"
 
-# One missing quarter in a row is carried forward; two or more end a tracking segment.
-MAX_FILLED_GAP = 1
 
 HOLDINGS_SCHEMA = pl.Schema(
     {
@@ -96,15 +94,17 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
 
     `raw_holdings` may carry a `source` column ("bulk" / "live"); only rows whose (accession,
     source) is that of a chosen filing are used. Without the column every row counts as bulk, so
-    holdings of live filings must be tagged "live" by the caller.
+    ValueError is raised if `filings` has a live row: untagged live holdings would be dropped.
 
     `kind` is PUT or CALL when the row has put_call set, else its share type (SH / PRN). Rows
     with shares <= 0 are dropped (counted in stats["nonpositive_shares"] if `stats` is given),
     then rows are summed by key. `filed` is the date the quarter's last chosen report was filed.
     """
-    chosen = select_reports(filings)
     if "source" not in raw_holdings.columns:
+        if "source" in filings.columns and (filings["source"] == LIVE).any():
+            raise ValueError('filings has live rows but raw_holdings has no "source" column to match them')
         raw_holdings = raw_holdings.with_columns(source=pl.lit(BULK))
+    chosen = select_reports(filings)
     quarter_filed = chosen.group_by("cik", "period").agg(filed=pl.col("filed").max())
     keys = chosen.select("accession", "source", "cik", "period").join(quarter_filed, on=["cik", "period"])
     rows = raw_holdings.join(keys, on=["accession", "source"], how="inner")
@@ -124,22 +124,32 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     )
 
 
-def fill_gaps(holdings: pl.DataFrame, last_q: int) -> tuple[pl.DataFrame, pl.DataFrame]:
+def fill_gaps(
+    holdings: pl.DataFrame, last_q: int, filed_quarters: pl.DataFrame | None = None
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """(filled holdings, fund_status): carry a single missing quarter, split tracking at longer gaps.
 
-    A fund-quarter with no holdings that sits one quarter after a filed quarter and before the
-    next one is a single gap: it is copied from the previous quarter with carried=True (filed
+    A quarter the fund did not file, one quarter after a filed quarter and before the next
+    filed one, is a single gap: it is copied from the previous quarter with carried=True (filed
     date unchanged). The same goes for `last_q` itself when the fund filed in `last_q - 1`. Two
-    or more missing quarters in a row end a segment and are not filled; a later filing starts a
-    new segment.
+    or more unfiled quarters in a row end a segment and are not filled; a later filing starts a
+    new segment. Only quarters that have rows are copied from.
+
+    `filed_quarters` (cik, q) says which fund-quarters were filed; default: those with rows in
+    `holdings`. Pass the chosen reports of select_reports (period as q) so that a filed report
+    with no usable rows (a liquidated fund, all shares <= 0) counts as filed, not as a gap.
 
     fund_status has one row per cik: first_q, last_filed_q, inactive (last_filed_q < last_q - 1,
     i.e. nothing filed in the latest two quarters) and segments, the (start, end) of each run of
     filed quarters, ends included, carried quarters inside.
     """
-    quarters = holdings.select("cik", "q").unique().sort("cik", "q")
+    filed = holdings if filed_quarters is None else filed_quarters
+    quarters = (
+        filed.select(pl.col("cik").cast(pl.Int64), pl.col("q").cast(pl.Int16)).unique().sort("cik", "q")
+    )
+    # One unfiled quarter in a row is carried forward (not tunable); two or more end a segment.
     missing_before = pl.col("q") - pl.col("q").shift(1).over("cik") - 1  # null for a fund's first quarter
-    starts_segment = missing_before.is_null() | (missing_before > MAX_FILLED_GAP)
+    starts_segment = missing_before.is_null() | (missing_before > 1)
     spans = (
         quarters.with_columns(segment=starts_segment.cum_sum().over("cik"))
         .group_by("cik", "segment", maintain_order=True)
@@ -157,9 +167,9 @@ def fill_gaps(holdings: pl.DataFrame, last_q: int) -> tuple[pl.DataFrame, pl.Dat
         .sort("cik")
     )
 
-    # Quarters to copy forward: (cik, source q, target q).
+    # Quarters to copy forward: (cik, source q, target q). A source without rows copies nothing.
     missing_after = pl.col("q").shift(-1).over("cik") - pl.col("q") - 1
-    interior = quarters.filter(missing_after == MAX_FILLED_GAP).select("cik", source_q="q", q=pl.col("q") + 1)
+    interior = quarters.filter(missing_after == 1).select("cik", source_q="q", q=pl.col("q") + 1)
     tail = status.filter(pl.col("last_filed_q") == last_q - 1).select(
         "cik", source_q="last_filed_q", q=pl.lit(last_q, dtype=pl.Int16)
     )
