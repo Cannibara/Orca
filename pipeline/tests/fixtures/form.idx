@@ -1,0 +1,14 @@
+Description:           Daily Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    Mar 31, 2025
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+
+
+
+Form Type   Company Name                                                  CIK         Date Filed  File Name
+--------------------------------------------------------------------------------------------------------------------------------------------
+10-K        ACME WIDGETS CORP                                             111111      20250331    edgar/data/111111/0000111111-25-000001.txt
+13F-HR      Alpha Capital Management LP                                   1111111     20250331    edgar/data/1111111/0001111111-25-000010.txt
+13F-HR/A    Beta Partners, L.P.                                           2222222     20250331    edgar/data/2222222/0002222222-25-000020.txt
+13F-NT      Gamma Advisers LLC                                            3333333     20250331    edgar/data/3333333/0003333333-25-000030.txt
+SC 13G/A    Delta Holder Group Inc                                        4444444     20250331    edgar/data/4444444/0004444444-25-000040.txt

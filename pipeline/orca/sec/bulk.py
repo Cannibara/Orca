@@ -163,7 +163,7 @@ def _filings(submission: pl.DataFrame, coverpage: pl.DataFrame) -> tuple[pl.Data
     return filings, bad
 
 
-def _raw_holdings(
+def raw_holdings(
     infotable: pl.DataFrame, filings: pl.DataFrame, bad_filings: list[str]
 ) -> tuple[pl.DataFrame, list[str]]:
     """Holdings of the kept filings, and one accession per holding dropped as bad input.
@@ -217,7 +217,7 @@ def parse_bulk_zip(path: Path, stats: dict | None = None) -> tuple[pl.DataFrame,
         coverpage = _read_table(z, "COVERPAGE")
         infotable = _read_table(z, "INFOTABLE")
     filings, bad_filings = _filings(submission, coverpage)
-    holdings, bad_holdings = _raw_holdings(infotable, filings, bad_filings)
+    holdings, bad_holdings = raw_holdings(infotable, filings, bad_filings)
     if stats is not None:
         stats["dropped_filings"] = len(bad_filings)
         stats["dropped_holdings"] = len(bad_holdings)

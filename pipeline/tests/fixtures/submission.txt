@@ -1,0 +1,94 @@
+<SEC-DOCUMENT>0001111111-25-000010.txt : 20250331
+<SEC-HEADER>0001111111-25-000010.hdr.sgml : 20250331
+ACCESSION NUMBER:		0001111111-25-000010
+CONFORMED SUBMISSION TYPE:	13F-HR
+PUBLIC DOCUMENT COUNT:		2
+CONFORMED PERIOD OF REPORT:	20250331
+FILED AS OF DATE:		20250331
+
+FILER:
+
+	COMPANY DATA:
+		COMPANY CONFORMED NAME:			Alpha Capital Management LP
+		CENTRAL INDEX KEY:			0001111111
+</SEC-HEADER>
+<DOCUMENT>
+<TYPE>13F-HR
+<SEQUENCE>1
+<FILENAME>primary_doc.xml
+<DESCRIPTION>FORM 13F-HR
+<TEXT>
+<XML>
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:com="http://www.sec.gov/edgar/common">
+  <headerData>
+    <submissionType>13F-HR</submissionType>
+    <filerInfo>
+      <filer>
+        <credentials>
+          <cik>0001111111</cik>
+          <ccc>XXXXXXXX</ccc>
+        </credentials>
+      </filer>
+      <periodOfReport>03-31-2025</periodOfReport>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPage>
+      <reportCalendarOrQuarter>03-31-2025</reportCalendarOrQuarter>
+      <isAmendment>N</isAmendment>
+      <filingManager>
+        <name>ALPHA CAPITAL MANAGEMENT LP</name>
+        <address>
+          <com:street1>1 MAIN STREET</com:street1>
+          <com:city>NEW YORK</com:city>
+        </address>
+      </filingManager>
+      <reportType>13F HOLDINGS REPORT</reportType>
+    </coverPage>
+    <summaryPage>
+      <tableEntryTotal>2</tableEntryTotal>
+      <tableValueTotal>3500000</tableValueTotal>
+    </summaryPage>
+  </formData>
+</edgarSubmission>
+</XML>
+</TEXT>
+</DOCUMENT>
+<DOCUMENT>
+<TYPE>INFORMATION TABLE
+<SEQUENCE>2
+<FILENAME>infotable.xml
+<DESCRIPTION>FORM 13F INFORMATION TABLE
+<TEXT>
+<XML>
+<?xml version="1.0" encoding="UTF-8"?>
+<ns1:informationTable xmlns:ns1="http://www.sec.gov/edgar/document/thirteenf/informationtable">
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>APPLE INC</ns1:nameOfIssuer>
+    <ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>037833100</ns1:cusip>
+    <ns1:value>1500000</ns1:value>
+    <ns1:shrsOrPrnAmt>
+      <ns1:sshPrnamt>10000</ns1:sshPrnamt>
+      <ns1:sshPrnamtType>SH</ns1:sshPrnamtType>
+    </ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>TESLA INC</ns1:nameOfIssuer>
+    <ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>88160R101</ns1:cusip>
+    <ns1:value>2000000</ns1:value>
+    <ns1:shrsOrPrnAmt>
+      <ns1:sshPrnamt>20000</ns1:sshPrnamt>
+      <ns1:sshPrnamtType>SH</ns1:sshPrnamtType>
+    </ns1:shrsOrPrnAmt>
+    <ns1:putCall>Put</ns1:putCall>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+</ns1:informationTable>
+</XML>
+</TEXT>
+</DOCUMENT>
+</SEC-DOCUMENT>
