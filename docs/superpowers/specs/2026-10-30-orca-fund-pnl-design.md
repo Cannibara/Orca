@@ -45,7 +45,7 @@ CUSIPs are used only as an internal join key. They are never shown in the UI or 
 
 ```
 GitHub Actions (weekly cron + manual "run now")
-  └─ Python pipeline (DuckDB + Polars)
+  └─ Python pipeline (Polars)
        ├─ ingest:   SEC bulk ZIPs, EDGAR daily index, OpenFIGI, price vendor, FRED
        ├─ store:    Parquet (zstd), partitioned by quarter / year   ← internal "lake"
        ├─ compute:  only funds/stocks touched by new data
@@ -196,16 +196,18 @@ Fund summary: total $ sold too early, total $ dodged, % of sales whose stock bea
 | File | Contents |
 |---|---|
 | `funds.json` | search index: fund_id, name, book, holdings count (~150 KB) |
+| `securities.json` | stock_id → ticker, name, sector (shared lookup, so fund files carry ids only) |
 | `latest_prices.json` | stock_id → latest close + date |
-| `fund/{fund_id}/summary.json` | header, performance + style metrics, yearly returns, AUM bridge per year/quarter |
-| `fund/{fund_id}/positions.json` | one row per stock ever held: held from/to, avg cost, avg exit, return, IRR, last change %/$, $ in, realised, shares now, cost |
-| `fund/{fund_id}/contrib/{year}.json` | per-stock contribution for one year |
-| `fund/{fund_id}/exits.json` | what-if rows and summary |
-| `fund/{fund_id}/trades/{stock_id}.json` | trades by quarter: delta, VWAP, low, high, shares after |
+| `fund/{fund_id}/summary.json` | header, performance + style metrics, yearly returns, AUM bridge per year/quarter, current holdings (shares, cost) |
+| `fund/{fund_id}/positions.json` | one row per stock ever held: held from/to, avg cost, avg exit, last change, $ in, realised, dividends, shares now, cost now, and its trades (quarter, delta, VWAP, low, high, shares after) |
+| `fund/{fund_id}/contrib.json` | per-stock contributions for every year |
+| `fund/{fund_id}/exits.json` | static what-if fields (shares sold, $ sold, avg exit, 1y after, SPY 1y after) and summary |
 | `stock/{stock_id}/weekly.json` | weekly closes for position charts (shared across funds) |
 | `home/*.json` | the six home lists (section 7.1) |
 
-Typical fund total: 20–60 KB; the largest filers (~16k positions) ~2 MB, loaded in parts.
+Anything that depends on the latest price (current value, unrealised, total P&L, return %, IRR, IRR if held, since sale, $ missed/dodged, % since buy) is computed in the browser from these files plus `latest_prices.json`, so fund files only change when filings change. Bundling trades and contributions into one file per fund keeps the object count near 5 per fund.
+
+Typical fund total: 20–60 KB; the largest filers (~16k positions) ~2 MB.
 
 ## 7. Website
 
