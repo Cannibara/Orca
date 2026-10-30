@@ -1,3 +1,5 @@
+import logging
+import re
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -79,12 +81,17 @@ def tsv(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def make_zip(tmp_path: Path, submissions=None, coverpages=None, infotable=None) -> Path:
+def make_zip(
+    tmp_path: Path, submissions=None, coverpages=None, infotable=None, infotable_encoding="utf-8"
+) -> Path:
     path = tmp_path / "form13f.zip"
     with zipfile.ZipFile(path, "w") as z:
         z.writestr("SUBMISSION.tsv", tsv(SUBMISSIONS if submissions is None else submissions))
         z.writestr("COVERPAGE.tsv", tsv(COVERPAGES if coverpages is None else coverpages))
-        z.writestr("INFOTABLE.tsv", tsv(INFOTABLE if infotable is None else infotable))
+        z.writestr(
+            "INFOTABLE.tsv",
+            tsv(INFOTABLE if infotable is None else infotable).encode(infotable_encoding),
+        )
     return path
 
 
@@ -225,17 +232,107 @@ def test_put_call_and_share_type_are_normalised(tmp_path):
 
 
 @pytest.mark.parametrize("sh_type", ["XX", ""])
-def test_unknown_share_type_is_rejected(tmp_path, sh_type):
-    infotable = [holding(ORIGINAL, "A", "1", "1", sh_type=sh_type)]
-    with pytest.raises(ValueError, match="SSHPRNAMTTYPE"):
-        parse_bulk_zip(make_zip(tmp_path, infotable=infotable))
+def test_holding_with_bad_share_type_is_dropped_and_counted(tmp_path, caplog, sh_type):
+    infotable = [
+        holding(ORIGINAL, "KEPT INC", "1500", "10"),
+        holding(ORIGINAL, "BAD INC", "2000", "20", sh_type=sh_type),
+    ]
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        filings, rows = parse_bulk_zip(make_zip(tmp_path, infotable=infotable), stats=stats)
+
+    assert rows["issuer"].to_list() == ["KEPT INC"]
+    assert filings["accession"].to_list() == [ORIGINAL, RESTATEMENT]  # the filing itself stays
+    assert stats == {"dropped_holdings": 1, "dropped_filings": 0}
+    [record] = caplog.records
+    assert "form13f.zip" in record.getMessage() and ORIGINAL in record.getMessage()
 
 
-@pytest.mark.parametrize("field", ["CIK", "FILING_DATE", "PERIODOFREPORT"])
-def test_filing_missing_cik_date_or_period_is_rejected(tmp_path, field):
-    submissions = [{**SUBMISSIONS[0], field: ""}]
-    with pytest.raises(ValueError, match="CIK, filing date or period"):
-        parse_bulk_zip(make_zip(tmp_path, submissions, COVERPAGES, INFOTABLE))
+@pytest.mark.parametrize(
+    "field, bad_value",
+    [
+        ("CIK", ""),
+        ("FILING_DATE", ""),
+        ("PERIODOFREPORT", ""),
+        ("PERIODOFREPORT", "2022-09-30"),  # not DD-MON-YYYY
+        ("CIK", "not-a-number"),
+    ],
+)
+def test_filing_missing_cik_date_or_period_is_dropped_with_its_holdings(
+    tmp_path, caplog, field, bad_value
+):
+    submissions = [{**SUBMISSIONS[0], field: bad_value}, SUBMISSIONS[1]]
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        filings, rows = parse_bulk_zip(
+            make_zip(tmp_path, submissions, COVERPAGES, INFOTABLE), stats=stats
+        )
+
+    assert filings["accession"].to_list() == [RESTATEMENT]
+    assert rows["accession"].to_list() == [RESTATEMENT]  # the two ORIGINAL holdings went too
+    assert stats == {"dropped_holdings": 2, "dropped_filings": 1}
+    [record] = caplog.records
+    assert "form13f.zip" in record.getMessage() and ORIGINAL in record.getMessage()
+
+
+def test_warning_names_at_most_five_accessions_but_stats_count_all(tmp_path, caplog):
+    accessions = [f"0000000000-23-00000{i}" for i in range(7)]
+    submissions = [
+        submission(a, "10-MAR-2023", "13F-HR", "", "31-DEC-2022") for a in accessions  # no CIK
+    ]
+    infotable = [holding(a, "SOME INC", "1", "1") for a in accessions]
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        filings, rows = parse_bulk_zip(
+            make_zip(tmp_path, submissions, COVERPAGES, infotable), stats=stats
+        )
+
+    assert filings.height == 0 and rows.height == 0
+    assert stats == {"dropped_holdings": 7, "dropped_filings": 7}
+    [record] = caplog.records  # one warning per ZIP
+    assert len(re.findall(r"\d{10}-\d{2}-\d{6}", record.getMessage())) == 5
+
+
+def test_clean_zip_reports_no_drops_and_logs_nothing(tmp_path, caplog):
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        parse_bulk_zip(make_zip(tmp_path), stats=stats)
+
+    assert stats == {"dropped_holdings": 0, "dropped_filings": 0}
+    assert caplog.records == []  # 13F-NT filings are expected, not bad input
+
+
+def test_value_unit_follows_filing_date_not_period(tmp_path):
+    # Period Q4 2022, but filed after the switch to dollars.
+    submissions = [submission(ORIGINAL, "14-FEB-2023", "13F-HR", "1111111", "31-DEC-2022")]
+    infotable = [holding(ORIGINAL, "APPLE INC", "100", "10")]
+
+    filings, rows = parse_bulk_zip(make_zip(tmp_path, submissions, COVERPAGES, infotable))
+
+    assert filings["period"].to_list() == [39]  # Q4 2022
+    assert rows["value_usd"].to_list() == [100.0]
+
+
+def test_duplicate_coverpage_rows_do_not_duplicate_filings_or_holdings(tmp_path):
+    coverpages = [*COVERPAGES, coverpage(ORIGINAL, "", "ALPHA CAPITAL LP (DUPLICATE ROW)")]
+
+    filings, rows = parse_bulk_zip(make_zip(tmp_path, coverpages=coverpages))
+
+    assert filings["accession"].to_list() == [ORIGINAL, RESTATEMENT]
+    assert filings["manager_name"].to_list() == ["ALPHA CAPITAL LP", "BETA PARTNERS LLC"]  # first wins
+    assert rows["value_usd"].to_list() == [1_500_000.0, 2_000_000.0, 7.0]
+
+
+def test_non_utf8_byte_in_issuer_name_does_not_abort_the_parse(tmp_path):
+    infotable = [
+        holding(ORIGINAL, "CAF\u00e9 INC", "1500", "10"),
+        holding(ORIGINAL, "PLAIN INC", "2000", "20"),
+    ]
+
+    _, rows = parse_bulk_zip(make_zip(tmp_path, infotable=infotable, infotable_encoding="latin-1"))
+
+    assert rows["issuer"].to_list() == ["CAF\ufffd INC", "PLAIN INC"]  # bad byte replaced
+    assert rows["value_usd"].to_list() == [1_500_000.0, 2_000_000.0]
 
 
 def test_zip_with_only_notices_gives_empty_frames_with_the_usual_columns(tmp_path):
