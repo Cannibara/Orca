@@ -4,7 +4,14 @@ from dataclasses import replace
 
 import pytest
 
-from orca.engine.fund import FundQuarter, aggregate_fund, check_bridge
+from orca.engine.fund import (
+    FundQuarter,
+    FundYear,
+    aggregate_fund,
+    check_bridge,
+    contributions,
+    fund_years,
+)
 from orca.engine.position import PositionQuarter, PositionResult, compute_position
 from orca.quarter_px import QuarterPx
 
@@ -223,3 +230,141 @@ def test_engine_position_through_the_fund():
     assert quarters[4].ret == pytest.approx((0 - 780 + 1200) / (780 - 600))
     assert sum(fq.market_move + fq.trade_gains for fq in quarters) == pytest.approx(940)
     assert sum(fq.dividends for fq in quarters) == 125
+
+
+def year_quarter(q, ret=None, **fields) -> FundQuarter:
+    return replace(fund_quarter(**fields), q=q, ret=ret)
+
+
+def test_chain_year():
+    # 2014 = q4..q7, quarterly 0.10, -0.05, 0.20, 0.00
+    quarters = [year_quarter(4 + i, ret=r) for i, r in enumerate([0.10, -0.05, 0.20, 0.0])]
+    (year,) = fund_years(quarters)
+    assert year.label == "2014" and year.qs == [4, 5, 6, 7]
+    assert year.ret == pytest.approx(0.254)
+
+
+def test_year_chains_only_the_quarters_that_have_a_return():
+    quarters = [year_quarter(4 + i, ret=r) for i, r in enumerate([None, 0.10, None, 0.20])]
+    assert fund_years(quarters)[0].ret == pytest.approx(1.1 * 1.2 - 1)
+    assert fund_years([year_quarter(4), year_quarter(5)])[0].ret is None
+
+
+def test_year_sums_and_edges():
+    quarters = [
+        year_quarter(
+            4, start=100, end=130, net_buying=10, market_move=15, trade_gains=5, dividends=1
+        ),
+        year_quarter(
+            5, start=130, end=150, net_buying=-20, market_move=30, trade_gains=-2, dividends=2
+        ),
+        year_quarter(
+            6, start=150, end=160, net_buying=0, market_move=10, trade_gains=0, dividends=3
+        ),
+        year_quarter(
+            7, start=160, end=170, net_buying=4, market_move=5, trade_gains=1, dividends=4
+        ),
+    ]
+    (year,) = fund_years(quarters)
+    assert (year.start, year.end) == (100, 170)
+    assert year.gains == pytest.approx(15 + 5 + 30 - 2 + 10 + 5 + 1)
+    assert year.inflows == pytest.approx(-6) and year.dividends == pytest.approx(10)
+    # (gains + dividends) / (start + inflows / 2)
+    assert year.approx_ret == pytest.approx((64 + 10) / (100 - 3))
+
+
+def test_approx_ret_none_when_the_denominator_is_not_positive():
+    (year,) = fund_years([year_quarter(4, start=0, net_buying=0, market_move=5)])
+    assert year.approx_ret is None
+    (year,) = fund_years([year_quarter(4, start=100, net_buying=-200, market_move=5)])
+    assert year.approx_ret is None
+
+
+def test_fund_years_split_at_calendar_years_in_order():
+    quarters = [year_quarter(q) for q in range(2, 11)]  # q2 .. q10: Q3 2013 .. Q3 2015
+    years = fund_years(quarters)
+    assert [(y.label, y.qs) for y in years] == [
+        ("2013 H2", [2, 3]),
+        ("2014", [4, 5, 6, 7]),
+        ("2015 9M", [8, 9, 10]),
+    ]
+    assert fund_years([]) == []
+
+
+def test_partial_year_label():
+    # quarters 52, 53 only
+    years = fund_years([year_quarter(52), year_quarter(53)])
+    assert [y.label for y in years] == ["2026 H1"]
+
+
+@pytest.mark.parametrize(
+    "quarters, label",
+    [
+        ([4, 5, 6, 7], "2014"),
+        ([52], "2026 Q1"),
+        ([53], "2026 Q2"),
+        ([55], "2026 Q4"),
+        ([52, 53], "2026 H1"),
+        ([54, 55], "2026 H2"),
+        ([52, 53, 54], "2026 9M"),
+        ([53, 54], "2026 Q2–Q3"),
+        ([53, 54, 55], "2026 Q2–Q4"),
+    ],
+)
+def test_year_labels(quarters, label):
+    assert fund_years([year_quarter(q) for q in quarters])[0].label == label
+
+
+def stock_position(stock_id, *quarters) -> PositionResult:
+    return position(*quarters, stock_id=stock_id)
+
+
+def test_contribution_points():
+    # year start 1000, net buying 200, stock pnl 110 -> 110 / (1000 + 100) * 100 = 10
+    year = FundYear("2014", [4, 5, 6, 7], None, 1000, 0, 0, 200, 0, None)
+    p = stock_position(
+        7,
+        pq(4, value=0, market_move=40, trade_gain=10, dividends=1),
+        pq(5, value=0, market_move=20, trade_gain=-5, dividends=2),
+        pq(7, value=0, market_move=30, trade_gain=10, dividends=2),
+    )
+    assert contributions([p], [year]) == {"2014": [(7, pytest.approx(10.0), pytest.approx(110))]}
+
+
+def test_contributions_only_count_the_quarters_of_each_year():
+    years = [
+        FundYear("2013", [0, 1, 2, 3], None, 1000, 0, 0, 0, 0, None),
+        FundYear("2014 H1", [4, 5], None, 2000, 0, 0, 0, 0, None),
+    ]
+    p = stock_position(
+        1,
+        pq(3, value=0, market_move=50),
+        pq(4, value=0, market_move=100),
+        pq(6, value=0, market_move=999),
+    )
+    result = contributions([p], years)
+    assert result["2013"] == [(1, pytest.approx(5.0), pytest.approx(50))]
+    assert result["2014 H1"] == [(1, pytest.approx(5.0), pytest.approx(100))]
+
+
+def test_contributions_skip_positions_without_quarters_in_the_year_and_sort_descending():
+    year = FundYear("2014", [4, 5, 6, 7], None, 1000, 0, 0, 0, 0, None)
+    gain = stock_position(1, pq(5, value=0, market_move=30))
+    loss = stock_position(2, pq(6, value=0, market_move=-20))
+    big = stock_position(3, pq(4, value=0, trade_gain=80))
+    elsewhere = stock_position(4, pq(8, value=0, market_move=500))
+    result = contributions([gain, loss, big, elsewhere], [year])
+    assert [(stock_id, points) for stock_id, points, _ in result["2014"]] == [
+        (3, pytest.approx(8.0)),
+        (1, pytest.approx(3.0)),
+        (2, pytest.approx(-2.0)),
+    ]
+
+
+def test_contributions_empty_when_the_denominator_is_not_positive():
+    years = [
+        FundYear("2013", [0, 1, 2, 3], None, 0, 0, 0, 0, 0, None),
+        FundYear("2014", [4, 5, 6, 7], None, 100, 0, 0, -200, 0, None),
+    ]
+    p = stock_position(1, pq(3, value=0, market_move=50), pq(4, value=0, market_move=50))
+    assert contributions([p], years) == {"2013": [], "2014": []}
