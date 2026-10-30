@@ -7,6 +7,12 @@ from collections.abc import Callable
 import httpx
 
 SEC_RATE_PER_SEC = 10.0  # SEC fair-access limit
+# OpenFIGI mapping limits: with a key 25 requests per 6 s and 100 jobs each, without 25 per minute
+# and 10 jobs each.
+FIGI_RATE_KEYED = 25 / 6
+FIGI_RATE_ANON = 25 / 60
+FIGI_JOBS_KEYED = 100
+FIGI_JOBS_ANON = 10
 REQUEST_TIMEOUT = 30.0  # seconds
 
 
@@ -117,4 +123,42 @@ def sec_client(
         transport=transport,
         sleep=sleep,
         clock=clock,
+    )
+
+
+class FigiClient(Client):
+    """Client for OpenFIGI. `jobs_per_request` is how many mapping jobs one POST may carry."""
+
+    def __init__(self, *args, jobs_per_request: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jobs_per_request = jobs_per_request
+
+
+def figi_client(
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> FigiClient:
+    """Client for OpenFIGI, limited to what the key allows.
+
+    With OPENFIGI_KEY set: 25 requests per 6 s, 100 jobs per request, key sent as
+    X-OPENFIGI-APIKEY. Without it: 25 requests per minute, 10 jobs per request.
+    """
+    key = os.environ.get("OPENFIGI_KEY", "").strip()
+    if key:
+        return FigiClient(
+            FIGI_RATE_KEYED,
+            {"X-OPENFIGI-APIKEY": key},
+            transport=transport,
+            sleep=sleep,
+            clock=clock,
+            jobs_per_request=FIGI_JOBS_KEYED,
+        )
+    return FigiClient(
+        FIGI_RATE_ANON,
+        {},
+        transport=transport,
+        sleep=sleep,
+        clock=clock,
+        jobs_per_request=FIGI_JOBS_ANON,
     )

@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from orca.http import Client, FetchError, sec_client
+from orca.http import Client, FetchError, figi_client, sec_client
 
 
 class FakeTime:
@@ -265,3 +265,45 @@ def test_retries_pass_through_the_rate_limiter():
 
     # 2 s backoff refills 2 * 25/60 of a token; the limiter waits out the other 0.4 s.
     assert t.sleeps == [2, pytest.approx(0.4)]
+
+
+def test_figi_client_with_key_is_fast_and_batches_100(monkeypatch):
+    monkeypatch.setenv("OPENFIGI_KEY", "secret-key")
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=[])
+
+    client = figi_client(httpx.MockTransport(handler), sleep=t.sleep, clock=t.clock)
+    for _ in range(3):
+        client.post_json("https://api.openfigi.com/v3/mapping", [])
+
+    assert client.jobs_per_request == 100
+    assert seen[0].headers["X-OPENFIGI-APIKEY"] == "secret-key"
+    # 25 requests per 6 s: the first call is immediate, the next two are 0.24 s apart.
+    assert t.sleeps == [pytest.approx(0.24)] * 2
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_figi_client_without_key_is_slow_and_batches_10(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("OPENFIGI_KEY", raising=False)
+    else:
+        monkeypatch.setenv("OPENFIGI_KEY", value)
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=[])
+
+    client = figi_client(httpx.MockTransport(handler), sleep=t.sleep, clock=t.clock)
+    for _ in range(3):
+        client.post_json("https://api.openfigi.com/v3/mapping", [])
+
+    assert client.jobs_per_request == 10
+    assert "X-OPENFIGI-APIKEY" not in seen[0].headers
+    # 25 requests per minute: 2.4 s apart.
+    assert t.sleeps == [pytest.approx(2.4)] * 2
