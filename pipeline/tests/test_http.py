@@ -309,8 +309,9 @@ def test_figi_client_without_key_is_slow_and_batches_10(monkeypatch, value):
     assert t.sleeps == [pytest.approx(2.4)] * 2
 
 
-def test_tiingo_client_sends_the_key_as_a_token_header_at_one_request_per_second(monkeypatch):
+def test_tiingo_client_sends_the_key_as_a_token_header_at_2_5_requests_per_second(monkeypatch):
     monkeypatch.setenv("TIINGO_KEY", " secret-key ")
+    monkeypatch.delenv("TIINGO_RATE_PER_SEC", raising=False)
     t = FakeTime()
     seen = []
 
@@ -324,7 +325,38 @@ def test_tiingo_client_sends_the_key_as_a_token_header_at_one_request_per_second
 
     assert seen[0].headers["Authorization"] == "Token secret-key"
     assert "secret-key" not in str(seen[0].url)
-    assert t.sleeps == [pytest.approx(1.0)] * 2
+    assert t.sleeps == [pytest.approx(0.4)] * 2
+
+
+@pytest.mark.parametrize(
+    ("value", "gap"), [("10", 0.1), (" 0.5 ", 2.0), ("", 0.4), ("   ", 0.4), (None, 0.4)]
+)
+def test_tiingo_rate_comes_from_the_environment(monkeypatch, value, gap):
+    monkeypatch.setenv("TIINGO_KEY", "k")
+    if value is None:
+        monkeypatch.delenv("TIINGO_RATE_PER_SEC", raising=False)
+    else:
+        monkeypatch.setenv("TIINGO_RATE_PER_SEC", value)
+    t = FakeTime()
+    client = tiingo_client(
+        httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
+        sleep=t.sleep,
+        clock=t.clock,
+    )
+
+    for _ in range(3):
+        client.get("https://api.tiingo.com/x")
+
+    assert t.sleeps == [pytest.approx(gap)] * 2
+
+
+@pytest.mark.parametrize("value", ["fast", "0", "-1", "nan", "inf"])
+def test_tiingo_rate_must_be_a_positive_number(monkeypatch, value):
+    monkeypatch.setenv("TIINGO_KEY", "k")
+    monkeypatch.setenv("TIINGO_RATE_PER_SEC", value)
+
+    with pytest.raises(RuntimeError, match="TIINGO_RATE_PER_SEC"):
+        tiingo_client()
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])

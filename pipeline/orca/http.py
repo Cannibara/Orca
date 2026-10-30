@@ -1,5 +1,6 @@
 """Rate-limited HTTP client with retries, used for every outbound request."""
 
+import math
 import os
 import time
 from collections.abc import Callable
@@ -13,9 +14,9 @@ FIGI_RATE_KEYED = 25 / 6
 FIGI_RATE_ANON = 25 / 60
 FIGI_JOBS_KEYED = 100
 FIGI_JOBS_ANON = 10
-# Tiingo: one request a second (3,600 an hour). An assumption: the task gave no Tiingo limit, so
-# check it against the plan we buy.
-TIINGO_RATE_PER_SEC = 1.0
+# Tiingo: the paid plan allows about 10,000 requests an hour (2.8 a second); 2.5 stays under it.
+# The environment variable TIINGO_RATE_PER_SEC overrides the default.
+TIINGO_RATE_DEFAULT = 2.5
 REQUEST_TIMEOUT = 30.0  # seconds
 
 
@@ -173,14 +174,28 @@ def tiingo_client(
     clock: Callable[[], float] = time.monotonic,
 ) -> Client:
     """Client for Tiingo. TIINGO_KEY goes out as `Authorization: Token <key>`, never in the URL
-    (URLs end up in FetchError messages)."""
+    (URLs end up in FetchError messages). Requests per second: TIINGO_RATE_PER_SEC if set (a
+    positive number), else 2.5."""
     key = os.environ.get("TIINGO_KEY", "").strip()
     if not key:
         raise RuntimeError("TIINGO_KEY is not set. Set it to your Tiingo API token.")
     return Client(
-        TIINGO_RATE_PER_SEC,
+        _tiingo_rate(),
         {"Authorization": f"Token {key}"},
         transport=transport,
         sleep=sleep,
         clock=clock,
     )
+
+
+def _tiingo_rate() -> float:
+    raw = os.environ.get("TIINGO_RATE_PER_SEC", "").strip()
+    if not raw:
+        return TIINGO_RATE_DEFAULT
+    try:
+        rate = float(raw)
+    except ValueError:
+        rate = math.nan
+    if not math.isfinite(rate) or rate <= 0:
+        raise RuntimeError(f"TIINGO_RATE_PER_SEC must be a positive number, got {raw!r}")
+    return rate

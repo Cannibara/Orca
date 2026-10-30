@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import date
 
 import httpx
@@ -53,15 +55,22 @@ def stored(*rows) -> pl.DataFrame:
 
 
 class Recording:
-    """Wraps a source and remembers each request it receives."""
+    """Wraps a source, remembers each request it receives and raises `errors[ticker]` if set."""
 
-    def __init__(self, inner):
+    def __init__(self, inner, errors: dict[str, Exception] | None = None):
         self.inner = inner
+        self.errors = errors or {}
         self.calls: list[tuple[str, date, date]] = []
 
     def daily(self, ticker, start, end):
         self.calls.append((ticker, start, end))
+        if ticker in self.errors:
+            raise self.errors[ticker]
         return self.inner.daily(ticker, start, end)
+
+
+def fetch_error(ticker: str, status: int | None) -> FetchError:
+    return FetchError(f"https://api.tiingo.com/tiingo/daily/{ticker}/prices", status)
 
 
 # Mon 6 May 2024 .. Fri 17 May 2024
@@ -302,6 +311,32 @@ def test_tiingo_unexpected_body_is_a_fetch_error(monkeypatch, body):
     assert "secret-key" not in str(exc.value)
 
 
+def test_tiingo_drops_bars_whose_split_factor_is_not_finite_and_positive(monkeypatch, caplog):
+    def bad(day, factor):
+        return dict(TIINGO_BODY[0], date=f"2024-05-{day}T00:00:00.000Z", splitFactor=factor)
+
+    body = [
+        bad("06", 1.0),
+        bad("07", 0.0),
+        bad("08", -2.0),
+        bad("09", float("nan")),
+        bad("10", float("inf")),
+        bad("13", None),
+        bad("14", 2.0),
+    ]
+
+    def handler(request):  # json.dumps (unlike httpx's json=) lets NaN and Infinity through
+        return httpx.Response(200, content=json.dumps(body).encode())
+
+    with caplog.at_level(logging.WARNING, logger="orca.prices"):
+        out = tiingo(handler, monkeypatch).daily("AAA", D(2024, 5, 6), D(2024, 5, 17))
+
+    assert out["date"].to_list() == [D(2024, 5, 6), D(2024, 5, 14)]
+    assert out["split_factor"].to_list() == [1.0, 2.0]
+    assert out.schema == DAILY_SCHEMA
+    assert any("AAA" in r.getMessage() and "5" in r.getMessage() for r in caplog.records)
+
+
 # --- store ------------------------------------------------------------------------------
 
 
@@ -474,6 +509,211 @@ def test_update_keeps_a_corrected_value_after_a_later_unchanged_run(tmp_path):
     )  # 77.0 is the stored value
 
     assert read_prices(lake).filter(pl.col("date") == D(2024, 5, 10))["close"].to_list() == [77.0]
+
+
+def test_update_does_not_read_the_whole_table(tmp_path, monkeypatch):
+    lake = Lake(tmp_path)
+    frames = {"AAA": daily(*WEEK1, *WEEK2), "BBB": daily(*WEEK1, *WEEK2)}
+    update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 5, 10))
+    compact_prices(lake)
+    update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 5, 13))
+
+    def no_full_read(self, table, part=None):
+        assert part is not None, "update_prices must not read the whole table"
+        return real_read(self, table, part)
+
+    real_read = Lake.read
+    monkeypatch.setattr(Lake, "read", no_full_read)
+    monkeypatch.setattr("orca.prices.read_prices", lambda lake: pytest.fail("full-table read"))
+
+    assert (
+        update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 5, 17)) == []
+    )
+
+    monkeypatch.undo()
+    assert read_prices(lake).height == 20
+
+
+def test_update_change_detection_sees_the_newest_stored_value_across_parts(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    compact_prices(lake)  # y2024 holds the original 10 May
+    fixed = FixtureSource({"AAA": daily(bar(D(2024, 5, 10), 77.0))})
+    assert update_prices(lake, fixed, {1: "AAA"}, today=D(2024, 5, 17)) == [1]  # z over y
+
+    assert update_prices(lake, fixed, {1: "AAA"}, today=D(2024, 5, 24)) == []  # 77.0 is current
+
+
+def test_update_change_detection_sees_the_newest_value_within_one_part(tmp_path):
+    lake = Lake(tmp_path)
+    first = daily(*WEEK1[:3])  # 6-8 May
+    second = daily(bar(D(2024, 5, 8), 55.0), *WEEK1[3:])  # 8 May restated, 9-10 May new
+    update_prices(lake, FixtureSource({"AAA": first}), {1: "AAA"}, today=D(2024, 5, 8), run_id="r1")
+    update_prices(
+        lake, FixtureSource({"AAA": second}), {1: "AAA"}, today=D(2024, 5, 10), run_id="r1"
+    )
+    assert lake.parts(TABLE) == ["zr1"]  # the part holds 8 May twice: 55.0 after the original
+
+    assert (
+        update_prices(lake, FixtureSource({"AAA": second}), {1: "AAA"}, today=D(2024, 5, 17)) == []
+    )
+
+
+# --- failures: spec section 8, skip a failed input, keep the last good data ---------------
+
+
+def test_one_failed_ticker_does_not_lose_the_others(tmp_path, caplog):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC")}
+    source = Recording(FixtureSource(frames), {"BBB": fetch_error("BBB", 500)})
+    stats: dict = {}
+
+    with caplog.at_level(logging.WARNING, logger="orca.prices"):
+        changed = update_prices(
+            lake, source, {1: "AAA", 2: "BBB", 3: "CCC"}, today=D(2024, 5, 10), stats=stats
+        )
+
+    assert changed == [1, 3]
+    assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 3]
+    assert stats == {"failed": [(2, "BBB", 500)], "empty": 0, "fetched": 2, "stopped": None}
+    assert any("BBB" in r.getMessage() for r in caplog.records)
+
+
+def test_stats_count_tickers_that_come_back_empty_and_network_failures(tmp_path):
+    lake = Lake(tmp_path)
+    source = Recording(FixtureSource({"AAA": daily(*WEEK1)}), {"NET": fetch_error("NET", None)})
+    stats: dict = {}
+
+    update_prices(lake, source, {1: "AAA", 2: "GONE", 3: "NET"}, today=D(2024, 5, 10), stats=stats)
+
+    assert stats == {"failed": [(3, "NET", None)], "empty": 1, "fetched": 1, "stopped": None}
+
+
+def test_stats_are_optional_and_restarted_on_each_call(tmp_path):
+    lake = Lake(tmp_path)
+    source = FixtureSource({"AAA": daily(*WEEK1)})
+    assert update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10)) == [1]
+    stats = {"failed": [(9, "OLD", 500)], "empty": 7, "fetched": 7, "stopped": "old"}
+
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), stats=stats)
+
+    assert stats == {"failed": [], "empty": 0, "fetched": 1, "stopped": None}
+
+
+def test_a_failed_ticker_keeps_its_last_good_data_and_is_retried_from_the_same_day(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {"AAA": daily(*WEEK1, *WEEK2), "BBB": daily(*WEEK1, *WEEK2)}
+    update_prices(lake, FixtureSource(frames), {1: "AAA"}, today=D(2024, 5, 10))
+
+    down = Recording(FixtureSource(frames), {"AAA": fetch_error("AAA", 503)})
+    assert update_prices(lake, down, {1: "AAA", 2: "BBB"}, today=D(2024, 5, 17)) == [2]
+    assert read_prices(lake).filter(stock_id=1).height == 5  # nothing lost, nothing invented
+
+    up = Recording(FixtureSource(frames))
+    assert update_prices(lake, up, {1: "AAA", 2: "BBB"}, today=D(2024, 5, 24)) == []
+    # the date AAA is retried from did not advance past its last good day (10 May)
+    assert ("AAA", D(2024, 5, 5), D(2024, 5, 24)) in up.calls
+    assert read_prices(lake).filter(stock_id=1).height == 10
+
+
+def test_a_failed_new_ticker_is_retried_from_the_start_of_the_history(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {"AAA": daily(*WEEK1)}
+    down = Recording(FixtureSource(frames), {"AAA": fetch_error("AAA", 500)})
+    assert update_prices(lake, down, {1: "AAA"}, today=D(2024, 5, 10)) == []
+    assert lake.parts(TABLE) == []
+
+    up = Recording(FixtureSource(frames))
+    assert update_prices(lake, up, {1: "AAA"}, today=D(2024, 5, 17)) == [1]
+    assert up.calls == [("AAA", D(2013, 1, 1), D(2024, 5, 17))]
+
+
+@pytest.mark.parametrize("status", [401, 403, 429])
+def test_the_breaker_stops_on_an_auth_or_rate_limit_error_and_keeps_earlier_rows(tmp_path, status):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC", "DDD")}
+    source = Recording(FixtureSource(frames), {"CCC": fetch_error("CCC", status)})
+    stats: dict = {}
+
+    changed = update_prices(
+        lake, source, {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD"}, today=D(2024, 5, 10), stats=stats
+    )
+
+    assert [c[0] for c in source.calls] == ["AAA", "BBB", "CCC"]  # DDD was never requested
+    assert changed == [1, 2]
+    assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 2]
+    assert stats["failed"] == [(3, "CCC", status)]
+    assert str(status) in stats["stopped"]
+
+
+def test_the_breaker_stops_after_25_consecutive_failures_and_keeps_earlier_rows(tmp_path):
+    lake = Lake(tmp_path)
+    good = {f"G{i}": daily(*WEEK1) for i in range(1, 4)}
+    tickers = {i: f"G{i}" for i in range(1, 4)} | {i: f"B{i}" for i in range(4, 40)}
+    source = Recording(
+        FixtureSource(good), {f"B{i}": fetch_error(f"B{i}", 500) for i in range(4, 40)}
+    )
+    stats: dict = {}
+
+    changed = update_prices(lake, source, tickers, today=D(2024, 5, 10), stats=stats)
+
+    assert changed == [1, 2, 3]
+    assert len(source.calls) == 3 + 25
+    assert len(stats["failed"]) == 25
+    assert "25" in stats["stopped"]
+    assert read_prices(lake)["stock_id"].n_unique() == 3
+
+
+def test_a_success_resets_the_consecutive_failure_count(tmp_path):
+    lake = Lake(tmp_path)
+    tickers = {i: f"B{i}" for i in range(1, 25)} | {25: "AAA"} | {i: f"B{i}" for i in range(26, 50)}
+    errors = {t: fetch_error(t, 500) for t in tickers.values() if t != "AAA"}
+    source = Recording(FixtureSource({"AAA": daily(*WEEK1)}), errors)
+    stats: dict = {}
+
+    update_prices(lake, source, tickers, today=D(2024, 5, 10), stats=stats)
+
+    assert len(source.calls) == 49  # 24 failures, a success, 24 failures: the breaker never trips
+    assert len(stats["failed"]) == 48
+    assert stats["stopped"] is None
+
+
+def test_progress_is_flushed_every_n_tickers_so_a_crash_keeps_what_was_fetched(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC", "DDD", "EEE")}
+    source = Recording(FixtureSource(frames), {"EEE": RuntimeError("job killed")})
+    tickers = {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD", 5: "EEE"}
+
+    with pytest.raises(RuntimeError, match="job killed"):
+        update_prices(lake, source, tickers, today=D(2024, 5, 10), flush_every=2)
+
+    # flushed after DDD (4 tickers done); nothing of EEE
+    assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 2, 3, 4]
+    assert lake.parts(TABLE) == ["z20240510"]
+
+
+def test_flushing_extends_one_part_and_returns_every_changed_stock(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC", "DDD", "EEE")}
+    tickers = {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD", 5: "EEE"}
+
+    changed = update_prices(
+        lake, FixtureSource(frames), tickers, today=D(2024, 5, 10), flush_every=2
+    )
+
+    assert changed == [1, 2, 3, 4, 5]
+    assert lake.parts(TABLE) == ["z20240510"]
+    assert read_prices(lake).height == 25
+
+
+def test_a_crash_before_the_first_flush_stores_nothing(tmp_path):
+    lake = Lake(tmp_path)
+    source = Recording(FixtureSource({"AAA": daily(*WEEK1)}), {"BBB": RuntimeError("bug")})
+
+    with pytest.raises(RuntimeError):
+        update_prices(lake, source, {1: "AAA", 2: "BBB"}, today=D(2024, 5, 10))
+
+    assert lake.parts(TABLE) == []
 
 
 def test_read_prices_of_an_empty_lake_has_the_schema(tmp_path):
