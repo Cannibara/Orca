@@ -1,6 +1,7 @@
 sic_from,sic_to,sector
 2830,2836,Health care
 2840,2844,Consumer staples
+3020,3029,Consumer discretionary
 3630,3639,Consumer discretionary
 3710,3716,Consumer discretionary
 5120,5129,Health care
@@ -19,6 +20,7 @@ sic_from,sic_to,sector
 3400,3569,Industrials
 3580,3599,Industrials
 3700,3799,Industrials
+3812,3812,Industrials
 4000,4799,Industrials
 5000,5199,Industrials
 8700,8799,Industrials

@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from orca import securities
-from orca.http import Client, FetchError, figi_client
+from orca.http import Client, FetchError, FigiClient, figi_client
 from orca.securities import (
     assign_stock_ids,
     fetch_shares_outstanding,
@@ -14,6 +14,7 @@ from orca.securities import (
     load_sec_tickers,
     map_cusips,
     normalise_name,
+    normalise_ticker,
     sector_for_sic,
 )
 
@@ -22,6 +23,16 @@ FIGI_URL = "https://api.openfigi.com/v3/mapping"
 
 def make_client(handler) -> Client:
     return Client(1000, {}, transport=httpx.MockTransport(handler), sleep=lambda s: None)
+
+
+def make_figi_client(handler, jobs_per_request: int = 100) -> FigiClient:
+    return FigiClient(
+        1000,
+        {},
+        transport=httpx.MockTransport(handler),
+        sleep=lambda s: None,
+        jobs_per_request=jobs_per_request,
+    )
 
 
 def tickers_frame(*rows: tuple[str, int, str]) -> pl.DataFrame:
@@ -131,7 +142,7 @@ def test_openfigi_without_key_uses_batches_of_10(monkeypatch):
 
 def test_duplicate_cusips_are_looked_up_once():
     seen = []
-    client = make_client(figi_handler({"A": found(hit("BBG1", "AAA", "Aaa Inc"))}, seen))
+    client = make_figi_client(figi_handler({"A": found(hit("BBG1", "AAA", "Aaa Inc"))}, seen))
 
     out = map_cusips(["A", "A", "B", "A"], {}, client, NO_TICKERS)
 
@@ -140,7 +151,7 @@ def test_duplicate_cusips_are_looked_up_once():
 
 
 def test_no_cusips_makes_no_request_and_keeps_schema():
-    client = make_client(lambda request: pytest.fail("unexpected request"))
+    client = make_figi_client(lambda request: pytest.fail("unexpected request"))
 
     out = map_cusips([], {}, client, NO_TICKERS)
 
@@ -163,7 +174,7 @@ def test_openfigi_prefers_us_listing_and_composite_figi():
             hit("BBG-X2", "XXY", "Y", exchCode="GR"),
         ),
     }
-    client = make_client(figi_handler(results))
+    client = make_figi_client(figi_handler(results))
 
     out = map_cusips(["C1", "C2"], {}, client, NO_TICKERS).to_dicts()
 
@@ -185,7 +196,7 @@ def test_etp_security_type_is_an_etf_case_insensitively():
         "C3": {"data": [hit("F3", "AAA", "Aaa", securityType="Depositary Receipt")]},
         "C4": {"data": [hit("F4", "BBB", "Bbb", securityType=None)]},
     }
-    client = make_client(figi_handler(results))
+    client = make_figi_client(figi_handler(results))
 
     out = map_cusips(["C1", "C2", "C3", "C4"], {}, client, NO_TICKERS)
 
@@ -193,19 +204,56 @@ def test_etp_security_type_is_an_etf_case_insensitively():
 
 
 def test_misaligned_openfigi_response_is_an_error():
-    client = make_client(lambda request: httpx.Response(200, json=[{"warning": "x"}]))
+    client = make_figi_client(lambda request: httpx.Response(200, json=[{"warning": "x"}]))
 
     with pytest.raises(ValueError, match="2 jobs"):
         map_cusips(["A", "B"], {}, client, NO_TICKERS)
 
 
 def test_openfigi_http_error_propagates():
-    client = make_client(lambda request: httpx.Response(401))
+    client = make_figi_client(lambda request: httpx.Response(401))
 
     with pytest.raises(FetchError) as exc:
         map_cusips(["A"], {}, client, NO_TICKERS)
 
     assert exc.value.status == 401
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("AAPL", "AAPL"),
+        ("BRK/B", "BRK-B"),
+        ("BRK.B", "BRK-B"),
+        ("brk-b", "BRK-B"),
+        (" bf.b ", "BF-B"),
+        (None, None),
+    ],
+)
+def test_normalise_ticker(raw, expected):
+    assert normalise_ticker(raw) == expected
+
+
+def test_openfigi_tickers_use_the_sec_style():
+    results = {
+        "C1": found(hit("F1", "BRK/B", "BERKSHIRE HATHAWAY INC-CL B")),
+        "C2": found(hit("F2", "bf.b", "BROWN FORMAN CORP-CLASS B")),
+        "C3": found(hit("F3", None, "NO TICKER")),
+    }
+    client = make_figi_client(figi_handler(results))
+
+    out = map_cusips(["C1", "C2", "C3"], {}, client, NO_TICKERS)
+
+    assert out["ticker"].to_list() == ["BRK-B", "BF-B", None]
+
+
+def test_name_matched_ticker_uses_the_sec_style():
+    sec = tickers_frame(("BRK.B", 1067983, "Berkshire Hathaway Inc"))
+    client = make_figi_client(figi_handler({}))
+
+    out = map_cusips(["C1"], {"C1": "BERKSHIRE HATHAWAY INC"}, client, sec)
+
+    assert out.row(0, named=True)["ticker"] == "BRK-B"
 
 
 # --- name fallback and unmapped -------------------------------------------------------
@@ -238,7 +286,7 @@ def test_name_fallback_exact_normalised_match():
         ("AAPL", 320193, "Apple Inc."),
         ("APLE", 1418121, "Apple Hospitality REIT, Inc."),
     )
-    client = make_client(figi_handler({}))
+    client = make_figi_client(figi_handler({}))
 
     out = map_cusips(
         ["037833100", "03784Y200"],
@@ -263,7 +311,7 @@ def test_name_fallback_needs_exactly_one_sec_row():
         ("GOOGL", 1652044, "Alphabet Inc."),
         ("GOOG", 1652044, "Alphabet Inc."),
     )
-    client = make_client(figi_handler({}))
+    client = make_figi_client(figi_handler({}))
 
     out = map_cusips(["02079K305"], {"02079K305": "ALPHABET INC CL A"}, client, sec)
 
@@ -272,7 +320,7 @@ def test_name_fallback_needs_exactly_one_sec_row():
 
 def test_name_fallback_is_only_for_cusips_openfigi_did_not_map():
     sec = tickers_frame(("AAPL", 320193, "Apple Inc."))
-    client = make_client(figi_handler({"C1": {"data": [hit("F1", "APC", "APPLE CO")]}}))
+    client = make_figi_client(figi_handler({"C1": {"data": [hit("F1", "APC", "APPLE CO")]}}))
 
     out = map_cusips(["C1", "C2"], {"C1": "APPLE INC", "C2": "APPLE INC"}, client, sec).to_dicts()
 
@@ -282,7 +330,7 @@ def test_name_fallback_is_only_for_cusips_openfigi_did_not_map():
 
 def test_unmapped_marked():
     sec = tickers_frame(("AAPL", 320193, "Apple Inc."))
-    client = make_client(figi_handler({"C3": {"error": "Invalid idValue format"}}))
+    client = make_figi_client(figi_handler({"C3": {"error": "Invalid idValue format"}}))
 
     out = map_cusips(["C1", "C2", "C3"], {"C1": "UNKNOWN CORP"}, client, sec).to_dicts()
 
@@ -299,7 +347,7 @@ def test_unmapped_marked():
 
 
 def test_mapped_frame_schema():
-    client = make_client(figi_handler({"A": found(hit("F", "T", "N"))}))
+    client = make_figi_client(figi_handler({"A": found(hit("F", "T", "N"))}))
 
     out = map_cusips(["A", "B"], {}, client, NO_TICKERS)
 
@@ -356,17 +404,64 @@ def test_identity_key_is_figi_else_ticker():
     out = assign_stock_ids(
         mapped_frame(
             ("C1", None, "AAPL", "Apple Inc.", False, "name"),  # ticker key: already known
-            ("C2", "F2", "AAPL", "Apple again", False, "openfigi"),  # figi key: a new security
-            ("C3", "F2", "AAPL", "Apple again", False, "openfigi"),  # same figi: same security
-            ("C4", None, "MSFT", "Microsoft Corp.", False, "name"),
-            ("C5", None, "MSFT", "Microsoft Corp.", False, "name"),
+            ("C2", "F2", "TSLA", "Tesla", False, "openfigi"),  # figi key: new
+            ("C3", "F2", "TSLA", "Tesla", False, "openfigi"),  # same figi: same security
+            ("C4", None, "MSFT", "Microsoft Corp.", False, "name"),  # ticker key: new
+            ("C5", None, "MSFT", "Microsoft Corp.", False, "name"),  # same ticker: same security
         ),
         existing,
     )
 
     assert out["stock_id"].to_list() == [1, 2, 3]
-    assert out["ticker"].to_list() == ["AAPL", "AAPL", "MSFT"]
+    assert out["ticker"].to_list() == ["AAPL", "TSLA", "MSFT"]
     assert out["figi"].to_list() == [None, "F2", None]
+
+
+def test_figi_and_ticker_keys_do_not_collide():
+    out = assign_stock_ids(
+        mapped_frame(
+            ("C1", "ABC", "XYZ", "Xyz", False, "openfigi"),
+            ("C2", None, "ABC", "Abc", False, "name"),
+        ),
+        securities_frame(),
+    )
+
+    assert out["stock_id"].to_list() == [1, 2]
+
+
+def test_ticker_only_row_joins_the_figi_row_with_that_ticker_in_the_same_call():
+    # The same issuer, seen once through OpenFIGI and once through the name fallback.
+    for rows in (
+        [
+            ("C1", None, "AAPL", "Apple Inc.", False, "name"),
+            ("C2", "F1", "AAPL", "APPLE INC", False, "openfigi"),
+        ],
+        [
+            ("C2", "F1", "AAPL", "APPLE INC", False, "openfigi"),
+            ("C1", None, "AAPL", "Apple Inc.", False, "name"),
+        ],
+    ):
+        out = assign_stock_ids(mapped_frame(*rows), securities_frame())
+
+        assert out["stock_id"].to_list() == [1]
+        assert out["figi"].to_list() == ["F1"]
+        assert out["ticker"].to_list() == ["AAPL"]
+
+
+def test_ticker_only_row_joins_the_existing_figi_row_with_that_ticker():
+    existing = securities_frame((7, "F1", "AAPL", "Apple Inc.", False))
+
+    out = assign_stock_ids(
+        mapped_frame(
+            ("C1", None, "AAPL", "Apple Inc.", False, "name"),
+            ("C2", None, "MSFT", "Microsoft Corp.", False, "name"),
+        ),
+        existing,
+    )
+
+    assert out["stock_id"].to_list() == [7, 8]
+    assert out["ticker"].to_list() == ["AAPL", "MSFT"]
+    assert out.head(1).equals(existing)
 
 
 def test_unmapped_rows_get_no_id():
@@ -467,6 +562,19 @@ def test_sector_for_sic():
         (7812, "Communication"),
         (4911, "Utilities"),
         (4941, "Utilities"),
+        # ranges around the carve-outs
+        (5122, "Health care"),  # drug wholesale, inside wholesale 5000-5199
+        (5141, "Consumer staples"),  # grocery wholesale
+        (5065, "Industrials"),
+        (2250, "Consumer discretionary"),  # textiles
+        (2450, "Materials"),  # wood products
+        (3050, "Materials"),  # rubber and plastics
+        (3021, "Consumer discretionary"),  # footwear, inside rubber and plastics 3000-3099
+        (3011, "Materials"),
+        (3150, "Consumer discretionary"),  # leather
+        (3812, "Industrials"),  # search, detection and navigation systems
+        (3811, "Other"),
+        (3813, "Other"),
         # outside every range
         (100, "Other"),
         (9995, "Other"),
@@ -519,6 +627,17 @@ def test_load_sec_tickers():
     assert out.rows() == [("AAPL", 320193, "Apple Inc."), ("MSFT", 789019, "MICROSOFT CORP")]
 
 
+def test_load_sec_tickers_normalises_tickers():
+    payload = {
+        "0": {"cik_str": 1067983, "ticker": "BRK.B", "title": "BERKSHIRE HATHAWAY INC"},
+        "1": {"cik_str": 14693, "ticker": "bf/b", "title": "BROWN FORMAN CORP"},
+    }
+
+    out = load_sec_tickers(make_client(lambda request: httpx.Response(200, json=payload)))
+
+    assert out["ticker"].to_list() == ["BRK-B", "BF-B"]
+
+
 def test_load_sec_tickers_empty_keeps_schema():
     out = load_sec_tickers(make_client(lambda request: httpx.Response(200, json={})))
 
@@ -550,20 +669,29 @@ def test_fetch_sic_404_is_none_and_other_errors_raise():
     assert exc.value.status == 403
 
 
-def facts(*entries: dict) -> dict:
+def concept(*entries: dict) -> dict:
+    """A companyconcept response for dei:EntityCommonStockSharesOutstanding."""
     return {
-        "cik": 320193,
-        "facts": {
-            "dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": list(entries)}}}
-        },
+        "cik": 1652044,
+        "taxonomy": "dei",
+        "tag": "EntityCommonStockSharesOutstanding",
+        "units": {"shares": list(entries)},
     }
 
 
+def entry(end, val, accn, filed, form="10-Q", fp="Q2"):
+    return {"end": end, "val": val, "accn": accn, "filed": filed, "form": form, "fp": fp}
+
+
+def shares_of(body: dict, cik: int = 1) -> float | None:
+    return fetch_shares_outstanding(make_client(lambda r: httpx.Response(200, json=body)), cik)
+
+
 def test_fetch_shares_outstanding_takes_latest_end():
-    body = facts(
-        {"end": "2024-01-19", "val": 15_550_061_000, "filed": "2024-02-02"},
-        {"end": "2024-10-18", "val": 15_115_823_000, "filed": "2024-11-01"},
-        {"end": "2023-10-20", "val": 15_552_752_000, "filed": "2023-11-03"},
+    body = concept(
+        entry("2024-01-19", 15_550_061_000, "0000320193-24-000006", "2024-02-02"),
+        entry("2024-10-18", 15_115_823_000, "0000320193-24-000123", "2024-11-01"),
+        entry("2023-10-20", 15_552_752_000, "0000320193-23-000106", "2023-11-03"),
     )
     seen = []
 
@@ -575,50 +703,89 @@ def test_fetch_shares_outstanding_takes_latest_end():
 
     assert result == 15_115_823_000.0
     assert isinstance(result, float)
-    assert seen == ["https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"]
+    assert seen == [
+        (
+            "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/dei/"
+            "EntityCommonStockSharesOutstanding.json"
+        )
+    ]
 
 
-def test_fetch_shares_outstanding_ties_on_end_take_latest_filed():
-    body = facts(
-        {"end": "2024-06-30", "val": 100, "filed": "2024-08-01"},
-        {"end": "2024-06-30", "val": 105, "filed": "2024-08-20"},  # amendment
-        {"end": "2024-06-30", "val": 90, "filed": "2024-07-15"},
+def test_fetch_shares_outstanding_ties_on_end_take_latest_filing():
+    body = concept(
+        entry("2024-06-30", 100, "0001-24-000002", "2024-08-01"),
+        entry("2024-06-30", 105, "0001-24-000009", "2024-08-20", form="10-Q/A"),
+        entry("2024-06-30", 90, "0001-24-000001", "2024-07-15"),
     )
 
-    client = make_client(lambda r: httpx.Response(200, json=body))
-
-    assert fetch_shares_outstanding(client, 1) == 105.0
+    assert shares_of(body) == 105.0
 
 
-def test_fetch_shares_outstanding_full_tie_is_deterministic():
+def test_fetch_shares_outstanding_sums_share_classes_of_one_filing():
+    # Alphabet-shaped: one filing reports each class as its own entry with the same end/filed.
+    body = concept(
+        entry("2024-07-16", 5_800_000_000, "0001652044-24-000079", "2024-07-24"),  # class A
+        entry("2024-07-16", 860_000_000, "0001652044-24-000079", "2024-07-24"),  # class B
+        entry("2024-07-16", 5_500_000_000, "0001652044-24-000079", "2024-07-24"),  # class C
+        entry("2024-04-17", 12_000_000_000, "0001652044-24-000052", "2024-04-25"),
+    )
+
+    assert shares_of(body) == 12_160_000_000.0
+
+
+def test_fetch_shares_outstanding_counts_a_repeated_entry_once():
+    body = concept(
+        entry("2024-07-16", 5_800_000_000, "0001652044-24-000079", "2024-07-24"),
+        entry("2024-07-16", 5_800_000_000, "0001652044-24-000079", "2024-07-24"),  # exact repeat
+        entry("2024-07-16", 860_000_000, "0001652044-24-000079", "2024-07-24"),
+    )
+
+    assert shares_of(body) == 6_660_000_000.0
+
+
+def test_fetch_shares_outstanding_ignores_older_filings_with_the_same_end():
+    body = concept(
+        entry("2024-06-30", 70, "0001-24-000001", "2024-07-15"),
+        entry("2024-06-30", 30, "0001-24-000001", "2024-07-15"),
+        entry("2024-06-30", 99, "0001-24-000005", "2024-08-01"),  # the latest filing: only this
+    )
+
+    assert shares_of(body) == 99.0
+
+
+def test_fetch_shares_outstanding_same_filing_date_takes_larger_accn():
+    body = concept(
+        entry("2024-06-30", 70, "0001-24-000005", "2024-08-01"),
+        entry("2024-06-30", 99, "0001-24-000007", "2024-08-01"),
+        entry("2024-06-30", 80, "0001-24-000006", "2024-08-01"),
+    )
+
+    assert shares_of(body) == 99.0
+
+
+def test_fetch_shares_outstanding_is_independent_of_listing_order():
     entries = [
-        {"end": "2024-06-30", "val": 100, "filed": "2024-08-01"},
-        {"end": "2024-06-30", "val": 300, "filed": "2024-08-01"},
+        entry("2024-07-16", 5_800_000_000, "0001652044-24-000079", "2024-07-24"),
+        entry("2024-07-16", 860_000_000, "0001652044-24-000079", "2024-07-24"),
+        entry("2024-04-17", 12_000_000_000, "0001652044-24-000052", "2024-04-25"),
     ]
-    forward = facts(*entries)
-    backward = facts(*reversed(entries))
 
-    a = fetch_shares_outstanding(make_client(lambda r: httpx.Response(200, json=forward)), 1)
-    b = fetch_shares_outstanding(make_client(lambda r: httpx.Response(200, json=backward)), 1)
-
-    assert a == b == 300.0
+    assert shares_of(concept(*entries)) == shares_of(concept(*reversed(entries)))
 
 
 @pytest.mark.parametrize(
     "body",
     [
-        {"facts": {}},
-        {"facts": {"dei": {}}},
-        {"facts": {"us-gaap": {"Assets": {}}}},
-        facts(),
-        {"facts": {"dei": {"EntityCommonStockSharesOutstanding": {"units": {}}}}},
-        facts({"end": "2024-06-30", "filed": "2024-08-01"}),  # no val
+        {},
+        {"units": {}},
+        {"units": {"USD": [{"end": "2024-06-30", "val": 1}]}},
+        concept(),
+        concept({"end": "2024-06-30", "accn": "a", "filed": "2024-08-01"}),  # no val
+        concept({"val": 5, "accn": "a", "filed": "2024-08-01"}),  # no end
     ],
 )
 def test_fetch_shares_outstanding_missing_concept_is_none(body):
-    client = make_client(lambda request: httpx.Response(200, json=body))
-
-    assert fetch_shares_outstanding(client, 1) is None
+    assert shares_of(body) is None
 
 
 def test_fetch_shares_outstanding_404_is_none_and_other_errors_raise():
