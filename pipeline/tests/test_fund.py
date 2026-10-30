@@ -10,6 +10,7 @@ from orca.engine.fund import (
     aggregate_fund,
     check_bridge,
     contributions,
+    full_years,
     fund_years,
 )
 from orca.engine.position import PositionQuarter, PositionResult, compute_position
@@ -289,6 +290,33 @@ def test_fund_years_split_at_calendar_years_in_order():
         ("2015 9M", [8, 9, 10]),
     ]
     assert fund_years([]) == []
+
+
+def test_full_years_need_four_quarters_with_a_return_and_not_the_first_quarter():
+    # q3 starts the segment; 2014 (q4-q7) is complete; 2015 (q8-q11) lacks q9's return; 2016
+    # (q12-q15) is complete; 2017 has one quarter
+    quarters = [year_quarter(q, ret=None if q in (3, 9) else 0.01) for q in range(3, 17)]
+    years = fund_years(quarters)
+    assert [y.label for y in full_years(years, quarters)] == ["2014", "2016"]
+
+
+def test_the_year_holding_the_first_quarter_is_not_full_even_if_that_quarter_has_a_return():
+    quarters = [year_quarter(q, ret=0.01) for q in range(4, 12)]  # q4 is the first quarter
+    assert [y.label for y in full_years(fund_years(quarters), quarters)] == ["2015"]
+
+
+def test_full_years_come_oldest_first_and_ignore_input_order():
+    quarters = [year_quarter(q, ret=0.01) for q in range(3, 16)]
+    years = fund_years(quarters)
+    assert [y.label for y in full_years(years[::-1], quarters)] == ["2014", "2015", "2016"]
+    assert full_years(years, []) == []
+    assert full_years([], quarters) == []
+
+
+def test_a_year_missing_from_the_quarters_is_not_full():
+    quarters = [year_quarter(q, ret=0.01) for q in range(3, 12)]
+    years = fund_years(quarters)
+    assert full_years(years, [fq for fq in quarters if fq.q != 6]) == [years[2]]  # only 2015
 
 
 def test_partial_year_label():

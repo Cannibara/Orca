@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from orca.engine.position import PositionResult
 from orca.quarters import BASE_YEAR
 
+_QUARTERS_PER_YEAR = 4
+
 
 @dataclass(frozen=True, slots=True)
 class FundQuarter:
@@ -129,6 +131,26 @@ def fund_years(quarters: list[FundQuarter]) -> list[FundYear]:
             )
         )
     return years
+
+
+def full_years(years: list[FundYear], quarters: list[FundQuarter]) -> list[FundYear]:
+    """The years that can be judged as whole years, oldest first: four quarters, each with a
+    return, and none of them the first quarter of `quarters`. That quarter has no return to
+    measure (the book was empty at its start), so the year holding it covers fewer than four
+    quarters of return. The year figures of the summary (best and worst year, years with a gain)
+    and the turnover all use this one set of years."""
+    if not quarters:
+        return []
+    first_q = min(fq.q for fq in quarters)
+    returns = {fq.q: fq.ret for fq in quarters}
+    return [
+        year
+        for year in sorted(years, key=lambda y: y.qs[0])
+        if len(year.qs) == _QUARTERS_PER_YEAR
+        and first_q not in year.qs
+        and year.ret is not None
+        and all(returns.get(q) is not None for q in year.qs)
+    ]
 
 
 def contributions(

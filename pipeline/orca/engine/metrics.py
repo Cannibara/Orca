@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import polars as pl
 
-from orca.engine.fund import FundQuarter, FundYear
+from orca.engine.fund import FundQuarter, FundYear, full_years
 from orca.engine.position import PositionResult
 from orca.quarters import BASE_YEAR
 
@@ -60,20 +60,15 @@ def performance(rets: list[tuple[int, float]], rf_by_year: dict[int, float]) -> 
 
 
 def turnover(years: list[FundYear], quarters: list[FundQuarter]) -> float | None:
-    """Mean over full (four-quarter) years of min(buys, sells) / mean book, from `quarters`.
+    """Mean over the full years (see `full_years`) of min(buys, sells) / mean book, from `quarters`.
 
     A year's buys and sells are summed over its quarters; its mean book is the mean of the year's
     start and its four quarter ends. The year holding the segment's first quarter is left out
-    (its buys are the whole book), as is a year whose mean book is not positive. None when no
-    year is left."""
-    if not quarters:
-        return None
-    first_q = min(fq.q for fq in quarters)
+    (its buys are the whole book), as is a year with a quarter without a return and a year whose
+    mean book is not positive. None when no year is left."""
     by_q = {fq.q: fq for fq in quarters}
     turnovers = []
-    for year in years:
-        if len(year.qs) != 4 or first_q in year.qs:
-            continue
+    for year in full_years(years, quarters):
         year_quarters = [by_q[q] for q in year.qs]
         mean_book = statistics.fmean([year.start, *(fq.end for fq in year_quarters)])
         if mean_book <= 0:

@@ -81,7 +81,7 @@ def test_a_return_below_minus_one_hundred_percent_stays_a_real_number():
         assert value is None or (isinstance(value, float) and math.isfinite(value))
 
 
-def quarter(q, start=0, end=0, buys=0, sells=0) -> FundQuarter:
+def quarter(q, start=0, end=0, buys=0, sells=0, ret=0.0) -> FundQuarter:
     return FundQuarter(
         q=q,
         start=start,
@@ -92,7 +92,7 @@ def quarter(q, start=0, end=0, buys=0, sells=0) -> FundQuarter:
         market_move=0.0,
         trade_gains=0.0,
         dividends=0.0,
-        ret=None,
+        ret=ret,
     )
 
 
@@ -135,6 +135,24 @@ def test_turnover_excludes_the_year_with_the_segment_start_and_partial_years():
     quarters = [quarter(q, start=1000, end=1000, buys=100, sells=100) for q in range(5, 11)]
     assert turnover(fund_years(quarters), quarters) is None  # 2014 is partial, 2015 partial too
     assert turnover([], []) is None
+
+
+def test_turnover_skips_a_year_with_a_quarter_without_a_return():
+    # the same quarters as test_turnover, with q5's return missing: 2014 is no longer a full year
+    quarters = [
+        quarter(3, start=0, end=1000, buys=1000),
+        quarter(4, start=1000, end=1000, buys=100, sells=50),
+        quarter(5, start=1000, end=1000, buys=100, sells=50, ret=None),
+        quarter(6, start=1000, end=1000, buys=50, sells=50),
+        quarter(7, start=1000, end=1000, buys=50, sells=50),
+    ]
+    assert turnover(fund_years(quarters), quarters) is None
+
+
+def test_turnover_ignores_years_the_quarters_do_not_cover():
+    quarters = [quarter(q, start=1000, end=1000, buys=100, sells=100) for q in range(3, 8)]
+    years = fund_years(quarters)
+    assert turnover(years, [fq for fq in quarters if fq.q != 5]) is None  # no KeyError
 
 
 def test_turnover_skips_a_year_with_an_empty_book():

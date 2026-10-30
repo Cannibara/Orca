@@ -22,14 +22,14 @@ import re
 import shutil
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import brotli
 import polars as pl
 
 from orca.config import PERIODS
-from orca.engine.fund import FundQuarter, FundYear
+from orca.engine.fund import FundQuarter, FundYear, full_years
 from orca.engine.metrics import Performance
 from orca.engine.position import PositionResult
 from orca.engine.whatif import ExitRow
@@ -53,7 +53,7 @@ _EXIT_COLUMNS = (
 )  # fmt: skip
 HEALTH_KEYS = ("filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags")
 
-_YEAR_QUARTERS = 4
+_PRICE_DECIMALS = 4  # prices are published to the hundredth of a cent
 _CUSIP_KEYS = frozenset({"cusip", "cusips"})
 _RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -171,9 +171,17 @@ def _write_all(out: Path, docs: Mapping[str, object], compress: bool) -> dict[st
 def publish_fund(out: Path, fund: FundOutput, compress: bool = True) -> dict[str, str]:
     """Write fund/{id}/summary.json, positions.json, contrib.json and exits.json under `out`;
     path -> checksum. Rows are ordered by stock_id (and years and quarters by time), so the
-    same fund gives the same bytes whatever the order it was computed in. Nothing is written
-    when the fund's metrics do not have exactly the contract's keys."""
+    same fund gives the same bytes whatever the order it was computed in. Trade prices (px,
+    low, high) are rounded to 4 places. Nothing is written (ValueError) when the fund's metrics
+    do not have exactly the contract's keys or `meta.n_holdings` is not the number of positions
+    with shares now."""
     _check_keys("metrics", fund.metrics, METRIC_KEYS)
+    held = sum(p.shares_now > 0 for p in fund.positions)
+    if fund.meta.n_holdings != held:
+        raise ValueError(
+            f"fund {fund.meta.fund_id}: n_holdings is {fund.meta.n_holdings} "
+            f"but {held} positions have shares now"
+        )
     base = f"fund/{fund.meta.fund_id}"
     years = sorted(fund.years, key=lambda y: y.qs[0])
     positions = sorted(fund.positions, key=lambda p: p.stock_id)
@@ -219,7 +227,11 @@ def _positions(positions: list[PositionResult]) -> dict:
     columns["last_pct"] = [pct for _, _, pct, _ in last]
     columns["last_usd"] = [usd for _, _, _, usd in last]
     columns["trades"] = [
-        [[t.q, t.delta, t.px, t.low, t.high, t.shares_after] for t in p.trades] for p in positions
+        [
+            [t.q, t.delta, _price(t.px), _price(t.low), _price(t.high), t.shares_after]
+            for t in p.trades
+        ]
+        for p in positions
     ]
     return columns
 
@@ -265,6 +277,12 @@ def _exits(fund: FundOutput) -> dict:
     }
 
 
+def _price(price: float | None) -> float | None:
+    """`price` rounded to `_PRICE_DECIMALS` places (prices come from float32 bars, so the digits
+    beyond are noise); None stays None."""
+    return None if price is None else round(price, _PRICE_DECIMALS)
+
+
 def _columns(rows: Sequence[object], *fields: str) -> dict[str, list]:
     """Column-oriented view of `rows`: {field: [row.field, ...]}."""
     return {name: [getattr(row, name) for row in rows] for name in fields}
@@ -294,18 +312,11 @@ def build_metrics(
     """The summary's `metrics` object. The performance figures are None without a `perf`.
 
     Best and worst year, the years with a gain (`years_pos`) out of `years_total`, and
-    `first_year` / `last_year` (as numbers) count full years only: four quarters, each with a
-    return. A partial year, and the year holding the segment's first quarter (which has no
-    return), would otherwise rank on fewer than four quarters of return. They are all None
-    when there is no full year; ties go to the earlier year."""
-    returns = {fq.q: fq.ret for fq in quarters}
-    full = [
-        y
-        for y in sorted(years, key=lambda y: y.qs[0])
-        if len(y.qs) == _YEAR_QUARTERS
-        and y.ret is not None
-        and all(returns.get(q) is not None for q in y.qs)
-    ]
+    `first_year` / `last_year` (as numbers) count the full years of `engine.fund.full_years`
+    only, the same years the turnover is taken over: a partial year, or the year holding the
+    segment's first quarter (which has no return), would rank on fewer than four quarters of
+    return. They are all None when there is no full year; ties go to the earlier year."""
+    full = full_years(years, quarters)
 
     def of_perf(name: str) -> float | None:
         return None if perf is None else getattr(perf, name)
@@ -337,20 +348,27 @@ def build_metrics(
 
 
 def weekly_closes(daily: pl.DataFrame) -> dict:
-    """{"start": ISO date, "close": [...]}: the last close of each week (Monday to Friday) from
-    one stock's split-adjusted daily rows (`date` and `close` are used), oldest first. `start`
-    is the last trading day of the first week. A day without a close is not priced and a week
-    without a priced day is left out, so the entries are consecutive trading weeks; a stock
-    without any priced day gives {"start": None, "close": []}."""
+    """{"start": ISO date, "close": [...]}: one entry per calendar week from the first week with
+    a priced day to the last, the entry `i` being the last close of the week (Monday to Sunday)
+    that ends on Friday `start + 7 i` days, from one stock's split-adjusted daily rows (`date`
+    and `close` are used). A day without a close is not priced; a week without a priced day
+    in between gets None (not the previous close). A stock without any priced day gives
+    {"start": None, "close": []}."""
     weeks = (
         daily.filter(pl.col("close").is_finite())
         .sort("date")
         .group_by(pl.col("date").dt.truncate("1w").alias("week"), maintain_order=True)
-        .agg(pl.col("date").last(), pl.col("close").last())
+        .agg(pl.col("close").last())
     )
     if weeks.is_empty():
         return {"start": None, "close": []}
-    return {"start": weeks["date"][0].isoformat(), "close": weeks["close"].to_list()}
+    close_of = dict(zip(weeks["week"].to_list(), weeks["close"].to_list()))
+    first, last = weeks["week"][0], weeks["week"][-1]  # Mondays, oldest first
+    count = (last - first).days // 7 + 1
+    return {
+        "start": (first + timedelta(days=4)).isoformat(),
+        "close": [close_of.get(first + timedelta(weeks=i)) for i in range(count)],
+    }
 
 
 # --- files shared by all funds ------------------------------------------------------------------
@@ -374,11 +392,12 @@ def publish_shared(
     name and sector (any others, such as figi or cusip, are not published), `latest_prices` maps
     stock_id to the latest close on `asof`, and `weekly` maps stock_id to `weekly_closes`'s
     result for the stocks whose file is to be written; a stock without closes gets no file.
+    Prices (latest and weekly) are rounded to 4 places.
     Nothing is written when `home.top` does not have exactly the periods of `config.PERIODS`."""
     _check_keys("home.top periods", home.top, tuple(PERIODS))
     funds = sorted(funds, key=lambda f: f.fund_id)
     table = securities.select("stock_id", "ticker", "name", "sector").sort("stock_id")
-    prices = {stock_id: latest_prices[stock_id] for stock_id in sorted(latest_prices)}
+    prices = {stock_id: _price(latest_prices[stock_id]) for stock_id in sorted(latest_prices)}
     docs: dict[str, object] = {
         "funds.json": {
             "v": 1,
@@ -420,7 +439,7 @@ def publish_shared(
         if closes["close"]:
             docs[f"stock/{stock_id}/weekly.json"] = {
                 "start": closes["start"],
-                "close": closes["close"],
+                "close": [_price(close) for close in closes["close"]],
             }
     return _write_all(out, docs, compress)
 

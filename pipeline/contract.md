@@ -1,7 +1,7 @@
 # Published JSON contract
 
-The single source of truth for every file the pipeline publishes. `pipeline/orca/publish.py` writes exactly
-this; the website (Plan B) builds its TypeScript types from it. Change this file first, then the writer.
+The single source of truth for every file the pipeline publishes. The writer produces exactly this and the
+website builds its TypeScript types from it. Change this file first, then the writer.
 
 ## Conventions
 
@@ -18,6 +18,8 @@ this; the website (Plan B) builds its TypeScript types from it. Change this file
   `.br` suffix) and served with `Content-Encoding: br` and `Content-Type: application/json`.
 - Paths are stable: a new run overwrites the same paths. `manifest.json` is uploaded last; a reader that
   fetches it sees every file it lists already in place.
+- Prices (`px`, `low`, `high`, `latest_prices.json`, `weekly.json`) are rounded to 4 decimal places. Dollar
+  amounts, share counts and averages are not rounded.
 - Rows are ordered by `stock_id` (positions, holdings, exits, securities) or by time (years, quarters), unless
   stated otherwise, so the same input gives the same bytes.
 
@@ -30,8 +32,8 @@ this; the website (Plan B) builds its TypeScript types from it. Change this file
 - `fund/{id}/positions.json`: `{"stock_id": [], "from_q": [], "to_q": [], "avg_cost": [], "avg_exit": [], "invested": [], "realised": [], "dividends": [], "shares_now": [], "cost_now": [], "last_q": [], "last_type": [], "last_pct": [], "last_usd": [], "trades": [[[q, delta, px, low, high, shares_after], ...], ...]}`
 - `fund/{id}/contrib.json`: `{"years": [label...], "by_year": {label: {"stock_id": [], "points": [], "pnl": []}}}`
 - `fund/{id}/exits.json`: `{"rows": {"stock_id": [], "status": [], "sold_shares": [], "sold_usd": [], "avg_exit": [], "last_sale_q": [], "one_y": [], "spy_one_y": []}, "summary": {"buys_12m": number|null, "sells_12m": number|null, "beat_spy_pct": number|null}}`
-- `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": []}` (weekly Friday closes, split-adjusted)
-- `home/top_{1y|3y|5y|max}.json`, `home/conviction.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: rows as returned by Task 12 (see Home).
+- `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": []}` (weekly Friday closes, split-adjusted; `close` is `(number | null)[]`)
+- `home/top_{1y|3y|5y|max}.json`, `home/conviction.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
 - `manifest.json` at the bucket root: `{"version": "...", "built": "...", "files": {path: sha256}}`; `health.json`: `{"filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags": [...]}`.
 
 ## Field notes
@@ -48,13 +50,13 @@ this; the website (Plan B) builds its TypeScript types from it. Change this file
 
 - `id` is the fund id (also the `{id}` of the path). `cik` is the SEC CIK (integer). `period_q` is the latest
   quarter the fund filed and `filed` the date of that filing. `book` is the priced long book in dollars,
-  `n_holdings` the number of positions held now, `priced_pct` the share of the reported book that is priced
+  `n_holdings` the number of positions held now (the length of `holdings_now`), `priced_pct` the share of the reported book that is priced
   (0 to 1). `tracked_since_q` is the first quarter of the fund's current tracking segment. `inactive` is true
   when the fund filed nothing in the latest two quarters.
-- `metrics`: annualised figures from the quarterly returns (see `engine/metrics.py`). `ann_return`, `sharpe`,
+- `metrics`: annualised figures from the quarterly returns. `ann_return`, `sharpe`,
   `sortino`, `vol`, `max_dd` (≤ 0), `calmar` and `quarters_pos_pct` are `null` below four quarterly returns
   (and Sharpe, Sortino, Calmar where their denominator is zero). `turnover` is the mean over full years of
-  min(buys, sells) ÷ mean book, `null` without one. `hold_all` / `hold_sold` are mean holding periods in years
+  min(buys, sells) ÷ mean book over the same full years (below), `null` without one. `hold_all` / `hold_sold` are mean holding periods in years
   over all positions / over positions sold out (`hold_sold` is `null` when none was).
 - `metrics` year figures count **full years** only: a calendar year of four quarters, each with a return. The
   year that holds the segment's first quarter has no return for that quarter and is not a full year. `best_year`
@@ -85,9 +87,11 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
   (negative for a trim), `null` for `"new"` and `"exit"`. `last_usd` is the trade's dollars, signed (buys
   positive, sales negative).
 - `trades[i]` lists the `i`-th position's trades oldest first, each row `[q, delta, px, low, high,
-  shares_after]`: the quarter, the signed change in shares, the estimated trade price (the quarter's VWAP,
-  the first report's close), the quarter's low and high price (`null` when the stock has none) and the shares
-  held after.
+  shares_after]`: the quarter, the signed change in shares, `px`, the quarter's low and high price (`null` when
+  the stock has none in the quarter) and the shares held after. `px` is the estimated trade price: the
+  quarter's volume-weighted average price, the quarter's close for a position's first report, or, when the
+  stock has no prices in the quarter, the last close before it or the price implied by the fund's reported
+  value.
 
 ### `fund/{id}/contrib.json`
 
@@ -107,15 +111,17 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
 
 ### `stock/{stock_id}/weekly.json`
 
-- `close[i]` is the last close of the `i`-th week, Monday to Friday, on today's share basis (split-adjusted,
-  not dividend-adjusted), oldest first. `start` is the date of the first week's last trading day, so the
-  `i`-th entry is about `start + 7 i` days. A day without a close is not priced, and a week with no priced day
-  is left out (rare: a stock halted for a whole week), so entries are consecutive trading weeks. A stock without
-  a single priced day has no file.
+- `start` is the Friday (ISO date) of the stock's first week with a priced day. `close` has one entry per
+  calendar week from that week through the stock's last week with a priced day: `close[i]` is the last close of
+  the week (Monday to Friday) ending on `start + 7 i` days, on today's share basis (split-adjusted, not
+  dividend-adjusted). It is `null` for a week in between with no priced day (a trading halt or a data gap); the
+  previous close is not carried forward. A day without a close is not priced. A stock without a single priced
+  day has no file.
 
 ### Home
 
-Each file is an object with `latest_q`, the quarter the lists are about.
+Each file is an object with `latest_q`, the quarter the lists are about. `name` in every row below is the
+fund's name.
 
 - `top_{period}.json` (`1y`, `3y`, `5y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
   best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return", "max_dd",

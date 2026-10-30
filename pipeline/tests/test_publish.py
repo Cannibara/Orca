@@ -2,14 +2,21 @@ import hashlib
 import json
 import re
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 
 import brotli
 import polars as pl
 import pytest
 
 from orca.config import PERIODS
-from orca.engine.fund import FundQuarter, FundYear, aggregate_fund, contributions, fund_years
+from orca.engine.fund import (
+    FundQuarter,
+    FundYear,
+    aggregate_fund,
+    contributions,
+    full_years,
+    fund_years,
+)
 from orca.engine.metrics import Performance, hold_lengths, performance, turnover
 from orca.engine.position import PositionResult, Trade, compute_position
 from orca.engine.whatif import ExitRow, beat_spy_pct, buys_vs_sells, exit_rows
@@ -130,9 +137,14 @@ def trade(q, kind, delta, px, shares_after, low=None, high=None) -> Trade:
     return Trade(q=q, type=kind, delta=delta, px=px, low=low, high=high, shares_after=shares_after)
 
 
+def with_positions(fund, positions, **kw) -> FundOutput:
+    """`fund` with other positions and the n_holdings that goes with them."""
+    held = sum(p.shares_now > 0 for p in positions)
+    return replace(fund, positions=positions, meta=replace(fund.meta, n_holdings=held), **kw)
+
+
 def fund_with(positions, **kw) -> FundOutput:
-    base = build_engine_fund()
-    return replace(base, positions=positions, **kw)
+    return with_positions(build_engine_fund(), positions, **kw)
 
 
 def fquarter(q, ret, start=100.0, end=110.0) -> FundQuarter:
@@ -356,7 +368,8 @@ def test_positions_file_columns_and_trades(tmp_path):
     assert len({len(col) for col in p.values()}) == 1
     first = fund.positions[0]
     assert p["trades"][0] == [
-        [t.q, t.delta, t.px, t.low, t.high, t.shares_after] for t in first.trades
+        [t.q, t.delta, round(t.px, 4), round(t.low, 4), round(t.high, 4), t.shares_after]
+        for t in first.trades
     ]
     assert [row[0] for row in p["trades"][0]] == [4, 6, 8, 10]  # new, add, trim, exit
     assert len(p["trades"][1]) == 1
@@ -406,10 +419,43 @@ def test_positions_are_sorted_by_stock_id_whatever_the_input_order(tmp_path):
     a = position(5, [trade(3, "new", 10.0, 1.0, 10.0)])
     b = position(2, [trade(3, "new", 10.0, 1.0, 10.0)])
     fund = build_engine_fund()
-    one = publish_fund(tmp_path / "one", replace(fund, positions=[a, b], exits=[]))
-    two = publish_fund(tmp_path / "two", replace(fund, positions=[b, a], exits=[]))
+    one = publish_fund(tmp_path / "one", with_positions(fund, [a, b], exits=[]))
+    two = publish_fund(tmp_path / "two", with_positions(fund, [b, a], exits=[]))
     assert one == two
     assert decoded(tmp_path / "one", "fund/7/positions.json")["stock_id"] == [2, 5]
+
+
+def test_trade_prices_are_rounded_to_four_places_and_nothing_else(tmp_path):
+    noisy = trade(9, "new", 100.123456789, 189.9499969482422, 100.123456789)
+    noisy = replace(noisy, low=0.123449999, high=1234.56785001)  # float32 noise below the 4th place
+    pos = position(
+        1, [noisy], invested=1234.5678912345, avg_cost=12.3456789, cost_now=500.123456789
+    )
+    publish_fund(tmp_path, fund_with([pos]))
+    p = decoded(tmp_path, "fund/7/positions.json")
+    assert p["trades"] == [[[9, 100.123456789, 189.95, 0.1234, 1234.5679, 100.123456789]]]
+    # money, shares and per-share averages keep every digit
+    assert (p["invested"], p["avg_cost"], p["cost_now"]) == (
+        [1234.5678912345],
+        [12.3456789],
+        [500.123456789],
+    )
+    assert p["last_usd"] == [100.123456789 * 189.9499969482422]  # from the unrounded price
+
+
+def test_a_missing_trade_price_range_stays_null(tmp_path):
+    publish_fund(tmp_path, fund_with([position(1, [trade(9, "new", 10.0, 5.5, 10.0)])]))
+    assert decoded(tmp_path, "fund/7/positions.json")["trades"] == [
+        [[9, 10.0, 5.5, None, None, 10.0]]
+    ]
+
+
+def test_publish_fund_rejects_an_n_holdings_that_is_not_the_positions_held(tmp_path):
+    fund = build_engine_fund()  # one position held (stock 2)
+    bad = replace(fund, meta=replace(fund.meta, n_holdings=2))
+    with pytest.raises(ValueError, match="n_holdings"):
+        publish_fund(tmp_path, bad)
+    assert not list(tmp_path.rglob("*.json"))
 
 
 def test_contrib_file(tmp_path):
@@ -554,6 +600,19 @@ def test_a_year_holding_the_segments_first_quarter_is_not_a_full_year():
     assert (m["years_pos"], m["years_total"], m["first_year"], m["last_year"]) == (1, 1, 2015, 2015)
 
 
+def test_year_figures_and_turnover_cover_the_same_years():
+    # 2014 holds the segment's first quarter; in 2015 one quarter has no return; 2016 is full
+    quarters = [fquarter(q, None if q in (4, 9) else 0.02) for q in range(4, 16)]
+    years = [
+        fyear("2014", [4, 5, 6, 7], 0.08),
+        fyear("2015", [8, 9, 10, 11], 0.06),
+        fyear("2016", [12, 13, 14, 15], 0.09),
+    ]
+    m = build_metrics(perf_obj(), years, quarters, turnover=None, hold_all=1.0, hold_sold=None)
+    assert (m["first_year"], m["last_year"], m["years_total"]) == (2016, 2016, 1)
+    assert [y.label for y in full_years(years, quarters)] == ["2016"]
+
+
 def test_metrics_without_performance_or_full_years_are_null():
     quarters = [fquarter(5, None), fquarter(6, 0.01)]
     years = [fyear("2014 Q2–Q3", [5, 6], 0.01)]
@@ -579,7 +638,7 @@ def test_metrics_without_performance_or_full_years_are_null():
 
 
 def test_metric_ties_pick_the_earliest_year():
-    quarters = [fquarter(q, 0.01) for q in range(4, 12)]
+    quarters = [fquarter(q, 0.01) for q in range(3, 12)]
     years = [fyear("2014", [4, 5, 6, 7], 0.10), fyear("2015", [8, 9, 10, 11], 0.10)]
     m = build_metrics(perf_obj(), years, quarters, turnover=None, hold_all=1.0, hold_sold=None)
     assert m["best_year"]["label"] == m["worst_year"]["label"] == "2014"
@@ -617,20 +676,36 @@ def test_weekly_closes_last_close_of_each_week():
     assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0, 14.0, 15.0]}
 
 
-def test_weekly_closes_start_is_the_first_weeks_last_trading_day():
+def test_weekly_closes_start_is_the_first_weeks_friday():
     df = daily([(date(2024, 1, 3), 11.0), (date(2024, 1, 4), 12.0), (date(2024, 1, 9), 13.0)])
-    assert weekly_closes(df) == {"start": "2024-01-04", "close": [12.0, 13.0]}
+    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0, 13.0]}
+    only_monday = daily([(date(2024, 1, 8), 5.0)])
+    assert weekly_closes(only_monday) == {"start": "2024-01-12", "close": [5.0]}
 
 
-def test_weekly_closes_ignore_input_order_unpriced_days_and_empty_weeks():
+def test_weekly_closes_keep_an_empty_week_as_null_and_never_forward_fill():
     rows = [
         (date(2024, 1, 5), 12.0),
         (date(2024, 1, 3), 11.0),
         (date(2024, 1, 12), None),  # unpriced: not a close, week 2 has no priced day
-        (date(2024, 1, 26), 20.0),  # weeks 3 has no rows at all; week 4 closes at 20
+        (date(2024, 1, 26), 20.0),  # week 3 has no rows at all; week 4 closes at 20
         (date(2024, 1, 4), None),  # a missing close does not hide Wed's or Fri's
     ]
-    assert weekly_closes(daily(rows)) == {"start": "2024-01-05", "close": [12.0, 20.0]}
+    assert weekly_closes(daily(rows)) == {"start": "2024-01-05", "close": [12.0, None, None, 20.0]}
+
+
+def test_weekly_close_i_is_the_week_ending_start_plus_7i_days():
+    days = [(1, 5), (1, 8), (1, 10), (1, 22), (1, 25), (2, 16), (2, 20)]  # trading days of 2024
+    rows = [(date(2024, month, day), 100.0 + n) for n, (month, day) in enumerate(days)]
+    result = weekly_closes(daily(rows))
+    friday = date.fromisoformat(result["start"])
+    assert friday == date(2024, 1, 5) and friday.weekday() == 4
+    assert len(result["close"]) == 8  # up to the week of Feb 19-23, the last with a priced day
+    for i, close in enumerate(result["close"]):
+        week_end = friday + timedelta(days=7 * i)
+        in_week = [px for d, px in rows if 0 <= (week_end - d).days <= 4]  # Monday to Friday
+        assert close == (in_week[-1] if in_week else None)
+    assert result["close"].count(None) == 3 and result["close"][-1] == 106.0
 
 
 def test_weekly_closes_of_nothing():
@@ -771,6 +846,17 @@ def test_securities_missing_a_column_is_an_error(tmp_path):
 def test_latest_prices_missing_become_null(tmp_path):
     shared(tmp_path, latest_prices={1: float("nan"), 2: None, 3: 5.0})
     assert decoded(tmp_path, "latest_prices.json")["price"] == [None, None, 5.0]
+
+
+def test_prices_are_published_to_four_places(tmp_path):
+    files = shared(
+        tmp_path,
+        latest_prices={1: 189.9499969482422, 2: 0.00004999},
+        weekly={1: {"start": "2024-01-05", "close": [47.48749923706055, None, 0.1 + 0.2]}},
+    )
+    assert decoded(tmp_path, "latest_prices.json")["price"] == [189.95, 0.0]
+    assert decoded(tmp_path, "stock/1/weekly.json")["close"] == [47.4875, None, 0.3]
+    assert "stock/1/weekly.json" in files
 
 
 def test_weekly_without_closes_is_not_published(tmp_path):
