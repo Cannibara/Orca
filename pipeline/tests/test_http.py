@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from orca.http import Client, FetchError, figi_client, sec_client
+from orca.http import Client, FetchError, figi_client, sec_client, tiingo_client
 
 
 class FakeTime:
@@ -307,3 +307,32 @@ def test_figi_client_without_key_is_slow_and_batches_10(monkeypatch, value):
     assert "X-OPENFIGI-APIKEY" not in seen[0].headers
     # 25 requests per minute: 2.4 s apart.
     assert t.sleeps == [pytest.approx(2.4)] * 2
+
+
+def test_tiingo_client_sends_the_key_as_a_token_header_at_one_request_per_second(monkeypatch):
+    monkeypatch.setenv("TIINGO_KEY", " secret-key ")
+    t = FakeTime()
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=[])
+
+    client = tiingo_client(httpx.MockTransport(handler), sleep=t.sleep, clock=t.clock)
+    for _ in range(3):
+        client.get("https://api.tiingo.com/tiingo/daily/AAPL/prices", startDate="2024-05-09")
+
+    assert seen[0].headers["Authorization"] == "Token secret-key"
+    assert "secret-key" not in str(seen[0].url)
+    assert t.sleeps == [pytest.approx(1.0)] * 2
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_tiingo_client_requires_a_key(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("TIINGO_KEY", raising=False)
+    else:
+        monkeypatch.setenv("TIINGO_KEY", value)
+
+    with pytest.raises(RuntimeError, match="TIINGO_KEY"):
+        tiingo_client()

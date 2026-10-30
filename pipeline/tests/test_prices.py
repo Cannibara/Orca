@@ -1,0 +1,565 @@
+from datetime import date
+
+import httpx
+import polars as pl
+import pytest
+
+from orca.http import FetchError, tiingo_client
+from orca.prices import (
+    DAILY_SCHEMA,
+    PRICES_SCHEMA,
+    FixtureSource,
+    TiingoSource,
+    compact_prices,
+    read_prices,
+    split_adjust_prices,
+    split_adjust_shares,
+    update_prices,
+)
+from orca.quarters import q_index
+from orca.storage import Lake
+
+TABLE = "prices_daily"
+D = date  # short alias: the tests are full of dates
+
+
+def bar(d: date, close: float, split: float = 1.0, dividend: float = 0.0, volume: float = 1000.0):
+    """One raw daily bar as a vendor returns it; open/high/low are fixed offsets from close."""
+    return {
+        "date": d,
+        "open": close - 1,
+        "high": close + 2,
+        "low": close - 2,
+        "close": close,
+        "volume": volume,
+        "split_factor": split,
+        "dividend": dividend,
+    }
+
+
+def daily(*bars) -> pl.DataFrame:
+    return pl.DataFrame(list(bars), schema=DAILY_SCHEMA)
+
+
+def stored(*rows) -> pl.DataFrame:
+    """Rows (stock_id, date, close, split_factor, volume, dividend) as read_prices returns them."""
+    return pl.DataFrame(
+        [
+            {"stock_id": sid, **bar(d, close, split, div, vol)}
+            for sid, d, close, split, vol, div in rows
+        ],
+        schema=PRICES_SCHEMA,
+    )
+
+
+class Recording:
+    """Wraps a source and remembers each request it receives."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.calls: list[tuple[str, date, date]] = []
+
+    def daily(self, ticker, start, end):
+        self.calls.append((ticker, start, end))
+        return self.inner.daily(ticker, start, end)
+
+
+# Mon 6 May 2024 .. Fri 17 May 2024
+WEEK1 = [bar(D(2024, 5, d), 10.0 + d) for d in (6, 7, 8, 9, 10)]
+WEEK2 = [bar(D(2024, 5, d), 10.0 + d) for d in (13, 14, 15, 16, 17)]
+
+
+# --- split adjustment -------------------------------------------------------------------
+
+
+def test_split_does_not_create_trade():
+    splits = pl.DataFrame({"date": [date(2024, 5, 10)], "split_factor": [2.0]})
+    assert split_adjust_shares(100, q_index(2024, 1), splits) == 200
+    assert split_adjust_shares(210, q_index(2024, 2), splits) == 210  # delta = +10, not +110
+
+
+def test_split_adjust_shares_without_splits_is_unchanged():
+    assert split_adjust_shares(100, q_index(2024, 1), pl.DataFrame()) == 100
+    empty = pl.DataFrame(schema={"date": pl.Date, "split_factor": pl.Float32})
+    assert split_adjust_shares(100, q_index(2024, 1), empty) == 100
+
+
+def test_split_adjust_shares_counts_only_splits_after_quarter_end():
+    q = q_index(2024, 1)  # ends 2024-03-31
+    splits = pl.DataFrame(
+        {
+            "date": [D(2023, 6, 1), D(2024, 3, 31), D(2024, 4, 1), D(2024, 9, 2), D(2025, 1, 2)],
+            "split_factor": [10.0, 5.0, 2.0, 1.5, 1.0],  # 1.0 rows are harmless
+        }
+    )
+    # the 31 March split is already in the quarter-end share count; 1 April on is not.
+    assert split_adjust_shares(100, q, splits) == pytest.approx(100 * 2.0 * 1.5)
+
+
+def test_split_adjust_shares_handles_reverse_splits_and_returns_float():
+    splits = pl.DataFrame({"date": [D(2024, 5, 10)], "split_factor": [0.125]})  # 1-for-8
+    out = split_adjust_shares(800, q_index(2024, 1), splits)
+    assert out == 100.0
+    assert isinstance(out, float)
+
+
+def test_split_adjust_prices():
+    df = stored(
+        (1, D(2024, 5, 8), 100.0, 1.0, 1000.0, 0.5),
+        (1, D(2024, 5, 9), 102.0, 1.0, 1200.0, 0.0),
+        (1, D(2024, 5, 10), 51.0, 2.0, 2000.0, 0.0),  # split day: already post-split
+        (1, D(2024, 5, 13), 52.0, 1.0, 1800.0, 0.0),
+    )
+
+    out = split_adjust_prices(df)
+
+    assert out["close"].to_list() == [50.0, 51.0, 51.0, 52.0]  # 100 before the 2:1 split -> 50
+    assert out["volume"].to_list() == [2000.0, 2400.0, 2000.0, 1800.0]  # volume doubles
+    assert out["open"].to_list() == [49.5, 50.5, 50.0, 51.0]
+    assert out["high"].to_list() == [51.0, 52.0, 53.0, 54.0]
+    assert out["low"].to_list() == [49.0, 50.0, 49.0, 50.0]
+    assert out["dividend"].to_list() == [0.25, 0.0, 0.0, 0.0]
+    assert out["split_factor"].to_list() == [1.0, 1.0, 2.0, 1.0]  # raw factors stay visible
+    assert out["date"].to_list() == df["date"].to_list()
+
+
+def test_split_adjust_prices_multiplies_later_splits_and_handles_reverse_splits():
+    df = stored(
+        (1, D(2024, 1, 2), 120.0, 1.0, 100.0, 0.0),
+        (1, D(2024, 2, 1), 60.0, 2.0, 200.0, 0.0),
+        (1, D(2024, 3, 1), 20.0, 3.0, 600.0, 0.0),
+        (1, D(2024, 4, 1), 25.0, 1.0, 500.0, 0.0),
+    )
+    out = split_adjust_prices(df)
+    assert out["close"].to_list() == [20.0, 20.0, 20.0, 25.0]  # all on today's share basis
+    assert out["volume"].to_list() == [600.0, 600.0, 600.0, 500.0]
+
+    reverse = stored(
+        (1, D(2024, 1, 2), 2.0, 1.0, 800.0, 0.0),
+        (1, D(2024, 2, 1), 16.0, 0.125, 100.0, 0.0),  # 1-for-8
+    )
+    out = split_adjust_prices(reverse)
+    assert out["close"].to_list() == [16.0, 16.0]
+    assert out["volume"].to_list() == [100.0, 100.0]
+
+
+def test_split_adjust_prices_per_stock_and_any_row_order():
+    df = stored(
+        (2, D(2024, 5, 13), 7.0, 1.0, 10.0, 0.0),
+        (1, D(2024, 5, 10), 51.0, 2.0, 2000.0, 0.0),
+        (2, D(2024, 5, 8), 6.0, 1.0, 10.0, 0.0),
+        (1, D(2024, 5, 8), 100.0, 1.0, 1000.0, 0.0),
+    )
+
+    out = split_adjust_prices(df)
+
+    assert out.select("stock_id", "date", "close").rows() == [
+        (1, D(2024, 5, 8), 50.0),
+        (1, D(2024, 5, 10), 51.0),
+        (2, D(2024, 5, 8), 6.0),  # stock 2 never split
+        (2, D(2024, 5, 13), 7.0),
+    ]
+
+
+def test_split_adjust_prices_is_float64_and_treats_missing_factor_as_no_split():
+    df = stored(
+        (1, D(2024, 5, 8), 100.0, 1.0, 1000.0, 0.0), (1, D(2024, 5, 9), 90.0, 1.0, 1.0, 0.0)
+    )
+    df = df.with_columns(split_factor=pl.Series([1.0, None], dtype=pl.Float32))
+
+    out = split_adjust_prices(df)
+
+    assert out["close"].to_list() == [100.0, 90.0]
+    assert {out.schema[c] for c in ("open", "high", "low", "close", "volume", "dividend")} == {
+        pl.Float64
+    }
+
+
+# --- sources ----------------------------------------------------------------------------
+
+
+def test_fixture_source_returns_rows_within_the_range():
+    source = FixtureSource({"AAA": daily(*WEEK1, *WEEK2)})
+
+    out = source.daily("AAA", D(2024, 5, 8), D(2024, 5, 13))
+
+    assert out["date"].to_list() == [D(2024, 5, 8), D(2024, 5, 9), D(2024, 5, 10), D(2024, 5, 13)]
+    assert out.schema == DAILY_SCHEMA
+
+
+def test_fixture_source_unknown_ticker_is_empty():
+    out = FixtureSource({}).daily("ZZZ", D(2024, 1, 1), D(2024, 12, 31))
+    assert out.is_empty()
+    assert out.schema == DAILY_SCHEMA
+
+
+TIINGO_BODY = [
+    {
+        "date": "2024-05-09T00:00:00.000Z",
+        "close": 183.0,
+        "high": 184.0,
+        "low": 181.0,
+        "open": 182.0,
+        "volume": 1000,
+        "adjClose": 91.5,
+        "adjHigh": 92.0,
+        "adjLow": 90.5,
+        "adjOpen": 91.0,
+        "adjVolume": 2000,
+        "divCash": 0.0,
+        "splitFactor": 1.0,
+    },
+    {
+        "date": "2024-05-10T00:00:00.000Z",
+        "close": 92.5,
+        "high": 93.0,
+        "low": 91.0,
+        "open": 91.5,
+        "volume": 2500,
+        "adjClose": 92.5,
+        "adjHigh": 93.0,
+        "adjLow": 91.0,
+        "adjOpen": 91.5,
+        "adjVolume": 2500,
+        "divCash": 0.25,
+        "splitFactor": 2.0,
+    },
+]
+
+
+def tiingo(handler, monkeypatch, key="secret-key") -> TiingoSource:
+    monkeypatch.setenv("TIINGO_KEY", key)
+    return TiingoSource(tiingo_client(httpx.MockTransport(handler), sleep=lambda s: None))
+
+
+def test_tiingo_requests_the_daily_prices_with_the_key_in_the_header_only(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=TIINGO_BODY)
+
+    out = tiingo(handler, monkeypatch).daily("BRK-B", D(2024, 5, 9), D(2024, 5, 17))
+
+    (request,) = seen
+    assert request.url.host == "api.tiingo.com"
+    assert request.url.path == "/tiingo/daily/BRK-B/prices"
+    assert dict(request.url.params) == {"startDate": "2024-05-09", "endDate": "2024-05-17"}
+    assert request.headers["Authorization"] == "Token secret-key"
+    assert "secret-key" not in str(request.url)
+    assert out.schema == DAILY_SCHEMA
+    # raw fields only: the vendor's adj* columns are not used
+    assert out.rows() == [
+        (D(2024, 5, 9), 182.0, 184.0, 181.0, 183.0, 1000.0, 1.0, 0.0),
+        (D(2024, 5, 10), 91.5, 93.0, 91.0, 92.5, 2500.0, 2.0, 0.25),
+    ]
+
+
+def test_tiingo_empty_answer_is_an_empty_frame(monkeypatch):
+    out = tiingo(lambda r: httpx.Response(200, json=[]), monkeypatch).daily(
+        "AAA", D(2024, 5, 9), D(2024, 5, 17)
+    )
+    assert out.is_empty()
+    assert out.schema == DAILY_SCHEMA
+
+
+def test_tiingo_unknown_ticker_404_is_an_empty_frame(monkeypatch):
+    def handler(request):
+        return httpx.Response(404, json={"detail": "Not found."})
+
+    out = tiingo(handler, monkeypatch).daily("GONE", D(2013, 1, 1), D(2024, 5, 17))
+
+    assert out.is_empty()
+    assert out.schema == DAILY_SCHEMA
+
+
+def test_tiingo_other_errors_propagate_without_leaking_the_key(monkeypatch):
+    def handler(request):
+        return httpx.Response(401, json={"detail": "Invalid token."})
+
+    with pytest.raises(FetchError) as exc:
+        tiingo(handler, monkeypatch).daily("AAA", D(2024, 5, 9), D(2024, 5, 17))
+
+    assert exc.value.status == 401
+    assert "secret-key" not in str(exc.value)
+    assert "secret-key" not in exc.value.url
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"detail": "Error: hourly request allocation exceeded"},
+        [{"date": "2024-05-09T00:00:00.000Z", "open": 1.0}],  # fields missing
+        [dict(TIINGO_BODY[0], date="not a date")],
+        [dict(TIINGO_BODY[0], close="n/a")],
+    ],
+)
+def test_tiingo_unexpected_body_is_a_fetch_error(monkeypatch, body):
+    with pytest.raises(FetchError) as exc:
+        tiingo(lambda r: httpx.Response(200, json=body), monkeypatch).daily(
+            "AAA", D(2024, 5, 9), D(2024, 5, 17)
+        )
+    assert "secret-key" not in str(exc.value)
+
+
+# --- store ------------------------------------------------------------------------------
+
+
+def test_update_fetches_only_new_days(tmp_path):
+    lake = Lake(tmp_path)
+    source = Recording(FixtureSource({"AAA": daily(*WEEK1, *WEEK2)}))
+
+    first = update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10))
+    second = update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17))
+
+    assert source.calls == [
+        ("AAA", D(2013, 1, 1), D(2024, 5, 10)),  # no rows yet: from the start of the history
+        ("AAA", D(2024, 5, 5), D(2024, 5, 17)),  # last stored date (10 May) - 5 days
+    ]
+    assert first == [1]  # a stock new to the store counts as changed
+    assert second == []  # plain new days (and the unchanged overlap) are not a change
+    prices = read_prices(lake)
+    assert prices["date"].to_list() == [b["date"] for b in WEEK1 + WEEK2]
+    assert prices.height == 10
+
+
+def test_update_stores_one_part_per_run_in_the_documented_types(tmp_path):
+    lake = Lake(tmp_path)
+    source = FixtureSource({"AAA": daily(*WEEK1, *WEEK2)})
+
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10))
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), run_id="20240517T0623")
+
+    assert lake.parts(TABLE) == ["z20240510", "z20240517T0623"]  # default id: today
+    assert lake.read(TABLE).schema == PRICES_SCHEMA
+    assert read_prices(lake).schema == PRICES_SCHEMA
+    assert read_prices(lake).select("stock_id").to_series().unique().to_list() == [1]
+
+
+def test_update_reports_price_corrections_in_the_overlap(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    corrected = [bar(D(2024, 5, 9), 99.0) if b["date"] == D(2024, 5, 9) else b for b in WEEK1]
+
+    changed = update_prices(
+        lake, FixtureSource({"AAA": daily(*corrected, *WEEK2)}), {1: "AAA"}, today=D(2024, 5, 17)
+    )
+
+    assert changed == [1]
+    prices = read_prices(lake)
+    assert prices.filter(pl.col("date") == D(2024, 5, 9))["close"].to_list() == [
+        99.0
+    ]  # later run wins
+    assert prices.height == 10  # no duplicate for the corrected day
+
+
+@pytest.mark.parametrize(
+    "field", ["open", "high", "low", "close", "volume", "dividend", "split_factor"]
+)
+def test_update_reports_a_change_in_any_field(tmp_path, field):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    revised = [dict(b, **{field: b[field] + 1}) if b["date"] == D(2024, 5, 8) else b for b in WEEK1]
+
+    changed = update_prices(
+        lake, FixtureSource({"AAA": daily(*revised)}), {1: "AAA"}, today=D(2024, 5, 17)
+    )
+
+    assert changed == [1]
+
+
+def test_update_reports_a_split_on_a_new_day(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    # 2:1 split on Monday 13 May, after the last stored day: every older price is now on a new basis
+    week2 = [bar(D(2024, 5, 13), 6.0, split=2.0), *WEEK2[1:]]
+
+    changed = update_prices(
+        lake, FixtureSource({"AAA": daily(*WEEK1, *week2)}), {1: "AAA"}, today=D(2024, 5, 17)
+    )
+
+    assert changed == [1]
+
+
+def test_update_reports_a_day_the_vendor_filled_in_behind_the_last_stored_day(tmp_path):
+    lake = Lake(tmp_path)
+    gappy = [b for b in WEEK1 if b["date"] != D(2024, 5, 8)]
+    update_prices(lake, FixtureSource({"AAA": daily(*gappy)}), {1: "AAA"}, today=D(2024, 5, 10))
+
+    changed = update_prices(
+        lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 17)
+    )
+
+    assert changed == [1]
+    assert read_prices(lake).height == 5
+
+
+def test_update_reports_only_the_stocks_that_changed(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {
+        "AAA": daily(*WEEK1, *WEEK2),
+        "BBB": daily(*WEEK1, *WEEK2),
+        "CCC": daily(*WEEK1, *WEEK2),
+    }
+    update_prices(lake, FixtureSource(frames), {3: "CCC", 1: "AAA", 2: "BBB"}, today=D(2024, 5, 10))
+    frames["BBB"] = daily(*[bar(b["date"], b["close"] + 1) for b in WEEK1], *WEEK2)  # BBB restated
+    frames["DDD"] = daily(*WEEK1)
+
+    changed = update_prices(
+        lake,
+        FixtureSource(frames),
+        {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD"},
+        today=D(2024, 5, 17),
+    )
+
+    assert changed == [2, 4]  # BBB restated, DDD new; AAA and CCC only gained plain days
+
+
+def test_update_without_any_rows_for_a_stock_stores_nothing_and_reports_nothing(tmp_path):
+    lake = Lake(tmp_path)
+    source = Recording(FixtureSource({"AAA": daily(*WEEK1)}))
+
+    assert update_prices(lake, source, {9: "GONE"}, today=D(2024, 5, 10)) == []
+    assert lake.parts(TABLE) == []
+
+    assert update_prices(lake, source, {1: "AAA", 9: "GONE"}, today=D(2024, 5, 10)) == [1]
+    assert update_prices(lake, source, {1: "AAA", 9: "GONE"}, today=D(2024, 5, 17)) == []
+    assert source.calls[-1] == ("GONE", D(2013, 1, 1), D(2024, 5, 17))  # still a stock with no rows
+    assert read_prices(lake)["stock_id"].unique().to_list() == [1]
+
+
+def test_update_with_nothing_new_writes_no_part(tmp_path):
+    lake = Lake(tmp_path)
+    source = FixtureSource({"AAA": daily(*WEEK1)})
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10))
+
+    assert update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 12)) == []
+
+    assert lake.parts(TABLE) == ["z20240510"]
+
+
+def test_update_leaves_stocks_it_is_not_asked_about_alone(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {"AAA": daily(*WEEK1, *WEEK2), "BBB": daily(*WEEK1, *WEEK2)}
+    update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 5, 10))
+    source = Recording(FixtureSource(frames))
+
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17))
+
+    assert [c[0] for c in source.calls] == ["AAA"]
+    prices = read_prices(lake)
+    assert prices.filter(stock_id=1).height == 10
+    assert prices.filter(stock_id=2).height == 5
+
+
+def test_update_twice_with_one_run_id_keeps_both_runs_rows(tmp_path):
+    lake = Lake(tmp_path)
+    source = FixtureSource({"AAA": daily(*WEEK1, *WEEK2)})
+
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 8), run_id="r1")
+    update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), run_id="r1")
+
+    assert lake.parts(TABLE) == ["zr1"]
+    assert read_prices(lake).height == 10
+
+
+def test_update_keeps_a_corrected_value_after_a_later_unchanged_run(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    fixed = FixtureSource({"AAA": daily(bar(D(2024, 5, 10), 77.0))})
+    update_prices(lake, fixed, {1: "AAA"}, today=D(2024, 5, 17))
+
+    assert (
+        update_prices(lake, fixed, {1: "AAA"}, today=D(2024, 5, 24)) == []
+    )  # 77.0 is the stored value
+
+    assert read_prices(lake).filter(pl.col("date") == D(2024, 5, 10))["close"].to_list() == [77.0]
+
+
+def test_read_prices_of_an_empty_lake_has_the_schema(tmp_path):
+    out = read_prices(Lake(tmp_path))
+    assert out.is_empty()
+    assert out.schema == PRICES_SCHEMA
+
+
+def test_read_prices_keeps_the_last_occurrence_in_part_order_and_sorts(tmp_path):
+    lake = Lake(tmp_path)
+    lake.write(
+        TABLE,
+        stored((2, D(2024, 1, 3), 5.0, 1.0, 1.0, 0.0), (1, D(2024, 1, 3), 9.0, 1.0, 1.0, 0.0)),
+        "y2024",
+    )
+    lake.write(
+        TABLE,
+        stored((1, D(2024, 1, 2), 8.0, 1.0, 1.0, 0.0), (1, D(2024, 1, 3), 10.0, 1.0, 1.0, 0.0)),
+        "z20240110",
+    )
+    lake.write(TABLE, stored((1, D(2024, 1, 3), 11.0, 1.0, 1.0, 0.0)), "z20240120")
+
+    out = read_prices(lake)
+
+    assert out.select("stock_id", "date", "close").rows() == [
+        (1, D(2024, 1, 2), 8.0),
+        (1, D(2024, 1, 3), 11.0),  # newest run wins
+        (2, D(2024, 1, 3), 5.0),
+    ]
+
+
+# --- compaction -------------------------------------------------------------------------
+
+
+def test_compaction_keeps_rows(tmp_path):
+    lake = Lake(tmp_path)
+    year_end = [bar(D(2023, 12, 27), 20.0), bar(D(2023, 12, 28), 21.0), bar(D(2023, 12, 29), 22.0)]
+    new_year = [bar(D(2024, 1, 2), 23.0), bar(D(2024, 1, 3), 24.0), bar(D(2024, 1, 4), 25.0)]
+    frames = {"AAA": daily(*year_end, *new_year), "BBB": daily(*year_end, *new_year)}
+    update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 1, 2))
+    frames["AAA"] = daily(*year_end, bar(D(2024, 1, 2), 23.5), *new_year[1:])  # 2 Jan restated
+    update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 1, 4))
+    before = read_prices(lake)
+    assert lake.parts(TABLE) == ["z20240102", "z20240104"]
+
+    compact_prices(lake)
+
+    assert lake.parts(TABLE) == ["y2023", "y2024"]
+    assert not list((tmp_path / TABLE).glob("z*.parquet"))
+    assert read_prices(lake).equals(before)
+    assert before.height == 12
+    assert before.filter(stock_id=1, date=D(2024, 1, 2))["close"].to_list() == [23.5]
+    assert lake.read(TABLE, part="y2023")["date"].dt.year().unique().to_list() == [2023]
+    assert lake.read(TABLE, part="y2024")["date"].dt.year().unique().to_list() == [2024]
+    assert lake.read(TABLE).height == 12  # compaction dropped the superseded 2 Jan row too
+
+
+def test_compaction_merges_new_runs_into_existing_yearly_parts(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    compact_prices(lake)
+    assert lake.parts(TABLE) == ["y2024"]
+    fixed = [bar(D(2024, 5, 10), 77.0)]
+    update_prices(
+        lake, FixtureSource({"AAA": daily(*fixed, *WEEK2)}), {1: "AAA"}, today=D(2024, 5, 17)
+    )
+    assert lake.parts(TABLE) == ["y2024", "z20240517"]
+    before = read_prices(lake)
+
+    compact_prices(lake)
+
+    assert lake.parts(TABLE) == ["y2024"]
+    assert lake.read(TABLE).height == 10  # one row per day, the restated 10 May replaced in place
+    assert read_prices(lake).equals(before)
+    assert before.filter(pl.col("date") == D(2024, 5, 10))["close"].to_list() == [77.0]
+
+
+def test_compaction_is_idempotent_and_ignores_an_empty_lake(tmp_path):
+    lake = Lake(tmp_path)
+    compact_prices(lake)
+    assert lake.parts(TABLE) == []
+
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK1)}), {1: "AAA"}, today=D(2024, 5, 10))
+    compact_prices(lake)
+    once = read_prices(lake)
+    compact_prices(lake)
+
+    assert lake.parts(TABLE) == ["y2024"]
+    assert read_prices(lake).equals(once)

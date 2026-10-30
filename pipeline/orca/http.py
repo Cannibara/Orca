@@ -13,6 +13,9 @@ FIGI_RATE_KEYED = 25 / 6
 FIGI_RATE_ANON = 25 / 60
 FIGI_JOBS_KEYED = 100
 FIGI_JOBS_ANON = 10
+# Tiingo: one request a second (3,600 an hour). An assumption: the task gave no Tiingo limit, so
+# check it against the plan we buy.
+TIINGO_RATE_PER_SEC = 1.0
 REQUEST_TIMEOUT = 30.0  # seconds
 
 
@@ -161,4 +164,23 @@ def figi_client(
         sleep=sleep,
         clock=clock,
         jobs_per_request=FIGI_JOBS_ANON,
+    )
+
+
+def tiingo_client(
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> Client:
+    """Client for Tiingo. TIINGO_KEY goes out as `Authorization: Token <key>`, never in the URL
+    (URLs end up in FetchError messages)."""
+    key = os.environ.get("TIINGO_KEY", "").strip()
+    if not key:
+        raise RuntimeError("TIINGO_KEY is not set. Set it to your Tiingo API token.")
+    return Client(
+        TIINGO_RATE_PER_SEC,
+        {"Authorization": f"Token {key}"},
+        transport=transport,
+        sleep=sleep,
+        clock=clock,
     )
