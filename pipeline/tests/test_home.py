@@ -168,6 +168,15 @@ def test_wins_losses_ranks_pnl_of_top_fund_eligible_funds():
     json.dumps(out)
 
 
+def test_wins_losses_ignores_funds_that_have_not_filed_the_latest_quarter():
+    fresh = snap(1, pnl_latest={11: 100.0, 12: -100.0})
+    stale = snap(2, period_q=LATEST_Q - 1, pnl_latest={21: 900.0, 22: -900.0})
+    out = wins_losses([fresh, stale])
+    assert [r["fund_id"] for r in out["wins"]] == [1]
+    assert [r["fund_id"] for r in out["losses"]] == [1]
+    assert wins_losses([]) == {"wins": [], "losses": []}
+
+
 def test_wins_losses_keeps_only_top_n():
     pnl = {i: float(i) for i in range(1, 6)} | {10 + i: -float(i) for i in range(1, 6)}
     out = wins_losses([snap(1, pnl_latest=pnl)], n=2)
@@ -222,6 +231,15 @@ def test_conviction_counts_a_three_point_jump_below_five_percent():
     assert [r["stock_id"] for r in conviction_moves([fund])] == [1]
 
 
+def test_conviction_jump_of_exactly_three_points_is_not_lost_to_float_error():
+    prev, now = 0.0021, 0.0321  # now - prev is 0.029999999999999995 in floats
+    assert now - prev < 0.03
+    fund = conviction_fund(
+        now={1: now}, weights_prev={1: prev}, trades_latest=[(1, trade("add", 10, 5.0))]
+    )
+    assert [r["stock_id"] for r in conviction_moves([fund])] == [1]
+
+
 def test_conviction_only_from_concentrated_funds():
     trades = [(1, trade("new", 100, 10.0))]
     now = {1: 0.06}
@@ -236,8 +254,9 @@ def test_conviction_only_from_concentrated_funds():
     kw = dict(n_priced=20, book=1e9, weights_now=spread(20) | now, trades_latest=trades)
     bank = snap(7, "FIRST BANK", **kw)
     flagged = snap(8, excluded=True, **kw)
-    snaps = [sixty_one, sixty, three, four, diffuse, small, bank, flagged]
-    assert ids(conviction_moves(snaps)) == [2, 4]
+    floor = snap(9, **(kw | {"book": 5e8}))  # the book floor itself is concentrated
+    snaps = [sixty_one, sixty, three, four, diffuse, small, bank, flagged, floor]
+    assert ids(conviction_moves(snaps)) == [2, 4, 9]
 
 
 def test_conviction_sorted_by_absolute_change():
@@ -251,6 +270,15 @@ def test_conviction_sorted_by_absolute_change():
         ],
     )
     assert [r["stock_id"] for r in conviction_moves([fund])] == [2, 3, 1]
+
+
+def test_conviction_ignores_funds_that_have_not_filed_the_latest_quarter():
+    trades = [(1, trade("new", 100, 10.0))]
+    fresh = conviction_fund(10, now={1: 0.06}, trades_latest=trades)
+    stale = conviction_fund(11, now={1: 0.06}, trades_latest=trades, period_q=LATEST_Q - 1)
+    assert ids(conviction_moves([fresh, stale])) == [10]
+    assert ids(conviction_moves([stale])) == [11]  # the newest of the snapshots given
+    assert conviction_moves([]) == []
 
 
 # --- crowded buys ------------------------------------------------------------------------
@@ -286,6 +314,20 @@ def test_crowded_needs_three_funds():
         }
     ]
     json.dumps(rows)
+
+
+def test_crowded_ignores_funds_that_have_not_filed_the_latest_quarter():
+    def buyer(fund_id, **kw):
+        return conviction_fund(
+            fund_id, now={7: 0.04}, trades_latest=[(7, trade("add", 10, 10.0))], **kw
+        )
+
+    fresh = [buyer(1), buyer(2)]
+    stale = buyer(3, period_q=LATEST_Q - 1)
+    assert crowded_buys([*fresh, stale]) == []  # two current buyers, the stale one is not current
+    rows = crowded_buys([*fresh, buyer(4), stale])
+    assert [(r["stock_id"], r["funds_buying"]) for r in rows] == [(7, 3)]
+    assert crowded_buys([]) == []
 
 
 def test_crowded_sorted_by_funds_then_dollars():
@@ -369,8 +411,17 @@ def test_calls_fund_eligibility():
     neither = one_buy(3, book=6e8, n_priced=30, weights_now=spread(30, top=0.3))
     bank = one_buy(4, name="FIRST BANK")
     flagged = one_buy(5, excluded=True)
-    rows = calls([top, concentrated, neither, bank, flagged], mcap, latest_px, filed_price, "q")
-    assert sorted(ids(rows)) == [1, 2]
+    giant = one_buy(6, n_priced=1000, weights_now=spread(1000, top=0.1))  # an index giant
+    almost = one_buy(7, n_priced=999, weights_now=spread(30, top=0.3))  # just under the giants
+    snaps = [top, concentrated, neither, bank, flagged, giant, almost]
+    rows = calls(snaps, mcap, latest_px, filed_price, "q")
+    assert sorted(ids(rows)) == [1, 2, 7]
+
+
+def test_calls_thresholds_are_inclusive():
+    buys = [(1, LATEST_Q, 0.5, 0.01, FILED)]
+    rows = calls([snap(1, buys_recent=buys)], {1: 3e8}, {1: 1.0}, filed_price, "q")
+    assert [r["stock_id"] for r in rows] == [1]
 
 
 def test_calls_window_anchors_on_latest_period_across_snaps():
