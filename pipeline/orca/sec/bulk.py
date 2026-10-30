@@ -169,7 +169,8 @@ def _raw_holdings(
     """Holdings of the kept filings, and one accession per holding dropped as bad input.
 
     Holdings of filings we left out on purpose (13F-NT ...) vanish silently; holdings of
-    filings dropped for bad input, and holdings with an unusable share type, are reported.
+    filings dropped for bad input, and holdings with an unusable share type, VALUE or
+    SSHPRNAMT, are reported.
     """
     units = pl.DataFrame(
         {
@@ -178,17 +179,23 @@ def _raw_holdings(
         }
     )
     dropped = infotable.filter(pl.col("accession").is_in(bad_filings))["accession"].to_list()
+    # strict=False: a VALUE or SSHPRNAMT that does not parse is as unusable as an empty one.
     holdings = infotable.join(units, on="accession", how="inner", maintain_order="left").with_columns(
-        sh_type=_clean_upper("sh_type")
+        sh_type=_clean_upper("sh_type"),
+        shares=pl.col("shares").cast(pl.Float64, strict=False),
+        value=pl.col("value").cast(pl.Float64, strict=False),
     )
-    usable = pl.col("sh_type").is_in(SH_TYPES).fill_null(False)
+    usable = (
+        pl.col("sh_type").is_in(SH_TYPES).fill_null(False)
+        & pl.col("shares").is_not_null()
+        & pl.col("value").is_not_null()
+    )
     dropped += holdings.filter(~usable)["accession"].to_list()
     holdings = holdings.filter(usable).with_columns(
-        shares=pl.col("shares").cast(pl.Float64),
         put_call=_clean_upper("put_call").replace_strict(
             {p: p for p in PUT_CALLS}, default=None, return_dtype=pl.String
         ),
-        value_usd=pl.col("value").cast(pl.Float64) * pl.col("unit"),
+        value_usd=pl.col("value") * pl.col("unit"),
     )
     holdings = holdings.select(
         "accession", "cusip", "issuer", "title", "shares", "sh_type", "put_call", "value_usd"
@@ -200,8 +207,8 @@ def parse_bulk_zip(path: Path, stats: dict | None = None) -> tuple[pl.DataFrame,
     """Parse one bulk ZIP into (filings, raw_holdings); only 13F-HR and 13F-HR/A filings.
 
     Bad input is dropped, never fatal: a kept-form filing with no usable CIK, filing date or
-    report period goes with its holdings, and a holding whose share type is not SH/PRN goes
-    alone. Drops are logged in one warning per ZIP and, if `stats` is given, counted in
+    report period goes with its holdings, and a holding whose share type is not SH/PRN, or
+    whose VALUE or SSHPRNAMT is empty or not a number, goes alone. Drops are logged in one warning per ZIP and, if `stats` is given, counted in
     stats["dropped_filings"] and stats["dropped_holdings"]. A ZIP missing a table or a
     required column raises ValueError: that is a format change, not a bad row.
     """

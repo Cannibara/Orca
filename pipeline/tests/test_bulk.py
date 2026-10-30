@@ -249,6 +249,53 @@ def test_holding_with_bad_share_type_is_dropped_and_counted(tmp_path, caplog, sh
 
 
 @pytest.mark.parametrize(
+    "value, shares",
+    [
+        ("n/a", "20"),  # non-numeric VALUE
+        ("", "20"),  # empty VALUE
+        ("2000", ""),  # empty SSHPRNAMT
+        ("2000", "1,000"),  # non-numeric SSHPRNAMT
+    ],
+    ids=["value-non-numeric", "value-empty", "shares-empty", "shares-non-numeric"],
+)
+def test_holding_with_unusable_value_or_shares_is_dropped_and_counted(
+    tmp_path, caplog, value, shares
+):
+    infotable = [
+        holding(ORIGINAL, "KEPT INC", "1500", "10"),
+        holding(ORIGINAL, "BAD INC", value, shares),
+        holding(RESTATEMENT, "ALSO KEPT INC", "7", "3"),
+    ]
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        filings, rows = parse_bulk_zip(make_zip(tmp_path, infotable=infotable), stats=stats)
+
+    assert rows["issuer"].to_list() == ["KEPT INC", "ALSO KEPT INC"]
+    assert rows["value_usd"].to_list() == [1_500_000.0, 7.0]
+    assert filings["accession"].to_list() == [ORIGINAL, RESTATEMENT]  # the filing itself stays
+    assert stats == {"dropped_holdings": 1, "dropped_filings": 0}
+    [record] = caplog.records
+    assert "form13f.zip" in record.getMessage() and ORIGINAL in record.getMessage()
+
+
+def test_every_kind_of_bad_holding_is_counted_in_one_warning(tmp_path, caplog):
+    infotable = [
+        holding(ORIGINAL, "KEPT INC", "1500", "10"),
+        holding(ORIGINAL, "BAD TYPE", "1", "1", sh_type="XX"),
+        holding(ORIGINAL, "BAD VALUE", "n/a", "1"),
+        holding(RESTATEMENT, "BAD SHARES", "1", ""),
+    ]
+    stats = {}
+    with caplog.at_level(logging.WARNING, logger="orca.sec.bulk"):
+        _, rows = parse_bulk_zip(make_zip(tmp_path, infotable=infotable), stats=stats)
+
+    assert rows["issuer"].to_list() == ["KEPT INC"]
+    assert stats == {"dropped_holdings": 3, "dropped_filings": 0}
+    [record] = caplog.records
+    assert ORIGINAL in record.getMessage() and RESTATEMENT in record.getMessage()
+
+
+@pytest.mark.parametrize(
     "field, bad_value",
     [
         ("CIK", ""),
