@@ -452,9 +452,10 @@ def refresh_prices(
     if stats["stopped"] is None:
         state.price_tried |= set(tickers) - failed
         state.price_refetch -= set(tickers) - failed
-    else:  # the run broke off: only stocks that have rows are known to have been fetched
-        state.price_tried |= touched
-        state.price_refetch -= touched
+    else:  # the run broke off: the stocks that answered (with rows or none) were fetched
+        done = touched | set(stats["answered"])
+        state.price_tried |= done
+        state.price_refetch -= done
     state.prices_in_flight = None
     state.save(lake)
 

@@ -203,8 +203,9 @@ def published_path(lake: Lake) -> Path:
 
 
 def load_published(lake: Lake, out_root: Path, compressed: bool = True) -> dict[str, str]:
-    """The files of the last successful publish: the lake's copy (it travels with the lake), else
-    the manifest in `out_root`."""
+    """The files of the last successful publish: the lake's copy (it travels with the lake; a
+    weekly run first makes it match the site's manifest, so an upload that never happened is not
+    taken as done), else the manifest in `out_root`."""
     path = published_path(lake)
     if path.exists():
         return json.loads(path.read_text())

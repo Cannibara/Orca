@@ -10,6 +10,7 @@ run parts into yearly parts `y<year>`. A later part overrides an earlier one, an
 import logging
 import math
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Protocol
 from urllib.parse import quote
@@ -229,12 +230,14 @@ def update_prices(
     lost: the next run finds them unchanged).
 
     `stats`, if given, is reset and filled: "fetched" (tickers that returned rows), "empty"
-    (tickers that returned none), "failed" (a (stock_id, ticker, HTTP status or None) per failed
-    ticker) and "stopped" (why the run stopped early, else None).
+    (tickers that returned none), "answered" (the stock_ids of both, in order), "failed" (a
+    (stock_id, ticker, HTTP status or None) per failed ticker) and "stopped" (why the run stopped
+    early, else None).
     """
     stats = {} if stats is None else stats
     failed: list[tuple[int, str, int | None]] = []
-    stats.update(fetched=0, empty=0, failed=failed, stopped=None)
+    answered: list[int] = []
+    stats.update(fetched=0, empty=0, answered=answered, failed=failed, stopped=None)
     last_by_id, recent = _stored_tail(lake)
     refetch = set(refetch)
     run_id = run_id or today.strftime("%Y%m%d")
@@ -280,6 +283,7 @@ def update_prices(
             in_a_row = 0
             fetched = _as_stored(bars, stock_id)
             stats["empty" if fetched.is_empty() else "fetched"] += 1
+            answered.append(stock_id)
             rows, history_changed = _new_rows(
                 fetched, last_date, recent.get((stock_id,)), history_until
             )
@@ -396,21 +400,38 @@ def split_adjust_prices(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def split_factors_by_quarter(splits: pl.DataFrame) -> dict[int, float]:
-    """The factor `split_adjust_shares` applies to a share count of quarter q, for every quarter
-    from 0 up to the last split's: the product of the split factors dated after q's end, in the
-    rows' (date) order, so `shares * factors.get(q, 1.0)` gives exactly the same float. The
-    quarter of the last split and later ones are absent (factor 1). `splits` has one stock's
-    (date, split_factor)."""
+@dataclass(frozen=True)
+class ShareFactors:
+    """One stock's `split_adjust_shares` factor per quarter (`of`). `by_q` holds the quarters
+    from `first`, which is before every split, up to the last split's quarter (exclusive): below
+    `first` the factor is `first`'s (every split is later), from the last split's quarter on it is
+    1.0. Without splits it is 1.0 everywhere."""
+
+    first: int = 0
+    by_q: dict[int, float] = field(default_factory=dict)
+
+    def of(self, q: int) -> float:
+        return self.by_q.get(max(q, self.first), 1.0)
+
+
+def split_factors_by_quarter(splits: pl.DataFrame) -> ShareFactors:
+    """The factor `split_adjust_shares` applies to a share count of quarter q, for every quarter:
+    the product of the split factors dated after q's end, in the rows' (date) order, so
+    `shares * factors.of(q)` gives exactly the same float (a report period before 2013 included).
+    `splits` has one stock's (date, split_factor)."""
     days = [
         (day, factor)
         for day, factor in splits.select("date", "split_factor").iter_rows()
         if factor is not None
     ]
     if not days:
-        return {}
+        return ShareFactors()
+    first = min(0, q_of_date(min(day for day, _ in days)) - 1)
     last_q = q_of_date(max(day for day, _ in days))
-    return {q: math.prod(factor for day, factor in days if day > q_end(q)) for q in range(last_q)}
+    by_q = {
+        q: math.prod(factor for day, factor in days if day > q_end(q)) for q in range(first, last_q)
+    }
+    return ShareFactors(first, by_q)
 
 
 def split_adjust_shares(shares: float, q: int, splits: pl.DataFrame) -> float:

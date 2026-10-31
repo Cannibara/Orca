@@ -125,11 +125,20 @@ def test_split_factors_by_quarter_agree_exactly_with_split_adjust_shares():
     )
     factors = split_factors_by_quarter(splits)
 
-    assert max(factors) == q_index(2024, 1)  # no split after a later quarter: absent, 1.0
-    for q in range(0, q_index(2026, 4)):
+    assert max(factors.by_q) == q_index(2024, 1)  # no split after a later quarter: 1.0
+    for q in range(-12, q_index(2026, 4)):  # a report period before 2013 included
         for shares in (1.0, 333.0, 123456789.0, 0.3):
-            assert shares * factors.get(q, 1.0) == split_adjust_shares(shares, q, splits), q
-    assert split_factors_by_quarter(splits.clear()) == {}
+            assert shares * factors.of(q) == split_adjust_shares(shares, q, splits), q
+    assert split_factors_by_quarter(splits.clear()).of(-1) == 1.0
+
+
+def test_split_factors_before_their_first_quarter_are_every_split():
+    splits = pl.DataFrame({"date": [D(2013, 2, 1), D(2020, 8, 31)], "split_factor": [7.0, 4.0]})
+    factors = split_factors_by_quarter(splits)
+
+    for q in (-40, -1):
+        assert 100 * factors.of(q) == 2800 == split_adjust_shares(100, q, splits)
+    assert 100 * factors.of(0) == 400  # the first split is in Q1 2013's share count
 
 
 def test_split_adjust_prices():
@@ -595,7 +604,9 @@ def test_one_failed_ticker_does_not_lose_the_others(tmp_path, caplog):
 
     assert changed == [1, 3]
     assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 3]
-    assert stats == {"failed": [(2, "BBB", 500)], "empty": 0, "fetched": 2, "stopped": None}
+    assert stats == {
+        "failed": [(2, "BBB", 500)], "empty": 0, "fetched": 2, "answered": [1, 3], "stopped": None
+    }  # fmt: skip
     assert any("BBB" in r.getMessage() for r in caplog.records)
 
 
@@ -606,18 +617,20 @@ def test_stats_count_tickers_that_come_back_empty_and_network_failures(tmp_path)
 
     update_prices(lake, source, {1: "AAA", 2: "GONE", 3: "NET"}, today=D(2024, 5, 10), stats=stats)
 
-    assert stats == {"failed": [(3, "NET", None)], "empty": 1, "fetched": 1, "stopped": None}
+    assert stats == {
+        "failed": [(3, "NET", None)], "empty": 1, "fetched": 1, "answered": [1, 2], "stopped": None
+    }  # fmt: skip
 
 
 def test_stats_are_optional_and_restarted_on_each_call(tmp_path):
     lake = Lake(tmp_path)
     source = FixtureSource({"AAA": daily(*WEEK1)})
     assert update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10)) == [1]
-    stats = {"failed": [(9, "OLD", 500)], "empty": 7, "fetched": 7, "stopped": "old"}
+    stats = {"failed": [(9, "OLD", 500)], "empty": 7, "fetched": 7, "answered": [9], "stopped": "old"}
 
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), stats=stats)
 
-    assert stats == {"failed": [], "empty": 0, "fetched": 1, "stopped": None}
+    assert stats == {"failed": [], "empty": 0, "fetched": 1, "answered": [1], "stopped": None}
 
 
 def test_a_failed_ticker_keeps_its_last_good_data_and_is_retried_from_the_same_day(tmp_path):

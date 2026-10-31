@@ -27,7 +27,7 @@ from orca.demo import (
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.home import FundSnapshot
-from orca.http import FetchError, FigiClient
+from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import FundMeta, FundOutput, read_json
 from orca.quarter_px import QuarterPx, close_on
@@ -53,6 +53,7 @@ from orca.run.budget import Budget
 from orca.run.market import update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
+from orca.sec.live import fetch_new_filings
 from orca.securities import FIGI_URL
 from orca.storage import Lake
 
@@ -481,6 +482,55 @@ def test_verify_rebuilds_funds_and_finds_differences(base_runs, tmp_path):
     assert verify(lake, inc / "out", sample=12, seed=1) == [f"fund/{KELPWOOD}/exits.json"]
 
 
+def fresh_runner(root: Path) -> None:
+    """What the workflow's restore leaves in `root/out` on a new runner: only the site's
+    manifest (none when the bucket has none)."""
+    shutil.rmtree(root / "out")
+    (root / "out").mkdir()
+    if (root / "bucket" / "manifest.json").exists():
+        shutil.copyfile(root / "bucket" / "manifest.json", root / "out" / "manifest.json")
+
+
+def test_a_run_whose_upload_never_happened_is_republished_by_the_next_run(
+    fixtures, base_runs, tmp_path
+):
+    # Week 2 computes Halyard's restatement and writes the lake's published.json, but its upload
+    # never happens; the lake is saved all the same. Week 3 starts from the site's manifest.
+    inc = from_base(base_runs, WEEK1, tmp_path)
+    lost = run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK2)
+    assert f"fund/{HALYARD}/summary.json" in lost.changed
+    lost_weekly = {p for p in lost.changed if p.startswith("stock/")}
+    assert lost_weekly
+    fresh_runner(inc)
+
+    week3 = run(inc, fixture_sources(fixtures), WEEK3)
+
+    assert f"fund/{HALYARD}/summary.json" in week3.changed
+    assert lost_weekly <= set(week3.changed)
+    good = tmp_path / "good"  # the same two weeks with both uploads done
+    shutil.copytree(base_runs[WEEK1], good)
+    run(good, fixture_sources(fixtures), WEEK2)
+    run(good, fixture_sources(fixtures), WEEK3)
+    assert fund_and_home_files(inc) == fund_and_home_files(good)
+    assert set(manifest(inc)) == set(bucket_files(inc)) - {"manifest.json"}
+    assert json.loads((inc / "lake" / "published.json").read_text()) == manifest(inc)
+    state = State.load(Lake(inc / "lake"))
+    assert not state.pending_funds and not state.pending_weekly
+
+
+def test_a_first_run_whose_upload_never_happened_is_republished_whole(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    run_weekly(Lake(tmp_path / "lake"), tmp_path / "out", fixture_sources(small), SMALL_TODAY)
+    fresh_runner(tmp_path)  # the site has no manifest yet
+
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY + timedelta(days=7))
+
+    assert stats.funds_recomputed == 1
+    assert set(manifest(tmp_path)) == set(bucket_files(tmp_path)) - {"manifest.json"}
+    assert {f"fund/{SMALL_FUND}/summary.json", "stock/1/weekly.json"} <= set(bucket_files(tmp_path))
+
+
 def test_demo_cli_writes_twelve_funds(tmp_path, fixtures):
     out = tmp_path / "demo-data"
     (out / "fund" / "1").mkdir(parents=True)  # an earlier demo, which is replaced
@@ -829,6 +879,28 @@ def test_closes_on_matches_close_on_for_many_days_at_once(tmp_path):
     assert found[(1, date(2024, 6, 2))] == 20.0  # Friday's close, split-adjusted
 
 
+def test_a_share_count_reported_before_2013_gets_every_later_split(tmp_path):
+    lake = Lake(tmp_path)
+    splits = {date(2014, 6, 9): 7.0, date(2020, 8, 31): 4.0}
+    prices.update_prices(
+        lake,
+        FixtureSource({"WIDG": flat_prices(40.0, date(2014, 1, 2), date(2021, 12, 31), splits)}),
+        {1: "WIDG"},
+        date(2021, 12, 31),
+    )
+    ctx = compute.Context(lake, q_index(2021, 4), {}, {}, None)
+    ctx.load([1])
+    rows = pl.DataFrame(
+        {"cik": [SMALL_FUND] * 3, "q": [-1, 5, 40], "stock_id": [1] * 3, "shares": [100.0] * 3},
+        schema={"cik": pl.Int64, "q": pl.Int32, "stock_id": pl.Int32, "shares": pl.Float64},
+    ).with_columns(value_usd=pl.lit(1.0))
+
+    adjusted, _ = compute._share_series(ctx, rows)
+
+    # Q4 2012 is before both splits, Q2 2014 before the second only, Q1 2023 after both.
+    assert {q: shares for q, (shares, _) in adjusted[1].items()} == {-1: 2800, 5: 400, 40: 100}
+
+
 # --- the time budget ------------------------------------------------------------------------
 
 
@@ -913,6 +985,33 @@ def test_budget_spent_in_the_price_backfill_resumes_with_the_stocks_not_fetched(
     assert not set(asked[:15]) & set(first)  # the 15 stocks never fetched come first
     assert set(asked) == set(fixtures.prices)  # then the held ones are refreshed
     assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
+
+
+def test_a_ticker_that_answered_with_no_rows_is_not_asked_first_again(fixtures, tmp_path):
+    clock, asked, empty = StoppedClock(), [], set()
+
+    class SomeEmpty(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append(ticker)
+            if len(asked) <= 2:
+                empty.add(ticker)  # the vendor has nothing for these two
+            if len(asked) == 10:
+                clock.run_out()
+            frame = super().daily(ticker, start, end)
+            return frame.clear() if ticker in empty else frame
+
+    sources = replace(fixture_sources(fixtures), prices=SomeEmpty(fixtures.prices))
+    stats = budgeted(tmp_path, sources, WEEK1, clock)
+
+    [flag] = [f for f in stats.flags if f["type"] == "prices"]
+    assert flag["stopped"] == "time budget" and (flag["fetched"], flag["empty"]) == (8, 2)
+    first = list(asked)
+    assert len(State.load(Lake(tmp_path / "lake")).price_tried) == 10  # the empty two included
+
+    asked.clear()
+    run(tmp_path, sources, WEEK1)
+
+    assert not set(asked[:15]) & set(first)  # only the 15 never asked come first
 
 
 def test_budget_spent_in_compute_publishes_the_funds_done_and_owes_the_rest(
@@ -1025,6 +1124,36 @@ def test_a_live_download_failing_for_four_weeks_is_given_up(tmp_path):
 
     assert State.load(Lake(tmp_path / "lake")).live_watermark == friday
     assert {"type": "live_downloads_abandoned", "days": ["2024-09-05"]} in health(tmp_path)["flags"]
+
+
+def test_a_filing_sec_refuses_for_four_weeks_is_given_up(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    friday = date(2024, 10, 4)
+    refused_day, accession = date(2024, 10, 2), "0000001001-24-000099"
+    header = "Form Type   Company Name   CIK   Date Filed   File Name\n" + "-" * 60 + "\n"
+
+    def sec(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/daily-index/" not in url:
+            return httpx.Response(403)  # the filing: SEC refuses it for good
+        listed = url.endswith(f"form.{refused_day:%Y%m%d}.idx")
+        line = f"13F-HR   Test Fund LP   1001   {refused_day:%Y%m%d}   edgar/data/1001/{accession}.txt"
+        return httpx.Response(200, content=(header + (line if listed else "")).encode())
+
+    client = Client(1e6, {}, transport=httpx.MockTransport(sec), sleep=lambda s: None, max_retries=0)
+    sources = replace(fixture_sources(small), live_filings=partial(fetch_new_filings, client))
+
+    run(tmp_path, sources, friday)
+
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == refused_day - timedelta(days=1)
+    assert not [f for f in health(tmp_path)["flags"] if f["type"].startswith("live_")]
+
+    run(tmp_path, sources, friday + timedelta(days=28))
+
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == friday + timedelta(days=28)
+    abandoned = {"type": "live_downloads_abandoned", "days": [refused_day.isoformat()]}
+    assert abandoned in health(tmp_path)["flags"]
 
 
 def test_a_failed_security_lookup_is_retried_next_run(tmp_path):

@@ -163,8 +163,9 @@ def ingest_live(
     lake: Lake, sources: Sources, state: State, today: date, flags: list, counts: Counts
 ) -> dict | None:
     """Ingest the live filings since the watermark and move it on: to `live_watermark`'s day,
-    or to the day before the earliest index day with a failed filing download, so the next run
-    reads that day again (for LIVE_RETRY_DAYS; an older failure is given up and flagged). A
+    or to the day before the earliest index day with a failed filing download (one SEC refused
+    amid successful downloads included), so the next run reads that day again (for
+    LIVE_RETRY_DAYS; an older failure is given up and flagged). A
     failed read (SEC throttling included) moves nothing and is flagged. Returns the counts to
     log."""
     if state.live_watermark is not None:

@@ -567,11 +567,53 @@ def test_weekend_days_do_not_count_towards_throttling():
     assert filings.height == 2
 
 
-@pytest.mark.parametrize("status", [403, 429])
-def test_a_refused_filing_download_stops_the_stage(status):
-    client, _ = make_client(day_routes(beta=status))
+def test_a_rate_limited_filing_download_stops_the_stage():
+    client, _ = make_client(day_routes(beta=429))
 
     with pytest.raises(FetchError) as exc:
         fetch_new_filings(client, MARCH_31, MARCH_31)
 
-    assert exc.value.status == status
+    assert exc.value.status == 429
+
+
+@pytest.mark.parametrize("refused", ["alpha", "beta"])  # before or after the other's download
+def test_a_refused_filing_download_amid_successes_is_a_failed_download(refused):
+    # SEC refuses some documents for good; throttling would refuse the other download too.
+    client, _ = make_client(day_routes(**{refused: 403}))
+    stats: dict = {}
+
+    filings, _ = fetch_new_filings(client, MARCH_31, MARCH_31, stats)
+
+    assert filings["accession"].to_list() == [BETA if refused == "alpha" else ALPHA]
+    assert stats["failed_filings"] == 1 and stats["failed_days"] == [MARCH_31]
+
+
+def many_filings(statuses: list[int | bytes]) -> tuple[dict[str, bytes | int], list[str]]:
+    """Routes for an index of one 13F-HR per status (a status or a body for its download), and
+    the download URLs in index order."""
+    accessions = [f"0001111111-25-{n:06d}" for n in range(1, len(statuses) + 1)]
+    lines = [f"13F-HR   Fund {a}   1111111   20250331   edgar/data/1111111/{a}.txt" for a in accessions]
+    urls = [f"https://www.sec.gov/Archives/edgar/data/1111111/{a}.txt" for a in accessions]
+    return {IDX_URL: index_text(*lines), **dict(zip(urls, statuses))}, urls
+
+
+def test_filing_downloads_refused_three_times_in_a_row_is_throttling():
+    routes, urls = many_filings([fixture("submission.txt"), 403, 403, 403, fixture("submission.txt")])
+    client, seen = make_client(routes)
+
+    with pytest.raises(FetchError) as exc:
+        fetch_new_filings(client, MARCH_31, MARCH_31)
+
+    assert exc.value.status == 403
+    assert seen == [IDX_URL, *urls[:4]]  # stops there
+
+
+def test_refused_filing_downloads_with_a_download_in_between_are_failed_downloads():
+    ok = fixture("submission.txt")
+    routes, _ = many_filings([403, 403, ok, 403, 403, ok, 403])
+    client, _ = make_client(routes)
+    stats: dict = {}
+
+    fetch_new_filings(client, MARCH_31, MARCH_31, stats)
+
+    assert stats["failed_filings"] == 5 and stats["failed_days"] == [MARCH_31]
