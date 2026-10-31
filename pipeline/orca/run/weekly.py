@@ -234,7 +234,7 @@ def run_weekly(
         state.save(lake)
 
     def securities() -> None:
-        map_new_cusips(lake, sources, state, flags, budget)
+        map_new_cusips(lake, sources, state, today, flags, budget)
         retry_lookups(lake, sources, state, flags, budget)
 
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))

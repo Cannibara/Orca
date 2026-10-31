@@ -328,7 +328,9 @@ def test_fetch_new_filings_reads_filings_and_holdings():
     assert holdings["issuer"].to_list() == ["APPLE INC", "TESLA INC", "MICROSOFT CORP"]
     assert holdings["put_call"].to_list() == [None, "PUT", None]
     assert holdings["value_usd"].to_list() == [1_500_000.0, 2_000_000.0, 7.0]
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "no_index_days": []}
+    assert stats == {
+        "dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "failed_days": [], "no_index_days": []
+    }  # fmt: skip
     # One index request, then one request per 13F-HR / 13F-HR/A filing; the 10-K, 13F-NT, SC 13G/A are never fetched.
     assert seen == [IDX_URL, ALPHA_URL, BETA_URL]
 
@@ -367,7 +369,10 @@ def test_fetch_new_filings_with_no_index_gives_empty_frames_and_zero_stats():
 
     assert filings.height == 0 and filings.schema == FILINGS_SCHEMA
     assert holdings.height == 0 and holdings.schema == HOLDINGS_SCHEMA
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "no_index_days": [MARCH_31]}
+    assert stats == {
+        "dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "failed_days": [],
+        "no_index_days": [MARCH_31],
+    }  # fmt: skip
     assert seen == [IDX_URL]
 
 
@@ -388,7 +393,10 @@ def test_fetch_new_filings_counts_and_skips_a_failed_download():
 
     assert filings["accession"].to_list() == [ALPHA]
     assert set(holdings["accession"]) == {ALPHA}
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 1, "no_index_days": []}
+    assert stats == {
+        "dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 1, "failed_days": [MARCH_31],
+        "no_index_days": [],
+    }  # fmt: skip
 
 
 @pytest.mark.parametrize(
@@ -424,7 +432,9 @@ def test_fetch_new_filings_drops_and_counts_a_filing_it_cannot_read(broken):
 
     assert filings["accession"].to_list() == [ALPHA]
     assert set(holdings["accession"]) == {ALPHA}  # nothing of the broken filing leaks through
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 1, "failed_filings": 0, "no_index_days": []}
+    assert stats == {
+        "dropped_holdings": 0, "dropped_filings": 1, "failed_filings": 0, "failed_days": [], "no_index_days": []
+    }  # fmt: skip
 
 
 def test_fetch_new_filings_sums_drops_across_filings():
@@ -519,3 +529,49 @@ def test_fetch_new_filings_lists_the_days_without_an_index():
 
     assert filings.height > 0
     assert stats["no_index_days"] == [date(2025, 3, 30), date(2025, 4, 1)]
+
+
+def day_url(day: date) -> str:
+    return f"https://www.sec.gov/Archives/edgar/daily-index/{day.year}/QTR{(day.month - 1) // 3 + 1}/form.{day:%Y%m%d}.idx"
+
+
+def test_three_business_days_in_a_row_refused_is_throttling_not_closed_days():
+    # SEC answers 403 when it throttles a client; a closed day (a holiday) is one day, not three.
+    refused = {day_url(date(2025, 3, d)): 403 for d in (26, 27, 28)}  # Wednesday to Friday
+    client, seen = make_client({**day_routes(), **refused})
+
+    with pytest.raises(FetchError) as exc:
+        fetch_new_filings(client, date(2025, 3, 26), MARCH_31)
+
+    assert exc.value.status == 403
+    assert seen == [day_url(date(2025, 3, d)) for d in (26, 27, 28)]  # stops there
+
+
+def test_a_refused_business_day_before_an_index_is_a_closed_day():
+    refused = {day_url(date(2025, 3, 27)): 403, day_url(date(2025, 3, 28)): 403}  # Thu, Fri
+    client, _ = make_client({**day_routes(), **refused})
+    stats: dict = {}
+
+    filings, _ = fetch_new_filings(client, date(2025, 3, 27), MARCH_31, stats)
+
+    assert filings["accession"].to_list() == [ALPHA, BETA]
+    assert stats["no_index_days"] == [date(2025, 3, d) for d in (27, 28, 29, 30)]
+
+
+def test_weekend_days_do_not_count_towards_throttling():
+    refused = {day_url(date(2025, 3, d)): 403 for d in (28, 29, 30)}  # Friday, Saturday, Sunday
+    client, _ = make_client({**day_routes(), **refused})
+
+    filings, _ = fetch_new_filings(client, date(2025, 3, 28), MARCH_31)
+
+    assert filings.height == 2
+
+
+@pytest.mark.parametrize("status", [403, 429])
+def test_a_refused_filing_download_stops_the_stage(status):
+    client, _ = make_client(day_routes(beta=status))
+
+    with pytest.raises(FetchError) as exc:
+        fetch_new_filings(client, MARCH_31, MARCH_31)
+
+    assert exc.value.status == status

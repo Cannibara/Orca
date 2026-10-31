@@ -391,3 +391,34 @@ def test_fetch_error_keeps_the_detail():
     err = FetchError("https://example.test/a", 502, "bad gateway")
     assert err.detail == "bad gateway"
     assert FetchError("https://example.test/a", None).detail == ""
+
+
+def test_a_body_that_cannot_be_decoded_is_a_fetch_error_after_retries():
+    t = FakeTime()
+
+    def handler(request):
+        raise httpx.DecodingError("bad gzip stream", request=request)
+
+    client = make_client(handler, t, max_retries=2)
+
+    with pytest.raises(FetchError) as exc:
+        client.get("https://example.test/a")
+
+    assert exc.value.status is None
+    assert "bad gzip" in exc.value.detail
+    assert t.sleeps == [2, 4]
+
+
+def test_sec_client_makes_at_most_8_requests_per_second(monkeypatch):
+    monkeypatch.setenv("ORCA_CONTACT", "test@example.com")
+    t = FakeTime()
+    client = sec_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200)),
+        sleep=t.sleep,
+        clock=t.clock,
+    )
+
+    for _ in range(9):
+        client.get("https://www.sec.gov/a")
+
+    assert t.now == pytest.approx(1.0)  # eight gaps of 1/8 s

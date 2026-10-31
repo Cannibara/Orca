@@ -327,6 +327,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
             dropped_filings=0,
             dropped_holdings=0,
             failed_filings=0,
+            failed_days=[],
             no_index_days=_no_index_days(since, until),
         )
         return filings, holdings

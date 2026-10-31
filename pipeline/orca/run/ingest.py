@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 LIVE_RECENT_BUSINESS_DAYS = 3  # a missing daily index this recent may only be late
 LIVE_FIRST_LOOKBACK_DAYS = 7  # first live read when there is no bulk data to start after
+LIVE_RETRY_DAYS = 28  # a day with a failed filing download is read again for four weeks
 
 
 def live_watermark(since: date, until: date, no_index_days: Iterable[date]) -> date:
@@ -156,6 +157,10 @@ def ingest_bulk(
 def ingest_live(
     lake: Lake, sources: Sources, state: State, today: date, flags: list, counts: Counts
 ) -> None:
+    """Ingest the live filings since the watermark and move it on: to `live_watermark`'s day,
+    or to the day before the earliest index day with a failed filing download, so the next run
+    reads that day again (for LIVE_RETRY_DAYS; an older failure is given up and flagged). A
+    failed read (SEC throttling included) moves nothing and is flagged."""
     if state.live_watermark is not None:
         since = state.live_watermark + timedelta(days=1)
     else:
@@ -176,7 +181,16 @@ def ingest_live(
         flags.append({"type": "live_failed", "url": strip_query(err.url), "status": err.status})
         return
     state.pending_funds |= ingest(lake, filings, raw, "live", counts)
-    state.live_watermark = live_watermark(since, until, stats.get("no_index_days", []))
+    watermark = live_watermark(since, until, stats.get("no_index_days", []))
+    failed = stats.get("failed_days", [])
+    held = [day for day in failed if day > today - timedelta(days=LIVE_RETRY_DAYS)]
+    if held:
+        watermark = min(watermark, min(held) - timedelta(days=1))
+    if abandoned := sorted(set(failed) - set(held)):
+        flags.append(
+            {"type": "live_downloads_abandoned", "days": [day.isoformat() for day in abandoned]}
+        )
+    state.live_watermark = watermark
     state.save(lake)
     counts.filings_parsed += filings.height
     counts.add("live", stats)

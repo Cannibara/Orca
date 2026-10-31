@@ -20,6 +20,7 @@ SHARES_CONCEPT_URL = (
 SIC_TO_SECTOR_CSV = Path(__file__).with_name("sic_to_sector.csv")
 
 OPENFIGI, NAME, UNMAPPED = "openfigi", "name", "unmapped"
+ERROR = "error"  # OpenFIGI answered the job with an error: no answer yet, ask again later
 ETF_SECTOR, OTHER_SECTOR = "ETF/Fund", "Other"
 
 MAPPED_SCHEMA = pl.Schema(
@@ -79,12 +80,14 @@ def map_cusips(
 
     OpenFIGI first; for CUSIPs it cannot map, an exact normalised-name match against exactly
     one SEC ticker row (`issuer_names`: cusip -> name from the 13F; `sec_tickers`: the frame
-    from `load_sec_tickers`); otherwise unmapped. `figi` is `figi_client()`; its
-    `jobs_per_request` sets the batch size. Tickers come out in SEC style (`normalise_ticker`).
+    from `load_sec_tickers`); otherwise unmapped. A CUSIP whose job OpenFIGI answered with an
+    `error` (not the "No identifier found" warning) gets method "error" and no name match: it
+    has no answer yet. `figi` is `figi_client()`; its `jobs_per_request` sets the batch size.
+    Tickers come out in SEC style (`normalise_ticker`).
     """
     distinct = list(dict.fromkeys(cusips))
     batch_size = figi.jobs_per_request
-    found: dict[str, _Match | None] = {}
+    found: dict[str, _Match | str | None] = {}
     for start in range(0, len(distinct), batch_size):
         batch = distinct[start : start + batch_size]
         found.update(zip(batch, _openfigi_batch(figi, batch)))
@@ -92,7 +95,9 @@ def map_cusips(
     titles = _titles_by_normalised_name(sec_tickers)
     rows = []
     for cusip in distinct:
-        if (match := found[cusip]) is not None:
+        if (match := found[cusip]) == ERROR:
+            match, method = (None, None, None, False), ERROR
+        elif match is not None:
             method = OPENFIGI
         elif (match := _name_match(issuer_names.get(cusip), titles)) is not None:
             method = NAME
@@ -102,12 +107,17 @@ def map_cusips(
     return pl.DataFrame(rows, schema=MAPPED_SCHEMA, orient="row")
 
 
-def _openfigi_batch(client: FigiClient, cusips: list[str]) -> list[_Match | None]:
+def _openfigi_batch(client: FigiClient, cusips: list[str]) -> list[_Match | str | None]:
+    """Each job's listing, None when OpenFIGI found nothing, or ERROR when it answered with an
+    error."""
     jobs = [{"idType": "ID_CUSIP", "idValue": cusip} for cusip in cusips]
     results = client.post_json(FIGI_URL, jobs).json()
     if not isinstance(results, list) or len(results) != len(jobs):
         raise ValueError(f"OpenFIGI answered {len(jobs)} jobs with an unaligned response")
-    return [_pick_listing(result.get("data")) for result in results]
+    return [
+        ERROR if "error" in result and not result.get("data") else _pick_listing(result.get("data"))
+        for result in results
+    ]
 
 
 def _pick_listing(data: list[dict] | None) -> _Match | None:

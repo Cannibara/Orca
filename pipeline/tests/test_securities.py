@@ -330,12 +330,12 @@ def test_name_fallback_is_only_for_cusips_openfigi_did_not_map():
 
 def test_unmapped_marked():
     sec = tickers_frame(("AAPL", 320193, "Apple Inc."))
-    client = make_figi_client(figi_handler({"C3": {"error": "Invalid idValue format"}}))
+    client = make_figi_client(figi_handler({}))
 
-    out = map_cusips(["C1", "C2", "C3"], {"C1": "UNKNOWN CORP"}, client, sec).to_dicts()
+    out = map_cusips(["C1", "C2"], {"C1": "UNKNOWN CORP"}, client, sec).to_dicts()
 
-    # C1: name matches nothing. C2: no issuer name at all. C3: an error entry.
-    for row, cusip in zip(out, ["C1", "C2", "C3"]):
+    # C1: name matches nothing. C2: no issuer name at all.
+    for row, cusip in zip(out, ["C1", "C2"]):
         assert row == {
             "cusip": cusip,
             "figi": None,
@@ -344,6 +344,26 @@ def test_unmapped_marked():
             "is_etf": False,
             "method": "unmapped",
         }
+
+
+def test_an_openfigi_job_error_is_not_an_answer():
+    # "No identifier found" is an answer (then the name fallback); an error is no answer at all:
+    # the CUSIP is marked for a retry, without the name fallback.
+    sec = tickers_frame(("AAPL", 320193, "Apple Inc."))
+    client = make_figi_client(figi_handler({"C3": {"error": "Too many requests"}}))
+
+    out = map_cusips(["C3"], {"C3": "APPLE INC"}, client, sec).to_dicts()
+
+    assert out == [
+        {
+            "cusip": "C3",
+            "figi": None,
+            "ticker": None,
+            "name": None,
+            "is_etf": False,
+            "method": "error",
+        }
+    ]
 
 
 def test_mapped_frame_schema():

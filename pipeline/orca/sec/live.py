@@ -23,7 +23,14 @@ from orca.sec.bulk import AMENDMENT_TYPES, KEPT_FORMS, MAX_LOGGED_ACCESSIONS, ra
 log = logging.getLogger(__name__)
 
 ARCHIVES = "https://www.sec.gov/Archives/"
-NO_INDEX_STATUSES = (403, 404)  # what EDGAR answers for a day with no index: weekend, holiday
+# EDGAR answers a day with no index (weekend, holiday) with 404 or 403, but 403 is also how SEC
+# refuses a client it throttles. A refused business day counts as closed once a later day's index
+# is read; three refused business days with no index read in between are throttling, and stop
+# the read.
+NO_INDEX = 404
+REFUSED = 403
+THROTTLED_AFTER = 3  # refused business days with no index read in between
+THROTTLE_STATUSES = frozenset({403, 429})  # on a filing download: SEC is throttling us
 INFO_TABLE_TYPE = "INFORMATION TABLE"
 PERIOD_FORMAT = "%m-%d-%Y"  # 03-31-2025
 
@@ -204,38 +211,57 @@ def _read_submission(submission: bytes, entry: IndexEntry) -> tuple[dict, list[d
 
 
 def _daily_index(client: Client, day: date) -> str | None:
-    """The day's index text, or None for a day EDGAR has no index for."""
+    """The day's index text, or None for a day EDGAR has no index for (404, or 403 on a weekend).
+    A 403 on a business day raises FetchError: only the days around it tell a closed day from
+    throttling."""
     quarter = (day.month - 1) // 3 + 1
     url = f"{ARCHIVES}edgar/daily-index/{day.year}/QTR{quarter}/form.{day:%Y%m%d}.idx"
     try:
         return client.get(url).text
     except FetchError as err:
-        if err.status in NO_INDEX_STATUSES:
+        if err.status == NO_INDEX or (err.status == REFUSED and day.weekday() >= 5):
             return None
         raise
 
 
 def _index_entries(
     client: Client, since: date, until: date
-) -> tuple[list[IndexEntry], int, list[date]]:
-    """13F entries of every day since..until, each filing once, the count of unusable lines, and
-    the days EDGAR had no index for."""
-    entries: dict[str, IndexEntry] = {}
+) -> tuple[dict[str, tuple[IndexEntry, date]], int, list[date]]:
+    """13F entries of every day since..until, each filing once with the day it was listed, the
+    count of unusable lines, and the days EDGAR had no index for (oldest first). A business day
+    refused with 403 counts as one once a later day's index is read; trailing refused days are
+    listed too (the caller reads recent missing days again); THROTTLED_AFTER refused business
+    days with no index read in between raise FetchError(403)."""
+    entries: dict[str, tuple[IndexEntry, date]] = {}
     dropped = 0
     no_index: list[date] = []
+    refused: list[date] = []
     day = since
     while day <= until:
-        text = _daily_index(client, day)
+        try:
+            text = _daily_index(client, day)
+        except FetchError as err:
+            if err.status != REFUSED:
+                raise
+            refused.append(day)
+            if len(refused) >= THROTTLED_AFTER:
+                raise FetchError(
+                    err.url, REFUSED, f"{len(refused)} business days in a row refused: throttled"
+                ) from err
+            day += timedelta(days=1)
+            continue
         if text is None:
             no_index.append(day)
         else:
+            no_index += refused  # EDGAR answers again: the refused days were closed
+            refused.clear()
             day_stats: dict = {}
             for entry in parse_daily_index(text, day_stats):
                 # A filing with several filers is listed once per filer: keep the first.
-                entries.setdefault(entry.accession, entry)
+                entries.setdefault(entry.accession, (entry, day))
             dropped += day_stats["dropped_filings"]
         day += timedelta(days=1)
-    return list(entries.values()), dropped, no_index
+    return entries, dropped, sorted(no_index + refused)
 
 
 def fetch_new_filings(
@@ -244,28 +270,35 @@ def fetch_new_filings(
     """(filings, raw_holdings) for 13F-HR / 13F-HR/A filings indexed from `since` to `until` inclusive.
 
     Same shapes as parse_bulk_zip, with source="live". Takes the one shared SEC client so
-    every request counts against the same rate limit. A day with no index (403 / 404) is
-    skipped; any other failed index request raises FetchError.
+    every request counts against the same rate limit. A day with no index (404, or 403 on a
+    weekend or a closed business day) is skipped; SEC throttling (403 on three business days
+    with no index read in between, or 403 / 429 on a filing download) and any other failed index
+    request raise FetchError.
 
     Bad input is dropped, never fatal: an index line, or a filing whose primary document, info
     table or report period is missing or unreadable, goes with its holdings; a holding with an
     unusable share type, value or share count goes alone; a filing that cannot be downloaded is
     skipped. If `stats` is given, these are counted in stats["dropped_filings"],
     stats["dropped_holdings"] and stats["failed_filings"], and one warning names the offenders;
-    stats["no_index_days"] lists the days that had no index, oldest first (a recent one may only
-    not be published yet, so a caller should read it again later).
+    stats["failed_days"] lists the index days with a failed download and stats["no_index_days"]
+    the days that had no index, each oldest first (a caller should read those days again later:
+    a recent missing index may only not be published yet).
     """
     entries, dropped_lines, no_index_days = _index_entries(client, since, until)
     filing_rows: list[dict] = []
     info_rows: list[dict[str, str | None]] = []
     bad_filings: list[str] = []
     failed_filings: list[str] = []
-    for entry in entries:
+    failed_days: set[date] = set()
+    for entry, day in entries.values():
         try:
             submission = client.get(ARCHIVES + entry.path).content
         except FetchError as err:
+            if err.status in THROTTLE_STATUSES:
+                raise
             log.debug("could not download %s: %s", entry.accession, err)
             failed_filings.append(entry.accession)
+            failed_days.add(day)
             continue
         try:
             filing, rows = _read_submission(submission, entry)
@@ -284,6 +317,7 @@ def fetch_new_filings(
         stats["dropped_filings"] = dropped_filings
         stats["dropped_holdings"] = len(bad_holdings)
         stats["failed_filings"] = len(failed_filings)
+        stats["failed_days"] = sorted(failed_days)
         stats["no_index_days"] = no_index_days
     if dropped_filings or bad_holdings or failed_filings:
         offending = list(dict.fromkeys([*bad_filings, *failed_filings, *bad_holdings]))

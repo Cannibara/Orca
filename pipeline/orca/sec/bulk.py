@@ -136,6 +136,8 @@ def _clean_upper(name: str) -> pl.Expr:
 
 def _filings(submission: pl.DataFrame, coverpage: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
     """Kept filings, and the accessions of kept-form filings dropped for a missing CIK, date or period."""
+    # A repeated SUBMISSION row must not repeat the filing (and so its holdings): first one wins.
+    submission = submission.unique(subset="accession", keep="first", maintain_order=True)
     kept = submission.with_columns(form=_clean_upper("form")).filter(pl.col("form").is_in(KEPT_FORMS))
     # strict=False: a value that does not parse is as unusable as an empty one.
     parsed = kept.with_columns(

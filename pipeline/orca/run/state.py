@@ -44,7 +44,10 @@ SECURITIES_TABLE_SCHEMA = pl.Schema(
         "shares_out": pl.Float64,
     }
 )
-CUSIP_MAP_SCHEMA = pl.Schema({"cusip": pl.String, "stock_id": pl.Int32, "method": pl.String})
+# `tried`: when OpenFIGI was last asked about the CUSIP (null in a lake from before it was kept).
+CUSIP_MAP_SCHEMA = pl.Schema(
+    {"cusip": pl.String, "stock_id": pl.Int32, "method": pl.String, "tried": pl.Date}
+)
 REPORTS_SCHEMA = FILINGS_SCHEMA
 FUND_STATE_SCHEMA = pl.Schema({"cik": pl.Int64, "meta": pl.String, "snap": pl.String})
 FUND_STATE_RUN = "fund_state_run"  # this run's fund state, one part per batch, until merged
@@ -84,8 +87,16 @@ def scan(lake: Lake, table: str, schema: pl.Schema, where: pl.Expr | None = None
 
 
 def read_table(lake: Lake, table: str, schema: pl.Schema) -> pl.DataFrame:
+    """`table` in `schema`; a column the stored table predates comes back null."""
     frame = lake.read(table)
-    return pl.DataFrame(schema=schema) if frame.is_empty() else frame.cast(schema)
+    if frame.is_empty():
+        return pl.DataFrame(schema=schema)
+    missing = [
+        pl.lit(None, dtype).alias(name)
+        for name, dtype in schema.items()
+        if name not in frame.columns
+    ]
+    return frame.with_columns(missing).cast(schema)
 
 
 def drop_parts(lake: Lake, table: str) -> None:
@@ -128,7 +139,7 @@ class State:
     that needs them is attempted and cleared only after a successful publish. `prices_in_flight`
     names a price run that has not finished: its parts may hold changes nobody has recorded.
     `lookup_retry` holds securities whose SIC code or shares outstanding are still to be fetched
-    (a lookup the time budget cut off)."""
+    (a lookup that failed or that the time budget cut off)."""
 
     live_watermark: date | None = None
     last_q: int | None = None

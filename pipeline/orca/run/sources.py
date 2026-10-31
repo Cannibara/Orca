@@ -1,4 +1,4 @@
-"""Everything a run fetches, as one injectable bundle (tests and the demo never touch the network)."""
+"""Everything a run fetches, in one injectable bundle (tests and the demo use no network)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass

@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import httpx
 
-SEC_RATE_PER_SEC = 10.0  # SEC fair-access limit
+SEC_RATE_PER_SEC = 8.0  # SEC's fair-access limit is 10; 8 leaves room for its own counting
 # OpenFIGI mapping limits: with a key 25 requests per 6 s and 100 jobs each, without 25 per minute
 # and 10 jobs each.
 FIGI_RATE_KEYED = 25 / 6
@@ -36,7 +36,8 @@ class FetchError(Exception):
 class Client:
     """GET / POST JSON at most `rate_per_sec` times a second, retrying transient failures.
 
-    Retries network errors, 429 and 5xx, sleeping 2, 4, 8, 16 s (doubling) between tries.
+    Retries network errors (a body that cannot be decoded counts as one), 429 and 5xx, sleeping
+    2, 4, 8, 16 s (doubling) between tries.
     Any other non-2xx response (other 4xx, and 3xx: redirects are never followed) raises
     FetchError at once. `sleep` and `clock` are injectable so tests can run on a fake clock.
     """
@@ -85,7 +86,7 @@ class Client:
             self._wait_for_token()
             try:
                 response = self._http.request(method, url, **kwargs)
-            except httpx.TransportError as err:
+            except (httpx.TransportError, httpx.DecodingError) as err:
                 failure = FetchError(url, None, str(err))
                 failure.__cause__ = err
             else:
@@ -112,7 +113,7 @@ def sec_client(
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> Client:
-    """Client for sec.gov: 10 requests/s and a User-Agent naming ORCA_CONTACT (SEC requires one).
+    """Client for sec.gov: 8 requests/s and a User-Agent naming ORCA_CONTACT (SEC requires one).
 
     Create it once and share it: www.sec.gov and data.sec.gov count against one SEC rate
     limit, so every SEC request must go through the same Client.

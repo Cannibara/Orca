@@ -979,3 +979,138 @@ def test_budget_minutes_come_from_the_environment(monkeypatch):
         monkeypatch.setenv("ORCA_TIME_BUDGET_MIN", bad)
         with pytest.raises(RuntimeError, match="ORCA_TIME_BUDGET_MIN"):
             Budget.from_env()
+
+
+# --- transient failures are retried on later runs ------------------------------------------
+
+
+def test_a_failed_live_download_is_read_again_next_run(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    calls = []
+    friday = date(2024, 10, 4)
+    failing = {friday: [friday - timedelta(days=2)], friday + timedelta(days=7): []}
+
+    def live(since, until, stats):
+        calls.append((since, until))
+        stats.update(
+            no_index_days=[], failed_filings=len(failing[until]), failed_days=failing[until]
+        )
+        return live_frames([])
+
+    sources = replace(fixture_sources(small), live_filings=live)
+    run(tmp_path, sources, friday)
+    run(tmp_path, sources, friday + timedelta(days=7))
+
+    assert calls[1] == (friday - timedelta(days=2), friday + timedelta(days=7))
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == friday + timedelta(days=7)
+
+
+def test_a_live_download_failing_for_four_weeks_is_given_up(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    friday, old = date(2024, 10, 4), date(2024, 9, 5)  # 29 days before
+
+    def live(since, until, stats):
+        stats.update(no_index_days=[], failed_filings=1, failed_days=[old])
+        return live_frames([])
+
+    run(tmp_path, replace(fixture_sources(small), live_filings=live), friday)
+
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == friday
+    assert {"type": "live_downloads_abandoned", "days": ["2024-09-05"]} in health(tmp_path)["flags"]
+
+
+def test_a_failed_security_lookup_is_retried_next_run(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    sources = fixture_sources(small)
+
+    def sic_down(cik):
+        raise FetchError(f"https://data.sec.gov/submissions/CIK{cik:010d}.json", 503)
+
+    run(tmp_path / "a", replace(sources, sic=sic_down), SMALL_TODAY)
+    lake = Lake(tmp_path / "a" / "lake")
+    assert {"type": "security_lookup_failed", "stock_id": 1, "status": 503} in health(
+        tmp_path / "a"
+    )["flags"]
+    assert State.load(lake).lookup_retry == {1}
+
+    run(tmp_path / "a", sources, SMALL_TODAY + timedelta(days=7))
+    run(tmp_path / "b", sources, SMALL_TODAY)  # never failed
+
+    assert State.load(lake).lookup_retry == set()
+    assert lake.read("securities").equals(Lake(tmp_path / "b" / "lake").read("securities"))
+    securities = read_json(tmp_path / "a" / "bucket" / "securities.json")
+    assert securities == read_json(tmp_path / "b" / "bucket" / "securities.json")
+
+
+GADGET = "000000BC" + cusip_check_digit("000000BC")
+
+
+def gadget_fixtures(known: bool) -> Fixtures:
+    rows = [Holding("WIDGET CORP", WIDGET, 400.0, 10), Holding("GADGET INC", GADGET, 300.0, 10)]
+    small = small_fixtures({Q1_24: rows, Q2_24: rows})
+    if not known:
+        return small
+    return replace(
+        small,
+        figi={**small.figi, GADGET: listing("BBG0TEST0002", "GADG", "GADGET INC")},
+        prices={**small.prices, "GADG": flat_prices(30.0)},
+    )
+
+
+def test_an_unmapped_cusip_is_asked_again_after_four_weeks(tmp_path):
+    run(tmp_path, fixture_sources(gadget_fixtures(known=False)), SMALL_TODAY)
+    cusip_map = Lake(tmp_path / "lake").read("cusip_map")
+    assert cusip_map.filter(cusip=GADGET)["method"].to_list() == ["unmapped"]
+
+    known = fixture_sources(gadget_fixtures(known=True))  # OpenFIGI knows it now
+    week = run(tmp_path, known, SMALL_TODAY + timedelta(days=7))
+    assert not [p for p in week.changed if p.startswith("fund/")]  # not asked again yet
+
+    later = run(tmp_path, known, SMALL_TODAY + timedelta(days=28))
+
+    assert f"fund/{SMALL_FUND}/positions.json" in later.changed
+    positions = read_json(tmp_path / "bucket" / f"fund/{SMALL_FUND}/positions.json")
+    assert len(positions["stock_id"]) == 2
+    cusip_map = Lake(tmp_path / "lake").read("cusip_map")
+    assert cusip_map.filter(cusip=GADGET)["method"].to_list() == ["openfigi"]
+    assert cusip_map["cusip"].is_unique().all()
+
+
+def test_an_openfigi_job_error_is_asked_again_next_run(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+
+    def erroring(request):
+        jobs = json.loads(request.content)
+        return httpx.Response(200, json=[{"error": "Unauthorized job"} for _ in jobs])
+
+    flaky = FigiClient(
+        1e6, {}, transport=httpx.MockTransport(erroring), sleep=lambda s: None, jobs_per_request=100
+    )
+    run(tmp_path, replace(fixture_sources(small), figi=flaky), SMALL_TODAY)
+
+    assert Lake(tmp_path / "lake").read("cusip_map").is_empty()  # no answer: nothing recorded
+    assert {"type": "cusip_mapping_errors", "count": 2} in health(tmp_path)["flags"]
+
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY)
+
+    assert f"fund/{SMALL_FUND}/positions.json" in stats.changed
+
+
+def test_sec_throttling_stops_the_live_stage_and_keeps_the_watermark(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    friday = date(2024, 10, 4)
+    run(tmp_path, fixture_sources(small), friday)
+    index = "https://www.sec.gov/Archives/edgar/daily-index/2024/QTR4/form.20241009.idx"
+
+    def throttled(since, until, stats):
+        raise FetchError(index, 403, "3 business days in a row refused: throttled")
+
+    run(tmp_path, replace(fixture_sources(small), live_filings=throttled), friday + timedelta(7))
+
+    assert {"type": "live_failed", "url": index, "status": 403} in health(tmp_path)["flags"]
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == friday

@@ -370,6 +370,15 @@ def test_duplicate_coverpage_rows_do_not_duplicate_filings_or_holdings(tmp_path)
     assert rows["value_usd"].to_list() == [1_500_000.0, 2_000_000.0, 7.0]
 
 
+def test_duplicate_submission_rows_do_not_duplicate_filings_or_holdings(tmp_path):
+    submissions = [*SUBMISSIONS, SUBMISSIONS[0]]  # the original listed twice
+
+    filings, rows = parse_bulk_zip(make_zip(tmp_path, submissions=submissions))
+
+    assert filings["accession"].to_list() == [ORIGINAL, RESTATEMENT]
+    assert rows["value_usd"].to_list() == [1_500_000.0, 2_000_000.0, 7.0]
+
+
 def test_non_utf8_byte_in_issuer_name_does_not_abort_the_parse(tmp_path):
     infotable = [
         holding(ORIGINAL, "CAF\u00e9 INC", "1500", "10"),

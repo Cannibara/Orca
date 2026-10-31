@@ -2,7 +2,7 @@
 of the stocks that matter, and the T-bill table."""
 
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 
@@ -31,13 +31,20 @@ from orca.run.state import (
     scan_parts,
     strip_query,
 )
-from orca.securities import assign_stock_ids, map_cusips, normalise_ticker, sector_for_sic
+from orca.securities import (
+    ERROR,
+    assign_stock_ids,
+    map_cusips,
+    normalise_ticker,
+    sector_for_sic,
+)
 from orca.storage import Lake
 
 BENCHMARK_CUSIP = "78462F103"  # SPY, the benchmark of the what-if figures
 EMPTY_FETCH_WARN = 0.25  # share of tickers answering with no rows that is worth a flag
 COMPACT_AT_RUNS = 4  # price runs not compacted yet that trigger a compaction into yearly parts
 COMPACT_AT_PARTS = 64  # ... or this many run parts (a long backfill flushes many)
+UNMAPPED_RETRY_DAYS = 28  # an unmapped CUSIP is asked about again after four weeks
 
 
 # --- securities -------------------------------------------------------------------------------
@@ -49,10 +56,14 @@ def stock_of(cusip_map: pl.DataFrame) -> dict[str, int]:
     return dict(zip(mapped["cusip"].to_list(), mapped["stock_id"].to_list()))
 
 
-def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list, budget: Budget) -> None:
-    """Map the share CUSIPs not yet in cusip_map (and the benchmark's), oldest first, give new
-    securities ids, sectors and shares outstanding, and mark every fund holding a newly mapped
-    CUSIP for recompute. A failed mapping leaves the CUSIPs for the next run."""
+def map_new_cusips(
+    lake: Lake, sources: Sources, state: State, today: date, flags: list, budget: Budget
+) -> None:
+    """Map the share CUSIPs not yet in cusip_map (and the benchmark's), oldest first, and the
+    unmapped ones last asked about UNMAPPED_RETRY_DAYS ago or more; give new securities ids,
+    sectors and shares outstanding, and mark every fund holding a newly mapped CUSIP for
+    recompute. A failed mapping leaves the CUSIPs for the next run, and so does an OpenFIGI job
+    answered with an error: such a CUSIP is not recorded (or its old row is kept)."""
     cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
     known = set(cusip_map["cusip"].to_list())
     firsts = scan_parts(
@@ -68,6 +79,12 @@ def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list, budg
     new = [c for c in held["cusip"].to_list() if c not in known]
     if BENCHMARK_CUSIP not in known and BENCHMARK_CUSIP not in new:
         new.append(BENCHMARK_CUSIP)
+    retry_before = today - timedelta(days=UNMAPPED_RETRY_DAYS)
+    due = cusip_map.filter(
+        pl.col("stock_id").is_null()
+        & (pl.col("tried").is_null() | (pl.col("tried") <= retry_before))
+    )["cusip"].to_list()
+    new += due
     if not new:
         return
     try:
@@ -87,6 +104,10 @@ def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list, budg
     except ValueError as err:  # an OpenFIGI answer that does not line up with the jobs
         flags.append({"type": "cusip_mapping_failed", "count": len(new), "detail": str(err)[:200]})
         return
+    errors = mapped.filter(pl.col("method") == ERROR).height
+    if errors:
+        flags.append({"type": "cusip_mapping_errors", "count": errors})
+    mapped = mapped.filter(pl.col("method") != ERROR)
 
     existing = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
     old_max = existing["stock_id"].max() or 0
@@ -99,14 +120,15 @@ def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list, budg
         ]
     )
 
-    new_map = cusip_rows(mapped, securities)
+    new_map = cusip_rows(mapped, securities, today)
     newly = new_map.filter(pl.col("stock_id").is_not_null())["cusip"].to_list()
     if newly:
         holders = scan(lake, "holdings", HOLDINGS_SCHEMA, pl.col("cusip").is_in(newly))
         state.pending_funds |= {int(c) for c in holders["cik"].unique().to_list()}
     state.save(lake)  # before the map is written, so a crash cannot lose these funds or lookups
     lake.write("securities", securities.sort("stock_id"))
-    lake.write("cusip_map", pl.concat([cusip_map, new_map]).sort("cusip"))
+    kept = cusip_map.filter(~pl.col("cusip").is_in(new_map["cusip"].to_list()))
+    lake.write("cusip_map", pl.concat([kept, new_map]).sort("cusip"))
 
 
 def issuer_names(lake: Lake, cusips: list[str]) -> dict[str, str]:
@@ -138,8 +160,8 @@ def enrich(
     budget: Budget,
 ) -> pl.DataFrame:
     """Company CIK (from the SEC ticker list), SIC code, sector and shares outstanding of new
-    securities. A failed lookup is flagged and left empty. Once the time budget is spent the
-    rest are left empty too and kept in `state.lookup_retry` for a later run."""
+    securities. A failed lookup is flagged and left empty, and so is every lookup once the time
+    budget is spent; those securities go to `state.lookup_retry` for a later run."""
     cik_of = {t: c for t, c in tickers.select("ticker", "cik").iter_rows()}
     rows = []
     for row in added.iter_rows(named=True):
@@ -160,6 +182,7 @@ def enrich(
                         "status": err.status,
                     }
                 )
+                state.lookup_retry.add(row["stock_id"])
         rows.append(
             {
                 **row,
@@ -226,10 +249,10 @@ def retry_lookups(lake: Lake, sources: Sources, state: State, flags: list, budge
     state.save(lake)
 
 
-def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame) -> pl.DataFrame:
-    """cusip_map rows of `mapped`: each CUSIP's stock id found by the security's key, its FIGI,
-    or (without one) the FIGI of a security with its ticker, else its ticker, as
-    assign_stock_ids identifies securities."""
+def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame, tried: date) -> pl.DataFrame:
+    """cusip_map rows of `mapped`, asked about on `tried`: each CUSIP's stock id found by the
+    security's key, its FIGI, or (without one) the FIGI of a security with its ticker, else its
+    ticker, as assign_stock_ids identifies securities."""
     by_figi, by_ticker, figi_of_ticker = {}, {}, {}
     for stock_id, figi, ticker in securities.select("stock_id", "figi", "ticker").iter_rows():
         if figi:
@@ -244,7 +267,7 @@ def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame) -> pl.DataFrame:
     ).iter_rows():
         figi = figi or figi_of_ticker.get(ticker)
         stock_id = by_figi.get(figi) if figi else by_ticker.get(ticker)
-        rows.append((cusip, stock_id, method))
+        rows.append((cusip, stock_id, method, tried))
     return pl.DataFrame(rows, schema=CUSIP_MAP_SCHEMA, orient="row")
 
 
@@ -354,8 +377,8 @@ def refresh_shares_outstanding(
     flags: list,
     budget: Budget,
 ) -> None:
-    """A split changes the share count: refetch it for the stocks whose history changed. Once
-    the time budget is spent the rest wait in `state.lookup_retry`."""
+    """A split changes the share count: refetch it for the stocks whose history changed. A failed
+    lookup, and every one once the time budget is spent, waits in `state.lookup_retry`."""
     fresh = {}
     for stock_id, cik in (
         securities.filter(pl.col("stock_id").is_in(stock_ids)).select("stock_id", "cik").iter_rows()
@@ -372,6 +395,7 @@ def refresh_shares_outstanding(
             flags.append(
                 {"type": "security_lookup_failed", "stock_id": stock_id, "status": err.status}
             )
+            state.lookup_retry.add(stock_id)
             continue
         if shares is not None:
             fresh[stock_id] = shares
