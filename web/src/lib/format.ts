@@ -1,7 +1,7 @@
 // Display formatters. Every one returns "—" for a missing value (null, or a
 // number that is not finite) so a table cell or tile never shows "NaN".
 export const MINUS = "−"; // U+2212
-const DASH = "—";
+export const DASH = "—";
 
 const missing = (x: number | null): x is null => x == null || !Number.isFinite(x);
 
@@ -53,6 +53,21 @@ export function px(price: number | null): string {
 /** Quarter index counted from Q1 2013: 53 → "Q2 2026". */
 export function qLabel(q: number): string {
   return "Q" + ((q % 4) + 1) + " " + (2013 + Math.floor(q / 4));
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** An ISO date as "13 Aug 2026". Text that is not an ISO date comes back unchanged. */
+export function fmtDate(iso: string | null): string {
+  if (iso == null) return DASH;
+  const [y, m, d] = iso.split("-").map(Number);
+  return m >= 1 && m <= 12 ? `${d} ${MONTHS[m - 1]} ${y}` : iso;
+}
+
+/** A risk ratio (Sharpe, Sortino, Calmar): two decimals, a true minus sign. */
+export function ratio(x: number | null): string {
+  if (missing(x)) return DASH;
+  return (x < 0 ? MINUS : "") + Math.abs(x).toFixed(2);
 }
 
 /** CSS class for a signed figure; "" for zero or missing. */

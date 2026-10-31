@@ -1,4 +1,4 @@
-import { money, pct, pp, px, qLabel, sgn, signClass } from "../src/lib/format";
+import { fmtDate, money, pct, pp, px, qLabel, ratio, sgn, signClass } from "../src/lib/format";
 
 test("money", () => {
   expect(money(1_234_000_000)).toBe("$1.23B");
@@ -128,4 +128,29 @@ test("sgn and signClass", () => {
   expect(signClass(-2)).toBe("down");
   expect(signClass(0)).toBe("");
   expect(signClass(null)).toBe("");
+});
+
+test("fmtDate", () => {
+  expect(fmtDate("2026-08-13")).toBe("13 Aug 2026");
+  expect(fmtDate("2026-01-05")).toBe("5 Jan 2026");
+  expect(fmtDate("2013-12-31")).toBe("31 Dec 2013");
+});
+
+test("fmtDate leaves text that is not an ISO date as it is, and dashes a missing one", () => {
+  expect(fmtDate("2026-13-01")).toBe("2026-13-01");
+  expect(fmtDate("soon")).toBe("soon");
+  expect(fmtDate(null)).toBe("—");
+});
+
+test("ratio", () => {
+  expect(ratio(1.234)).toBe("1.23");
+  expect(ratio(0)).toBe("0.00");
+  expect(ratio(-0.5)).toBe("−0.50");
+  expect(ratio(12)).toBe("12.00");
+});
+
+test("ratio gives a dash for a missing or non-finite value", () => {
+  expect(ratio(null)).toBe("—");
+  expect(ratio(NaN)).toBe("—");
+  expect(ratio(-Infinity)).toBe("—");
 });

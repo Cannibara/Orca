@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
@@ -13,29 +13,10 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { MINUS, money, pct, pp, px, qLabel, signClass } from "../lib/format";
+import { DASH, fmtDate, money, pct, pp, px, qLabel, ratio, signClass } from "../lib/format";
+import { useLoad, type Load } from "../lib/useLoad";
 
 // ---- loading ----------------------------------------------------------------
-
-type Load<T> = { status: "loading" } | { status: "error" } | { status: "ready"; data: T };
-
-/** Run `load` on mount and whenever `deps` change; a result that arrives after a newer request started is dropped. */
-function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Load<T> {
-  const [state, setState] = useState<Load<T>>({ status: "loading" });
-  useEffect(() => {
-    let current = true;
-    setState((s) => (s.status === "loading" ? s : { status: "loading" }));
-    load().then(
-      (data) => current && setState({ status: "ready", data }),
-      () => current && setState({ status: "error" }),
-    );
-    return () => {
-      current = false;
-    };
-    // `deps` is the caller's list of what `load` depends on.
-  }, deps);
-  return state;
-}
 
 function Status({ state }: { state: Load<unknown> }) {
   if (state.status === "error") {
@@ -66,21 +47,6 @@ async function loadLookup(): Promise<Lookup> {
 }
 
 // ---- cells --------------------------------------------------------------------
-
-const DASH = "—";
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "2026-08-13" -> "13 Aug 2026". */
-function fmtDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return m >= 1 && m <= 12 ? `${d} ${MONTHS[m - 1]} ${y}` : iso;
-}
-
-/** Sharpe ratio, two decimals, a true minus sign. */
-function ratio(x: number | null): string {
-  if (x == null || !Number.isFinite(x)) return DASH;
-  return (x < 0 ? MINUS : "") + Math.abs(x).toFixed(2);
-}
 
 /** Price move from `base` to `price`; null when either is missing. */
 function change(price: number | undefined, base: number): number | null {
