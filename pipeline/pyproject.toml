@@ -24,3 +24,6 @@ packages = ["orca"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "network: runs against the real SEC, OpenFIGI, Tiingo and FRED services; needs ORCA_NETWORK=1 and their keys",
+]

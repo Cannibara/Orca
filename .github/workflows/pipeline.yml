@@ -1,0 +1,172 @@
+name: Pipeline
+
+# Weekly: restore the lake from the private R2 bucket, ingest new filings and prices, recompute the
+# funds they touch, upload the changed files to the public R2 bucket (manifest.json last), save the
+# lake back. Monthly: rebuild a sample of funds from the lake's raw filings and compare them with
+# what is published. A failed run leaves the site on the last good version; GitHub's default
+# notifications email the failure.
+
+on:
+  schedule:
+    - cron: "23 6 * * 0" # weekly run: Sundays 06:23 UTC
+    - cron: "41 7 1 * *" # monthly check: the 1st of each month, 07:41 UTC
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Rebuild everything (recompute and republish every fund)
+        type: boolean
+        default: false
+
+# One run at a time, and a run in progress is never cancelled: it reads the lake from R2 and writes
+# it back, so two at once would lose work.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: pipeline
+
+env:
+  # rclone reads its "r2" remote from these. The lake bucket holds CUSIPs and is never public; the
+  # site bucket is the public one.
+  RCLONE_CONFIG_R2_TYPE: s3
+  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+  RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+  RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true" # an object-only R2 token cannot create buckets
+  RCLONE_TRANSFERS: "16"
+  RCLONE_CHECKERS: "16"
+  R2_LAKE_BUCKET: ${{ vars.R2_LAKE_BUCKET }}
+  R2_SITE_BUCKET: ${{ vars.R2_SITE_BUCKET }}
+  # rclone release from GitHub, checked against the SHA256SUMS of that release.
+  RCLONE_VERSION: v1.74.4
+  RCLONE_LINUX_AMD64_SHA256: fe435e0c36228e7c2f116a8701f01127bb1f694005fc11d1f27186c8bca4115d
+
+jobs:
+  weekly:
+    # These strings must equal the cron entries above.
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 6 * * 0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      ORCA_LAKE_DIR: data/lake
+      ORCA_OUT_DIR: data/out
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+      - name: Install rclone
+        run: |
+          url="https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/rclone.zip" "$url"
+          echo "${RCLONE_LINUX_AMD64_SHA256}  $RUNNER_TEMP/rclone.zip" | sha256sum --check -
+          unzip -q -j "$RUNNER_TEMP/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$RUNNER_TEMP/rclone-bin"
+          sudo install -m 0755 "$RUNNER_TEMP/rclone-bin/rclone" /usr/local/bin/rclone
+          rclone version
+      - name: Check the buckets
+        run: |
+          if [ -z "$R2_LAKE_BUCKET" ] || [ -z "$R2_SITE_BUCKET" ]; then
+            echo "::error::set the repository variables R2_LAKE_BUCKET and R2_SITE_BUCKET"
+            exit 1
+          fi
+          if [ "$R2_LAKE_BUCKET" = "$R2_SITE_BUCKET" ]; then
+            echo "::error::the lake holds CUSIPs and must not be the public site bucket"
+            exit 1
+          fi
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Restore the lake
+        run: rclone sync "r2:${R2_LAKE_BUCKET}" data/lake
+      - name: Restore the previous manifest
+        run: |
+          mkdir -p data/out
+          # Absent on the first run.
+          if [ -n "$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)" ]; then
+            rclone copy "r2:${R2_SITE_BUCKET}/manifest.json" data/out
+          fi
+      - name: Run the pipeline
+        env:
+          ORCA_COMMAND: ${{ inputs.full && 'rebuild' || 'weekly' }}
+          ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
+          OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
+          TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          TIINGO_RATE_PER_SEC: ${{ vars.TIINGO_RATE_PER_SEC }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+        run: uv run python -m orca.run "$ORCA_COMMAND"
+      - name: Upload the changed files, then the manifest
+        run: |
+          # The run stages only the files that changed; the newest folder is this run's.
+          staging="$(find data/out/staging -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          if [ -z "$staging" ]; then
+            echo "::error::the run left no staging folder"
+            exit 1
+          fi
+          headers=(
+            --header-upload "Content-Encoding: br"
+            --header-upload "Content-Type: application/json"
+            --header-upload "Cache-Control: public, max-age=300"
+          )
+          rclone copy "$staging" "r2:${R2_SITE_BUCKET}" --include "*.json" --ignore-times "${headers[@]}"
+          # Last, so a reader never finds a manifest that names a file not yet uploaded.
+          rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
+      - name: Save the lake
+        run: rclone sync data/lake "r2:${R2_LAKE_BUCKET}"
+
+  verify:
+    # These strings must equal the cron entries above.
+    if: github.event.schedule == '41 7 1 * *'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ORCA_LAKE_DIR: data/lake
+      ORCA_OUT_DIR: data/out
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+      - name: Install rclone
+        run: |
+          url="https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/rclone.zip" "$url"
+          echo "${RCLONE_LINUX_AMD64_SHA256}  $RUNNER_TEMP/rclone.zip" | sha256sum --check -
+          unzip -q -j "$RUNNER_TEMP/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$RUNNER_TEMP/rclone-bin"
+          sudo install -m 0755 "$RUNNER_TEMP/rclone-bin/rclone" /usr/local/bin/rclone
+          rclone version
+      - name: Check the buckets
+        run: |
+          if [ -z "$R2_LAKE_BUCKET" ] || [ -z "$R2_SITE_BUCKET" ]; then
+            echo "::error::set the repository variables R2_LAKE_BUCKET and R2_SITE_BUCKET"
+            exit 1
+          fi
+          if [ "$R2_LAKE_BUCKET" = "$R2_SITE_BUCKET" ]; then
+            echo "::error::the lake holds CUSIPs and must not be the public site bucket"
+            exit 1
+          fi
+      - name: Install dependencies
+        run: uv sync --locked
+      # verify rebuilds funds from the lake's raw filings and compares their files' checksums with
+      # the lake's published.json (the manifest, when the lake has none): nothing else is needed.
+      - name: Restore the lake
+        run: rclone sync "r2:${R2_LAKE_BUCKET}" data/lake
+      - name: Restore the manifest
+        run: |
+          mkdir -p data/out
+          if [ -n "$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)" ]; then
+            rclone copy "r2:${R2_SITE_BUCKET}/manifest.json" data/out
+          fi
+      - name: Rebuild a sample of funds and compare
+        run: uv run python -m orca.run verify --sample 50
