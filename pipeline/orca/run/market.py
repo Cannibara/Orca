@@ -399,7 +399,7 @@ def refresh_prices(
     run_id: str,
     flags: list,
     budget: Budget,
-) -> list[int]:
+) -> dict:
     """Fetch the prices of the stocks held in the latest quarter, the benchmark, the stocks sold
     out within the last EXIT_REFRESH_QUARTERS quarters (held in one of them), any stock never
     fetched and, from the start of their history, the stocks of `state.price_refetch`. Never

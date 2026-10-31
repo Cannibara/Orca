@@ -64,6 +64,10 @@ FAILURE_FLAGS = {  # a run that tolerated one of these has fetched less than it 
     "cusip_mapping_failed",
     "security_lookup_failed",
     "tbill_failed",
+    "time_budget",
+    "cusip_mapping_errors",
+    "cusip_remap_failed",
+    "live_downloads_abandoned",
 }
 ZIP_DIR = "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/"
 
@@ -296,6 +300,7 @@ def test_incomplete_flags():
     assert incomplete({"type": "prices", "failed_count": 0, "stopped": "rate limit"})
     assert not incomplete({"type": "prices", "failed_count": 0, "stopped": None})
     assert not incomplete({"type": "price_mismatch"})
+    assert incomplete({"type": "time_budget", "minutes": 270, "stages": ["compute"]})
 
 
 def test_broken_bridges():

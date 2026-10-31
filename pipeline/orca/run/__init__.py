@@ -7,9 +7,13 @@ lists and health -> only the changed files kept -> CUSIP scan -> manifest. Anyth
 before the manifest leaves the published site on the last good version, and what the run still
 owes (funds and stocks to recompute) is kept in the lake's state, so the next run picks it up.
 
+Every run has a time budget (`budget`): when it is spent, the long stages stop cleanly and the
+next run carries on from the state.
+
 Modules: `state` (lake tables, state.json, stored fund state), `sources` (what a run fetches),
-`ingest` (bulk and live filings), `market` (securities, prices, T-bill), `compute` (one fund),
-`publish_step` (shared files, CUSIP guard, staging), `weekly` (the run and `verify`), `cli`.
+`budget` (the time budget), `ingest` (bulk and live filings), `market` (securities, prices,
+T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `weekly` (the
+run and `verify`), `cli`.
 
 Lake layout (all under `lake.root`):
 - `filings/qNNN`, `raw_holdings/qNNN`: every filing of report period NNN and its raw rows, one
@@ -20,7 +24,8 @@ Lake layout (all under `lake.root`):
   snapshot as JSON, for the funds a run does not recompute) and `fund_state_run/bNNNNN` (the
   running publish's fund state, merged into `fund_state` after the manifest).
 - `ingested.json` (bulk ZIPs ingested, name -> sha256), `state.json` (live watermark, last
-  quarter, pending recomputes), `published.json` (the last manifest's files).
+  quarter, pending recomputes, lookups and price histories still owed), `published.json` (the
+  last manifest's files).
 
 A fund is identified by its CIK (`fund_id` = CIK), so ids never depend on ingestion order.
 """
