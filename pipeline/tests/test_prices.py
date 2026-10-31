@@ -125,11 +125,20 @@ def test_split_factors_by_quarter_agree_exactly_with_split_adjust_shares():
     )
     factors = split_factors_by_quarter(splits)
 
-    assert max(factors) == q_index(2024, 1)  # no split after a later quarter: absent, 1.0
-    for q in range(0, q_index(2026, 4)):
+    assert max(factors.by_q) == q_index(2024, 1)  # no split after a later quarter: 1.0
+    for q in range(-12, q_index(2026, 4)):  # a report period before 2013 included
         for shares in (1.0, 333.0, 123456789.0, 0.3):
-            assert shares * factors.get(q, 1.0) == split_adjust_shares(shares, q, splits), q
-    assert split_factors_by_quarter(splits.clear()) == {}
+            assert shares * factors.of(q) == split_adjust_shares(shares, q, splits), q
+    assert split_factors_by_quarter(splits.clear()).of(-1) == 1.0
+
+
+def test_split_factors_before_their_first_quarter_are_every_split():
+    splits = pl.DataFrame({"date": [D(2013, 2, 1), D(2020, 8, 31)], "split_factor": [7.0, 4.0]})
+    factors = split_factors_by_quarter(splits)
+
+    for q in (-40, -1):
+        assert 100 * factors.of(q) == 2800 == split_adjust_shares(100, q, splits)
+    assert 100 * factors.of(0) == 400  # the first split is in Q1 2013's share count
 
 
 def test_split_adjust_prices():

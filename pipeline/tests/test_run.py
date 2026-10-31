@@ -878,6 +878,28 @@ def test_closes_on_matches_close_on_for_many_days_at_once(tmp_path):
     assert found[(1, date(2024, 6, 2))] == 20.0  # Friday's close, split-adjusted
 
 
+def test_a_share_count_reported_before_2013_gets_every_later_split(tmp_path):
+    lake = Lake(tmp_path)
+    splits = {date(2014, 6, 9): 7.0, date(2020, 8, 31): 4.0}
+    prices.update_prices(
+        lake,
+        FixtureSource({"WIDG": flat_prices(40.0, date(2014, 1, 2), date(2021, 12, 31), splits)}),
+        {1: "WIDG"},
+        date(2021, 12, 31),
+    )
+    ctx = compute.Context(lake, q_index(2021, 4), {}, {}, None)
+    ctx.load([1])
+    rows = pl.DataFrame(
+        {"cik": [SMALL_FUND] * 3, "q": [-1, 5, 40], "stock_id": [1] * 3, "shares": [100.0] * 3},
+        schema={"cik": pl.Int64, "q": pl.Int32, "stock_id": pl.Int32, "shares": pl.Float64},
+    ).with_columns(value_usd=pl.lit(1.0))
+
+    adjusted, _ = compute._share_series(ctx, rows)
+
+    # Q4 2012 is before both splits, Q2 2014 before the second only, Q1 2023 after both.
+    assert {q: shares for q, (shares, _) in adjusted[1].items()} == {-1: 2800, 5: 400, 40: 100}
+
+
 # --- the time budget ------------------------------------------------------------------------
 
 
