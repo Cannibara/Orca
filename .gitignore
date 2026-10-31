@@ -7,3 +7,7 @@ pipeline/.venv/
 # Pipeline data (lake and output dirs); anchored so web/src/data/ is not ignored
 /data/
 /pipeline/data/
+
+# Web build artefacts
+/web/node_modules/
+/web/dist/
