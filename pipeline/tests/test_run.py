@@ -29,7 +29,7 @@ from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import FundMeta, FundOutput, read_json
 from orca.quarter_px import QuarterPx, close_on
-from orca.quarters import q_index
+from orca.quarters import q_end, q_index
 from orca.run import (
     CusipLeakError,
     InvariantError,
@@ -1206,3 +1206,58 @@ def test_at_most_remap_per_run_held_cusips_are_asked_again_each_run(tmp_path, mo
 
     # SPY (unmapped here) is asked again after four weeks; the held CUSIPs one per run.
     assert seen == [[demo.SPY_CUSIP], [WIDGET], [GADGET]]
+
+
+# --- which prices are refreshed -------------------------------------------------------------
+
+
+def test_weekly_refresh_covers_the_latest_quarter_and_exits_of_the_last_8_quarters(tmp_path):
+    # Stock RECENT was sold out 5 quarters before the deadline quarter, OLD 10 quarters before.
+    recent, old = (
+        "000000CD" + cusip_check_digit("000000CD"),
+        "000000DE" + cusip_check_digit("000000DE"),
+    )
+    last_q = q_index(2026, 2)
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    rows = {
+        q: [widget]
+        + ([Holding("RECENT INC", recent, 300.0, 10)] if q <= last_q - 5 else [])
+        + ([Holding("OLD INC", old, 200.0, 10)] if q <= last_q - 10 else [])
+        for q in range(last_q - 12, last_q + 1)
+    }
+    small = small_fixtures({})
+    every_day = {
+        t: flat_prices(p, start=date(2023, 1, 2), end=date(2026, 12, 31))
+        for t, p in (("WIDG", 40.0), ("RCNT", 30.0), ("OLDX", 20.0))
+    }
+    filings = [
+        Filing(f"0000001001-26-{i:06d}", SMALL_FUND, "Test Fund LP", q, q_end(q) + timedelta(30), r)
+        for i, (q, r) in enumerate(sorted(rows.items()))
+    ]
+    fx = replace(
+        small,
+        zips={SMALL_ZIP: bulk_zip(filings)},
+        figi={
+            WIDGET: listing("BBG0TEST0001", "WIDG", "WIDGET CORP"),
+            recent: listing("BBG0TEST0003", "RCNT", "RECENT INC"),
+            old: listing("BBG0TEST0004", "OLDX", "OLD INC"),
+        },
+        prices=every_day,
+    )
+    first, later = date(2026, 10, 16), date(2026, 10, 23)
+    run(tmp_path, fixture_sources(fx), first)
+    asked = []
+
+    class Recording(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append(ticker)
+            return super().daily(ticker, start, end)
+
+    run(tmp_path, replace(fixture_sources(fx), prices=Recording(every_day)), later)
+
+    assert sorted(asked) == ["RCNT", "WIDG"]  # and not OLDX (nor SPY, which has no listing here)
+    latest = read_json(tmp_path / "bucket" / "latest_prices.json")
+    ticker = dict(zip(*Lake(tmp_path / "lake").read("securities").select("stock_id", "ticker")))
+    dates = {ticker[sid]: day for sid, day in zip(latest["stock_id"], latest["date"])}
+    assert dates == {"WIDG": "2026-10-23", "RCNT": "2026-10-23", "OLDX": "2026-10-16"}
+    assert latest["asof"] == "2026-10-23"

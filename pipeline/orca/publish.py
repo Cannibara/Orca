@@ -381,7 +381,7 @@ def publish_shared(
     funds: Iterable[FundMeta],
     securities: pl.DataFrame,
     asof: date,
-    latest_prices: Mapping[int, float | None],
+    latest_prices: Mapping[int, tuple[date, float] | None],
     home: HomeLists,
     weekly: Mapping[int, dict] | None = None,
     compress: bool = True,
@@ -391,14 +391,19 @@ def publish_shared(
 
     `funds` is every fund (the search index), `securities` has the columns stock_id, ticker,
     name and sector (any others, such as figi or cusip, are not published), `latest_prices` maps
-    stock_id to the latest close on `asof`, and `weekly` maps stock_id to `weekly_closes`'s
-    result for the stocks whose file is to be written; a stock without closes gets no file.
-    Prices (latest and weekly) are rounded to 4 places.
+    stock_id to (day, close) of its latest close, or None (a close that is not a finite number
+    counts as none: price and date null), `asof` is the latest of those days, and `weekly` maps
+    stock_id to `weekly_closes`'s result for the stocks whose file is to be written; a stock
+    without closes gets no file. Prices (latest and weekly) are rounded to 4 places.
     Nothing is written when `home.top` does not have exactly the periods of `config.PERIODS`."""
     _check_keys("home.top periods", home.top, tuple(PERIODS))
     funds = sorted(funds, key=lambda f: f.fund_id)
     table = securities.select("stock_id", "ticker", "name", "sector").sort("stock_id")
-    prices = {stock_id: _price(latest_prices[stock_id]) for stock_id in sorted(latest_prices)}
+    closes = {}
+    for stock_id in sorted(latest_prices):
+        day, close = latest_prices[stock_id] or (None, None)
+        known = close is not None and math.isfinite(close)
+        closes[stock_id] = (day.isoformat(), _price(close)) if known else (None, None)
     docs: dict[str, object] = {
         "funds.json": {
             "v": 1,
@@ -410,8 +415,9 @@ def publish_shared(
         "securities.json": {name: table[name].to_list() for name in table.columns},
         "latest_prices.json": {
             "asof": asof.isoformat(),
-            "stock_id": list(prices),
-            "price": list(prices.values()),
+            "stock_id": list(closes),
+            "price": [close for _, close in closes.values()],
+            "date": [day for day, _ in closes.values()],
         },
     }
     latest_q = home.latest_q

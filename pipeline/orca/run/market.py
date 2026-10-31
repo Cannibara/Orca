@@ -50,6 +50,7 @@ COMPACT_AT_PARTS = 64  # ... or this many run parts (a long backfill flushes man
 UNMAPPED_RETRY_DAYS = 28  # an unmapped CUSIP is asked about again after four weeks
 REMAP_DAYS = 28  # a held CUSIP OpenFIGI mapped is asked about again after four weeks ...
 REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
+EXIT_REFRESH_QUARTERS = 8  # prices of stocks sold out this recently are still refreshed
 
 
 # --- securities -------------------------------------------------------------------------------
@@ -393,11 +394,14 @@ def refresh_prices(
     flags: list,
     budget: Budget,
 ) -> list[int]:
-    """Fetch the prices of the stocks held in the latest quarter, the benchmark, any stock never
-    fetched and, from the start of their history, the stocks of `state.price_refetch` (these
-    two first, so a backfill the time budget cut short goes on where it stopped); record the
-    stocks whose history changed (and those with new rows, for their weekly file) in the state
-    before anything is recomputed from them. Returns the changed ids.
+    """Fetch the prices of the stocks held in the latest quarter, the benchmark, the stocks sold
+    out within the last EXIT_REFRESH_QUARTERS quarters (held in one of them), any stock never
+    fetched and, from the start of their history, the stocks of `state.price_refetch`. Never
+    fetched and refetched stocks come first (so a backfill the time budget cut short goes on
+    where it stopped), then the latest quarter's and the benchmark, then the recent exits, so a
+    short budget drops those first. Older exits keep their last close. Record the stocks whose
+    history changed (and those with new rows, for their weekly file) in the state before anything
+    is recomputed from them. Returns the changed ids.
 
     A price run writes its parts as it goes but reports the changed stocks only at the end, so
     the run is marked in flight while it works. If it dies, the next run takes every stock of its
@@ -409,11 +413,12 @@ def refresh_prices(
     untried = known - state.price_tried
     refetch = state.price_refetch & known
     first = untried | refetch
-    wanted = held_stocks(lake, stocks, last_q) | first
+    latest = held_stocks(lake, stocks, last_q)
     if BENCHMARK_CUSIP in stocks:
-        wanted.add(stocks[BENCHMARK_CUSIP])
+        latest.add(stocks[BENCHMARK_CUSIP])
+    exits = held_stocks(lake, stocks, last_q - EXIT_REFRESH_QUARTERS) - latest
     ticker_of = dict(securities.select("stock_id", "ticker").iter_rows())
-    ordered = sorted(wanted & first) + sorted(wanted - first)
+    ordered = sorted(first) + sorted(latest - first) + sorted(exits - first)
     tickers = {sid: ticker_of[sid] for sid in ordered if ticker_of.get(sid)}
     run_part_count = sum(p.startswith("z") for p in lake.parts(PRICES_TABLE))
     if len(price_runs(lake)) >= COMPACT_AT_RUNS or run_part_count >= COMPACT_AT_PARTS:

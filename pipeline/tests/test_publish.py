@@ -772,7 +772,7 @@ def shared(out, **kw) -> dict[str, str]:
         funds=[build_engine_fund(7).meta, replace(build_engine_fund(3).meta, name="BETA FUND")],
         securities=securities_frame(),
         asof=date(2026, 10, 29),
-        latest_prices={2: 410.5, 1: 189.95},
+        latest_prices={2: (date(2026, 10, 29), 410.5), 1: (date(2025, 3, 7), 189.95)},
         home=home_lists(),
     )
     args.update(kw)
@@ -812,6 +812,7 @@ def test_shared_files_follow_the_contract(tmp_path):
         "asof": "2026-10-29",
         "stock_id": [1, 2],
         "price": [189.95, 410.5],
+        "date": ["2025-03-07", "2026-10-29"],  # stock 1 has not been refreshed since March 2025
     }
     assert decoded(tmp_path, "stock/1/weekly.json") == {"start": "2024-01-05", "close": [1.0, 2.0]}
 
@@ -852,14 +853,20 @@ def test_securities_missing_a_column_is_an_error(tmp_path):
 
 
 def test_latest_prices_missing_become_null(tmp_path):
-    shared(tmp_path, latest_prices={1: float("nan"), 2: None, 3: 5.0})
-    assert decoded(tmp_path, "latest_prices.json")["price"] == [None, None, 5.0]
+    day = date(2026, 10, 29)
+    shared(tmp_path, latest_prices={1: (day, float("nan")), 2: None, 3: (day, 5.0)})
+    latest = decoded(tmp_path, "latest_prices.json")
+    assert latest["price"] == [None, None, 5.0]
+    assert latest["date"] == [None, None, "2026-10-29"]  # no close, no date
 
 
 def test_prices_are_published_to_four_places(tmp_path):
     files = shared(
         tmp_path,
-        latest_prices={1: 189.9499969482422, 2: 0.00004999},
+        latest_prices={
+            1: (date(2026, 10, 29), 189.9499969482422),
+            2: (date(2026, 10, 29), 0.00004999),
+        },
         weekly={1: {"start": "2024-01-05", "close": [47.48749923706055, None, 0.1 + 0.2]}},
     )
     assert decoded(tmp_path, "latest_prices.json")["price"] == [189.95, 0.0]

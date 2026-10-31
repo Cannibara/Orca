@@ -27,7 +27,7 @@ website builds its TypeScript types from it. Change this file first, then the wr
 
 - `funds.json`: `{"v": 1, "id": [], "name": [], "book": [], "n": []}`
 - `securities.json`: `{"stock_id": [], "ticker": [], "name": [], "sector": []}`
-- `latest_prices.json`: `{"asof": "YYYY-MM-DD", "stock_id": [], "price": []}`
+- `latest_prices.json`: `{"asof": "YYYY-MM-DD", "stock_id": [], "price": [], "date": []}`
 - `fund/{id}/summary.json`: `{"id", "name", "cik", "period_q", "filed", "book", "n_holdings", "priced_pct", "tracked_since_q", "inactive", "metrics": {"ann_return", "sharpe", "sortino", "vol", "max_dd", "calmar", "best_year": {"label", "ret"}, "worst_year": {"label", "ret"}, "years_pos", "years_total", "quarters_pos_pct", "turnover", "hold_all", "hold_sold", "first_year", "last_year"}, "years": {"label": [], "ret": [], "start": [], "end": [], "gains": [], "inflows": [], "dividends": [], "approx_ret": []}, "quarters": {"q": [], "ret": [], "start": [], "end": [], "market_move": [], "net_buying": [], "trade_gains": [], "dividends": []}, "holdings_now": {"stock_id": [], "shares": [], "cost": []}}`
 - `fund/{id}/positions.json`: `{"stock_id": [], "from_q": [], "to_q": [], "avg_cost": [], "avg_exit": [], "invested": [], "realised": [], "dividends": [], "shares_now": [], "cost_now": [], "last_q": [], "last_type": [], "last_pct": [], "last_usd": [], "trades": [[[q, delta, px, low, high, shares_after], ...], ...]}`
 - `fund/{id}/contrib.json`: `{"years": [label...], "by_year": {label: {"stock_id": [], "points": [], "pnl": []}}}`
@@ -43,8 +43,11 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `funds.json`: the search index, one entry per fund, ordered by `id`. `n` is the number of holdings now.
   `v` is the format version.
 - `securities.json`: one entry per stock, ordered by `stock_id`. `sector` is a string.
-- `latest_prices.json`: the latest close per stock on `asof`, ordered by `stock_id`; `price` is `null` for a stock
-  without one.
+- `latest_prices.json`: each stock's latest stored close, ordered by `stock_id`. `price` is the close and `date`
+  (ISO) the day of it; both are `null` for a stock without one. `asof` is the latest `date` of all. Every week the
+  pipeline refreshes the stocks held in the latest quarter and those sold out within the last 8 quarters (the
+  benchmark too); a stock sold out longer ago, or delisted, keeps its last close, and its `date` says how old
+  that is. Show a price as current only when its `date` is recent.
 
 ### `fund/{id}/summary.json`
 

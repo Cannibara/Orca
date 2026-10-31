@@ -108,9 +108,7 @@ def publish_shared_files(
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA).sort("stock_id")
     latest = latest_closes(lake)
     asof = max((day for day, _ in latest.values()), default=today)
-    latest_prices = {
-        sid: (latest[sid][1] if sid in latest else None) for sid in securities["stock_id"].to_list()
-    }
+    latest_prices = {sid: latest.get(sid) for sid in securities["stock_id"].to_list()}
 
     # The calls lists are ranked on prices as of the deadline quarter's end, not this week's, so
     # the home files change with filings only (the browser shows moves to the latest price).
