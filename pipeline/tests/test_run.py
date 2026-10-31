@@ -986,6 +986,33 @@ def test_budget_spent_in_the_price_backfill_resumes_with_the_stocks_not_fetched(
     assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
 
 
+def test_a_ticker_that_answered_with_no_rows_is_not_asked_first_again(fixtures, tmp_path):
+    clock, asked, empty = StoppedClock(), [], set()
+
+    class SomeEmpty(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append(ticker)
+            if len(asked) <= 2:
+                empty.add(ticker)  # the vendor has nothing for these two
+            if len(asked) == 10:
+                clock.run_out()
+            frame = super().daily(ticker, start, end)
+            return frame.clear() if ticker in empty else frame
+
+    sources = replace(fixture_sources(fixtures), prices=SomeEmpty(fixtures.prices))
+    stats = budgeted(tmp_path, sources, WEEK1, clock)
+
+    [flag] = [f for f in stats.flags if f["type"] == "prices"]
+    assert flag["stopped"] == "time budget" and (flag["fetched"], flag["empty"]) == (8, 2)
+    first = list(asked)
+    assert len(State.load(Lake(tmp_path / "lake")).price_tried) == 10  # the empty two included
+
+    asked.clear()
+    run(tmp_path, sources, WEEK1)
+
+    assert not set(asked[:15]) & set(first)  # only the 15 never asked come first
+
+
 def test_budget_spent_in_compute_publishes_the_funds_done_and_owes_the_rest(
     fixtures, base_runs, tmp_path, monkeypatch
 ):
