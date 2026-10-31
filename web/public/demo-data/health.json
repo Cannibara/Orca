@@ -1,0 +1,1 @@
+{"coverage_median":1.0,"filings_parsed":530,"flags":[{"fund_id":9100006,"ours":2070.23583984375,"q":53,"reported":207023.59491088864,"stock_id":4,"type":"price_mismatch"},{"fund_id":9100007,"q":53,"ratio":3.0,"stock_id":4,"type":"split_suspect"}],"funds_recomputed":12,"unmapped_cusips":0}
