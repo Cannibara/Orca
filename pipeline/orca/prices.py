@@ -9,7 +9,7 @@ run parts into yearly parts `y<year>`. A later part overrides an earlier one, an
 
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
 from typing import Protocol
 from urllib.parse import quote
@@ -205,13 +205,15 @@ def update_prices(
     flush_every: int = FLUSH_EVERY,
     should_stop: Callable[[], bool] | None = None,
     history_until: date | None = None,
+    refetch: Iterable[int] = (),
 ) -> list[int]:
     """Fetch each stock's prices through `today`, in the order of `tickers`, and append the new
     and revised bars to new parts `z<run_id>-0001`, `-0002`, ... (run_id default: today as
     YYYYMMDD; a run id already in the lake goes on from its last part number).
 
     A stock is fetched from 5 days before its last stored date, or from 2013-01-01 when it has no
-    rows. Returns the sorted stock_ids whose history changed: stocks that got their first rows,
+    rows or is in `refetch` (its ticker changed: the whole history is fetched again, and counts as
+    changed). Returns the sorted stock_ids whose history changed: stocks that got their first rows,
     stocks whose stored bars were revised (a price correction, or a split recorded late) or
     back-filled, and stocks with a new or changed split factor, which re-bases every older price.
     Plain new days are not a change. With `history_until` (the last closed quarter's end), a
@@ -234,6 +236,7 @@ def update_prices(
     failed: list[tuple[int, str, int | None]] = []
     stats.update(fetched=0, empty=0, failed=failed, stopped=None)
     last_by_id, recent = _stored_tail(lake)
+    refetch = set(refetch)
     run_id = run_id or today.strftime("%Y%m%d")
     numbers = [int(p.rpartition("-")[2]) for p in run_parts(lake, run_id) if p != f"z{run_id}"]
     next_number = max(numbers, default=0) + 1
@@ -256,7 +259,10 @@ def update_prices(
             log.warning("prices: stopping the run: the time budget is spent")
             break
         last_date = last_by_id.get(stock_id)
-        start = HISTORY_START if last_date is None else last_date - timedelta(days=OVERLAP_DAYS)
+        if last_date is None or stock_id in refetch:
+            start = HISTORY_START
+        else:
+            start = last_date - timedelta(days=OVERLAP_DAYS)
         try:
             bars = source.daily(ticker, start, today)
         except FetchError as err:

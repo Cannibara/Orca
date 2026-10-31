@@ -33,8 +33,11 @@ from orca.run.state import (
 )
 from orca.securities import (
     ERROR,
+    OPENFIGI,
+    SEC_TICKERS_SCHEMA,
     assign_stock_ids,
     map_cusips,
+    normalise_name,
     normalise_ticker,
     sector_for_sic,
 )
@@ -45,6 +48,8 @@ EMPTY_FETCH_WARN = 0.25  # share of tickers answering with no rows that is worth
 COMPACT_AT_RUNS = 4  # price runs not compacted yet that trigger a compaction into yearly parts
 COMPACT_AT_PARTS = 64  # ... or this many run parts (a long backfill flushes many)
 UNMAPPED_RETRY_DAYS = 28  # an unmapped CUSIP is asked about again after four weeks
+REMAP_DAYS = 28  # a held CUSIP OpenFIGI mapped is asked about again after four weeks ...
+REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
 
 
 # --- securities -------------------------------------------------------------------------------
@@ -249,6 +254,102 @@ def retry_lookups(lake: Lake, sources: Sources, state: State, flags: list, budge
     state.save(lake)
 
 
+def remap_held_cusips(
+    lake: Lake,
+    sources: Sources,
+    state: State,
+    today: date,
+    last_q: int,
+    flags: list,
+    budget: Budget,
+) -> None:
+    """Ask OpenFIGI again about the CUSIPs held in the latest quarter that it mapped REMAP_DAYS
+    ago or more, the longest unasked first, at most REMAP_PER_RUN. A security whose FIGI has a
+    new ticker now takes it (stock id and FIGI unchanged) and its whole price history is fetched
+    again under it (`state.price_refetch`); one whose FIGI now names another company, or whose
+    CUSIP maps to another FIGI now, is flagged and left as it is. A CUSIP OpenFIGI no longer
+    knows keeps its mapping; one answered with an error is asked again next run."""
+    cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
+    held = scan(
+        lake, "holdings", HOLDINGS_SCHEMA, (pl.col("q") >= last_q) & (pl.col("kind") == "SH")
+    )["cusip"].unique()
+    due = (
+        cusip_map.filter(
+            (pl.col("method") == OPENFIGI)
+            & pl.col("stock_id").is_not_null()
+            & pl.col("cusip").is_in(held.to_list())
+            & (pl.col("tried").is_null() | (pl.col("tried") <= today - timedelta(days=REMAP_DAYS)))
+        )
+        .sort("tried", "cusip", nulls_last=False)
+        .head(REMAP_PER_RUN)
+    )
+    if due.is_empty():
+        return
+    if budget.spent():
+        budget.cut("securities")
+        return
+    try:
+        answers = map_cusips(
+            due["cusip"].to_list(), {}, sources.figi, pl.DataFrame(schema=SEC_TICKERS_SCHEMA)
+        )
+    except FetchError as err:
+        flags.append(
+            {"type": "cusip_remap_failed", "url": strip_query(err.url), "status": err.status}
+        )
+        return
+    except ValueError as err:
+        flags.append({"type": "cusip_remap_failed", "detail": str(err)[:200]})
+        return
+
+    securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
+    row_of = {row["stock_id"]: row for row in securities.iter_rows(named=True)}
+    stock_of_cusip = dict(due.select("cusip", "stock_id").iter_rows())
+    new_tickers: dict[int, str] = {}
+    asked = []
+    for cusip, figi, ticker, name, method in answers.select(
+        "cusip", "figi", "ticker", "name", "method"
+    ).iter_rows():
+        if method == ERROR:
+            continue
+        asked.append(cusip)
+        stock_id = stock_of_cusip[cusip]
+        row = row_of.get(stock_id)
+        if method != OPENFIGI or row is None:
+            continue
+        if figi != row["figi"]:
+            flags.append({"type": "figi_changed", "stock_id": stock_id})
+            continue
+        if ticker and ticker != row["ticker"] and stock_id not in new_tickers:
+            new_tickers[stock_id] = ticker
+            flags.append(
+                {
+                    "type": "ticker_changed",
+                    "stock_id": stock_id,
+                    "old": row["ticker"],
+                    "new": ticker,
+                }
+            )
+        if name and row["name"] and normalise_name(name) != normalise_name(row["name"]):
+            flags.append({"type": "security_renamed", "stock_id": stock_id, "name": name})
+    if new_tickers:
+        state.price_refetch |= set(new_tickers)
+        state.save(lake)  # before the tickers change, so the history is never left unfetched
+        update = pl.DataFrame(
+            {"stock_id": list(new_tickers), "_ticker": list(new_tickers.values())},
+            schema={"stock_id": pl.Int32, "_ticker": pl.String},
+        )
+        securities = (
+            securities.join(update, on="stock_id", how="left")
+            .with_columns(ticker=pl.coalesce("_ticker", "ticker"))
+            .drop("_ticker")
+        )
+        lake.write("securities", securities.cast(SECURITIES_TABLE_SCHEMA).sort("stock_id"))
+    cusip_map = cusip_map.with_columns(
+        tried=pl.when(pl.col("cusip").is_in(asked)).then(pl.lit(today)).otherwise(pl.col("tried"))
+    )
+    lake.write("cusip_map", cusip_map.sort("cusip"))
+
+
 def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame, tried: date) -> pl.DataFrame:
     """cusip_map rows of `mapped`, asked about on `tried`: each CUSIP's stock id found by the
     security's key, its FIGI, or (without one) the FIGI of a security with its ticker, else its
@@ -292,10 +393,11 @@ def refresh_prices(
     flags: list,
     budget: Budget,
 ) -> list[int]:
-    """Fetch the prices of the stocks held in the latest quarter, the benchmark and any stock
-    never fetched (those first, so a backfill the time budget cut short goes on where it
-    stopped); record the stocks whose history changed (and those with new rows, for their weekly
-    file) in the state before anything is recomputed from them. Returns the changed ids.
+    """Fetch the prices of the stocks held in the latest quarter, the benchmark, any stock never
+    fetched and, from the start of their history, the stocks of `state.price_refetch` (these
+    two first, so a backfill the time budget cut short goes on where it stopped); record the
+    stocks whose history changed (and those with new rows, for their weekly file) in the state
+    before anything is recomputed from them. Returns the changed ids.
 
     A price run writes its parts as it goes but reports the changed stocks only at the end, so
     the run is marked in flight while it works. If it dies, the next run takes every stock of its
@@ -303,12 +405,15 @@ def refresh_prices(
     recover_prices_in_flight(lake, state)
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
     stocks = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
-    untried = set(securities["stock_id"].to_list()) - state.price_tried
-    wanted = held_stocks(lake, stocks, last_q) | untried
+    known = set(securities["stock_id"].to_list())
+    untried = known - state.price_tried
+    refetch = state.price_refetch & known
+    first = untried | refetch
+    wanted = held_stocks(lake, stocks, last_q) | first
     if BENCHMARK_CUSIP in stocks:
         wanted.add(stocks[BENCHMARK_CUSIP])
     ticker_of = dict(securities.select("stock_id", "ticker").iter_rows())
-    ordered = sorted(wanted & untried) + sorted(wanted - untried)
+    ordered = sorted(wanted & first) + sorted(wanted - first)
     tickers = {sid: ticker_of[sid] for sid in ordered if ticker_of.get(sid)}
     run_part_count = sum(p.startswith("z") for p in lake.parts(PRICES_TABLE))
     if len(price_runs(lake)) >= COMPACT_AT_RUNS or run_part_count >= COMPACT_AT_PARTS:
@@ -325,6 +430,7 @@ def refresh_prices(
         stats=stats,
         should_stop=budget.spent,
         history_until=q_end(q_of_date(today) - 1),  # the open quarter's bars move no fund file
+        refetch=refetch,
     )
     if stats["stopped"] == "time budget":
         budget.cut("prices")
@@ -334,8 +440,10 @@ def refresh_prices(
     state.pending_weekly |= touched | set(changed)
     if stats["stopped"] is None:
         state.price_tried |= set(tickers) - failed
+        state.price_refetch -= set(tickers) - failed
     else:  # the run broke off: only stocks that have rows are known to have been fetched
         state.price_tried |= touched
+        state.price_refetch -= touched
     state.prices_in_flight = None
     state.save(lake)
 

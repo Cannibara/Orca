@@ -139,7 +139,8 @@ class State:
     that needs them is attempted and cleared only after a successful publish. `prices_in_flight`
     names a price run that has not finished: its parts may hold changes nobody has recorded.
     `lookup_retry` holds securities whose SIC code or shares outstanding are still to be fetched
-    (a lookup that failed or that the time budget cut off)."""
+    (a lookup that failed or that the time budget cut off); `price_refetch` the stocks whose
+    whole price history is to be fetched again (their ticker changed)."""
 
     live_watermark: date | None = None
     last_q: int | None = None
@@ -151,6 +152,7 @@ class State:
     pending_all: bool = False
     prices_in_flight: str | None = None
     lookup_retry: set[int] = field(default_factory=set)
+    price_refetch: set[int] = field(default_factory=set)
 
     @staticmethod
     def path(lake: Lake) -> Path:
@@ -174,6 +176,7 @@ class State:
             pending_all=bool(raw.get("pending_all", False)),
             prices_in_flight=raw.get("prices_in_flight"),
             lookup_retry=set(raw.get("lookup_retry", [])),
+            price_refetch=set(raw.get("price_refetch", [])),
         )
 
     def save(self, lake: Lake) -> None:
@@ -190,6 +193,7 @@ class State:
                 "pending_all": self.pending_all,
                 "prices_in_flight": self.prices_in_flight,
                 "lookup_retry": sorted(self.lookup_retry),
+                "price_refetch": sorted(self.price_refetch),
             },
         )
 

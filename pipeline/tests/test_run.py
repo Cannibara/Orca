@@ -1114,3 +1114,95 @@ def test_sec_throttling_stops_the_live_stage_and_keeps_the_watermark(tmp_path):
 
     assert {"type": "live_failed", "url": index, "status": 403} in health(tmp_path)["flags"]
     assert State.load(Lake(tmp_path / "lake")).live_watermark == friday
+
+
+# --- ticker changes -------------------------------------------------------------------------
+
+
+def renamed_fixtures(ticker: str = "WIDG", name: str = "WIDGET CORP", figi="BBG0TEST0001"):
+    """The small fixtures with WIDGET's OpenFIGI listing as given; WDGT's prices are WIDG's +1."""
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    return replace(
+        small,
+        figi={WIDGET: listing(figi, ticker, name)},
+        prices={**small.prices, "WDGT": flat_prices(41.0)},
+    )
+
+
+def test_a_ticker_change_is_picked_up_and_the_history_fetched_again(tmp_path):
+    run(tmp_path, fixture_sources(renamed_fixtures()), SMALL_TODAY)
+    changed = fixture_sources(renamed_fixtures(ticker="WDGT"))  # same FIGI, new ticker
+    asked = []
+
+    class Recording(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append((ticker, start))
+            return super().daily(ticker, start, end)
+
+    sources = replace(changed, prices=Recording(renamed_fixtures().prices))
+    week = run(tmp_path, sources, SMALL_TODAY + timedelta(days=7))
+    assert not [p for p in week.changed if p.startswith("fund/")]  # not asked again yet
+
+    asked.clear()
+    later = run(tmp_path, sources, SMALL_TODAY + timedelta(days=28))
+
+    lake = Lake(tmp_path / "lake")
+    assert lake.read("securities").filter(stock_id=1)["ticker"].to_list() == ["WDGT"]
+    assert lake.read("securities").filter(stock_id=1)["figi"].to_list() == ["BBG0TEST0001"]
+    assert ("WDGT", date(2013, 1, 1)) in asked  # the whole history, under the new ticker
+    assert {"type": "ticker_changed", "stock_id": 1, "old": "WIDG", "new": "WDGT"} in health(
+        tmp_path
+    )["flags"]
+    assert f"fund/{SMALL_FUND}/summary.json" in later.changed
+    summary = read_json(tmp_path / "bucket" / f"fund/{SMALL_FUND}/summary.json")
+    assert summary["quarters"]["end"] == [410.0, 410.0]  # valued on the refetched history
+    assert read_json(tmp_path / "bucket" / "securities.json")["ticker"][0] == "WDGT"
+
+    asked.clear()
+    run(tmp_path, sources, SMALL_TODAY + timedelta(days=35))
+    assert ("WDGT", date(2013, 1, 1)) not in asked  # fetched in full once
+
+
+def test_a_security_whose_figi_now_names_another_company_is_flagged(tmp_path):
+    run(tmp_path, fixture_sources(renamed_fixtures()), SMALL_TODAY)
+
+    later = fixture_sources(renamed_fixtures(name="WIDGET HOLDINGS PLC"))
+    run(tmp_path, later, SMALL_TODAY + timedelta(days=28))
+
+    flags = health(tmp_path)["flags"]
+    assert {"type": "security_renamed", "stock_id": 1, "name": "WIDGET HOLDINGS PLC"} in flags
+    lake = Lake(tmp_path / "lake")
+    assert lake.read("securities").filter(stock_id=1)["ticker"].to_list() == ["WIDG"]
+
+
+def test_a_cusip_that_now_maps_to_another_figi_is_flagged_and_left_alone(tmp_path):
+    run(tmp_path, fixture_sources(renamed_fixtures()), SMALL_TODAY)
+
+    later = fixture_sources(renamed_fixtures(ticker="WDGT", figi="BBG0OTHER001"))
+    run(tmp_path, later, SMALL_TODAY + timedelta(days=28))
+
+    assert {"type": "figi_changed", "stock_id": 1} in health(tmp_path)["flags"]
+    lake = Lake(tmp_path / "lake")
+    assert lake.read("securities").filter(stock_id=1)["ticker"].to_list() == ["WIDG"]
+
+
+def test_at_most_remap_per_run_held_cusips_are_asked_again_each_run(tmp_path, monkeypatch):
+    small = gadget_fixtures(known=True)
+    run(tmp_path, fixture_sources(small), SMALL_TODAY)
+    monkeypatch.setattr("orca.run.market.REMAP_PER_RUN", 1)
+    seen = []
+    sources = fixture_sources(small)
+    real_post = sources.figi.post_json
+
+    def recording_post(url, body):
+        seen.append([job["idValue"] for job in body])
+        return real_post(url, body)
+
+    monkeypatch.setattr(sources.figi, "post_json", recording_post)
+
+    run(tmp_path, sources, SMALL_TODAY + timedelta(days=28))
+    run(tmp_path, sources, SMALL_TODAY + timedelta(days=29))
+
+    # SPY (unmapped here) is asked again after four weeks; the held CUSIPs one per run.
+    assert seen == [[demo.SPY_CUSIP], [WIDGET], [GADGET]]

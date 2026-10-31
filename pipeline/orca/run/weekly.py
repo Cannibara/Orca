@@ -26,7 +26,13 @@ from orca.quarters import q_end, q_of_date
 from orca.run.budget import Budget
 from orca.run.compute import Context, affected_funds, compute_batch
 from orca.run.ingest import Counts, ingest_bulk, ingest_live
-from orca.run.market import map_new_cusips, refresh_prices, retry_lookups, update_rf
+from orca.run.market import (
+    map_new_cusips,
+    refresh_prices,
+    remap_held_cusips,
+    retry_lookups,
+    update_rf,
+)
 from orca.run.publish_step import (
     CusipLeakError,
     capped,
@@ -236,6 +242,7 @@ def run_weekly(
     def securities() -> None:
         map_new_cusips(lake, sources, state, today, flags, budget)
         retry_lookups(lake, sources, state, flags, budget)
+        remap_held_cusips(lake, sources, state, today, last_q, flags, budget)
 
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))
     _stage("live", budget, lambda: ingest_live(lake, sources, state, today, flags, counts))
