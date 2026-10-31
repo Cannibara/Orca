@@ -22,9 +22,10 @@ class Lake:
         else:
             path = self.root / table / f"{part}.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Write a temporary file next to the target, then rename it over the target: a part that
-        # is rewritten in place (a price run's part is extended every flush) is never left half
-        # written by a crash.
+        # Write a temporary file next to the target, then rename it over the target: a table or
+        # part that is rewritten in place (a quarter's filings when new ones arrive, a year of
+        # prices when runs are compacted, the security master) is never left half written by a
+        # crash.
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
         os.close(fd)
         try:
