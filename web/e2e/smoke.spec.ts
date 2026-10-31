@@ -1,0 +1,84 @@
+// Smoke tests against `vite preview` of the demo-data build (see playwright.config.ts): the home
+// page, a fund page and that fund's first position page, at desktop and phone width, light and
+// dark (the two projects). Each page must show its heading, log no console or page errors, and
+// not scroll sideways.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { expect, test, type Page } from "@playwright/test";
+
+const DEMO = join(import.meta.dirname, "..", "public", "demo-data");
+const readJson = (file: string) => JSON.parse(readFileSync(join(DEMO, file), "utf8"));
+
+const funds: { id: number[]; name: string[] } = readJson("funds.json");
+const fundId: number = funds.id[0];
+const fundName: string = funds.name[0];
+const stockId: number = readJson(`fund/${fundId}/positions.json`).stock_id[0];
+
+const routes = [
+  { name: "home", path: "/" },
+  { name: "fund page", path: `/fund/${fundId}` },
+  { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
+];
+const widths = [1280, 400];
+
+// The shell links Google Fonts. Answer those requests here so the run needs no network (the
+// fallback fonts are used) and a font outage cannot fail a build.
+test.beforeEach(async ({ page }) => {
+  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) =>
+    route.fulfill({ status: 200, contentType: "text/css", body: "" }),
+  );
+});
+
+/** Open a page, wait until it has loaded its data, and return the errors logged while it did. */
+async function open(page: Page, path: string): Promise<string[]> {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
+  });
+  page.on("pageerror", (err) => errors.push(`uncaught: ${err.message}`));
+  await page.goto(path);
+  await expect(page.locator("h1")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  return errors;
+}
+
+for (const width of widths) {
+  test.describe(`at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } });
+
+    for (const route of routes) {
+      test(`${route.name}: shows its heading and logs no errors`, async ({ page }) => {
+        const errors = await open(page, route.path);
+        await expect(page.locator("h1")).toBeVisible();
+        expect(errors).toEqual([]);
+      });
+
+      test(`${route.name}: no horizontal overflow at ${width}px`, async ({ page }) => {
+        await open(page, route.path);
+        const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth: window.innerWidth,
+        }));
+        expect(innerWidth).toBe(width);
+        expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      });
+    }
+  });
+}
+
+// The pre-rendered page lives at dist/fund/{id}/index.html, which is the URL with the trailing slash.
+test("the pre-rendered fund page has the fund's name as its title and its heading", async ({ page }) => {
+  await open(page, `/fund/${fundId}/`);
+  await expect(page).toHaveTitle(`${fundName} · Orca`);
+  await expect(page.locator("h1")).toHaveText(fundName);
+});
+
+test("the page follows the colour scheme", async ({ page, colorScheme }) => {
+  await open(page, "/");
+  const [r, g, b] = await page.evaluate(() => {
+    const rgb = getComputedStyle(document.body).backgroundColor.match(/\d+/g) ?? [];
+    return rgb.slice(0, 3).map(Number);
+  });
+  const lightness = (r + g + b) / (3 * 255);
+  expect(colorScheme === "dark" ? lightness < 0.25 : lightness > 0.75).toBe(true);
+});

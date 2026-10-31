@@ -1,0 +1,99 @@
+name: Web
+
+# Every push and pull request that touches the site runs its tests: the Vitest suite, a build
+# against the demo data, and the Playwright smoke tests against that build (home, fund and
+# position pages, 1280 and 400 px wide, light and dark).
+#
+# A push to the default branch then builds the real site and deploys it to Cloudflare Pages
+# (project "orca"). The build reads its data from the repository variable VITE_DATA_URL (the
+# public R2 site bucket, which needs a CORS rule allowing GET from the Pages domain) and
+# pre-renders a page for each of the largest funds listed in that bucket's funds.json.
+#
+# The deploy job runs in the `production` environment. In Settings > Environments, restrict it to
+# the default branch (deployment branches) and keep CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+# there; VITE_DATA_URL may be a repository or an environment variable.
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/web.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: web
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run the unit tests
+        run: npx vitest run
+      - name: Build with the demo data
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run the smoke tests
+        run: npx playwright test
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    # One deploy at a time; one that has started is never cancelled.
+    concurrency:
+      group: web-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Fetch funds.json from the data site
+        env:
+          VITE_DATA_URL: ${{ vars.VITE_DATA_URL }}
+        run: |
+          if [[ ! "$VITE_DATA_URL" =~ ^https?:// ]]; then
+            echo "::error::Set the repository variable VITE_DATA_URL to the data site's URL (https://...)."
+            exit 1
+          fi
+          # The files are brotli-encoded: --compressed makes curl decode them.
+          curl --fail --silent --show-error --compressed --retry 3 --max-time 120 \
+            --output "$RUNNER_TEMP/funds.json" "${VITE_DATA_URL%/}/funds.json"
+      - name: Build
+        env:
+          VITE_DATA_URL: ${{ vars.VITE_DATA_URL }}
+          PRERENDER_FUNDS: ${{ runner.temp }}/funds.json
+        run: npm run build
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name orca
