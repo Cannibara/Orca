@@ -126,8 +126,10 @@ jobs:
           rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
       - name: Save the lake
         # Also after a failed, cancelled or timed-out step: what the run stored is progress, and the
-        # lake's state says what is still owed. Never when the restore did not complete (a partial
-        # lake must not overwrite the bucket).
+        # lake's state says what is still owed. If the upload did not complete, the lake's
+        # published.json is ahead of the site: the next run compares it with the site's manifest
+        # (which the restore brings) and republishes what the site lacks. Never when the restore
+        # did not complete (a partial lake must not overwrite the bucket).
         if: always() && steps.restore.outcome == 'success'
         env:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

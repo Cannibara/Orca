@@ -1,5 +1,6 @@
 """The weekly run (`run_weekly`) and the monthly check (`verify`)."""
 
+import json
 import logging
 import random
 import statistics
@@ -19,6 +20,7 @@ from orca.publish import (
     changed_files,
     new_version,
     publish_fund,
+    read_manifest,
     write_health,
     write_manifest,
 )
@@ -120,6 +122,44 @@ def _recompute_set(lake: Lake, ctx: Context, state: State, last_q: int) -> set[i
         sorted(state.pending_stocks),
         holders,
     )
+
+
+def _reconcile_published(lake: Lake, out_root: Path, state: State, compress: bool) -> None:
+    """Make the lake's published.json what the site has: the manifest in `out_root` (the site's,
+    which the workflow restores there; none means the site has nothing yet). They differ when a
+    run wrote published.json but its upload failed or never ran, and the lake was saved all the
+    same. The funds and weekly files whose published paths differ are then owed again, so this
+    run rebuilds them and stages what the site lacks. Without a published.json in the lake there
+    is nothing to reconcile (`load_published` reads the manifest)."""
+    path = published_path(lake)
+    if not path.exists():
+        return
+    recorded = json.loads(path.read_text())
+    site = read_manifest(out_root, compress)
+    differ = {p for p in recorded.keys() | site.keys() if recorded.get(p) != site.get(p)}
+    if not differ:
+        return
+    funds = {i for p in differ if (i := _path_id(p, "fund")) is not None}
+    stocks = {i for p in differ if (i := _path_id(p, "stock")) is not None}
+    log.warning(
+        "the site is behind the lake's last publish (%d files differ): republishing %d funds "
+        "and %d weekly files",
+        len(differ),
+        len(funds),
+        len(stocks),
+    )
+    state.pending_funds |= funds
+    state.pending_weekly |= stocks
+    state.save(lake)  # before published.json, so a crash in between reconciles again
+    write_json_atomic(path, site)
+
+
+def _path_id(path: str, kind: str) -> int | None:
+    """The id in a published `{kind}/{id}/<file>` path (`fund` or `stock`), else None."""
+    parts = path.split("/")
+    if len(parts) == 3 and parts[0] == kind and parts[1].isdigit():
+        return int(parts[1])
+    return None
 
 
 def _stage(name: str, budget: Budget, work: Callable[[], dict | None]) -> None:
@@ -232,11 +272,16 @@ def run_weekly(
     from there. If funds were computed, they are published with the shared files and health.json
     names the stages cut short (`time_budget`); the funds not reached stay pending (a rebuild cut
     short is finished as an ordinary recompute of them). If the budget ran out before the first
-    fund, nothing is published."""
+    fund, nothing is published.
+
+    The site's manifest in `out_root` (the workflow restores it there) is what was really
+    uploaded: where the lake's published.json differs from it, an earlier run's upload did not
+    complete, and the funds and weekly files concerned are rebuilt and staged again."""
     budget = Budget.from_env() if budget is None else budget
     out_root = Path(out_root)
     lake.root.mkdir(parents=True, exist_ok=True)
     state = State.load(lake)
+    _reconcile_published(lake, out_root, state, compress)
     last_q = deadline_quarter(today)
     run_id = today.strftime("%Y%m%d")
     flags: list = []

@@ -481,6 +481,55 @@ def test_verify_rebuilds_funds_and_finds_differences(base_runs, tmp_path):
     assert verify(lake, inc / "out", sample=12, seed=1) == [f"fund/{KELPWOOD}/exits.json"]
 
 
+def fresh_runner(root: Path) -> None:
+    """What the workflow's restore leaves in `root/out` on a new runner: only the site's
+    manifest (none when the bucket has none)."""
+    shutil.rmtree(root / "out")
+    (root / "out").mkdir()
+    if (root / "bucket" / "manifest.json").exists():
+        shutil.copyfile(root / "bucket" / "manifest.json", root / "out" / "manifest.json")
+
+
+def test_a_run_whose_upload_never_happened_is_republished_by_the_next_run(
+    fixtures, base_runs, tmp_path
+):
+    # Week 2 computes Halyard's restatement and writes the lake's published.json, but its upload
+    # never happens; the lake is saved all the same. Week 3 starts from the site's manifest.
+    inc = from_base(base_runs, WEEK1, tmp_path)
+    lost = run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK2)
+    assert f"fund/{HALYARD}/summary.json" in lost.changed
+    lost_weekly = {p for p in lost.changed if p.startswith("stock/")}
+    assert lost_weekly
+    fresh_runner(inc)
+
+    week3 = run(inc, fixture_sources(fixtures), WEEK3)
+
+    assert f"fund/{HALYARD}/summary.json" in week3.changed
+    assert lost_weekly <= set(week3.changed)
+    good = tmp_path / "good"  # the same two weeks with both uploads done
+    shutil.copytree(base_runs[WEEK1], good)
+    run(good, fixture_sources(fixtures), WEEK2)
+    run(good, fixture_sources(fixtures), WEEK3)
+    assert fund_and_home_files(inc) == fund_and_home_files(good)
+    assert set(manifest(inc)) == set(bucket_files(inc)) - {"manifest.json"}
+    assert json.loads((inc / "lake" / "published.json").read_text()) == manifest(inc)
+    state = State.load(Lake(inc / "lake"))
+    assert not state.pending_funds and not state.pending_weekly
+
+
+def test_a_first_run_whose_upload_never_happened_is_republished_whole(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    run_weekly(Lake(tmp_path / "lake"), tmp_path / "out", fixture_sources(small), SMALL_TODAY)
+    fresh_runner(tmp_path)  # the site has no manifest yet
+
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY + timedelta(days=7))
+
+    assert stats.funds_recomputed == 1
+    assert set(manifest(tmp_path)) == set(bucket_files(tmp_path)) - {"manifest.json"}
+    assert {f"fund/{SMALL_FUND}/summary.json", "stock/1/weekly.json"} <= set(bucket_files(tmp_path))
+
+
 def test_demo_cli_writes_twelve_funds(tmp_path, fixtures):
     out = tmp_path / "demo-data"
     (out / "fund" / "1").mkdir(parents=True)  # an earlier demo, which is replaced
