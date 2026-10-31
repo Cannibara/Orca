@@ -2,18 +2,23 @@ name: Web
 
 # Every push and pull request that touches the site runs its tests: the Vitest suite, a build
 # against the demo data, and the Playwright smoke tests against that build (home, fund and
-# position pages, 1280 and 400 px wide, light and dark).
+# position pages, the methodology and a not-found page, 1280 and 400 px wide, light and dark). When
+# the smoke tests fail, their report and traces are attached to the run as an artifact.
 #
 # A push to the default branch then builds the real site and deploys it to Cloudflare Pages
 # (project "orca"). The build reads its data from the repository variable VITE_DATA_URL (the
 # public R2 site bucket, which needs a CORS rule allowing GET from the Pages domain) and
-# pre-renders a page for each of the largest funds listed in that bucket's funds.json.
+# pre-renders a page for each of the largest funds listed in that bucket's funds.json. Running
+# the workflow by hand from the default branch (Actions tab > Web > Run workflow) does the same,
+# which is how to redeploy after a data refresh adds funds: the pre-rendered pages and their
+# funds list only change when the site is built again.
 #
 # The deploy job runs in the `production` environment. In Settings > Environments, restrict it to
 # the default branch (deployment branches) and keep CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
 # there; VITE_DATA_URL may be a repository or an environment variable.
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "web/**"
@@ -53,11 +58,22 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run the smoke tests
+        id: smoke
         run: npx playwright test
+      - name: Upload the Playwright report
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production

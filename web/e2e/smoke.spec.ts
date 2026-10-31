@@ -1,7 +1,7 @@
 // Smoke tests against `vite preview` of the demo-data build (see playwright.config.ts): the home
-// page, a fund page and that fund's first position page, at desktop and phone width, light and
-// dark (the two projects). Each page must show its heading, log no console or page errors, and
-// not scroll sideways.
+// page, a fund page, that fund's first position page, the methodology and a not-found page, at
+// desktop and phone width, light and dark (the two projects). Each page must show its heading, log
+// no console or page errors, and not scroll sideways.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -18,6 +18,8 @@ const routes = [
   { name: "home", path: "/" },
   { name: "fund page", path: `/fund/${fundId}` },
   { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
+  { name: "how it works", path: "/how-it-works" },
+  { name: "not found", path: "/no-such-page" },
 ];
 const widths = [1280, 400];
 
@@ -71,6 +73,18 @@ test("the pre-rendered fund page has the fund's name as its title and its headin
   await open(page, `/fund/${fundId}/`);
   await expect(page).toHaveTitle(`${fundName} · Orca`);
   await expect(page.locator("h1")).toHaveText(fundName);
+});
+
+// The pre-rendered title names the fund; moving around inside the app must not leave it behind.
+test("the title follows the route when navigating inside the app", async ({ page }) => {
+  await open(page, `/fund/${fundId}/`);
+  await expect(page).toHaveTitle(`${fundName} · Orca`);
+  await page.getByRole("link", { name: "Orca home" }).click();
+  await expect(page.locator("h1")).toHaveText(/See how the big funds/);
+  await expect(page).toHaveTitle("Orca");
+  await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "How it works" }).click();
+  await expect(page.locator("h1")).toHaveText(/How Orca estimates/);
+  await expect(page).toHaveTitle("How it works · Orca");
 });
 
 test("the page follows the colour scheme", async ({ page, colorScheme }) => {
