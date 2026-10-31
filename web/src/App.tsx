@@ -1,4 +1,6 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { TooltipProvider } from "./charts/Tooltip";
+import Home from "./pages/Home";
 
 // Placeholder page: later tasks replace each one with a real page from src/pages/.
 function Stub({ title }: { title: string }) {
@@ -30,13 +32,16 @@ export default function App() {
         </div>
       </header>
       <main className="wrap">
-        <Routes>
-          <Route path="/" element={<Stub title="Home" />} />
-          <Route path="/fund/:id" element={<Stub title="Fund" />} />
-          <Route path="/fund/:id/stock/:stockId" element={<Stub title="Position" />} />
-          <Route path="/how-it-works" element={<Stub title="How it works" />} />
-          <Route path="*" element={<Stub title="Page not found" />} />
-        </Routes>
+        {/* One shared tooltip for every chart on every page: mounted here, never per page. */}
+        <TooltipProvider>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/fund/:id" element={<Stub title="Fund" />} />
+            <Route path="/fund/:id/stock/:stockId" element={<Stub title="Position" />} />
+            <Route path="/how-it-works" element={<Stub title="How it works" />} />
+            <Route path="*" element={<Stub title="Page not found" />} />
+          </Routes>
+        </TooltipProvider>
       </main>
     </>
   );
