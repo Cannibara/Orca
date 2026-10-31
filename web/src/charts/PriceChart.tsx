@@ -118,7 +118,7 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
     <>
       <Legend items={LEGEND} />
       <div className="chart" ref={ref}>
-        <svg ref={svgRef} viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="img" aria-label={label}>
+        <svg ref={svgRef} viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={M.l} x2={width - M.r} y1={Y(t)} y2={Y(t)} className="grid" />

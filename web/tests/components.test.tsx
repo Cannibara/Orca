@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Chips } from "../src/components/Chips";
 import { DataTable, type Column } from "../src/components/DataTable";
 import { Signed } from "../src/components/Signed";
+import { Tile } from "../src/components/Tiles";
+import { money, pct, pp } from "../src/lib/format";
 import { Tabs, tabPanelProps } from "../src/components/Tabs";
 
 type Row = { name: string; n: number };
@@ -216,6 +218,42 @@ describe("Signed", () => {
     expect(screen.getByText("loss")).toHaveClass("down");
     expect(screen.getByText("flat")).not.toHaveAttribute("class");
     expect(screen.getByText("none")).not.toHaveAttribute("class");
+  });
+});
+
+describe("Signed and Tile colour what is printed", () => {
+  it("leaves a figure that prints as zero uncoloured, whatever its sign before rounding", () => {
+    render(
+      <>
+        <Signed v={-0.4}>{money(-0.4, true)}</Signed>
+        <Signed v={-0.0001}>{pct(-0.0001, 0)}</Signed>
+        <Signed v={0.04}>{pp(0.04)}</Signed>
+        <Signed v={-0.6}>{money(-0.6, true)}</Signed>
+        <Signed v={-0.0006}>{pct(-0.0006)}</Signed>
+      </>,
+    );
+    expect(screen.getByText("$0")).not.toHaveAttribute("class");
+    expect(screen.getByText("0%")).not.toHaveAttribute("class");
+    expect(screen.getByText("0.0 pts")).not.toHaveAttribute("class");
+    expect(screen.getByText("−$1")).toHaveClass("down");
+    expect(screen.getByText("−0.1%")).toHaveClass("down");
+  });
+
+  it("colours a tile's value by its tone, except a value that prints as zero", () => {
+    render(
+      <>
+        <Tile label="Early" value="$0" tone="down" />
+        <Tile label="Dodged" value="$1.2M" tone="up" />
+        <Tile label="Flat" value="0.0%" tone="up" />
+        <Tile label="Plain" value="$5" />
+      </>,
+    );
+    const value = (label: string) => screen.getByText(label).parentElement!.querySelector(".v")!;
+    expect(value("Early")).not.toHaveClass("down");
+    expect(value("Early")).toHaveAttribute("class", "v");
+    expect(value("Dodged")).toHaveClass("v", "up");
+    expect(value("Flat")).toHaveAttribute("class", "v");
+    expect(value("Plain")).toHaveAttribute("class", "v");
   });
 });
 

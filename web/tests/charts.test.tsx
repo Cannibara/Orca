@@ -92,10 +92,10 @@ describe("ColumnChart", () => {
     expect(b.container.querySelectorAll("rect.selbg")).toHaveLength(0);
   });
 
-  test("the svg is an image named by the label prop", () => {
+  test("the svg is a group named by the label prop, so the focusable bars inside it stay exposed", () => {
     const { container } = render(<ColumnChart {...base} series={[ret]} />);
     const svg = container.querySelector("svg")!;
-    expect(svg.getAttribute("role")).toBe("img");
+    expect(svg.getAttribute("role")).toBe("group");
     expect(svg.getAttribute("aria-label")).toBe("Annual returns");
   });
 
@@ -258,6 +258,14 @@ describe("DivergingBars", () => {
     expect(container.querySelector("svg")!.getAttribute("aria-label")).toBe("Contribution");
   });
 
+  test("the svg is a group named by the label prop, so the focusable rows inside it stay exposed", () => {
+    const { container } = render(<DivergingBars items={items} fmt={ptsFmt} label="Contribution" />);
+    const svg = container.querySelector("svg")!;
+    expect(svg.getAttribute("role")).toBe("group");
+    expect(svg.getAttribute("aria-label")).toBe("Contribution");
+    container.querySelectorAll("rect.hit").forEach((h) => expect(h.getAttribute("aria-label")).toBeTruthy());
+  });
+
   test("the domain is symmetric: every grid line has a mirror image about the centre", () => {
     const { container } = render(<DivergingBars items={items} fmt={ptsFmt} label="c" />);
     const xs = Array.from(container.querySelectorAll("line.grid, line.base")).map((l) => num(l, "x1"));
@@ -313,6 +321,36 @@ describe("DivergingBars", () => {
     await user.tab();
     await user.tab();
     expect(tipEl().querySelector(".t")!.textContent).toBe("BBB · Beta Inc");
+  });
+
+  test("a sum row does not set the scale: its bar stops at the plot edge and its label keeps the true value", () => {
+    const rows = [
+      { label: "AAA", sub: "a", value: 2 },
+      { label: "BBB", sub: "b", value: -1 },
+      { label: "970 other stocks", sub: "the rest, added together", value: 40, sum: true },
+      { label: "CCC", sub: "c", value: -2 },
+    ];
+    const { container } = render(<DivergingBars items={rows} fmt={ptsFmt} label="c" />);
+    // the axis runs to the largest single bar (2), not to 40
+    const axis = Array.from(container.querySelectorAll("text.ax")).map((t) => Number.parseFloat(t.textContent!));
+    expect(Math.max(...axis)).toBe(2);
+    expect(Math.min(...axis)).toBe(-2);
+    const tipX = (m: Element) => Number(/Q([\d.]+),/.exec(m.getAttribute("d")!)![1]);
+    const marks = Array.from(container.querySelectorAll("path.mark"));
+    expect(marks).toHaveLength(4);
+    expect(tipX(marks[0])).toBeCloseTo(W - 64, 6); // AAA, the largest gain, reaches the edge of the scale
+    expect(tipX(marks[2])).toBeCloseTo(W - 64, 6); // the sum is cut off there too
+    expect(container.querySelectorAll("text.val")[2].textContent).toBe("40 pts");
+    expect(container.querySelectorAll("rect.hit")[2].getAttribute("aria-label")).toBe("970 other stocks 40 pts");
+  });
+
+  test("a chart of nothing but a sum row scales to that row", () => {
+    const { container } = render(
+      <DivergingBars items={[{ label: "3 other stocks", sub: "", value: -4, sum: true }]} fmt={ptsFmt} label="c" />,
+    );
+    const axis = Array.from(container.querySelectorAll("text.ax")).map((t) => Number.parseFloat(t.textContent!));
+    expect(Math.max(...axis)).toBe(4);
+    expect(container.querySelectorAll("path.mark")).toHaveLength(1);
   });
 
   test("on a narrow chart the axis labels thin out but keep 0", () => {
@@ -397,9 +435,9 @@ describe("PriceChart", () => {
     ["Weekly close", "Buy", "Sell", "Quarter low"].forEach((t) => expect(legend.textContent).toContain(t));
   });
 
-  test("the svg is an image with a default or supplied label", () => {
+  test("the svg is a group (its trade dots take focus) with a default or supplied label", () => {
     const a = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
-    expect(a.container.querySelector("svg")!.getAttribute("role")).toBe("img");
+    expect(a.container.querySelector("svg")!.getAttribute("role")).toBe("group");
     expect(a.container.querySelector("svg")!.getAttribute("aria-label")).toMatch(/price/i);
     a.unmount();
     const b = render(<PriceChart closes={closesFull} start={START} trades={trades} label="NVDA price" />);
@@ -506,9 +544,9 @@ describe("StepChart", () => {
     expect(container.querySelector("path.step-line")!.getAttribute("d")!.match(/V/g)).toHaveLength(1);
   });
 
-  test("the svg is an image with a default or supplied label", () => {
+  test("the svg is a group with a default or supplied label", () => {
     const a = render(<StepChart quarters={stepQuarters} shares={stepShares} />);
-    expect(a.container.querySelector("svg")!.getAttribute("role")).toBe("img");
+    expect(a.container.querySelector("svg")!.getAttribute("role")).toBe("group");
     expect(a.container.querySelector("svg")!.getAttribute("aria-label")).toBe("Shares held by quarter");
     a.unmount();
     const b = render(<StepChart quarters={stepQuarters} shares={stepShares} label="NVDA shares" />);

@@ -25,6 +25,7 @@ import { DASH, fmtDate, money, pct, px, qLabel, sgn, shareCount, signClass } fro
 import { irr, positionFlows, positionRows, returnPct, totalPnl, tradeMove } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
+import { useTitle } from "../lib/useTitle";
 import NotFound from "./NotFound";
 
 // ---- loading ----------------------------------------------------------------
@@ -155,7 +156,8 @@ function PositionTiles({ data }: { data: PositionData }) {
 }
 
 function PositionView({ data }: { data: PositionData }) {
-  const { summary, position: p, weekly } = data;
+  const { summary, position: p, security, weekly } = data;
+  useTitle(`${security?.ticker ?? `#${p.stock_id}`} · ${summary.name} · Orca`);
   return (
     <div className="view">
       <Header data={data} />

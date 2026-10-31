@@ -28,20 +28,24 @@ export function money(usd: number | null, signed = false): string {
   else if (m < 1e3) s = "$" + m + "M";
   else if (b2 < 10) s = "$" + b2.toFixed(2) + "B";
   else s = "$" + (a / 1e9).toFixed(1) + "B";
-  return (signed ? sgn(usd) : usd < 0 ? MINUS : "") + s;
+  // The sign follows the printed figure: a value that rounds to $0 has none.
+  return (dollars === 0 ? "" : signed ? sgn(usd) : usd < 0 ? MINUS : "") + s;
 }
 
 /** A fraction as a percentage: 0.1234 → "+12.3%". `signed: false` drops the plus sign. */
 export function pct(x: number | null, digits = 1, signed = true): string {
   if (missing(x)) return DASH;
-  const s = Math.abs(x * 100).toFixed(digits) + "%";
-  return (signed ? sgn(x) : x < 0 ? MINUS : "") + s;
+  const digitsText = Math.abs(x * 100).toFixed(digits);
+  // The sign follows the printed figure: a value that rounds to 0.0% has none.
+  const sign = Number(digitsText) === 0 ? "" : signed ? sgn(x) : x < 0 ? MINUS : "";
+  return sign + digitsText + "%";
 }
 
 /** Percentage points: -2.04 → "−2.0 pts". */
 export function pp(points: number | null): string {
   if (missing(points)) return DASH;
-  return sgn(points) + Math.abs(points).toFixed(1) + " pts";
+  const digitsText = Math.abs(points).toFixed(1);
+  return (Number(digitsText) === 0 ? "" : sgn(points)) + digitsText + " pts";
 }
 
 /** Share price: whole dollars from $100, cents below. */
@@ -74,7 +78,20 @@ export function fmtDate(iso: string | null): string {
 /** A risk ratio (Sharpe, Sortino, Calmar): two decimals, a true minus sign. */
 export function ratio(x: number | null): string {
   if (missing(x)) return DASH;
-  return (x < 0 ? MINUS : "") + Math.abs(x).toFixed(2);
+  const digitsText = Math.abs(x).toFixed(2);
+  return (x < 0 && Number(digitsText) !== 0 ? MINUS : "") + digitsText;
+}
+
+/** A whole-number count with thousands separators; with a noun, in the right number: 1 → "1 position", 16000 → "16,000 positions". */
+export function count(n: number | null, noun?: string): string {
+  if (missing(n)) return DASH;
+  const text = n.toLocaleString("en-US");
+  return noun === undefined ? text : `${text} ${n === 1 ? noun : noun + "s"}`;
+}
+
+/** True for a printed figure that is zero ("$0", "0.0%", "0.0 pts", "0.00"): it is shown in no colour. */
+export function printsZero(text: string): boolean {
+  return /^[+−]?\$?0(\.0+)?( pts|%|×)?$/.test(text);
 }
 
 /** CSS class for a signed figure; "" for zero or missing. */

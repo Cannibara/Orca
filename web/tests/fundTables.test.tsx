@@ -286,6 +286,36 @@ describe("Every stock they've owned", () => {
       expect(tileSub("Worst position")).toBe("−$300");
     });
 
+    it("reads — for Unrealised P&L when no held position is priced, never $0", () => {
+      // S1 is held but has no close; S3 is sold out and has one
+      renderTables({ positions: [pos(1), sold(3, 700)], prices: pricesOf({ 3: 10 }) });
+      expect(tileValue("Unrealised P&L")).toBe("—");
+      expect(tileOf("Unrealised P&L").querySelector(".v")).toHaveAttribute("class", "v");
+      expect(tileValue("Realised P&L")).toBe("+$700");
+    });
+
+    it("reads — for Unrealised P&L when no price is known at all", () => {
+      renderTables({ positions: [pos(1), pos(2)], prices: new Map() });
+      expect(tileValue("Unrealised P&L")).toBe("—");
+    });
+
+    it("a priced held position that is exactly flat reads $0 in no colour", () => {
+      renderTables({ positions: [pos(1)], prices: pricesOf({ 1: 10 }) }); // 100 shares at 10 against a cost of 1,000
+      expect(tileValue("Unrealised P&L")).toBe("$0");
+      expect(tileOf("Unrealised P&L").querySelector(".v")).toHaveAttribute("class", "v");
+    });
+
+    it("counts with thousands separators", () => {
+      const n = 1200;
+      const many = Array.from({ length: n }, (_, i) => pos(i + 1));
+      renderTables({
+        positions: many,
+        prices: new Map(many.map((p) => [p.stock_id, 15] as [number, number])),
+        stocks: stocksTo(n),
+      });
+      expect(tileSub("Profitable")).toBe("1,200 of 1,200");
+    });
+
     it("does not follow the filter", async () => {
       renderTables({ positions: rows, prices: closes });
       await userEvent.click(screen.getByRole("button", { name: "Sold" }));
@@ -405,6 +435,8 @@ describe("What if they'd kept it", () => {
     renderTables({ exits, prices });
     expect(tileValue("Sold too early")).toBe("$1,110"); // 1,000 + 110
     expect(tileValue("Losses dodged")).toBe("$1,140"); // 1,000 + 140, unsigned
+    expect(tileOf("Sold too early").querySelector(".v")).toHaveClass("down");
+    expect(tileOf("Losses dodged").querySelector(".v")).toHaveClass("up");
   });
 
   it("shows the share of sales that beat SPY the next year", () => {
@@ -524,6 +556,9 @@ describe("What if they'd kept it", () => {
     expect(within(screen.getByRole("table", { name: SALES })).getByText("They have not sold or trimmed anything yet.")).toBeInTheDocument();
     expect(tileValue("Sold too early")).toBe("$0");
     expect(tileValue("Losses dodged")).toBe("$0");
+    // nothing missed and nothing dodged: neither is red or green
+    expect(tileOf("Sold too early").querySelector(".v")).toHaveAttribute("class", "v");
+    expect(tileOf("Losses dodged").querySelector(".v")).toHaveAttribute("class", "v");
   });
 
   it("virtualises a long list of sales", () => {

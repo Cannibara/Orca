@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import { clearDataCache } from "../src/data/api";
-import type { Contrib, LatestPrices, Positions, Summary } from "../src/data/types";
+import type { Contrib, ContribYear, LatestPrices, Positions, Summary } from "../src/data/types";
+import { pp } from "../src/lib/format";
 import Fund from "../src/pages/Fund";
 
 // ---- fixtures: the demo JSON under public/demo-data, served through a mocked fetch ----
@@ -166,6 +167,29 @@ describe("Fund page", () => {
       await loaded("Kelpwood Capital LP");
       expect((document.querySelector(".meta") as HTMLElement).textContent).toContain(`Live value ${value}`);
       expect(screen.getByText(note)).toBeInTheDocument();
+    });
+
+    it.each([
+      [1, "1 holding"],
+      [16000, "16,000 holdings"],
+    ])("counts the holdings with thousands separators and the right plural (%i)", async (n, text) => {
+      stubData(summaryWith((s) => (s.n_holdings = n)));
+      renderFund();
+      await loaded("Kelpwood Capital LP");
+      expect((document.querySelector(".meta") as HTMLElement).textContent).toContain(text);
+    });
+
+    it("counts unpriced holdings with thousands separators", async () => {
+      const ids = Array.from({ length: 1234 }, (_, i) => 500000 + i);
+      stubData(
+        summaryWith((s) => {
+          s.holdings_now = { stock_id: ids, shares: ids.map(() => 1), cost: ids.map(() => 1) };
+          s.n_holdings = ids.length;
+        }),
+      );
+      renderFund();
+      await loaded("Kelpwood Capital LP");
+      expect(screen.getByText("1,234 holdings unpriced")).toBeInTheDocument();
     });
 
     it("notes that an inactive fund filed nothing in the latest two quarters", async () => {
@@ -437,6 +461,135 @@ describe("Fund page", () => {
       await loaded("Kelpwood Capital LP");
       const labels = barLabels("Contribution to 2025 return by stock");
       expect(labels).toEqual(["XOM", "HD", "PLD", "UNH", "NFLX", "GOOGL", "CAT", "COST", "V", "NEE", "AVGO", "TSLA", "LLY"]);
+    });
+
+    describe("a year with many stocks (R32)", () => {
+      /** n contributions of distinct sizes between −5 and +5 points, on stocks the securities file does not know. */
+      function manyContributions(n: number): ContribYear {
+        const stock_id = Array.from({ length: n }, (_, i) => 100000 + i);
+        const points = stock_id.map((_, i) => Math.round(((((i * 7919) % n) / n) * 10 - 5) * 1000) / 1000);
+        return { stock_id, points, pnl: points.map((p) => p * 1e6) };
+      }
+      const contribOf = (year: ContribYear, label = "2025"): Record<string, unknown> => ({
+        [`fund/${FUND}/contrib.json`]: { years: [label], by_year: { [label]: year } } satisfies Contrib,
+      });
+      /** The year's stocks, largest contribution first. */
+      const ranked = (year: ContribYear) =>
+        year.stock_id.map((id, i) => ({ id, points: year.points[i] })).sort((a, b) => b.points - a.points);
+      const sum = (xs: { points: number }[]) => xs.reduce((t, x) => t + x.points, 0);
+      const CHART = "Contribution to 2025 return by stock";
+
+      it("draws the 15 largest and 15 smallest, and one row adding up the rest", async () => {
+        const year = manyContributions(1000);
+        stubData(contribOf(year));
+        renderFund();
+        await loaded("Kelpwood Capital LP");
+        const all = ranked(year);
+        const head = all.slice(0, 15);
+        const tail = all.slice(-15);
+        const rest = all.slice(15, -15);
+
+        expect(chart(CHART).querySelectorAll("rect.hit")).toHaveLength(31);
+        expect(barLabels(CHART)).toEqual([...head.map((s) => `#${s.id}`), "970 other stocks", ...tail.map((s) => `#${s.id}`)]);
+        const hits = Array.from(chart(CHART).querySelectorAll("rect.hit")).map((h) => h.getAttribute("aria-label"));
+        expect(hits[0]).toBe(`#${head[0].id} ${pp(head[0].points)}`);
+        expect(hits[15]).toBe(`970 other stocks ${pp(sum(rest))}`);
+        expect(hits[30]).toBe(`#${tail[14].id} ${pp(tail[14].points)}`);
+        // the three groups cover every stock once, so the caption's sum is exact
+        expect(sum(head) + sum(rest) + sum(tail)).toBeCloseTo(sum(all), 9);
+        expect(screen.getByText(new RegExp(`^Contributions add up to ${pp(sum(all)).replace("+", "\\+")}, an approximate return`))).toBeInTheDocument();
+        expect(screen.getByText(/Showing the 15 largest and 15 smallest of 1,000 stocks/)).toBeInTheDocument();
+      });
+
+      it("the row for the rest has the summed P&L in its tooltip", async () => {
+        const year = manyContributions(100);
+        stubData(contribOf(year));
+        renderFund(FUND, { withTooltip: true });
+        await loaded("Kelpwood Capital LP");
+        fireEvent.focus(screen.getByRole("img", { name: /^70 other stocks / }));
+        const tip = document.getElementById("tip") as HTMLElement;
+        expect(tip.textContent).toContain("70 other stocks");
+        const rest = ranked(year).slice(15, -15);
+        expect(tip.textContent).toContain(pp(sum(rest)));
+        expect(tip.textContent).toContain("P&L");
+      });
+
+      it("draws every stock of a year with 31, and caps one with 32", async () => {
+        stubData(contribOf(manyContributions(31)));
+        const first = renderFund();
+        await loaded("Kelpwood Capital LP");
+        expect(chart(CHART).querySelectorAll("rect.hit")).toHaveLength(31);
+        expect(barLabels(CHART).some((l) => /other stocks/.test(l ?? ""))).toBe(false);
+        expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+        expect(screen.queryByText(/Showing the 15 largest/)).toBeNull();
+        first.unmount();
+        clearDataCache();
+
+        stubData(contribOf(manyContributions(32)));
+        renderFund();
+        await loaded("Kelpwood Capital LP");
+        expect(chart(CHART).querySelectorAll("rect.hit")).toHaveLength(31);
+        expect(barLabels(CHART)[15]).toBe("2 other stocks");
+        expect(screen.getByRole("button", { name: "Show all 32" })).toBeInTheDocument();
+      });
+
+      it("Show all lists every stock in a virtual table, largest contribution first", async () => {
+        const year = manyContributions(1000);
+        stubData(contribOf(year));
+        const user = userEvent.setup();
+        renderFund();
+        await loaded("Kelpwood Capital LP");
+        const panel = section("What drove 2025");
+        await user.click(within(panel).getByRole("button", { name: "Show all 1,000" }));
+
+        expect(chart(CHART)).toBeNull();
+        const table = within(panel).getByRole("table", { name: "All contributions to 2025" });
+        expect(table).toHaveAttribute("aria-rowcount", "1001"); // header + every stock
+        expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Stock", "Contribution", "P&L"]);
+        const rendered = within(table).getAllByRole("row").length;
+        expect(rendered).toBeGreaterThan(3); // not an empty table
+        expect(rendered).toBeLessThan(100); // virtualised: nowhere near 1,001
+        const all = ranked(year);
+        const first = within(within(table).getAllByRole("row")[1]).getAllByRole("cell").map((c) => c.textContent);
+        expect(first).toEqual([`#${all[0].id}`, pp(all[0].points), expect.stringMatching(/^\+\$[\d.]+[MK]?$/)]);
+        // the caption stays, with the same exact sum
+        expect(within(panel).getByText(/^Contributions add up to /)).toBeInTheDocument();
+
+        await user.click(within(panel).getByRole("button", { name: "Show the chart" }));
+        expect(within(panel).queryByRole("table")).toBeNull();
+        expect(chart(CHART).querySelectorAll("rect.hit")).toHaveLength(31);
+      });
+
+      it("shows the company name beside the ticker in the table", async () => {
+        const year = manyContributions(40);
+        year.stock_id[0] = 2; // NVDA, made the largest so that it is in the first rows
+        year.points[0] = 99;
+        stubData(contribOf(year));
+        const user = userEvent.setup();
+        renderFund();
+        await loaded("Kelpwood Capital LP");
+        await user.click(screen.getByRole("button", { name: "Show all 40" }));
+        const table = screen.getByRole("table", { name: "All contributions to 2025" });
+        expect(within(table).getByText("NVDA")).toBeInTheDocument();
+        expect(within(table).getByText("NVIDIA CORP")).toBeInTheDocument();
+      });
+
+      it("picking a year with few stocks brings the chart back", async () => {
+        const contrib: Contrib = {
+          years: ["2024", "2025"],
+          by_year: { "2025": manyContributions(200), "2024": manyContributions(5) },
+        };
+        stubData({ [`fund/${FUND}/contrib.json`]: contrib });
+        const user = userEvent.setup();
+        renderFund();
+        await loaded("Kelpwood Capital LP");
+        await user.click(screen.getByRole("button", { name: "Show all 200" }));
+        expect(screen.getByRole("table", { name: "All contributions to 2025" })).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "2024" }));
+        expect(chart("Contribution to 2024 return by stock").querySelectorAll("rect.hit")).toHaveLength(5);
+        expect(screen.queryByRole("table", { name: /All contributions/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+      });
     });
 
     it("tooltip names the company and gives the dollar P&L", async () => {

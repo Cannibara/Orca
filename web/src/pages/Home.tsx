@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
@@ -15,8 +15,9 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { DASH, fmtDate, money, pct, pp, px, qLabel, ratio } from "../lib/format";
+import { DASH, count, fmtDate, money, pct, pp, px, qLabel, ratio } from "../lib/format";
 import { useLoad, type Load } from "../lib/useLoad";
+import { useTitle } from "../lib/useTitle";
 
 // ---- loading ----------------------------------------------------------------
 
@@ -88,11 +89,28 @@ function FundSearch() {
   const navigate = useNavigate();
   const funds = useLoad(loadFunds, []);
   const [query, setQuery] = useState("");
+  // The results can be put away (Escape, or focus leaving the box) without losing the text; typing or focus brings them back.
+  const [open, setOpen] = useState(true);
+  const input = useRef<HTMLInputElement>(null);
   const matches = useMemo(() => (funds.status === "ready" ? matchFunds(funds.data, query) : []), [funds, query]);
   const typed = query.trim() !== "";
+  const showing = typed && open && funds.status !== "error";
 
   return (
-    <div className="search-box">
+    <div
+      className="search-box"
+      onFocus={() => setOpen(true)}
+      onBlur={(e) => {
+        // Focus moving to something else inside the box (the button, a result) keeps the results open.
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !showing) return;
+        e.preventDefault(); // a search field would otherwise clear itself
+        input.current?.focus(); // (before closing: focusing the box opens the results)
+        setOpen(false);
+      }}
+    >
       <form
         className="search"
         role="search"
@@ -103,12 +121,16 @@ function FundSearch() {
       >
         <label htmlFor="fund-search">Search a fund or manager</label>
         <input
+          ref={input}
           id="fund-search"
           type="search"
           placeholder="Type a fund name"
           autoComplete="off"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
         />
         <button className="btn" type="submit" disabled={matches.length === 0}>
           Open fund
@@ -119,8 +141,9 @@ function FundSearch() {
           Search isn't available right now. The fund list didn't load.
         </p>
       )}
-      {typed && funds.status !== "error" && (
-        <div className="results">
+      {showing && (
+        // A press on the results must not take focus from the box, or the results would close before the click lands.
+        <div className="results" onMouseDown={(e) => e.preventDefault()}>
           {funds.status === "loading" ? (
             <p className="cap" role="status">
               Loading funds…
@@ -136,7 +159,7 @@ function FundSearch() {
                   <Link to={`/fund/${m.id}`}>
                     <span>{m.name}</span>
                     <span className="cap">
-                      {money(m.book)} · {m.n} positions
+                      {money(m.book)} · {count(m.n, "position")}
                     </span>
                   </Link>
                 </li>
@@ -162,7 +185,7 @@ const PERIODS: ChipOption<Period>[] = [
 const TOP_COLUMNS: Column<TopRow>[] = [
   { header: "Fund", align: "l", cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
   { header: "13F book", cell: (r) => money(r.book) },
-  { header: "Positions", cell: (r) => r.n_positions },
+  { header: "Positions", cell: (r) => count(r.n_positions) },
   { header: "Return / yr", cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return)}</Signed> },
   { header: "Worst drop", cell: (r) => pct(r.max_dd, 0, false) },
   { header: "Sharpe", cell: (r) => ratio(r.sharpe) },
@@ -309,7 +332,7 @@ function Crowded({ lookup }: { lookup: Lookup }) {
         </span>
       ),
     },
-    { header: "Funds buying", cell: (r) => r.funds_buying },
+    { header: "Funds buying", cell: (r) => count(r.funds_buying) },
     { header: "Total bought", cell: (r) => money(r.total_bought) },
     { header: "Avg weight after", cell: (r) => pct(r.avg_weight_after, 1, false) },
   ];
@@ -430,6 +453,7 @@ const TABS: TabItem<TabId>[] = [
 ];
 
 export default function Home() {
+  useTitle("Orca");
   const [tab, setTab] = useState<TabId>("top");
   // Chip choices live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");

@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { useTitle } from "../lib/useTitle";
 
 /** Unknown route, or a fund or stock that does not exist. */
 export default function NotFound() {
+  useTitle("Not found · Orca");
   return (
     <div className="view">
       <div className="sec">

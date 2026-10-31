@@ -9,6 +9,11 @@ export type DivergingItem = {
   sub: string;
   value: number;
   extra?: TipRow[];
+  /**
+   * The row adds up many others. It can be far longer than any one bar, so it does not set the
+   * scale: its bar stops at the edge of the plot and its label keeps the true value.
+   */
+  sum?: boolean;
 };
 
 export type DivergingBarsProps = {
@@ -35,7 +40,8 @@ export function DivergingBars({ items, fmt, label }: DivergingBarsProps) {
   const iw = width - M.l - M.r;
 
   // Symmetric domain, so the zero line is the centre of the plot.
-  const extent = Math.max(0, ...items.map((d) => Math.abs(d.value))) || 1;
+  const single = items.filter((d) => !d.sum);
+  const extent = Math.max(0, ...(single.length > 0 ? single : items).map((d) => Math.abs(d.value))) || 1;
   const ticks = niceTicks(-extent, extent, 5);
   const t0 = ticks[0];
   const t1 = ticks[ticks.length - 1];
@@ -51,7 +57,7 @@ export function DivergingBars({ items, fmt, label }: DivergingBarsProps) {
     <>
       <Legend items={LEGEND} />
       <div className="chart" ref={ref}>
-        <svg viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="img" aria-label={label}>
+        <svg viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
           {ticks.map((t, i) => (
             <g key={t}>
               <line x1={X(t)} x2={X(t)} y1={M.t} y2={H - M.b} className={t === 0 ? "base" : "grid"} />
@@ -64,7 +70,7 @@ export function DivergingBars({ items, fmt, label }: DivergingBarsProps) {
           ))}
           {items.map((d, i) => {
             const yc = M.t + i * ROW + ROW / 2;
-            const x1 = X(d.value);
+            const x1 = X(Math.max(t0, Math.min(t1, d.value)));
             const r = Math.min(4, BAR / 2, Math.abs(x1 - x0));
             const gain = d.value >= 0;
             const top = yc - BAR / 2;

@@ -153,6 +153,79 @@ describe("Home", () => {
     expect(await screen.findByText(`Fund page ${tern}`)).toBeInTheDocument();
   });
 
+  it("search results close on Escape and when focus leaves the box, and come back on typing or focus", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    const box = screen.getByRole("searchbox", { name: /search a fund/i });
+    const results = () => screen.queryByRole("list", { name: "Matching funds" });
+
+    await user.type(box, "Ter");
+    expect(await screen.findByRole("list", { name: "Matching funds" })).toBeInTheDocument();
+
+    // Escape closes the list but keeps the text and the focus; typing opens it again
+    await user.keyboard("{Escape}");
+    expect(results()).toBeNull();
+    expect(box).toHaveValue("Ter");
+    expect(box).toHaveFocus();
+    await user.keyboard("n");
+    expect(await screen.findByRole("list", { name: "Matching funds" })).toBeInTheDocument();
+
+    // clicking elsewhere closes it; focusing the box again opens it
+    await user.click(document.body);
+    expect(results()).toBeNull();
+    expect(box).toHaveValue("Tern");
+    await user.click(box);
+    expect(results()).not.toBeNull();
+
+    // moving focus within the box (the button, then a result) keeps it open; tabbing out closes it
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Open fund" })).toHaveFocus();
+    expect(results()).not.toBeNull();
+    await user.tab();
+    const link = within(results()!).getByRole("link", { name: /Tern Harbor Equity/ });
+    expect(link).toHaveFocus();
+    expect(results()).not.toBeNull();
+    await user.tab(); // the second result
+    expect(results()).not.toBeNull();
+    await user.tab(); // out of the box, onto the tabs
+    expect(screen.getByRole("tab", { name: "Top funds" })).toHaveFocus();
+    expect(results()).toBeNull();
+  });
+
+  it("Escape from a result puts the focus back in the search box", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    const box = screen.getByRole("searchbox", { name: /search a fund/i });
+    await user.type(box, "Tern");
+    await screen.findByRole("list", { name: "Matching funds" });
+    await user.tab(); // Open fund
+    await user.tab(); // the first result
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("list", { name: "Matching funds" })).toBeNull();
+    expect(box).toHaveFocus();
+  });
+
+  it("counts positions with thousands separators and the right plural, in the search results and in the Top funds list", async () => {
+    const funds = demo<FundsIndex>("funds.json");
+    funds.n[funds.name.indexOf("Kelpwood Capital LP")] = 16000;
+    funds.n[funds.name.indexOf("Tern Harbor Equity")] = 1;
+    const t3 = demo<TopList>("home/top_3y.json");
+    t3.eligible[0] = { ...t3.eligible[0], n_positions: 16000 };
+    stubData({ "funds.json": funds, "home/top_3y.json": t3 });
+    const user = userEvent.setup();
+    renderHome();
+    const box = screen.getByRole("searchbox", { name: /search a fund/i });
+    await user.type(box, "Kelpwood");
+    expect(await screen.findByText(/· 16,000 positions$/)).toBeInTheDocument();
+    await user.clear(box);
+    await user.type(box, "Tern H");
+    expect(await screen.findByText(/· 1 position$/)).toBeInTheDocument();
+    const cells = within(await screen.findByRole("table", { name: "Top funds" })).getAllByRole("row")[1];
+    expect(within(cells).getByText("16,000")).toBeInTheDocument();
+  });
+
   it("top funds period switch reloads list", async () => {
     const urls = stubData();
     const user = userEvent.setup();

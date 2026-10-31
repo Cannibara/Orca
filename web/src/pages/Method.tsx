@@ -1,5 +1,6 @@
 // "How it works": what a 13F covers and the formulas behind every estimate. Static text, no data.
 // The wording and formulas are the approved mockup's; the page ends with the not-advice line.
+import { useTitle } from "../lib/useTitle";
 
 // The formulas keep their line breaks and alignment (the .formula box is white-space: pre).
 const TRADE_PRICE = `typical price = (high + low + close) ÷ 3
@@ -15,6 +16,7 @@ const RETURNS = `quarter return = (end value − start value − net buying + di
 year = the four quarters chained`;
 
 export default function Method() {
+  useTitle("How it works · Orca");
   return (
     <div className="view">
       <div className="prose">

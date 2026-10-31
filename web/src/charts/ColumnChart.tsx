@@ -128,7 +128,7 @@ export function ColumnChart({
     <>
       {series.length >= 2 && <Legend items={series.map((s) => ({ label: s.name, color: s.color }))} />}
       <div className="chart" ref={ref}>
-        <svg viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="img" aria-label={label}>
+        <svg viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={M.l} x2={width - M.r} y1={Y(t)} y2={Y(t)} className={t === 0 ? "base" : "grid"} />

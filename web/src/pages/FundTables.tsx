@@ -11,7 +11,7 @@ import { StockLabel } from "../components/StockLabel";
 import { Tile, Tiles } from "../components/Tiles";
 import { toRows, yearsSince2013, type Stock } from "../data/api";
 import type { Exits, ExitsRows, PositionRow } from "../data/types";
-import { DASH, money, pct, pp, px, qLabel, ratio, shareCount, signClass } from "../lib/format";
+import { DASH, count, money, pct, pp, px, qLabel, ratio, shareCount, signClass } from "../lib/format";
 import { heldFlows, irr, missed, positionFlows, profitablePct, returnPct, sinceSale, totalPnl, unrealised } from "../lib/live";
 
 // ---- shared table machinery -----------------------------------------------------
@@ -158,6 +158,7 @@ function PositionTiles({ rows, profitable }: { rows: PosRow[]; profitable: numbe
   const s = useMemo(() => {
     let realised = 0;
     let unreal = 0;
+    let heldPriced = 0;
     let known = 0;
     let wins = 0;
     let won = 0;
@@ -168,7 +169,10 @@ function PositionTiles({ rows, profitable }: { rows: PosRow[]; profitable: numbe
     let worst: PosRow | undefined;
     for (const r of rows) {
       realised += r.p.realised;
-      if (r.unreal !== null) unreal += r.unreal;
+      if (r.unreal !== null) {
+        unreal += r.unreal;
+        heldPriced++;
+      }
       if (r.total === null) continue;
       known++;
       if (best === undefined || r.total > (best.total as number)) best = r;
@@ -182,14 +186,20 @@ function PositionTiles({ rows, profitable }: { rows: PosRow[]; profitable: numbe
         if (r.ret !== null) losers.push(r.ret);
       }
     }
-    return { realised, unreal, known, wins, won, lost, winners: mean(winners), losers: mean(losers), best, worst };
+    return { realised, unreal, heldPriced, known, wins, won, lost, winners: mean(winners), losers: mean(losers), best, worst };
   }, [rows]);
 
   return (
     <Tiles label="Position statistics">
-      <Tile label="Profitable" value={pct(profitable, 0, false)} sub={s.known > 0 ? `${s.wins} of ${s.known}` : undefined} />
+      <Tile label="Profitable" value={pct(profitable, 0, false)} sub={s.known > 0 ? `${count(s.wins)} of ${count(s.known)}` : undefined} />
       <Tile label="Realised P&L" value={money(s.realised, true)} tone={signClass(s.realised)} />
-      <Tile label="Unrealised P&L" value={money(s.unreal, true)} sub="at latest prices" tone={signClass(s.unreal)} />
+      {/* With no held position priced there is nothing to add up: a dash, not $0. */}
+      <Tile
+        label="Unrealised P&L"
+        value={s.heldPriced > 0 ? money(s.unreal, true) : DASH}
+        sub="at latest prices"
+        tone={s.heldPriced > 0 ? signClass(s.unreal) : ""}
+      />
       <Tile label="Avg winner / loser" value={`${pct(s.winners, 0)} / ${pct(s.losers, 0)}`} />
       <Tile label="$ won per $ lost" value={s.lost > 0 ? `${ratio(s.won / s.lost)}×` : DASH} />
       <Tile label="Best position" value={s.best?.ticker ?? DASH} sub={s.best ? money(s.best.total, true) : undefined} />
@@ -353,12 +363,12 @@ function SaleTiles({ rows, summary }: { rows: SaleRow[]; summary: Exits["summary
   const both = buys !== null && sells !== null;
   return (
     <Tiles label="What-if statistics">
-      <Tile label="Sold too early" value={money(early)} sub="gains missed after selling" tone="down" />
-      <Tile label="Losses dodged" value={money(dodged)} sub="drops avoided by selling" tone="up" />
+      <Tile label="Sold too early" value={money(early)} sub="gains missed after selling" tone={early > 0 ? "down" : ""} />
+      <Tile label="Losses dodged" value={money(dodged)} sub="drops avoided by selling" tone={dodged > 0 ? "up" : ""} />
       <Tile
         label="Sold stocks that beat SPY next year"
         value={pct(beat, 0, false)}
-        sub={beat !== null && measured > 0 ? `of ${measured} sold ${measured === 1 ? "stock" : "stocks"}` : undefined}
+        sub={beat !== null && measured > 0 ? `of ${count(measured, "sold stock")}` : undefined}
       />
       <Tile
         label="Buys vs sells, next 12 months"

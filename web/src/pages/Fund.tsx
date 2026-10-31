@@ -6,6 +6,7 @@ import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
 import { Section } from "../components/Section";
 import { Signed } from "../components/Signed";
+import { StockLabel } from "../components/StockLabel";
 import { Tile, Tiles } from "../components/Tiles";
 import {
   isFundFileMissing,
@@ -22,10 +23,11 @@ import {
   type Stock,
 } from "../data/api";
 import type { Contrib, ContribYear, Exits, PositionRow, Summary, YearsBlock } from "../data/types";
-import { DASH, MINUS, fmtDate, money, pct, pp, qLabel, ratio, signClass } from "../lib/format";
+import { DASH, MINUS, count, fmtDate, money, pct, pp, qLabel, ratio, signClass } from "../lib/format";
 import { liveValue, positionRows, profitablePct } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
+import { useTitle } from "../lib/useTitle";
 import { FundTables } from "./FundTables";
 import NotFound from "./NotFound";
 
@@ -110,12 +112,12 @@ function Header({ summary: s, prices }: { summary: Summary; prices: Map<number, 
           {live.missing > 0 && (
             <>
               {" "}
-              <span className="cap">{live.missing === 1 ? "1 holding unpriced" : `${live.missing} holdings unpriced`}</span>
+              <span className="cap">{`${count(live.missing, "holding")} unpriced`}</span>
             </>
           )}
         </span>
         <span>
-          <b>{s.n_holdings}</b> {s.n_holdings === 1 ? "holding" : "holdings"}
+          <b>{count(s.n_holdings)}</b> {s.n_holdings === 1 ? "holding" : "holdings"}
         </span>
         {s.priced_pct < COVERAGE_WARN ? (
           <span className="badge" title="Part of this fund's reported book has no price, so its figures cover only the priced part.">
@@ -349,6 +351,54 @@ function contributions(col: ContribYear | undefined): Contribution[] {
     .sort((a, b) => b.points - a.points);
 }
 
+/** R32: this many of the largest and of the smallest contributions get a bar of their own. */
+const BARS_AT_EACH_END = 15;
+/** A year with no more stocks than this draws them all; a bar per stock would run to thousands of rows for a big fund. */
+const MAX_ALL_BARS = 2 * BARS_AT_EACH_END + 1;
+
+/** The bars to draw for contributions sorted largest first: all of them, or both ends and one row adding up the rest (R32). */
+function barItems(sorted: Contribution[], stocks: Map<number, Stock>): DivergingItem[] {
+  const bar = (c: Contribution): DivergingItem => {
+    const stock = stocks.get(c.stockId);
+    return {
+      label: stock?.ticker ?? `#${c.stockId}`,
+      sub: stock?.name ?? "",
+      value: c.points,
+      extra: [{ value: money(c.pnl, true), label: "P&L" }],
+    };
+  };
+  if (sorted.length <= MAX_ALL_BARS) return sorted.map(bar);
+  const rest = sorted.slice(BARS_AT_EACH_END, sorted.length - BARS_AT_EACH_END);
+  const others: DivergingItem = {
+    label: `${count(rest.length)} other stocks`,
+    sub: "the rest, added together",
+    value: rest.reduce((t, c) => t + c.points, 0),
+    extra: [{ value: money(rest.reduce((t, c) => t + c.pnl, 0), true), label: "P&L" }],
+    sum: true,
+  };
+  return [
+    ...sorted.slice(0, BARS_AT_EACH_END).map(bar),
+    others,
+    ...sorted.slice(sorted.length - BARS_AT_EACH_END).map(bar),
+  ];
+}
+
+type ContributionRow = Contribution & { stock: Stock | undefined };
+
+const CONTRIBUTION_COLUMNS: Column<ContributionRow>[] = [
+  {
+    header: "Stock",
+    align: "l",
+    cell: (r) => (
+      <span className="tick">
+        <StockLabel stock={r.stock} stockId={r.stockId} />
+      </span>
+    ),
+  },
+  { header: "Contribution", cell: (r) => <Signed v={r.points}>{pp(r.points)}</Signed> },
+  { header: "P&L", cell: (r) => <Signed v={r.pnl}>{money(r.pnl, true)}</Signed> },
+];
+
 function Contributions({
   label,
   years,
@@ -361,19 +411,10 @@ function Contributions({
   stocks: Map<number, Stock>;
 }) {
   const sorted = useMemo(() => contributions(contrib.by_year[label]), [contrib, label]);
-  const items = useMemo<DivergingItem[]>(
-    () =>
-      sorted.map((c) => {
-        const stock = stocks.get(c.stockId);
-        return {
-          label: stock?.ticker ?? `#${c.stockId}`,
-          sub: stock?.name ?? "",
-          value: c.points,
-          extra: [{ value: money(c.pnl, true), label: "P&L" }],
-        };
-      }),
-    [sorted, stocks],
-  );
+  const items = useMemo(() => barItems(sorted, stocks), [sorted, stocks]);
+  const rows = useMemo<ContributionRow[]>(() => sorted.map((c) => ({ ...c, stock: stocks.get(c.stockId) })), [sorted, stocks]);
+  const [all, setAll] = useState(false);
+  const capped = sorted.length > MAX_ALL_BARS;
   const total = sorted.reduce((t, c) => t + c.points, 0);
   const at = years.label.indexOf(label);
   const chained = at >= 0 ? years.ret[at] : null;
@@ -394,8 +435,28 @@ function Contributions({
           <p className="cap">No positions this year</p>
         ) : (
           <>
-            <DivergingBars items={items} fmt={pp} label={`Contribution to ${label} return by stock`} />
+            {capped && all ? (
+              <DataTable
+                label={`All contributions to ${label}`}
+                columns={CONTRIBUTION_COLUMNS}
+                rows={rows}
+                virtual
+                rowKey={(r) => r.stockId}
+              />
+            ) : (
+              <DivergingBars items={items} fmt={pp} label={`Contribution to ${label} return by stock`} />
+            )}
+            {capped && (
+              <button type="button" className="linkbtn" onClick={() => setAll((a) => !a)}>
+                {all ? "Show the chart" : `Show all ${count(sorted.length)}`}
+              </button>
+            )}
             <p className="cap">{`Contributions add up to ${pp(total)}, an approximate return. The chained quarterly return for ${label} is ${pct(chained)}.`}</p>
+            {capped && !all && (
+              <p className="cap">
+                {`Showing the ${BARS_AT_EACH_END} largest and ${BARS_AT_EACH_END} smallest of ${count(sorted.length, "stock")}. The other ${count(rows.length - 2 * BARS_AT_EACH_END)} are added together in one bar, which stops at the edge of the chart if it is longer than the scale.`}
+              </p>
+            )}
           </>
         )}
       </div>
@@ -407,6 +468,7 @@ function Contributions({
 
 function FundView({ data }: { data: FundData }) {
   const { summary, contrib, positions, exits, stocks, prices, asof, profitable } = data;
+  useTitle(`${summary.name} · Orca`);
   const [year, setYear] = useState(() => defaultYear(summary));
   return (
     <div className="view">

@@ -1,4 +1,4 @@
-import { fmtDate, money, pct, pp, px, qLabel, ratio, sgn, shareCount, signClass } from "../src/lib/format";
+import { count, fmtDate, money, pct, pp, printsZero, px, qLabel, ratio, sgn, shareCount, signClass } from "../src/lib/format";
 
 test("money", () => {
   expect(money(1_234_000_000)).toBe("$1.23B");
@@ -168,4 +168,57 @@ test("shareCount gives a dash for a missing or non-finite value", () => {
   expect(shareCount(null)).toBe("—");
   expect(shareCount(NaN)).toBe("—");
   expect(shareCount(Infinity)).toBe("—");
+});
+
+test("a figure that rounds to zero is printed without a sign (money)", () => {
+  expect(money(-0.4)).toBe("$0");
+  expect(money(-0.4, true)).toBe("$0");
+  expect(money(0.4, true)).toBe("$0");
+  expect(money(-0.5, true)).toBe("−$1"); // rounds to one: signed
+  expect(money(0.5, true)).toBe("+$1");
+  expect(money(-0.6)).toBe("−$1");
+});
+
+test("a figure that rounds to zero is printed without a sign (pct)", () => {
+  expect(pct(-0.0001)).toBe("0.0%");
+  expect(pct(0.0001)).toBe("0.0%");
+  expect(pct(-0.0001, 1, false)).toBe("0.0%");
+  expect(pct(-0.004, 0)).toBe("0%"); // −0.4% at whole percents
+  expect(pct(-0.0049, 0, false)).toBe("0%");
+  expect(pct(-0.005, 0)).toBe("−1%");
+  expect(pct(-0.0006)).toBe("−0.1%");
+  expect(pct(0.0006)).toBe("+0.1%");
+});
+
+test("a figure that rounds to zero is printed without a sign (pp)", () => {
+  expect(pp(-0.04)).toBe("0.0 pts");
+  expect(pp(0.04)).toBe("0.0 pts");
+  expect(pp(-0.06)).toBe("−0.1 pts");
+  expect(pp(0.06)).toBe("+0.1 pts");
+});
+
+test("a figure that rounds to zero is printed without a sign (ratio)", () => {
+  expect(ratio(-0.004)).toBe("0.00");
+  expect(ratio(-0.006)).toBe("−0.01");
+});
+
+test("printsZero recognises a printed zero in every format", () => {
+  for (const zero of ["$0", "0.0%", "0%", "0.0 pts", "0.00", "0", "+$0", "−0.0%", "0.00×"]) {
+    expect(printsZero(zero), zero).toBe(true);
+  }
+  for (const other of ["$1", "$0.5M", "0.1%", "10%", "−0.1 pts", "0.01", "—", "New", "$10K", "100"]) {
+    expect(printsZero(other), other).toBe(false);
+  }
+});
+
+test("count: thousands separators, and the noun in the right number", () => {
+  expect(count(0)).toBe("0");
+  expect(count(16000)).toBe("16,000");
+  expect(count(0, "position")).toBe("0 positions");
+  expect(count(1, "position")).toBe("1 position");
+  expect(count(2, "position")).toBe("2 positions");
+  expect(count(16000, "position")).toBe("16,000 positions");
+  expect(count(1234567, "holding")).toBe("1,234,567 holdings");
+  expect(count(null)).toBe("—");
+  expect(count(NaN, "position")).toBe("—");
 });
