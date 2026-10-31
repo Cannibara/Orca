@@ -33,7 +33,7 @@ import tempfile
 import zipfile
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
@@ -369,8 +369,10 @@ def _write_json_atomic(path: Path, obj: object) -> None:
 
 @dataclass
 class _State:
-    """What runs hand on to each other (lake/state.json). The pending sets are added to before
-    the work that needs them is attempted and cleared only after a successful publish."""
+    """What runs hand on to each other (lake/state.json). The pending sets (and `pending_all`, a
+    recompute of every fund owed by a rebuild or a new T-bill table) are added to before the work
+    that needs them is attempted and cleared only after a successful publish. `prices_in_flight`
+    names a price run that has not finished: its part may hold changes nobody has recorded."""
 
     live_watermark: date | None = None
     last_q: int | None = None
@@ -379,6 +381,8 @@ class _State:
     pending_weekly: set[int] = field(default_factory=set)
     price_tried: set[int] = field(default_factory=set)
     rf_stale: bool = False
+    pending_all: bool = False
+    prices_in_flight: str | None = None
 
     @staticmethod
     def path(lake: Lake) -> Path:
@@ -399,6 +403,8 @@ class _State:
             pending_weekly=set(raw.get("pending_weekly", [])),
             price_tried=set(raw.get("price_tried", [])),
             rf_stale=bool(raw.get("rf_stale", False)),
+            pending_all=bool(raw.get("pending_all", False)),
+            prices_in_flight=raw.get("prices_in_flight"),
         )
 
     def save(self, lake: Lake) -> None:
@@ -412,6 +418,8 @@ class _State:
                 "pending_weekly": sorted(self.pending_weekly),
                 "price_tried": sorted(self.price_tried),
                 "rf_stale": self.rf_stale,
+                "pending_all": self.pending_all,
+                "prices_in_flight": self.prices_in_flight,
             },
         )
 
@@ -524,9 +532,8 @@ def _ingest_bulk(lake: Lake, sources: Sources, state: _State, flags: list, count
                 checksum = sha256_file(dest)
                 filings, raw = parse_bulk_zip(dest, stats)
             except (ValueError, zipfile.BadZipFile) as err:
-                flags.append(
-                    {"type": "bulk_unreadable", "url": strip_query(url), "detail": str(err)[:200]}
-                )
+                detail = str(err).replace(str(dest), name)[:200]  # not the runner's temp path
+                flags.append({"type": "bulk_unreadable", "url": strip_query(url), "detail": detail})
                 continue
             finally:
                 dest.unlink(missing_ok=True)
@@ -605,7 +612,17 @@ def _map_new_cusips(lake: Lake, sources: Sources, state: _State, flags: list) ->
         tickers = sources.sec_tickers()
         issuers = _issuer_names(lake, new)
         mapped = map_cusips(new, issuers, sources.figi, tickers)
-    except (FetchError, ValueError) as err:
+    except FetchError as err:
+        flags.append(
+            {
+                "type": "cusip_mapping_failed",
+                "count": len(new),
+                "url": strip_query(err.url),
+                "status": err.status,
+            }
+        )
+        return
+    except ValueError as err:  # an OpenFIGI answer that does not line up with the jobs
         flags.append({"type": "cusip_mapping_failed", "count": len(new), "detail": str(err)[:200]})
         return
 
@@ -717,7 +734,12 @@ def _update_prices(
 ) -> list[int]:
     """Fetch the prices of the stocks held in the latest quarter, the benchmark and any stock
     never fetched; record the stocks whose history changed (and those with new rows, for their
-    weekly file) in the state before anything is recomputed from them. Returns the changed ids."""
+    weekly file) in the state before anything is recomputed from them. Returns the changed ids.
+
+    A price run writes its part as it goes but reports the changed stocks only at the end, so the
+    run is marked in flight while it works. If it dies, the next run takes every stock of its part
+    as changed: more recomputing than needed, but no change is lost."""
+    _recover_prices_in_flight(lake, state)
     securities = _read_table(lake, "securities", TABLE_SCHEMA)
     stock_of = _stock_of(_read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
     wanted = _held_stocks(lake, stock_of, last_q) | (
@@ -730,6 +752,8 @@ def _update_prices(
     if sum(p.startswith("z") for p in lake.parts(PRICES_TABLE)) >= COMPACT_AT_RUN_PARTS:
         compact_prices(lake)
     stats: dict = {}
+    state.prices_in_flight = run_id
+    state.save(lake)
     changed = update_prices(lake, sources.prices, tickers, today, run_id=run_id, stats=stats)
     part = f"z{run_id}"
     touched = set()
@@ -742,6 +766,7 @@ def _update_prices(
         state.price_tried |= set(tickers) - failed
     else:  # the run broke off: only stocks that have rows are known to have been fetched
         state.price_tried |= touched
+    state.prices_in_flight = None
     state.save(lake)
 
     asked = stats["fetched"] + stats["empty"]
@@ -761,6 +786,18 @@ def _update_prices(
     if changed:
         _refresh_shares_outstanding(lake, sources, securities, changed, flags)
     return changed
+
+
+def _recover_prices_in_flight(lake: Lake, state: _State) -> None:
+    if state.prices_in_flight is None:
+        return
+    part = f"z{state.prices_in_flight}"
+    if part in lake.parts(PRICES_TABLE):
+        stocks = set(lake.read(PRICES_TABLE, part=part)["stock_id"].unique().to_list())
+        state.pending_stocks |= stocks
+        state.pending_weekly |= stocks
+    state.prices_in_flight = None
+    state.save(lake)
 
 
 def _refresh_shares_outstanding(
@@ -832,26 +869,27 @@ def _latest_closes(lake: Lake) -> dict[int, tuple[date, float]]:
 
 def _update_rf(
     lake: Lake, sources: Sources, state: _State, last_q: int, full: bool, flags: list
-) -> bool:
+) -> None:
     """The T-bill table, refetched when the latest quarter moves on (or on a full run, or after a
-    failure): Sharpe and Sortino of every fund depend on it, so it changes only together with a
-    recompute of every fund. Returns whether it changed."""
+    failure): Sharpe and Sortino of every fund depend on it, so a new table is written only
+    after a recompute of every fund is recorded as owed (`pending_all`)."""
     stored = _rf(lake)
     if stored and not (full or state.rf_stale or state.last_q != last_q):
-        return False
+        return
     try:
         fetched = sources.tbill()
     except FetchError as err:
         flags.append({"type": "tbill_failed", "url": strip_query(err.url), "status": err.status})
         state.rf_stale = True
-        return False
+        return
     state.rf_stale = False
     fetched = {int(y): float(r) for y, r in fetched.items()}
     if fetched == stored:
-        return False
+        return
+    state.pending_all = True
+    state.save(lake)
     years = sorted(fetched)
     lake.write("rf", pl.DataFrame({"year": years, "rate": [fetched[y] for y in years]}, RF_SCHEMA))
-    return True
 
 
 def _rf(lake: Lake) -> dict[int, float]:
@@ -1170,76 +1208,94 @@ def _snapshot(
 # --- fund state (what unchanged funds contribute to the shared files) --------------------------
 
 
-def _meta_json(meta: FundMeta) -> str:
-    return json.dumps({**asdict(meta), "filed": meta.filed.isoformat()}, sort_keys=True)
+# The stored fund state is JSON written field by field from the dataclasses, so a field added to
+# FundMeta or FundSnapshot (or Trade, Performance) is kept, and a removed one fails loudly.
+_STORED_TYPES = {cls.__name__: cls for cls in (FundMeta, FundSnapshot, Trade, Performance)}
 
 
-def _meta_from(text: str) -> FundMeta:
-    raw = json.loads(text)
-    return FundMeta(**{**raw, "filed": date.fromisoformat(raw["filed"])})
-
-
-def _snap_json(s: FundSnapshot) -> str:
-    return json.dumps(
-        {
-            "fund_id": s.fund_id,
-            "name": s.name,
-            "book": s.book,
-            "n_priced": s.n_priced,
-            "priced_pct": s.priced_pct,
-            "quarters_filed": s.quarters_filed,
-            "excluded": s.excluded,
-            "weights_now": list(s.weights_now.items()),
-            "weights_prev": list(s.weights_prev.items()),
-            "trades_latest": [[sid, asdict(t)] for sid, t in s.trades_latest],
-            "pnl_latest": list(s.pnl_latest.items()),
-            "buys_recent": [
-                [sid, q, px, w, filed.isoformat()] for sid, q, px, w, filed in s.buys_recent
-            ],
-            "perf": {k: (asdict(p) if p is not None else None) for k, p in s.perf.items()},
-            "filed": s.filed.isoformat(),
-            "period_q": s.period_q,
+def _encode(value: object) -> object:
+    """`value` as JSON-ready data that `_decode` turns back into an equal value: dataclasses,
+    dates, tuples and dicts (with any keys) are tagged; floats round-trip exactly."""
+    if isinstance(value, date):
+        return {"__date__": value.isoformat()}
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            "__type__": type(value).__name__,
+            **{f.name: _encode(getattr(value, f.name)) for f in fields(value)},
         }
-    )
+    if isinstance(value, dict):
+        return {"__dict__": [[_encode(k), _encode(v)] for k, v in value.items()]}
+    if isinstance(value, tuple):
+        return {"__tuple__": [_encode(v) for v in value]}
+    if isinstance(value, list):
+        return [_encode(v) for v in value]
+    return value
 
 
-def _snap_from(text: str) -> FundSnapshot:
-    raw = json.loads(text)
-    return FundSnapshot(
-        fund_id=raw["fund_id"],
-        name=raw["name"],
-        book=raw["book"],
-        n_priced=raw["n_priced"],
-        priced_pct=raw["priced_pct"],
-        quarters_filed=raw["quarters_filed"],
-        excluded=raw["excluded"],
-        weights_now={int(k): v for k, v in raw["weights_now"]},
-        weights_prev={int(k): v for k, v in raw["weights_prev"]},
-        trades_latest=[(int(sid), Trade(**t)) for sid, t in raw["trades_latest"]],
-        pnl_latest={int(k): v for k, v in raw["pnl_latest"]},
-        buys_recent=[
-            (int(sid), q, px, w, date.fromisoformat(f)) for sid, q, px, w, f in raw["buys_recent"]
-        ],
-        perf={k: (Performance(**p) if p is not None else None) for k, p in raw["perf"].items()},
-        filed=date.fromisoformat(raw["filed"]),
-        period_q=raw["period_q"],
-    )
+def _decode(value: object) -> object:
+    if isinstance(value, list):
+        return [_decode(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    if "__date__" in value:
+        return date.fromisoformat(value["__date__"])
+    if "__tuple__" in value:
+        return tuple(_decode(v) for v in value["__tuple__"])
+    if "__dict__" in value:
+        return {_decode(k): _decode(v) for k, v in value["__dict__"]}
+    cls = _STORED_TYPES[value["__type__"]]
+    return cls(**{k: _decode(v) for k, v in value.items() if k != "__type__"})
+
+
+def _dump(value: object) -> str:
+    return json.dumps(_encode(value), sort_keys=True)
+
+
+def _load(text: str) -> object:
+    return _decode(json.loads(text))
 
 
 # --- publishing -----------------------------------------------------------------------------
 
 _TOKEN = re.compile(r"(?<![0-9A-Za-z])(?<![0-9]\.)[0-9A-Za-z]{9}(?![0-9A-Za-z])(?!\.[0-9])")
+_CUSIP_SPECIALS = {"*": 36, "@": 37, "#": 38}
+
+
+def cusip_check_digit(base: str) -> str:
+    """The check digit of a CUSIP's first eight characters (the standard modulus-10 rule: the
+    characters at even positions doubled, letters worth 10 to 35, digits of products summed)."""
+    total = 0
+    for position, char in enumerate(base.upper()):
+        if char.isdigit():
+            value = int(char)
+        elif "A" <= char <= "Z":
+            value = ord(char) - ord("A") + 10
+        else:
+            value = _CUSIP_SPECIALS[char]
+        if position % 2:
+            value *= 2
+        total += value // 10 + value % 10
+    return str((10 - total % 10) % 10)
+
+
+def _is_cusip(text: str) -> bool:
+    """Whether `text` is a well-formed CUSIP: nine characters ending in their check digit."""
+    if len(text) != 9 or not all(c.isalnum() or c in _CUSIP_SPECIALS for c in text[:8]):
+        return False
+    return cusip_check_digit(text[:8]) == text[8]
 
 
 def _cusip_leaks(staging: Path, cusips: set[str], compressed: bool) -> list[str]:
-    """Staged files containing a CUSIP of the security master as a whole token (not inside a
-    longer word or number)."""
+    """Where staged files contain a CUSIP of `cusips` as a whole token (not inside a longer word
+    or number): "path (offset n)" of the first one in each file. The CUSIP itself is not named,
+    as the error ends up in a log."""
     leaks = []
     for path in sorted(staging.rglob("*.json")):
         data = path.read_bytes()
         text = (brotli.decompress(data) if compressed else data).decode("ascii", "replace")
-        if any(token.upper() in cusips for token in _TOKEN.findall(text)):
-            leaks.append(path.relative_to(staging).as_posix())
+        hit = next((m for m in _TOKEN.finditer(text) if m.group().upper() in cusips), None)
+        if hit is not None:
+            leaks.append(f"{path.relative_to(staging).as_posix()} (offset {hit.start()})")
     return leaks
 
 
@@ -1381,20 +1437,23 @@ def run_weekly(
     run_id = today.strftime("%Y%m%d")
     flags: list = []
     counts = _Counts()
+    if full:  # owed until a publish succeeds, even if this run dies
+        state.pending_all = True
+        state.save(lake)
 
     _ingest_bulk(lake, sources, state, flags, counts)
     _ingest_live(lake, sources, state, today, flags, counts)
     _map_new_cusips(lake, sources, state, flags)
     _update_prices(lake, sources, state, today, last_q, run_id, flags)
-    rf_changed = _update_rf(lake, sources, state, last_q, full, flags)
+    _update_rf(lake, sources, state, last_q, full, flags)
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
         flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
 
     ctx = _Context.build(lake, last_q)
-    # The deadline quarter, the T-bill rate and the benchmark (every fund's what-if figures) are
-    # inputs of every fund.
-    everything = full or rf_changed or state.last_q != last_q or ctx.spy_id in state.pending_stocks
+    # A rebuild, the deadline quarter, the T-bill rate and the benchmark (every fund's what-if
+    # figures) concern every fund.
+    everything = state.pending_all or state.last_q != last_q or ctx.spy_id in state.pending_stocks
     if everything:
         recompute = _all_ciks(lake)
     else:
@@ -1428,16 +1487,13 @@ def run_weekly(
     stored = _read_table(lake, "fund_state", FUND_STATE_SCHEMA)
     stored = stored.clear() if full else stored.filter(~pl.col("cik").is_in(sorted(recompute)))
     fresh = pl.DataFrame(
-        [
-            (r.output.meta.fund_id, _meta_json(r.output.meta), _snap_json(r.snapshot))
-            for r in results
-        ],
+        [(r.output.meta.fund_id, _dump(r.output.meta), _dump(r.snapshot)) for r in results],
         schema=FUND_STATE_SCHEMA,
         orient="row",
     )
     fund_state = pl.concat([stored, fresh]).sort("cik")
-    metas = [_meta_from(m) for m in fund_state["meta"].to_list()]
-    snaps = [_snap_from(s) for s in fund_state["snap"].to_list()]
+    metas = [_load(m) for m in fund_state["meta"].to_list()]
+    snaps = [_load(s) for s in fund_state["snap"].to_list()]
     weekly_ids = None if full else state.pending_weekly
     files.update(_publish_shared(ctx, staging, metas, snaps, weekly_ids, today, compress))
 
@@ -1460,7 +1516,10 @@ def run_weekly(
     previous = _load_published(lake, out_root, compress)
     changed = changed_files(files, previous)
     _keep_only(staging, set(changed))
-    leaks = _cusip_leaks(staging, set(cusip_map["cusip"].to_list()), compress)
+    # Only well-formed CUSIPs are guarded: a junk 13F value ("0", "N/A") is nobody's identifier
+    # and must not stop the run when free text happens to contain it.
+    guarded = {c for c in cusip_map["cusip"].to_list() if _is_cusip(c)}
+    leaks = _cusip_leaks(staging, guarded, compress)
     if leaks:
         raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
 
@@ -1474,6 +1533,7 @@ def run_weekly(
     state.pending_funds.clear()
     state.pending_stocks.clear()
     state.pending_weekly.clear()
+    state.pending_all = False
     state.last_q = last_q
     state.save(lake)
     _prune_staging(out_root)

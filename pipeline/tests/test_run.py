@@ -1,23 +1,42 @@
+import io
 import json
 import shutil
-from dataclasses import replace
+import zipfile
+from dataclasses import asdict, fields, replace
 from datetime import date, timedelta
+from functools import partial
 from pathlib import Path
 
+import httpx
 import polars as pl
 import pytest
 
-from orca import demo
-from orca.demo import Filing, Fixtures, Holding, bulk_zip, fixture_sources, listing, live_frames
+from orca import demo, prices
+from orca.demo import (
+    Filing,
+    Fixtures,
+    Holding,
+    bulk_zip,
+    fixture_sources,
+    listing,
+    live_frames,
+)
+from orca.engine.metrics import Performance
+from orca.engine.position import Trade
+from orca.home import FundSnapshot
+from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
-from orca.publish import read_json
+from orca.publish import FundMeta, read_json
 from orca.quarter_px import QuarterPx
 from orca.quarters import q_index
 from orca.run import (
     CusipLeakError,
     InvariantError,
+    _decode,
+    _encode,
     affected_funds,
     copy_published,
+    cusip_check_digit,
     deadline_quarter,
     live_watermark,
     main,
@@ -27,6 +46,7 @@ from orca.run import (
     strip_query,
     verify,
 )
+from orca.securities import FIGI_URL
 from orca.storage import Lake
 
 WEEK1, WEEK2, WEEK3 = date(2026, 10, 16), date(2026, 10, 23), date(2026, 10, 30)
@@ -99,7 +119,7 @@ def flat_prices(
     return pl.DataFrame(rows, schema=DAILY_SCHEMA, orient="row")
 
 
-WIDGET = "000000AB1"
+WIDGET = "000000AB5"  # a valid check digit
 SMALL_FUND = 1001
 SMALL_ZIP = "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/2024q3_form13f.zip"
 
@@ -397,22 +417,49 @@ def test_new_deadline_quarter_recomputes_every_fund(fixtures, base_runs, tmp_pat
 
 
 def test_published_files_hold_no_cusip(base_runs, fixtures):
+    cusips = set(fixtures.live_holdings["cusip"].to_list())
+    for body in fixtures.zips.values():
+        with zipfile.ZipFile(io.BytesIO(body)) as z:
+            rows = z.read("INFOTABLE.tsv").decode().splitlines()
+        column = rows[0].split("\t").index("CUSIP")
+        cusips |= {row.split("\t")[column] for row in rows[1:]}
+    assert {"91DEMO2B7", demo.SPY_CUSIP} <= cusips  # the bond and the benchmark are among them
+    assert set(fixtures.figi) <= cusips
+
     root = base_runs[WEEK2]
-    cusips = set(fixtures.figi)
-    for path, data in bucket_files(root).items():
-        text = read_json(root / "bucket" / path) if path else None
-        dumped = json.dumps(text)
-        assert not any(c in dumped for c in cusips), path
+    for path in bucket_files(root):
+        text = json.dumps(read_json(root / "bucket" / path))
+        assert not [c for c in cusips if c in text], path
 
 
 def test_cusip_in_a_published_file_aborts_before_manifest(tmp_path):
     widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
     leaky = small_fixtures({Q1_24: [widget], Q2_24: [widget]}, name=f"Fund {WIDGET} LP")
 
-    with pytest.raises(CusipLeakError, match="funds.json"):
+    with pytest.raises(CusipLeakError, match=r"funds\.json \(offset \d+\)") as err:
         run_weekly(Lake(tmp_path / "lake"), tmp_path / "out", fixture_sources(leaky), SMALL_TODAY)
 
+    assert WIDGET not in str(err.value)  # the error names where, not what
     assert not (tmp_path / "out" / "manifest.json").exists()
+
+
+def test_junk_cusip_does_not_abort_the_run(tmp_path):
+    # A 13F "CUSIP" without a valid check digit is no security's identifier: free text that
+    # happens to contain it is published.
+    junk = "999999999"
+    rows = [Holding("WIDGET CORP", WIDGET, 400.0, 10), Holding("UNKNOWN", junk, 400.0, 10)]
+    small = small_fixtures({Q1_24: rows, Q2_24: rows}, name=f"Fund {junk} LP")
+
+    run(tmp_path, fixture_sources(small), SMALL_TODAY)
+
+    assert junk in Lake(tmp_path / "lake").read("cusip_map")["cusip"].to_list()
+    assert read_json(tmp_path / "bucket" / "funds.json")["name"] == [f"Fund {junk} LP"]
+
+
+def test_cusip_check_digit():
+    assert cusip_check_digit("78462F10") == "3"  # SPY
+    assert cusip_check_digit("03783310") == "0"  # Apple
+    assert cusip_check_digit("000000AB") == "5"
 
 
 def test_verify_rebuilds_funds_and_finds_differences(base_runs, tmp_path):
@@ -495,3 +542,149 @@ def test_live_reads_again_a_recent_day_that_had_no_index(tmp_path):
     run(tmp_path, sources, friday + timedelta(days=7))
 
     assert calls[1] == (friday, friday + timedelta(days=7))
+
+
+def test_tbill_change_survives_an_aborted_run(fixtures, base_runs, tmp_path, monkeypatch):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    fred = "https://api.stlouisfed.org/fred/series/observations?api_key=SECRET"
+
+    def fred_down():
+        raise FetchError(fred, 500)
+
+    # A rebuild while FRED is down: it completes, and the T-bill table is marked stale.
+    down = replace(fixture_sources(fixtures), tbill=fred_down)
+    run(inc, down, WEEK3, full=True)
+    assert {"type": "tbill_failed", "url": fred.split("?")[0], "status": 500} in health(inc)[
+        "flags"
+    ]
+
+    # The next run gets new rates but dies before publishing ...
+    new_rates = replace(fixture_sources(fixtures), tbill=lambda: {**fixtures.tbill, 2026: 0.03})
+    monkeypatch.setattr("orca.run.check_bridge", lambda fq: False)
+    with pytest.raises(InvariantError):
+        run_weekly(Lake(inc / "lake"), inc / "out", new_rates, WEEK3)
+    monkeypatch.undo()
+
+    # ... so the run after it still owes every fund a recompute with the new rates.
+    stats = run(inc, new_rates, WEEK3)
+    assert stats.funds_recomputed == 12
+
+
+def test_aborted_rebuild_is_finished_by_the_next_run(fixtures, base_runs, tmp_path, monkeypatch):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    monkeypatch.setattr("orca.run.check_bridge", lambda fq: False)
+    with pytest.raises(InvariantError):
+        run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK3, full=True)
+    monkeypatch.undo()
+
+    stats = run(inc, fixture_sources(fixtures), WEEK3)
+
+    assert stats.funds_recomputed == 12
+
+
+class _KilledAfter(FixtureSource):
+    """Serves bars until `ticker` has been served, then dies like a killed process."""
+
+    def __init__(self, frames, ticker):
+        super().__init__(frames)
+        self._ticker, self._served = ticker, False
+
+    def daily(self, ticker, start, end):
+        if self._served:
+            raise KeyboardInterrupt("killed")
+        self._served = ticker == self._ticker
+        return super().daily(ticker, start, end)
+
+
+def test_changed_prices_survive_a_run_killed_during_the_price_update(
+    fixtures, base_runs, tmp_path, monkeypatch
+):
+    # Week 2 stores CMG's split day without its split factor.
+    late_split = {
+        **fixtures.prices,
+        "CMG": fixtures.prices["CMG"].with_columns(
+            split_factor=pl.when(pl.col("date") == date(2026, 10, 21))
+            .then(1.0)
+            .otherwise(pl.col("split_factor"))
+        ),
+    }
+    inc = from_base(base_runs, WEEK1, tmp_path)
+    run(inc, replace(fixture_sources(fixtures), prices=FixtureSource(late_split)), WEEK2)
+
+    # Week 3's run stores the corrected bar (flushed after each ticker), then is killed.
+    monkeypatch.setattr("orca.run.update_prices", partial(prices.update_prices, flush_every=1))
+    killed = replace(fixture_sources(fixtures), prices=_KilledAfter(fixtures.prices, "CMG"))
+    with pytest.raises(KeyboardInterrupt):
+        run_weekly(Lake(inc / "lake"), inc / "out", killed, WEEK3)
+    monkeypatch.undo()
+
+    # The next run finds the bar already stored, yet still recomputes CMG's holders.
+    stats = run(inc, fixture_sources(fixtures), WEEK3)
+    holders = [
+        cik for cik in range(demo.FUND_CIK0, demo.FUND_CIK0 + 12)
+        if demo.FUNDS[cik - demo.FUND_CIK0].name in demo.NICHE["CMG"]
+    ]  # fmt: skip
+    for cik in holders:
+        assert f"fund/{cik}/positions.json" in stats.changed
+
+
+def test_stored_fund_state_round_trips_every_field():
+    trade = Trade(q=53, type="add", delta=10.0, px=12.5, low=None, high=13.0, shares_after=30.0)
+    perf = Performance(0.1, 1.2, None, 0.2, -0.3, 0.33, 0.6)
+    snap = FundSnapshot(
+        fund_id=1,
+        name="Test Fund LP",
+        book=1e9,
+        n_priced=2,
+        priced_pct=0.9,
+        quarters_filed=12,
+        excluded=False,
+        weights_now={7: 0.6, 8: 0.4},
+        weights_prev={7: 1.0},
+        trades_latest=[(7, trade)],
+        pnl_latest={7: -5.5, 8: 2.0},
+        buys_recent=[(7, 53, 12.5, 0.6, date(2026, 8, 1))],
+        perf={"1y": perf, "3y": None},
+        filed=date(2026, 8, 1),
+        period_q=53,
+    )
+    meta = FundMeta(1, "Test Fund LP", 1, 53, date(2026, 8, 1), 1e9, 2, 0.9, 40, False)
+    assert {f.name for f in fields(snap)} == set(asdict(snap))  # every field is set above
+
+    assert _decode(json.loads(json.dumps(_encode(snap)))) == snap
+    assert _decode(json.loads(json.dumps(_encode(meta)))) == meta
+
+
+def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    down = FigiClient(
+        1e6,
+        {},
+        transport=httpx.MockTransport(lambda request: httpx.Response(503)),
+        sleep=lambda s: None,
+        jobs_per_request=100,
+    )
+
+    run(tmp_path, replace(fixture_sources(small), figi=down), SMALL_TODAY)
+
+    flag = {"type": "cusip_mapping_failed", "count": 2, "url": FIGI_URL, "status": 503}
+    assert flag in health(tmp_path)["flags"]
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY)
+    assert f"fund/{SMALL_FUND}/positions.json" in stats.changed
+    positions = read_json(tmp_path / "bucket" / f"fund/{SMALL_FUND}/positions.json")
+    assert positions["stock_id"] == [1]
+
+
+def test_unreadable_zip_is_flagged_by_its_name(tmp_path):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("SUBMISSION.tsv", "ACCESSION_NUMBER\n")  # no COVERPAGE / INFOTABLE
+    small = replace(small_fixtures({}), zips={SMALL_ZIP: buffer.getvalue()})
+
+    run(tmp_path, fixture_sources(small), SMALL_TODAY)
+
+    [flag] = [f for f in health(tmp_path)["flags"] if f["type"] == "bulk_unreadable"]
+    assert flag["url"] == SMALL_ZIP
+    assert flag["detail"].startswith("2024q3_form13f.zip: SUBMISSION.tsv has no column(s)")
+    assert str(tmp_path) not in flag["detail"] and "/tmp" not in flag["detail"]

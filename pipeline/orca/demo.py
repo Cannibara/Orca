@@ -32,7 +32,7 @@ from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
 from orca.quarters import q_end, q_index, q_of_date
-from orca.run import Sources, copy_published, run_weekly
+from orca.run import Sources, copy_published, cusip_check_digit, run_weekly
 from orca.sec.bulk import raw_holdings
 from orca.sec.live import FILINGS_SCHEMA, INFO_SCHEMA
 from orca.storage import Lake
@@ -427,13 +427,7 @@ def _prices(seed: int) -> tuple[dict[str, pl.DataFrame], dict[str, dict[int, flo
 def _cusip(i: int) -> str:
     """A made-up CUSIP with a valid check digit."""
     base = f"{910000 + 37 * i:06d}10"
-    total = 0
-    for pos, ch in enumerate(base):
-        v = int(ch) if ch.isdigit() else ord(ch) - 55
-        if pos % 2:
-            v *= 2
-        total += v // 10 + v % 10
-    return base + str((10 - total % 10) % 10)
+    return base + cusip_check_digit(base)
 
 
 def _unit(ticker: str) -> float:
