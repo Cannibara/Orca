@@ -27,7 +27,7 @@ from orca.demo import (
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.home import FundSnapshot
-from orca.http import FetchError, FigiClient
+from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import FundMeta, FundOutput, read_json
 from orca.quarter_px import QuarterPx, close_on
@@ -53,6 +53,7 @@ from orca.run.budget import Budget
 from orca.run.market import update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
+from orca.sec.live import fetch_new_filings
 from orca.securities import FIGI_URL
 from orca.storage import Lake
 
@@ -1123,6 +1124,36 @@ def test_a_live_download_failing_for_four_weeks_is_given_up(tmp_path):
 
     assert State.load(Lake(tmp_path / "lake")).live_watermark == friday
     assert {"type": "live_downloads_abandoned", "days": ["2024-09-05"]} in health(tmp_path)["flags"]
+
+
+def test_a_filing_sec_refuses_for_four_weeks_is_given_up(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
+    friday = date(2024, 10, 4)
+    refused_day, accession = date(2024, 10, 2), "0000001001-24-000099"
+    header = "Form Type   Company Name   CIK   Date Filed   File Name\n" + "-" * 60 + "\n"
+
+    def sec(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/daily-index/" not in url:
+            return httpx.Response(403)  # the filing: SEC refuses it for good
+        listed = url.endswith(f"form.{refused_day:%Y%m%d}.idx")
+        line = f"13F-HR   Test Fund LP   1001   {refused_day:%Y%m%d}   edgar/data/1001/{accession}.txt"
+        return httpx.Response(200, content=(header + (line if listed else "")).encode())
+
+    client = Client(1e6, {}, transport=httpx.MockTransport(sec), sleep=lambda s: None, max_retries=0)
+    sources = replace(fixture_sources(small), live_filings=partial(fetch_new_filings, client))
+
+    run(tmp_path, sources, friday)
+
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == refused_day - timedelta(days=1)
+    assert not [f for f in health(tmp_path)["flags"] if f["type"].startswith("live_")]
+
+    run(tmp_path, sources, friday + timedelta(days=28))
+
+    assert State.load(Lake(tmp_path / "lake")).live_watermark == friday + timedelta(days=28)
+    abandoned = {"type": "live_downloads_abandoned", "days": [refused_day.isoformat()]}
+    assert abandoned in health(tmp_path)["flags"]
 
 
 def test_a_failed_security_lookup_is_retried_next_run(tmp_path):

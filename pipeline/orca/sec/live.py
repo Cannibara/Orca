@@ -26,11 +26,13 @@ ARCHIVES = "https://www.sec.gov/Archives/"
 # EDGAR answers a day with no index (weekend, holiday) with 404 or 403, but 403 is also how SEC
 # refuses a client it throttles. A refused business day counts as closed once a later day's index
 # is read; three refused business days with no index read in between are throttling, and stop
-# the read.
+# the read. Filing downloads follow the same rule: a refused one amid successful downloads is a
+# failed download (SEC refuses some documents for good), three refused in a row with no download
+# in between are throttling. 429 always is.
 NO_INDEX = 404
 REFUSED = 403
-THROTTLED_AFTER = 3  # refused business days with no index read in between
-THROTTLE_STATUSES = frozenset({403, 429})  # on a filing download: SEC is throttling us
+RATE_LIMITED = 429
+THROTTLED_AFTER = 3  # refused business days, or filing downloads, with no success in between
 INFO_TABLE_TYPE = "INFORMATION TABLE"
 PERIOD_FORMAT = "%m-%d-%Y"  # 03-31-2025
 
@@ -272,13 +274,13 @@ def fetch_new_filings(
     Same shapes as parse_bulk_zip, with source="live". Takes the one shared SEC client so
     every request counts against the same rate limit. A day with no index (404, or 403 on a
     weekend or a closed business day) is skipped; SEC throttling (403 on three business days
-    with no index read in between, or 403 / 429 on a filing download) and any other failed index
-    request raise FetchError.
+    with no index read in between, 403 on three filing downloads with no download in between, or
+    429 on a filing download) and any other failed index request raise FetchError.
 
     Bad input is dropped, never fatal: an index line, or a filing whose primary document, info
     table or report period is missing or unreadable, goes with its holdings; a holding with an
-    unusable share type, value or share count goes alone; a filing that cannot be downloaded is
-    skipped. If `stats` is given, these are counted in stats["dropped_filings"],
+    unusable share type, value or share count goes alone; a filing that cannot be downloaded
+    (refused amid successful downloads included) is skipped. If `stats` is given, these are counted in stats["dropped_filings"],
     stats["dropped_holdings"] and stats["failed_filings"], and one warning names the offenders;
     stats["failed_days"] lists the index days with a failed download and stats["no_index_days"]
     the days that had no index, each oldest first (a caller should read those days again later:
@@ -290,16 +292,24 @@ def fetch_new_filings(
     bad_filings: list[str] = []
     failed_filings: list[str] = []
     failed_days: set[date] = set()
+    refused = 0  # filing downloads refused since the last successful one
     for entry, day in entries.values():
         try:
             submission = client.get(ARCHIVES + entry.path).content
         except FetchError as err:
-            if err.status in THROTTLE_STATUSES:
+            if err.status == RATE_LIMITED:
                 raise
+            if err.status == REFUSED:
+                refused += 1
+                if refused >= THROTTLED_AFTER:
+                    raise FetchError(
+                        err.url, REFUSED, f"{refused} filing downloads in a row refused: throttled"
+                    ) from err
             log.debug("could not download %s: %s", entry.accession, err)
             failed_filings.append(entry.accession)
             failed_days.add(day)
             continue
+        refused = 0
         try:
             filing, rows = _read_submission(submission, entry)
         except ValueError as err:
