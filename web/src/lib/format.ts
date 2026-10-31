@@ -50,6 +50,13 @@ export function px(price: number | null): string {
   return "$" + (price >= 100 ? price.toFixed(0) : price.toFixed(2));
 }
 
+/** A share count rounded to whole shares, with thousands separators: 1234567.4 → "1,234,567". */
+export function shareCount(n: number | null): string {
+  if (missing(n)) return DASH;
+  const whole = Math.round(n);
+  return (whole < 0 ? MINUS : "") + Math.abs(whole).toLocaleString("en-US");
+}
+
 /** Quarter index counted from Q1 2013: 53 → "Q2 2026". */
 export function qLabel(q: number): string {
   return "Q" + ((q % 4) + 1) + " " + (2013 + Math.floor(q / 4));

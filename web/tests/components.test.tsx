@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { Chips } from "../src/components/Chips";
 import { DataTable, type Column } from "../src/components/DataTable";
+import { Signed } from "../src/components/Signed";
 import { Tabs, tabPanelProps } from "../src/components/Tabs";
 
 type Row = { name: string; n: number };
@@ -132,6 +133,89 @@ describe("DataTable", () => {
       render(<DataTable columns={columns} rows={many.slice(0, 150)} />);
       expect(screen.getAllByRole("row")).toHaveLength(151);
     });
+  });
+
+  describe("column widths of a virtual table", () => {
+    // jsdom has no layout, so model the auto layout: a header is as wide as its widest visible cell
+    // (10 px a character).
+    beforeEach(() => {
+      vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+        if (this.tagName !== "TH") return 0;
+        const i = Array.from(this.parentElement!.children).indexOf(this);
+        const cells = Array.from(
+          this.closest("table")!.querySelectorAll<HTMLElement>(`tbody tr:not([aria-hidden]) td:nth-child(${i + 1})`),
+        );
+        return 10 * Math.max(this.textContent!.length, ...cells.map((c) => c.textContent!.length));
+      });
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    // rows 0-999 have a one-letter name, the rest a long one
+    const names = (long: string): Row[] => Array.from({ length: 2000 }, (_, i) => ({ name: i < 1000 ? "s" : long, n: i }));
+    const pinned = () =>
+      Array.from(document.querySelectorAll<HTMLElement>("thead th")).map((th) => th.style.minWidth);
+
+    it("pins each column at the widest it has shown while scrolling, and never narrower", () => {
+      const rows = names("a long name");
+      const { container, unmount } = render(<DataTable columns={columns} rows={rows} virtual />);
+      expect(pinned()).toEqual(["40px", "50px", "40px"]);
+      const scroller = container.firstElementChild as HTMLElement;
+      fireEvent.scroll(scroller, { target: { scrollTop: 40 * 1500 } });
+      expect(pinned()).toEqual(["110px", "50px", "40px"]);
+      fireEvent.scroll(scroller, { target: { scrollTop: 0 } });
+      expect(screen.getAllByText("s", { selector: "td" }).length).toBeGreaterThan(0); // back among the short names
+      expect(pinned()).toEqual(["110px", "50px", "40px"]);
+      unmount(); // before the virtualizer's scroll-idle timer fires
+    });
+
+    it("starts again from what is measured when the columns change", () => {
+      const rows = names("a long name");
+      const { rerender } = render(<DataTable columns={columns} rows={rows} virtual />);
+      expect(pinned()).toEqual(["40px", "50px", "40px"]);
+      const other: Column<Row>[] = [
+        { header: "Ab", key: "name", align: "l", cell: (r) => r.name },
+        { header: "Cd", key: "n", cell: (r) => r.n },
+      ];
+      rerender(<DataTable columns={other} rows={rows} virtual />);
+      expect(pinned()).toEqual(["20px", "20px"]); // narrower than before; no pin of the old table is left
+    });
+
+    it("starts again from what is measured when the rows change", () => {
+      const { container, rerender, unmount } = render(<DataTable columns={columns} rows={names("a long name")} virtual />);
+      const scroller = container.firstElementChild as HTMLElement;
+      fireEvent.scroll(scroller, { target: { scrollTop: 40 * 1500 } });
+      fireEvent.scroll(scroller, { target: { scrollTop: 0 } });
+      expect(pinned()[0]).toBe("110px"); // same rows: the pin stays
+      // a new row set (a filter or a sort): the widest cell is no longer among them
+      rerender(<DataTable columns={columns} rows={names("a long name").slice(0, 900)} virtual />);
+      expect(pinned()[0]).toBe("40px");
+      unmount();
+    });
+
+    it("leaves no pins behind once the table is not virtual", () => {
+      const rows = names("a long name");
+      const { rerender } = render(<DataTable columns={columns} rows={rows} virtual />);
+      expect(pinned()[0]).toBe("40px");
+      rerender(<DataTable columns={columns} rows={rows} />);
+      expect(pinned()).toEqual(["", "", ""]);
+    });
+  });
+});
+
+describe("Signed", () => {
+  it("colours a figure by its sign", () => {
+    render(
+      <>
+        <Signed v={5}>gain</Signed>
+        <Signed v={-5}>loss</Signed>
+        <Signed v={0}>flat</Signed>
+        <Signed v={null}>none</Signed>
+      </>,
+    );
+    expect(screen.getByText("gain")).toHaveClass("up");
+    expect(screen.getByText("loss")).toHaveClass("down");
+    expect(screen.getByText("flat")).not.toHaveAttribute("class");
+    expect(screen.getByText("none")).not.toHaveAttribute("class");
   });
 });
 

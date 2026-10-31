@@ -227,7 +227,10 @@ describe("Fund page", () => {
       stubData({ ...summaryWith(nullMetrics), [`fund/${FUND}/positions.json`]: noPositions });
       renderFund();
       await loaded("Kelpwood Capital LP");
-      const values = Array.from(document.querySelectorAll(".tile .v")).map((v) => v.textContent);
+      // the metric tiles under the header (the tables further down have tiles of their own)
+      const values = ["Performance", "How they trade"].flatMap((group) =>
+        Array.from(screen.getByRole("group", { name: group }).querySelectorAll(".v")).map((v) => v.textContent),
+      );
       expect(values).toHaveLength(11);
       expect(values.every((v) => v === "—")).toBe(true);
       expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
@@ -482,6 +485,41 @@ describe("Fund page", () => {
       expect(screen.getByText("No positions this year")).toBeInTheDocument();
       expect(chart("Contribution to 2023 return by stock")).toBeNull();
       expect(screen.queryByText(/The chained quarterly return for/)).toBeNull();
+    });
+  });
+
+  describe("positions and what-if tables", () => {
+    it("mounts both tables below the charts, from one fetch of positions and one of exits", async () => {
+      const urls = stubData();
+      renderFund();
+      await loaded("Kelpwood Capital LP");
+      const drove = screen.getByRole("heading", { name: /^What drove / });
+      const owned = screen.getByRole("heading", { name: "Every stock they've owned" });
+      const whatIf = screen.getByRole("heading", { name: "What if they'd kept it" });
+      expect(drove.compareDocumentPosition(owned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(owned.compareDocumentPosition(whatIf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(section("Every stock they've owned")).getAllByRole("row")).toHaveLength(23); // 22 positions
+      expect(within(section("What if they'd kept it")).getAllByRole("row")).toHaveLength(23); // 22 sales
+      expect(tileValue("Profitable")).toBe("59%"); // as "Positions profitable" above
+      expect(urls.filter((u) => u.endsWith(`/fund/${FUND}/positions.json`))).toHaveLength(1);
+      expect(urls.filter((u) => u.endsWith(`/fund/${FUND}/exits.json`))).toHaveLength(1);
+    });
+
+    it("computes them at the page's latest prices", async () => {
+      const lp = demo<LatestPrices>("latest_prices.json");
+      stubData({ "latest_prices.json": { ...lp, price: lp.price.map(() => 1) } }); // every stock at $1
+      renderFund();
+      await loaded("Kelpwood Capital LP");
+      const owned = section("Every stock they've owned");
+      expect(within(owned).getAllByText("$1.00").length).toBeGreaterThan(0);
+      expect(tileValue("Profitable")).toBe(tileValue("Positions profitable")); // one share of positions in profit, two tiles
+      expect(tileValue("Profitable")).not.toBe("59%"); // the share at the demo's own prices
+    });
+
+    it("a failed exits file is a failed load, like the other files of the fund", async () => {
+      stubData({}, [`fund/${FUND}/exits.json`]);
+      renderFund();
+      expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't load this fund/);
     });
   });
 

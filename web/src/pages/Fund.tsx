@@ -4,49 +4,66 @@ import { ColumnChart } from "../charts/ColumnChart";
 import { DivergingBars, type DivergingItem } from "../charts/DivergingBars";
 import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
+import { Section } from "../components/Section";
+import { Signed } from "../components/Signed";
 import { Tile, Tiles } from "../components/Tiles";
 import {
   NotFoundError,
   loadContrib,
+  loadExits,
   loadLatestPrices,
   loadPositions,
   loadSecurities,
   loadSummary,
   priceMap,
+  stockMap,
   toRows,
+  type Stock,
 } from "../data/api";
-import type { Contrib, ContribYear, Summary, YearsBlock } from "../data/types";
+import type { Contrib, ContribYear, Exits, PositionRow, Summary, YearsBlock } from "../data/types";
 import { DASH, MINUS, fmtDate, money, pct, pp, qLabel, ratio, signClass } from "../lib/format";
 import { liveValue, positionRows, profitablePct } from "../lib/live";
 import { useLoad } from "../lib/useLoad";
+import { FundTables } from "./FundTables";
 import NotFound from "./NotFound";
 
 // ---- loading ----------------------------------------------------------------
-
-type Stock = { ticker: string; name: string };
 
 /** Everything the page shows, loaded together. */
 type FundData = {
   summary: Summary;
   contrib: Contrib;
+  positions: PositionRow[];
+  exits: Exits;
   stocks: Map<number, Stock>;
   prices: Map<number, number>;
+  /** Date of the latest prices (latest_prices.json `asof`): the IRR clock. */
+  asof: string;
   /** Share of positions in profit at the latest prices; null when no position has a computable total. */
   profitable: number | null;
 };
 
 async function loadFund(id: number): Promise<FundData> {
-  const [summary, positions, contrib, securities, latest] = await Promise.all([
+  const [summary, positionsFile, contrib, exits, securities, latest] = await Promise.all([
     loadSummary(id),
     loadPositions(id),
     loadContrib(id),
+    loadExits(id),
     loadSecurities(),
     loadLatestPrices(),
   ]);
   const prices = priceMap(latest);
-  const stocks = new Map<number, Stock>();
-  securities.stock_id.forEach((stockId, i) => stocks.set(stockId, { ticker: securities.ticker[i], name: securities.name[i] }));
-  return { summary, contrib, stocks, prices, profitable: profitablePct(positionRows(positions), prices) };
+  const positions = positionRows(positionsFile);
+  return {
+    summary,
+    contrib,
+    positions,
+    exits,
+    stocks: stockMap(securities),
+    prices,
+    asof: latest.asof,
+    profitable: profitablePct(positions, prices),
+  };
 }
 
 /** The fund id in the URL: a whole number, or null for anything else ("abc", "12abc", "1.5", "-3"). */
@@ -68,25 +85,6 @@ const yrs = (x: number | null): string => (x == null || !Number.isFinite(x) ? DA
 
 /** An axis tick for a value already in percent: −2.5 → "−2.5%", 10 → "10%". */
 const axisPct = (v: number): string => (v < 0 ? MINUS : "") + Math.abs(v).toFixed(1).replace(/\.0$/, "") + "%";
-
-function Signed({ v, children }: { v: number | null; children: ReactNode }) {
-  return <span className={signClass(v) || undefined}>{children}</span>;
-}
-
-/** A named section: its heading labels the region. `intro` sits beside the heading. */
-function Section({ id, title, intro, children }: { id: string; title: string; intro?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="sec" aria-labelledby={id}>
-      <div className="sec-head">
-        <div>
-          <h2 id={id}>{title}</h2>
-        </div>
-        {intro}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 /** The "Show the numbers" / "Show the chart" button, and whether the table is the one showing. */
 function useNumbersToggle(): [numbers: boolean, button: ReactNode] {
@@ -414,7 +412,7 @@ function Contributions({
 // ---- page ------------------------------------------------------------------------------
 
 function FundView({ data }: { data: FundData }) {
-  const { summary, contrib, stocks, prices, profitable } = data;
+  const { summary, contrib, positions, exits, stocks, prices, asof, profitable } = data;
   const [year, setYear] = useState(() => defaultYear(summary));
   return (
     <div className="view">
@@ -423,7 +421,7 @@ function FundView({ data }: { data: FundData }) {
       <GainsVsInflows years={summary.years} />
       <AnnualReturns years={summary.years} yearLabels={contrib.years} year={year} onYear={setYear} />
       {year !== null && <Contributions label={year} years={summary.years} contrib={contrib} stocks={stocks} />}
-      {/* Task 6 mounts <FundTables> here, below the charts. */}
+      <FundTables fundId={summary.id} positions={positions} exits={exits} prices={prices} stocks={stocks} asof={asof} />
     </div>
   );
 }

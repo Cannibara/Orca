@@ -2,8 +2,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
+import { Signed } from "../components/Signed";
+import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
-import { loadFunds, loadHome, loadLatestPrices, loadSecurities, priceMap } from "../data/api";
+import { loadFunds, loadHome, loadLatestPrices, loadSecurities, priceMap, stockMap, type Stock } from "../data/api";
 import type {
   CallRow,
   ConvictionRow,
@@ -13,7 +15,7 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { DASH, fmtDate, money, pct, pp, px, qLabel, ratio, signClass } from "../lib/format";
+import { DASH, fmtDate, money, pct, pp, px, qLabel, ratio } from "../lib/format";
 import { useLoad, type Load } from "../lib/useLoad";
 
 // ---- loading ----------------------------------------------------------------
@@ -35,15 +37,13 @@ function Status({ state }: { state: Load<unknown> }) {
 
 /** What most lists need to turn ids into names and to compute figures from today's close. */
 type Lookup = {
-  stocks: Map<number, { ticker: string; name: string }>;
+  stocks: Map<number, Stock>;
   prices: Map<number, number>;
 };
 
 async function loadLookup(): Promise<Lookup> {
   const [sec, lp] = await Promise.all([loadSecurities(), loadLatestPrices()]);
-  const stocks = new Map<number, { ticker: string; name: string }>();
-  sec.stock_id.forEach((id, i) => stocks.set(id, { ticker: sec.ticker[i], name: sec.name[i] }));
-  return { stocks, prices: priceMap(lp) };
+  return { stocks: stockMap(sec), prices: priceMap(lp) };
 }
 
 // ---- cells --------------------------------------------------------------------
@@ -53,34 +53,15 @@ function change(price: number | undefined, base: number): number | null {
   return price === undefined || !(base > 0) ? null : price / base - 1;
 }
 
-function Signed({ v, children }: { v: number | null; children: ReactNode }) {
-  return <span className={signClass(v) || undefined}>{children}</span>;
-}
-
 function FundLink({ id, name }: { id: number; name: string }) {
   return <Link to={`/fund/${id}`}>{name}</Link>;
-}
-
-function StockLabel({ lookup, stockId }: { lookup: Lookup; stockId: number }) {
-  const s = lookup.stocks.get(stockId);
-  return (
-    <>
-      <span className="mono">{s?.ticker ?? `#${stockId}`}</span>
-      {s && (
-        <>
-          {" "}
-          <span className="cap">{s.name}</span>
-        </>
-      )}
-    </>
-  );
 }
 
 /** Ticker with the name beside it, linking to the stock's page within a fund. */
 function StockLink({ lookup, fundId, stockId }: { lookup: Lookup; fundId: number; stockId: number }) {
   return (
     <Link className="tick" to={`/fund/${fundId}/stock/${stockId}`}>
-      <StockLabel lookup={lookup} stockId={stockId} />
+      <StockLabel stock={lookup.stocks.get(stockId)} stockId={stockId} />
     </Link>
   );
 }
@@ -324,7 +305,7 @@ function Crowded({ lookup }: { lookup: Lookup }) {
       align: "l",
       cell: (r) => (
         <span className="tick">
-          <StockLabel lookup={lookup} stockId={r.stock_id} />
+          <StockLabel stock={lookup.stocks.get(r.stock_id)} stockId={r.stock_id} />
         </span>
       ),
     },

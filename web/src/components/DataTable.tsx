@@ -60,21 +60,30 @@ export function DataTable<T>({
       observeElementRect(instance, (rect) => cb(rect.height > 0 ? rect : { ...rect, height: FALLBACK_VIEW_H })),
   });
 
+  // Indexes of the rows to render, and the height of the rows left out above and below them.
+  const windowed = virtual ? virtualizer.getVirtualItems() : [];
+  const indexes = virtual ? windowed.map((v) => v.index) : rows.map((_, i) => i);
+  const padTop = windowed.length > 0 ? windowed[0].start : 0;
+  const padBottom = windowed.length > 0 ? virtualizer.getTotalSize() - windowed[windowed.length - 1].end : 0;
+  const first = windowed.length > 0 ? windowed[0].index : -1;
+  const last = windowed.length > 0 ? windowed[windowed.length - 1].index : -1;
+
   // Only the rows in view are in the table, so its auto layout would resize the columns as the rows
-  // change while scrolling. Never let a column shrink below the widest it has been.
+  // change while scrolling. Pin each column at the widest it has been for these columns and rows; the
+  // pins are dropped when either changes (a filter, a sort, other columns) and measured afresh.
+  // Callers keep `columns` and `rows` the same objects between renders (module constants, useMemo).
+  useLayoutEffect(() => {
+    scroller.current?.querySelectorAll<HTMLElement>("thead th").forEach((th) => {
+      th.style.minWidth = "";
+    });
+  }, [virtual, columns, rows]);
   useLayoutEffect(() => {
     if (!virtual) return;
     scroller.current?.querySelectorAll<HTMLElement>("thead th").forEach((th) => {
       const w = th.offsetWidth;
       if (w > (parseFloat(th.style.minWidth) || 0)) th.style.minWidth = `${w}px`;
     });
-  });
-
-  // Indexes of the rows to render, and the height of the rows left out above and below them.
-  const windowed = virtual ? virtualizer.getVirtualItems() : [];
-  const indexes = virtual ? windowed.map((v) => v.index) : rows.map((_, i) => i);
-  const padTop = windowed.length > 0 ? windowed[0].start : 0;
-  const padBottom = windowed.length > 0 ? virtualizer.getTotalSize() - windowed[windowed.length - 1].end : 0;
+  }, [virtual, columns, rows, first, last]);
 
   const header = (c: Column<T>, i: number) => {
     const dir = sort && c.key !== undefined && sort.key === c.key ? sort.dir : 0;

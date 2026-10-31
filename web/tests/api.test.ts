@@ -12,10 +12,11 @@ import {
   loadWeekly,
   priceDates,
   priceMap,
+  stockMap,
   toRows,
   yearsSince2013,
 } from "../src/data/api";
-import type { CallRow, LatestPrices, RowsFile, TopList } from "../src/data/types";
+import type { CallRow, LatestPrices, RowsFile, Securities, TopList } from "../src/data/types";
 
 type Reply = { status: number; body?: unknown };
 
@@ -160,4 +161,24 @@ test("yearsSince2013", () => {
   expect(yearsSince2013("2017-01-01")).toBeCloseTo(1461 / 365.25, 12); // 2016 is a leap year
   expect(yearsSince2013("2026-10-30")).toBeCloseTo((Date.UTC(2026, 9, 30) - Date.UTC(2013, 0, 1)) / (365.25 * 86_400_000), 12);
   expect(yearsSince2013("2012-07-01")).toBeLessThan(0);
+});
+
+describe("stockMap", () => {
+  it("maps each stock id to its ticker and name", () => {
+    const sec: Securities = {
+      stock_id: [7, 3],
+      ticker: ["AAA", "BBB"],
+      name: ["Alpha Corp", "Beta Inc"],
+      sector: ["Tech", "Energy"],
+    };
+    const m = stockMap(sec);
+    expect(m.size).toBe(2);
+    expect(m.get(7)).toEqual({ ticker: "AAA", name: "Alpha Corp" });
+    expect(m.get(3)).toEqual({ ticker: "BBB", name: "Beta Inc" });
+    expect(m.get(99)).toBeUndefined();
+  });
+
+  it("is empty for no securities", () => {
+    expect(stockMap({ stock_id: [], ticker: [], name: [], sector: [] }).size).toBe(0);
+  });
 });

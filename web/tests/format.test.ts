@@ -1,4 +1,4 @@
-import { fmtDate, money, pct, pp, px, qLabel, ratio, sgn, signClass } from "../src/lib/format";
+import { fmtDate, money, pct, pp, px, qLabel, ratio, sgn, shareCount, signClass } from "../src/lib/format";
 
 test("money", () => {
   expect(money(1_234_000_000)).toBe("$1.23B");
@@ -153,4 +153,19 @@ test("ratio gives a dash for a missing or non-finite value", () => {
   expect(ratio(null)).toBe("—");
   expect(ratio(NaN)).toBe("—");
   expect(ratio(-Infinity)).toBe("—");
+});
+
+test("shareCount rounds to whole shares with thousands separators", () => {
+  expect(shareCount(0)).toBe("0");
+  expect(shareCount(999)).toBe("999");
+  expect(shareCount(1234567.4)).toBe("1,234,567");
+  expect(shareCount(1234567.5)).toBe("1,234,568");
+  expect(shareCount(341060531)).toBe("341,060,531");
+  expect(shareCount(0.4)).toBe("0");
+});
+
+test("shareCount gives a dash for a missing or non-finite value", () => {
+  expect(shareCount(null)).toBe("—");
+  expect(shareCount(NaN)).toBe("—");
+  expect(shareCount(Infinity)).toBe("—");
 });

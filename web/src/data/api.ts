@@ -1,5 +1,5 @@
 // Typed loaders for the published JSON (paths exactly as in pipeline/contract.md),
-// plus the small helpers every page shares: toRows, priceMap, priceDates, yearsSince2013.
+// plus the small helpers every page shares: toRows, stockMap, priceMap, priceDates, yearsSince2013.
 import type {
   Contrib,
   Exits,
@@ -67,6 +67,16 @@ export const loadContrib = (id: number) => getJson<Contrib>(`fund/${id}/contrib.
 export const loadExits = (id: number) => getJson<Exits>(`fund/${id}/exits.json`);
 export const loadWeekly = (stockId: number) => getJson<Weekly>(`stock/${stockId}/weekly.json`);
 export const loadHome = <N extends HomeName>(name: N) => getJson<HomeFiles[N]>(`home/${name}.json`);
+
+/** A stock as the pages name it. */
+export type Stock = { ticker: string; name: string };
+
+/** securities.json -> stock_id -> its ticker and name. */
+export function stockMap(sec: Securities): Map<number, Stock> {
+  const m = new Map<number, Stock>();
+  sec.stock_id.forEach((id, i) => m.set(id, { ticker: sec.ticker[i], name: sec.name[i] }));
+  return m;
+}
 
 /** Column-oriented block -> one object per row (all columns have the same length). */
 export function toRows<T>(cols: Record<string, unknown[]>): T[] {
