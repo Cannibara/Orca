@@ -14,6 +14,7 @@ import {
   returnPct,
   sinceSale,
   totalPnl,
+  tradeMove,
   tradeT,
   unrealised,
 } from "../src/lib/live";
@@ -131,6 +132,20 @@ test("tradeT is q/4 + 0.125 years after 2013-01-01", () => {
   expect(tradeT(0)).toBe(0.125);
   expect(tradeT(4)).toBe(1.125);
   expect(tradeT(53)).toBe(13.375);
+});
+
+test("tradeMove names a trade from its signed change and the shares left (New / Add / Trim / Exit)", () => {
+  expect(tradeMove(trade(4, 100, 10, 100))).toBe("New"); // shares after = the buy: nothing held before
+  expect(tradeMove(trade(5, 50, 10, 150))).toBe("Add");
+  expect(tradeMove(trade(6, -50, 10, 100))).toBe("Trim");
+  expect(tradeMove(trade(7, -100, 10, 0))).toBe("Exit");
+  expect(tradeMove(trade(8, 30, 10, 30))).toBe("New"); // bought again after a full exit
+});
+
+test("tradeMove tolerates float noise in the share counts", () => {
+  expect(tradeMove(trade(4, 1234567.1, 10, 1234567.1 + 1e-7))).toBe("New");
+  expect(tradeMove(trade(5, -1234567.1, 10, 1e-7))).toBe("Exit");
+  expect(tradeMove(trade(6, -10, 10, 1e-3))).toBe("Trim"); // a real remainder is not an exit
 });
 
 test("positionFlows: trade flow is -delta x px at tradeT(q), plus the holding at now (R10)", () => {

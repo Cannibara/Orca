@@ -85,6 +85,8 @@ main{padding-block:24px 64px}
 .fhead{display:flex;flex-direction:column;gap:10px}
 .meta{display:flex;gap:8px 18px;flex-wrap:wrap;color:var(--ink2);font-size:14px}
 .meta b{color:var(--ink);font-weight:600}
+.back{align-self:flex-start;text-decoration:none;padding-block:4px}
+.back:hover{text-decoration:underline}
 
 /* tables */
 .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}

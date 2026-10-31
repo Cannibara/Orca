@@ -1,6 +1,7 @@
 import { useRef, useState, type PointerEvent } from "react";
 import type { Trade } from "../data/types";
 import { px, qLabel, sgn } from "../lib/format";
+import { tradeMove } from "../lib/live";
 import { Legend } from "./Legend";
 import { compact, linePath, niceTicks } from "./scale";
 import { tipHandlers, useTooltip, type TipRow } from "./Tooltip";
@@ -30,13 +31,6 @@ const LEGEND = [
 // Quarter q covers calendar quarter q % 4 of year 2013 + floor(q / 4).
 const qStartMs = (q: number) => Date.UTC(2013 + Math.floor(q / 4), (q % 4) * 3, 1);
 const qMidMs = (q: number) => (qStartMs(q) + qStartMs(q + 1)) / 2;
-
-/** New / Add / Trim / Exit, from the signed change and the shares left afterwards. */
-function tradeKind(t: Trade): "New" | "Add" | "Trim" | "Exit" {
-  const eps = 1e-6 * Math.max(1, Math.abs(t.delta));
-  if (t.delta > 0) return Math.abs(t.sharesAfter - t.delta) <= eps ? "New" : "Add";
-  return Math.abs(t.sharesAfter) <= eps ? "Exit" : "Trim";
-}
 
 const dollars = (t: number) => "$" + +t.toFixed(2);
 
@@ -195,7 +189,7 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
           />
           {trades.map((t, k) => {
             const buy = t.delta > 0;
-            const kind = tradeKind(t);
+            const kind = tradeMove(t);
             const cx = X(weekOf(qMidMs(t.q)));
             const cy = Y(t.px);
             const color = buy ? "var(--s1)" : "var(--s2)";

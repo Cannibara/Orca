@@ -2,12 +2,9 @@ import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { TooltipProvider } from "./charts/Tooltip";
 import Fund from "./pages/Fund";
 import Home from "./pages/Home";
+import Method from "./pages/Method";
 import NotFound from "./pages/NotFound";
-
-// Placeholder page: later tasks replace each one with a real page from src/pages/.
-function Stub({ title }: { title: string }) {
-  return <h1>{title}</h1>;
-}
+import Position from "./pages/Position";
 
 export default function App() {
   return (
@@ -39,8 +36,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/fund/:id" element={<Fund />} />
-            <Route path="/fund/:id/stock/:stockId" element={<Stub title="Position" />} />
-            <Route path="/how-it-works" element={<Stub title="How it works" />} />
+            <Route path="/fund/:id/stock/:stockId" element={<Position />} />
+            <Route path="/how-it-works" element={<Method />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>

@@ -8,7 +8,8 @@ import { Section } from "../components/Section";
 import { Signed } from "../components/Signed";
 import { Tile, Tiles } from "../components/Tiles";
 import {
-  NotFoundError,
+  isFundFileMissing,
+  isListedFund,
   loadContrib,
   loadExits,
   loadLatestPrices,
@@ -23,6 +24,7 @@ import {
 import type { Contrib, ContribYear, Exits, PositionRow, Summary, YearsBlock } from "../data/types";
 import { DASH, MINUS, fmtDate, money, pct, pp, qLabel, ratio, signClass } from "../lib/format";
 import { liveValue, positionRows, profitablePct } from "../lib/live";
+import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
 import { FundTables } from "./FundTables";
 import NotFound from "./NotFound";
@@ -43,7 +45,9 @@ type FundData = {
   profitable: number | null;
 };
 
-async function loadFund(id: number): Promise<FundData> {
+/** null when funds.json does not list the fund (R29): nothing of an unknown fund is requested. */
+async function loadFund(id: number): Promise<FundData | null> {
+  if (!(await isListedFund(id))) return null;
   const [summary, positionsFile, contrib, exits, securities, latest] = await Promise.all([
     loadSummary(id),
     loadPositions(id),
@@ -65,16 +69,6 @@ async function loadFund(id: number): Promise<FundData> {
     profitable: profitablePct(positions, prices),
   };
 }
-
-/** The fund id in the URL: a whole number, or null for anything else ("abc", "12abc", "1.5", "-3"). */
-function parseFundId(param: string | undefined): number | null {
-  if (param === undefined || !/^\d+$/.test(param)) return null;
-  const id = Number(param);
-  return Number.isSafeInteger(id) ? id : null;
-}
-
-/** The 404 of one of this fund's own files means the fund does not exist; a missing shared file is a broken site. */
-const isUnknownFund = (err: unknown, id: number): boolean => err instanceof NotFoundError && err.url.includes(`/fund/${id}/`);
 
 // ---- small pieces -----------------------------------------------------------
 
@@ -437,7 +431,7 @@ function FundLoader({ id }: { id: number }) {
     );
   }
   if (state.status === "error") {
-    return isUnknownFund(state.error, id) ? (
+    return isFundFileMissing(state.error, id) ? (
       <NotFound />
     ) : (
       <p className="note" role="alert">
@@ -445,11 +439,11 @@ function FundLoader({ id }: { id: number }) {
       </p>
     );
   }
-  return <FundView data={state.data} />;
+  return state.data === null ? <NotFound /> : <FundView data={state.data} />;
 }
 
 export default function Fund() {
-  const id = parseFundId(useParams().id);
+  const id = parseId(useParams().id);
   // Keyed by id, so moving to another fund drops the year picked on this one.
   return id === null ? <NotFound /> : <FundLoader key={id} id={id} />;
 }

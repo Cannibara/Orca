@@ -9,6 +9,20 @@ type Flow = [t: number, amount: number];
 /** Trade time in years after 2013-01-01: the middle of quarter q (R10). */
 export const tradeT = (q: number): number => q / 4 + 0.125;
 
+/** What a trade did to the holding. */
+export type Move = "New" | "Add" | "Trim" | "Exit";
+
+/**
+ * Names a trade from its signed change and the shares left afterwards: a buy that leaves exactly what it
+ * bought is a New position (the first buy, or a buy after selling out), any other buy an Add; a sale that
+ * leaves nothing is an Exit, any other sale a Trim. The tolerance absorbs float noise in the share counts.
+ */
+export function tradeMove(t: Pick<Trade, "delta" | "sharesAfter">): Move {
+  const eps = 1e-6 * Math.max(1, Math.abs(t.delta));
+  if (t.delta > 0) return Math.abs(t.sharesAfter - t.delta) <= eps ? "New" : "Add";
+  return Math.abs(t.sharesAfter) <= eps ? "Exit" : "Trim";
+}
+
 /** Value of a set of dated flows at annual rate r. */
 function npv(flows: Flow[], r: number): number {
   let sum = 0;

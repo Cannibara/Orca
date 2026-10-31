@@ -1,5 +1,6 @@
 // Typed loaders for the published JSON (paths exactly as in pipeline/contract.md),
-// plus the small helpers every page shares: toRows, stockMap, priceMap, priceDates, yearsSince2013.
+// plus the small helpers every page shares: toRows, stockMap, priceMap, priceDates, yearsSince2013,
+// and the two checks that tell an unknown fund from a failed load.
 import type {
   Contrib,
   Exits,
@@ -67,6 +68,18 @@ export const loadContrib = (id: number) => getJson<Contrib>(`fund/${id}/contrib.
 export const loadExits = (id: number) => getJson<Exits>(`fund/${id}/exits.json`);
 export const loadWeekly = (stockId: number) => getJson<Weekly>(`stock/${stockId}/weekly.json`);
 export const loadHome = <N extends HomeName>(name: N) => getJson<HomeFiles[N]>(`home/${name}.json`);
+
+/**
+ * Whether funds.json lists the fund. The index, not a 404, says whether a fund exists (R29): a static
+ * host's single-page-app fallback can answer a missing JSON file with index.html and a 200.
+ */
+export async function isListedFund(id: number): Promise<boolean> {
+  return (await loadFunds()).id.includes(id);
+}
+
+/** The 404 of one of the fund's own files (a missing shared file is a broken site, not an unknown fund). */
+export const isFundFileMissing = (err: unknown, id: number): boolean =>
+  err instanceof NotFoundError && err.url.includes(`/fund/${id}/`);
 
 /** A stock as the pages name it. */
 export type Stock = { ticker: string; name: string };

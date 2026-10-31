@@ -1,6 +1,8 @@
 import {
   NotFoundError,
   clearDataCache,
+  isFundFileMissing,
+  isListedFund,
   loadContrib,
   loadExits,
   loadFunds,
@@ -142,6 +144,26 @@ const lp = (price: (number | null)[], date: (string | null)[]): LatestPrices => 
   stock_id: [1, 2, 3],
   price,
   date,
+});
+
+test("isListedFund is decided by funds.json, whatever the fund's own files answer (R29)", async () => {
+  mockFetch({ status: 200, body: { v: 1, id: [7, 9], name: ["A", "B"], book: [1, 2], n: [1, 1] } });
+  expect(await isListedFund(9)).toBe(true);
+  expect(await isListedFund(8)).toBe(false);
+  expect(await isListedFund(10)).toBe(false);
+});
+
+test("isListedFund rejects when funds.json cannot be read, so a broken index is not 'unknown fund'", async () => {
+  mockFetch({ status: 404 });
+  await expect(isListedFund(7)).rejects.toBeInstanceOf(NotFoundError);
+});
+
+test("isFundFileMissing: only the 404 of one of this fund's own files", () => {
+  expect(isFundFileMissing(new NotFoundError("/demo-data/fund/7/summary.json"), 7)).toBe(true);
+  expect(isFundFileMissing(new NotFoundError("/demo-data/fund/7/positions.json"), 7)).toBe(true);
+  expect(isFundFileMissing(new NotFoundError("/demo-data/fund/70/summary.json"), 7)).toBe(false); // another fund
+  expect(isFundFileMissing(new NotFoundError("/demo-data/securities.json"), 7)).toBe(false); // a shared file
+  expect(isFundFileMissing(new Error("HTTP 500 for /demo-data/fund/7/summary.json"), 7)).toBe(false);
 });
 
 test("priceMap holds every non-null price, stale ones included, and skips null (R5)", () => {
