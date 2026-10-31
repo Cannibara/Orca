@@ -13,12 +13,21 @@ export function sgn(x: number): "+" | "−" | "" {
 export function money(usd: number | null, signed = false): string {
   if (missing(usd)) return DASH;
   const a = Math.abs(usd);
+  // Round to each tier's precision first and take the first tier whose rounded
+  // value is still below its ceiling, so a value that rounds up to the next
+  // unit moves up with it ("$1.0M", never "$1000K"; "$10M", never "$10.0M").
+  const dollars = Math.round(a);
+  const k = Math.round(a / 1e3);
+  const m1 = Math.round(a / 1e5) / 10;
+  const m = Math.round(a / 1e6);
+  const b2 = Math.round(a / 1e7) / 100;
   let s: string;
-  if (a >= 1e9) s = "$" + (a / 1e9).toFixed(a >= 1e10 ? 1 : 2) + "B";
-  else if (a >= 1e7) s = "$" + Math.round(a / 1e6) + "M";
-  else if (a >= 1e6) s = "$" + (a / 1e6).toFixed(1) + "M";
-  else if (a >= 1e4) s = "$" + Math.round(a / 1e3) + "K";
-  else s = "$" + Math.round(a).toLocaleString("en-US");
+  if (dollars < 1e4) s = "$" + dollars.toLocaleString("en-US");
+  else if (k < 1e3) s = "$" + k + "K";
+  else if (m1 < 10) s = "$" + m1.toFixed(1) + "M";
+  else if (m < 1e3) s = "$" + m + "M";
+  else if (b2 < 10) s = "$" + b2.toFixed(2) + "B";
+  else s = "$" + (a / 1e9).toFixed(1) + "B";
   return (signed ? sgn(usd) : usd < 0 ? MINUS : "") + s;
 }
 

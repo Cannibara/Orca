@@ -28,6 +28,55 @@ test("money thresholds", () => {
   expect(money(4_500_000, true)).toBe("+$4.5M");
 });
 
+test("money rounds first, then moves up a unit at each boundary", () => {
+  // $K -> $M
+  expect(money(999_499)).toBe("$999K");
+  expect(money(999_500)).toBe("$1.0M");
+  expect(money(999_999)).toBe("$1.0M");
+  // 1 dp $M -> whole $M
+  expect(money(9_949_999)).toBe("$9.9M");
+  expect(money(9_950_000)).toBe("$10M");
+  expect(money(9_999_999)).toBe("$10M");
+  // $M -> $B
+  expect(money(999_499_999)).toBe("$999M");
+  expect(money(999_500_000)).toBe("$1.00B");
+  expect(money(999_999_999)).toBe("$1.00B");
+  // 2 dp $B -> 1 dp $B
+  expect(money(9_994_999_999)).toBe("$9.99B");
+  expect(money(9_995_000_000)).toBe("$10.0B");
+  expect(money(9_999_999_999)).toBe("$10.0B");
+  // dollars -> $K
+  expect(money(9_999.4)).toBe("$9,999");
+  expect(money(9_999.6)).toBe("$10K");
+  // sign is unaffected by the move up
+  expect(money(-999_999)).toBe("−$1.0M");
+  expect(money(-9_999_999, true)).toBe("−$10M");
+  expect(money(999_999_999, true)).toBe("+$1.00B");
+});
+
+test("money never prints a figure outside its unit's format", () => {
+  const forms = [
+    /^\$(0|[1-9]\d{0,2}|[1-9],\d{3})$/, // $0 .. $9,999
+    /^\$[1-9]\d{1,2}K$/, // $10K .. $999K
+    /^\$[1-9]\.\dM$/, // $1.0M .. $9.9M
+    /^\$[1-9]\d{1,2}M$/, // $10M .. $999M
+    /^\$[1-9]\.\d\dB$/, // $1.00B .. $9.99B
+    /^\$[1-9]\d+\.\dB$/, // $10.0B and up
+  ];
+  const bad: string[] = [];
+  for (let v = 0.5; v < 5e12; v *= 1.0001) {
+    const s = money(v);
+    if (!forms.some((f) => f.test(s))) bad.push(`${v} -> ${s}`);
+  }
+  for (const edge of [9_999.5, 999_500, 9_950_000, 999_500_000, 9_995_000_000]) {
+    for (const d of [-1, -0.5, -0.01, 0, 0.01, 1]) {
+      const s = money(edge + d);
+      if (!forms.some((f) => f.test(s))) bad.push(`${edge + d} -> ${s}`);
+    }
+  }
+  expect(bad.slice(0, 5)).toEqual([]);
+});
+
 test("pct and pp", () => {
   expect(pct(0.1234)).toBe("+12.3%");
   expect(pct(-0.05, 0)).toBe("−5%");
