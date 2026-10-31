@@ -604,7 +604,9 @@ def test_one_failed_ticker_does_not_lose_the_others(tmp_path, caplog):
 
     assert changed == [1, 3]
     assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 3]
-    assert stats == {"failed": [(2, "BBB", 500)], "empty": 0, "fetched": 2, "stopped": None}
+    assert stats == {
+        "failed": [(2, "BBB", 500)], "empty": 0, "fetched": 2, "answered": [1, 3], "stopped": None
+    }  # fmt: skip
     assert any("BBB" in r.getMessage() for r in caplog.records)
 
 
@@ -615,18 +617,20 @@ def test_stats_count_tickers_that_come_back_empty_and_network_failures(tmp_path)
 
     update_prices(lake, source, {1: "AAA", 2: "GONE", 3: "NET"}, today=D(2024, 5, 10), stats=stats)
 
-    assert stats == {"failed": [(3, "NET", None)], "empty": 1, "fetched": 1, "stopped": None}
+    assert stats == {
+        "failed": [(3, "NET", None)], "empty": 1, "fetched": 1, "answered": [1, 2], "stopped": None
+    }  # fmt: skip
 
 
 def test_stats_are_optional_and_restarted_on_each_call(tmp_path):
     lake = Lake(tmp_path)
     source = FixtureSource({"AAA": daily(*WEEK1)})
     assert update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10)) == [1]
-    stats = {"failed": [(9, "OLD", 500)], "empty": 7, "fetched": 7, "stopped": "old"}
+    stats = {"failed": [(9, "OLD", 500)], "empty": 7, "fetched": 7, "answered": [9], "stopped": "old"}
 
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), stats=stats)
 
-    assert stats == {"failed": [], "empty": 0, "fetched": 1, "stopped": None}
+    assert stats == {"failed": [], "empty": 0, "fetched": 1, "answered": [1], "stopped": None}
 
 
 def test_a_failed_ticker_keeps_its_last_good_data_and_is_retried_from_the_same_day(tmp_path):

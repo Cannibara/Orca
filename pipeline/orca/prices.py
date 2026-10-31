@@ -230,12 +230,14 @@ def update_prices(
     lost: the next run finds them unchanged).
 
     `stats`, if given, is reset and filled: "fetched" (tickers that returned rows), "empty"
-    (tickers that returned none), "failed" (a (stock_id, ticker, HTTP status or None) per failed
-    ticker) and "stopped" (why the run stopped early, else None).
+    (tickers that returned none), "answered" (the stock_ids of both, in order), "failed" (a
+    (stock_id, ticker, HTTP status or None) per failed ticker) and "stopped" (why the run stopped
+    early, else None).
     """
     stats = {} if stats is None else stats
     failed: list[tuple[int, str, int | None]] = []
-    stats.update(fetched=0, empty=0, failed=failed, stopped=None)
+    answered: list[int] = []
+    stats.update(fetched=0, empty=0, answered=answered, failed=failed, stopped=None)
     last_by_id, recent = _stored_tail(lake)
     refetch = set(refetch)
     run_id = run_id or today.strftime("%Y%m%d")
@@ -281,6 +283,7 @@ def update_prices(
             in_a_row = 0
             fetched = _as_stored(bars, stock_id)
             stats["empty" if fetched.is_empty() else "fetched"] += 1
+            answered.append(stock_id)
             rows, history_changed = _new_rows(
                 fetched, last_date, recent.get((stock_id,)), history_until
             )
