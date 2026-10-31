@@ -10,7 +10,8 @@ import polars as pl
 
 
 class Lake:
-    """Tables stored as zstd Parquet: root/table.parquet, or root/table/<part>.parquet."""
+    """Tables stored as zstd Parquet: root/table.parquet, or root/table/<part>.parquet. Every write
+    is atomic: a file appears whole or not at all."""
 
     def __init__(self, root: Path):
         self.root = Path(root)
@@ -21,7 +22,17 @@ class Lake:
         else:
             path = self.root / table / f"{part}.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(path, compression="zstd")
+        # Write a temporary file next to the target, then rename it over the target: a part that
+        # is rewritten in place (a price run's part is extended every flush) is never left half
+        # written by a crash.
+        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
+        os.close(fd)
+        try:
+            df.write_parquet(tmp, compression="zstd")
+            os.replace(tmp, path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
         return path
 
     def read(self, table: str, part: str | None = None) -> pl.DataFrame:

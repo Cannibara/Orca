@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import polars as pl
+import pytest
 
 from orca.storage import Lake, Manifest, sha256_file
 
@@ -77,3 +80,25 @@ def test_sha256_file(tmp_path):
     f.write_bytes(b"abc")
 
     assert sha256_file(f) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+
+def test_write_is_atomic_and_leaves_no_temp_files(tmp_path, monkeypatch):
+    lake = Lake(tmp_path)
+    lake.write("prices", pl.DataFrame({"px": [1.0]}), part="z20261030")
+
+    def crash(self, path, *args, **kwargs):
+        Path(path).write_bytes(b"half a parquet file")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", crash)
+    with pytest.raises(OSError, match="disk full"):
+        lake.write("prices", pl.DataFrame({"px": [2.0, 3.0]}), part="z20261030")
+    monkeypatch.undo()
+
+    # The old part is intact and no temporary file is left behind.
+    assert lake.read("prices", part="z20261030")["px"].to_list() == [1.0]
+    assert [p.name for p in (tmp_path / "prices").iterdir()] == ["z20261030.parquet"]
+
+    lake.write("prices", pl.DataFrame({"px": [2.0, 3.0]}), part="z20261030")
+    assert lake.read("prices", part="z20261030")["px"].to_list() == [2.0, 3.0]
+    assert [p.name for p in (tmp_path / "prices").iterdir()] == ["z20261030.parquet"]
