@@ -34,6 +34,9 @@ from orca.run import (
     InvariantError,
     _decode,
     _encode,
+    _is_cusip,
+    _State,
+    _update_rf,
     affected_funds,
     copy_published,
     cusip_check_digit,
@@ -688,3 +691,56 @@ def test_unreadable_zip_is_flagged_by_its_name(tmp_path):
     assert flag["url"] == SMALL_ZIP
     assert flag["detail"].startswith("2024q3_form13f.zip: SUBMISSION.tsv has no column(s)")
     assert str(tmp_path) not in flag["detail"] and "/tmp" not in flag["detail"]
+
+
+def test_rf_stays_stale_until_the_table_is_written(tmp_path, monkeypatch):
+    lake = Lake(tmp_path / "lake")
+    sources = replace(fixture_sources(small_fixtures({})), tbill=lambda: {2024: 0.05})
+    state = _State(rf_stale=True)  # an earlier fetch failed
+
+    def disk_full(table, df, part=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(lake, "write", disk_full)
+    with pytest.raises(OSError, match="disk full"):
+        _update_rf(lake, sources, state, Q2_24, False, [])
+
+    # The new rates are not stored, so the next run must fetch them again.
+    saved = _State.load(lake)
+    assert saved.rf_stale and saved.pending_all
+    monkeypatch.undo()
+
+    _update_rf(lake, sources, state, Q2_24, False, [])
+
+    assert not state.rf_stale
+    assert dict(lake.read("rf").iter_rows()) == {2024: 0.05}
+
+
+def test_stale_flag_clears_when_the_fetched_rates_are_the_stored_ones(tmp_path):
+    lake = Lake(tmp_path / "lake")
+    sources = replace(fixture_sources(small_fixtures({})), tbill=lambda: {2024: 0.05})
+    _update_rf(lake, sources, _State(), Q2_24, False, [])
+    state = _State(last_q=Q2_24, rf_stale=True)
+
+    _update_rf(lake, sources, state, Q2_24, False, [])
+
+    assert not state.rf_stale
+    assert not state.pending_all
+
+
+@pytest.mark.parametrize("lead", ["É", "²", "٣", "Ａ"])  # non-ASCII letter, digits, full-width
+def test_non_ascii_text_is_never_a_cusip(lead):
+    text = lead + "2345678"
+    assert len(text) == 8
+    assert not _is_cusip(text + cusip_check_digit("A2345678"))  # a check digit that fits "A..."
+    assert not _is_cusip(text + cusip_check_digit("32345678"))  # ... or "3..."
+
+
+def test_non_ascii_cusip_does_not_crash_the_leak_scan(tmp_path):
+    odd = "ÉBCDEFGH5"
+    rows = [Holding("WIDGET CORP", WIDGET, 400.0, 10), Holding("ODD", odd, 400.0, 10)]
+    small = small_fixtures({Q1_24: rows, Q2_24: rows})
+
+    run(tmp_path, fixture_sources(small), SMALL_TODAY)
+
+    assert odd in Lake(tmp_path / "lake").read("cusip_map")["cusip"].to_list()

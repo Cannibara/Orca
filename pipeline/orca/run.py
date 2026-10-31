@@ -882,14 +882,15 @@ def _update_rf(
         flags.append({"type": "tbill_failed", "url": strip_query(err.url), "status": err.status})
         state.rf_stale = True
         return
-    state.rf_stale = False
     fetched = {int(y): float(r) for y, r in fetched.items()}
     if fetched == stored:
+        state.rf_stale = False
         return
     state.pending_all = True
-    state.save(lake)
+    state.save(lake)  # rf_stale stays set: a crash before the write must fetch the rates again
     years = sorted(fetched)
     lake.write("rf", pl.DataFrame({"year": years, "rate": [fetched[y] for y in years]}, RF_SCHEMA))
+    state.rf_stale = False
 
 
 def _rf(lake: Lake) -> dict[int, float]:
@@ -1280,7 +1281,9 @@ def cusip_check_digit(base: str) -> str:
 
 def _is_cusip(text: str) -> bool:
     """Whether `text` is a well-formed CUSIP: nine characters ending in their check digit."""
-    if len(text) != 9 or not all(c.isalnum() or c in _CUSIP_SPECIALS for c in text[:8]):
+    if len(text) != 9 or not text.isascii():
+        return False
+    if not all(c.isalnum() or c in _CUSIP_SPECIALS for c in text[:8]):
         return False
     return cusip_check_digit(text[:8]) == text[8]
 
