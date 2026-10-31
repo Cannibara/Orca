@@ -70,11 +70,17 @@ def ids(rows) -> list[int]:
 # --- exclusion ---------------------------------------------------------------------------
 
 
-def test_is_excluded_name_is_case_insensitive_substring():
+def test_is_excluded_name_is_case_insensitive_from_the_start_of_a_word():
     assert is_excluded_name("First Bank of Ohio")
     assert is_excluded_name("STATE RETIREMENT SYSTEM")
     assert is_excluded_name("Acme Securities LLC")
+    assert is_excluded_name("First Bankshares Inc")  # the word starts as listed
+    assert is_excluded_name("ZIONS BANCORPORATION")
+    assert is_excluded_name("Bessemer Trust Company")
+    assert is_excluded_name("bank-of-ohio")
     assert not is_excluded_name("Alpha Capital")
+    assert not is_excluded_name("DRIFTBANK PARTNERS")  # not a bank: BANK inside a word
+    assert not is_excluded_name("CITRUST COMPANY LLC")
 
 
 # --- top funds ---------------------------------------------------------------------------
@@ -575,3 +581,23 @@ def test_just_filed_order_exclusions_and_limit():
     small = snap(7, "SMALL FUND", book=1e6, filed=date(2026, 8, 1))  # small funds still list
     assert ids(just_filed([a, b, c, d, bank, flagged, small])) == [3, 2, 1, 7, 4]
     assert ids(just_filed([a, b, c, d, bank, flagged, small], n=2)) == [3, 2]
+
+
+def test_calls_keep_the_50_best_and_the_50_worst():
+    buys = [(sid, LATEST_Q, 10.0, 0.02, FILED) for sid in range(1, 121)]
+    latest_px = {sid: 1.0 + sid / 10 for sid in range(1, 121)}  # stock 120 moved most
+    mcap = dict.fromkeys(range(1, 121), 1e9)
+
+    rows = calls([snap(1, buys_recent=buys)], mcap, latest_px, filed_price, "q")
+
+    assert [r["stock_id"] for r in rows] == [*range(120, 70, -1), *range(50, 0, -1)]
+
+
+def test_calls_keep_every_row_up_to_100():
+    buys = [(sid, LATEST_Q, 10.0, 0.02, FILED) for sid in range(1, 101)]
+    latest_px = {sid: 1.0 + sid / 10 for sid in range(1, 101)}
+    mcap = dict.fromkeys(range(1, 101), 1e9)
+
+    rows = calls([snap(1, buys_recent=buys)], mcap, latest_px, filed_price, "q")
+
+    assert len(rows) == 100

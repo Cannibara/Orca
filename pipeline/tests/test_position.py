@@ -258,3 +258,18 @@ def test_exit_leaves_exactly_zero_cost_despite_rounding():
     r = compute_position(1, shares, px, segment_start_q=9, last_q=12, implied_px={})
     assert [t.type for t in r.trades] == ["new", "trim", "exit"]
     assert r.cost_now == 0 and r.quarters[-1].cost == 0
+
+
+def test_entry_marks_a_first_report_and_a_holding_priced_for_the_first_time():
+    # Held from the segment's first quarter: the first report is an entry; a later add is not.
+    r = compute_position(1, {10: 100, 11: 150}, PX, segment_start_q=10, last_q=11, implied_px={})
+    assert [(t.type, t.entry) for t in r.trades] == [("new", True), ("add", False)]
+
+    # Bought after the segment started: a real new position.
+    r = compute_position(1, {11: 100}, PX, segment_start_q=10, last_q=11, implied_px={})
+    assert [(t.type, t.entry) for t in r.trades] == [("new", False)]
+
+    # Held while unpriced (q10, q11), valued from q12: it enters the book as at a first report.
+    px = {12: qpx(vwap=16, close=13), 13: qpx(vwap=20, close=21)}
+    r = compute_position(1, {11: 100, 12: 100, 13: 50}, px, 10, 13, implied_px={})
+    assert [(t.q, t.type, t.entry) for t in r.trades] == [(12, "new", True), (13, "trim", False)]

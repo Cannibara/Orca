@@ -1,6 +1,8 @@
 import gc
 import io
 import json
+import logging
+import re
 import shutil
 import zipfile
 from dataclasses import asdict, fields, replace
@@ -677,6 +679,10 @@ def test_stored_fund_state_round_trips_every_field():
 
     assert decode(json.loads(json.dumps(encode(snap)))) == snap
     assert decode(json.loads(json.dumps(encode(meta)))) == meta
+    # A trade stored before `entry` existed reads back as no entry.
+    old = encode(trade)
+    del old["entry"]
+    assert decode(old) == trade
 
 
 def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path):
@@ -1261,3 +1267,80 @@ def test_weekly_refresh_covers_the_latest_quarter_and_exits_of_the_last_8_quarte
     dates = {ticker[sid]: day for sid, day in zip(latest["stock_id"], latest["date"])}
     assert dates == {"WIDG": "2026-10-23", "RCNT": "2026-10-23", "OLDX": "2026-10-16"}
     assert latest["asof"] == "2026-10-23"
+
+
+# --- first reports are not moves -----------------------------------------------------------
+
+
+def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_call(tmp_path):
+    # Three concentrated funds file for the first time in the deadline quarter: their first
+    # report "buys" everything at the quarter's close, which is no decision of that quarter. A
+    # fund already tracked that buys a fifth stock is a real move.
+    tickers = ["AAAA", "BBBB", "CCCC", "DDDD", "EEEE"]
+    cusips = {t: f"00000{i}AA" + cusip_check_digit(f"00000{i}AA") for i, t in enumerate(tickers)}
+    stake = {t: Holding(f"{t} INC", cusips[t], 250e6, 5e6) for t in tickers}  # $50 a share
+    book = [stake[t] for t in tickers[:4]]
+    filings = [
+        Filing(f"000000{cik}-24-000002", cik, f"New Fund {cik}", Q2_24, date(2024, 8, 9), book)
+        for cik in (2001, 2002, 2003)
+    ]
+    filings += [
+        Filing("0000002004-24-000001", 2004, "Old Fund", Q1_24, date(2024, 5, 10), book),
+        Filing(
+            "0000002004-24-000002",
+            2004,
+            "Old Fund",
+            Q2_24,
+            date(2024, 8, 9),
+            [*book, stake["EEEE"]],
+        ),
+    ]
+    live_f, live_h = live_frames([])
+    fx = Fixtures(
+        zips={SMALL_ZIP: bulk_zip(filings)},
+        live_filings=live_f,
+        live_holdings=live_h,
+        figi={cusips[t]: listing(f"BBG0FIRST00{i}", t, f"{t} INC") for i, t in enumerate(tickers)},
+        sec_tickers=pl.DataFrame(
+            [(t, 6000 + i, f"{t} INC") for i, t in enumerate(tickers)],
+            schema={"ticker": pl.String, "cik": pl.Int64, "title": pl.String},
+            orient="row",
+        ),
+        sic={6000 + i: 3571 for i in range(5)},
+        shares_out={6000 + i: 1e9 for i in range(5)},
+        prices={t: flat_prices(50.0) for t in tickers},
+        tbill={2024: 0.05},
+    )
+
+    run(tmp_path, fixture_sources(fx), SMALL_TODAY)
+
+    def home(name):
+        return read_json(tmp_path / "bucket" / "home" / f"{name}.json")["rows"]
+
+    stock = {t: i + 1 for i, t in enumerate(tickers)}  # ids in first-seen order
+    assert [(r["fund_id"], r["stock_id"], r["move"]) for r in home("conviction")] == [
+        (2004, stock["EEEE"], "new")
+    ]
+    assert home("crowded") == []
+    assert [(r["fund_id"], r["stock_id"]) for r in home("calls_q")] == [(2004, stock["EEEE"])]
+    assert [(r["fund_id"], r["stock_id"]) for r in home("calls_y")] == [(2004, stock["EEEE"])]
+    # The first filers' trades are still in their own files.
+    positions = read_json(tmp_path / "bucket" / "fund/2001/positions.json")
+    assert positions["last_type"] == ["new"] * 4
+
+
+# --- logs -----------------------------------------------------------------------------------
+
+
+def test_each_stage_logs_its_time_and_counts_and_no_url_query(fixtures, tmp_path, caplog):
+    with caplog.at_level(logging.INFO, logger="orca"):
+        run(tmp_path, fixture_sources(fixtures), WEEK1)
+
+    lines = {r.getMessage().split(":")[0]: r.getMessage() for r in caplog.records}
+    for stage in ("bulk", "live", "securities", "prices", "rf", "compute", "publish"):
+        assert stage in lines, stage
+        assert re.search(r"\d+\.\d s", lines[stage]), lines[stage]
+    assert "zips=49" in lines["bulk"]
+    assert "funds=12" in lines["compute"]
+    assert "fetched=25" in lines["prices"]
+    assert not [r for r in caplog.records if "?" in r.getMessage() and "://" in r.getMessage()]

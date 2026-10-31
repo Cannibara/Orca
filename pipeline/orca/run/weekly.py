@@ -122,16 +122,22 @@ def _recompute_set(lake: Lake, ctx: Context, state: State, last_q: int) -> set[i
     )
 
 
-def _stage(name: str, budget: Budget, work: Callable[[], object]) -> None:
+def _stage(name: str, budget: Budget, work: Callable[[], dict | None]) -> None:
     """Run one stage of the run, unless the time budget is already spent (then it is recorded as
-    cut and skipped: what it would have done stays owed in the state)."""
+    cut and skipped: what it would have done stays owed in the state), and log its time and the
+    counts it returns."""
     if budget.spent():
         budget.cut(name)
         log.warning("%s: skipped, the time budget is spent", name)
         return
     started = time.monotonic()
-    work()
-    log.info("%s: done in %.1f s", name, time.monotonic() - started)
+    _log_stage(name, started, work())
+
+
+def _log_stage(name: str, started: float, counts: dict | None) -> None:
+    """One INFO line per stage: its time and counts (numbers, never a URL)."""
+    shown = "".join(f" {key}={value}" for key, value in (counts or {}).items())
+    log.info("%s: %.1f s%s", name, time.monotonic() - started, shown)
 
 
 @dataclass
@@ -239,10 +245,12 @@ def run_weekly(
         state.pending_all = True
         state.save(lake)
 
-    def securities() -> None:
-        map_new_cusips(lake, sources, state, today, flags, budget)
-        retry_lookups(lake, sources, state, flags, budget)
-        remap_held_cusips(lake, sources, state, today, last_q, flags, budget)
+    def securities() -> dict:
+        return {
+            **(map_new_cusips(lake, sources, state, today, flags, budget) or {}),
+            **(retry_lookups(lake, sources, state, flags, budget) or {}),
+            **(remap_held_cusips(lake, sources, state, today, last_q, flags, budget) or {}),
+        }
 
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))
     _stage("live", budget, lambda: ingest_live(lake, sources, state, today, flags, counts))
@@ -265,6 +273,7 @@ def run_weekly(
         )
         return RunStats(run_id, None, last_q, {}, [], counts.filings_parsed, 0, flags)
 
+    started = time.monotonic()
     ctx = Context.build(lake, last_q)
     recompute = _recompute_set(lake, ctx, state, last_q)
     staging = new_version(out_root, run_id)
@@ -272,6 +281,8 @@ def run_weekly(
     flags += funds.flags
     files, computed = funds.files, set(funds.metas)
     remaining = recompute - funds.attempted
+    _log_stage("compute", started, {"funds": len(computed), "owed": len(remaining)})
+    started = time.monotonic()
     rebuild = full and not remaining  # a whole rebuild replaces what was published before
     if budget.flag():
         flags.append(budget.flag())
@@ -326,6 +337,7 @@ def run_weekly(
     if leaks:
         raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
 
+    _log_stage("publish", started, {"files": len(files), "changed": len(changed)})
     dropped = funds.attempted - computed
     merged = dict(files) if rebuild else {**previous, **files}
     merged = {path: sha for path, sha in merged.items() if not is_fund_path(path, dropped)}

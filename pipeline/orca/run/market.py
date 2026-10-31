@@ -64,12 +64,13 @@ def stock_of(cusip_map: pl.DataFrame) -> dict[str, int]:
 
 def map_new_cusips(
     lake: Lake, sources: Sources, state: State, today: date, flags: list, budget: Budget
-) -> None:
+) -> dict | None:
     """Map the share CUSIPs not yet in cusip_map (and the benchmark's), oldest first, and the
     unmapped ones last asked about UNMAPPED_RETRY_DAYS ago or more; give new securities ids,
     sectors and shares outstanding, and mark every fund holding a newly mapped CUSIP for
     recompute. A failed mapping leaves the CUSIPs for the next run, and so does an OpenFIGI job
-    answered with an error: such a CUSIP is not recorded (or its old row is kept)."""
+    answered with an error: such a CUSIP is not recorded (or its old row is kept). Returns the
+    counts to log."""
     cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
     known = set(cusip_map["cusip"].to_list())
     firsts = scan_parts(
@@ -135,6 +136,7 @@ def map_new_cusips(
     lake.write("securities", securities.sort("stock_id"))
     kept = cusip_map.filter(~pl.col("cusip").is_in(new_map["cusip"].to_list()))
     lake.write("cusip_map", pl.concat([kept, new_map]).sort("cusip"))
+    return {"cusips_asked": len(new), "cusips_mapped": len(newly), "securities_added": added.height}
 
 
 def issuer_names(lake: Lake, cusips: list[str]) -> dict[str, str]:
@@ -201,7 +203,9 @@ def enrich(
     return pl.DataFrame(rows, schema=SECURITIES_TABLE_SCHEMA)
 
 
-def retry_lookups(lake: Lake, sources: Sources, state: State, flags: list, budget: Budget) -> None:
+def retry_lookups(
+    lake: Lake, sources: Sources, state: State, flags: list, budget: Budget
+) -> dict | None:
     """Fetch what earlier runs did not get for the securities of `state.lookup_retry`: the SIC
     code (and so the sector) of a stock without one, and the shares outstanding. A security
     leaves the list once its lookups answer; a failed one is flagged and stays."""
@@ -253,6 +257,7 @@ def retry_lookups(lake: Lake, sources: Sources, state: State, flags: list, budge
     lake.write("securities", securities.cast(SECURITIES_TABLE_SCHEMA).sort("stock_id"))
     state.lookup_retry -= set(found)  # only once the answers are stored
     state.save(lake)
+    return {"lookups_retried": len(found)}
 
 
 def remap_held_cusips(
@@ -263,7 +268,7 @@ def remap_held_cusips(
     last_q: int,
     flags: list,
     budget: Budget,
-) -> None:
+) -> dict | None:
     """Ask OpenFIGI again about the CUSIPs held in the latest quarter that it mapped REMAP_DAYS
     ago or more, the longest unasked first, at most REMAP_PER_RUN. A security whose FIGI has a
     new ticker now takes it (stock id and FIGI unchanged) and its whole price history is fetched
@@ -349,6 +354,7 @@ def remap_held_cusips(
         tried=pl.when(pl.col("cusip").is_in(asked)).then(pl.lit(today)).otherwise(pl.col("tried"))
     )
     lake.write("cusip_map", cusip_map.sort("cusip"))
+    return {"cusips_remapped": len(asked), "tickers_changed": len(new_tickers)}
 
 
 def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame, tried: date) -> pl.DataFrame:
@@ -401,7 +407,7 @@ def refresh_prices(
     where it stopped), then the latest quarter's and the benchmark, then the recent exits, so a
     short budget drops those first. Older exits keep their last close. Record the stocks whose
     history changed (and those with new rows, for their weekly file) in the state before anything
-    is recomputed from them. Returns the changed ids.
+    is recomputed from them. Returns the counts to log.
 
     A price run writes its parts as it goes but reports the changed stocks only at the end, so
     the run is marked in flight while it works. If it dies, the next run takes every stock of its
@@ -468,7 +474,13 @@ def refresh_prices(
         )
     if changed:
         refresh_shares_outstanding(lake, sources, securities, changed, state, flags, budget)
-    return changed
+    return {
+        "tickers": len(tickers),
+        "fetched": stats["fetched"],
+        "empty": stats["empty"],
+        "failed": len(failed),
+        "changed": len(changed),
+    }
 
 
 def recover_prices_in_flight(lake: Lake, state: State) -> None:

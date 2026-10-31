@@ -2,6 +2,7 @@
 calls. Every list is a plain function of the per-fund snapshots and returns JSON-ready rows
 (dicts of int, float, str and None; dates as ISO strings), identified by stock_id and fund_id."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -29,6 +30,10 @@ from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 
 _BUYS = ("new", "add")
+CALLS_EACH_END = 50  # the calls lists keep this many best and this many worst rows
+# A listed word must start a word of the name: "FIRST BANK" and "BANKSHARES" are banks, while
+# "DRIFTBANK" is not.
+_EXCLUDED = re.compile(r"(?<![A-Z0-9])(?:" + "|".join(map(re.escape, EXCLUDE_NAME_WORDS)) + ")")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +42,7 @@ class FundSnapshot:
     keyed by stock_id (`weights_prev` is the quarter before `weights_now`). `trades_latest` pairs
     each stock_id with its trade in the latest quarter; `pnl_latest` is the latest quarter's P&L
     per stock; `buys_recent` holds (stock_id, q, est. price, weight after, filed) for recent new
-    and add trades. `perf` is keyed by period ("1y", "3y", "5y", "max"), None when too short."""
+    and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf` is keyed by period ("1y", "3y", "5y", "max"), None when too short."""
 
     fund_id: int
     name: str
@@ -57,9 +62,9 @@ class FundSnapshot:
 
 
 def is_excluded_name(name: str) -> bool:
-    """Whether a fund name marks a bank, insurer, pension or broker (case-insensitive)."""
-    upper = name.upper()
-    return any(word in upper for word in EXCLUDE_NAME_WORDS)
+    """Whether a fund name marks a bank, insurer, pension or broker: one of EXCLUDE_NAME_WORDS
+    at the start of a word (case-insensitive)."""
+    return _EXCLUDED.search(name.upper()) is not None
 
 
 def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
@@ -236,6 +241,7 @@ def calls(
     CALLS_MIN_MCAP or more and a known latest price of CALLS_MIN_PRICE or more. Window "q" keeps
     buys of the latest quarter, "y" those of the latest four (never a later quarter, such as an
     early filer's). A buy without a positive est. price has no move to rank and is left out.
+    Only the CALLS_EACH_END best and CALLS_EACH_END worst rows are kept.
 
     `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
     snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale."""
@@ -266,6 +272,8 @@ def calls(
             }
             ranked.append((price / est_price - 1, row))
     ranked.sort(key=lambda pr: (-pr[0], pr[1]["fund_id"], pr[1]["stock_id"], pr[1]["q"]))
+    if len(ranked) > 2 * CALLS_EACH_END:
+        ranked = ranked[:CALLS_EACH_END] + ranked[-CALLS_EACH_END:]
     return [row for _, row in ranked]
 
 

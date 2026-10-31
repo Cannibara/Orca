@@ -443,6 +443,8 @@ def _snapshot(
     filed_at = (
         dict(rows.group_by("q").agg(pl.col("filed").max()).iter_rows()) if rows.height else {}
     )
+    # Entry trades (a first report, a holding priced for the first time) are no move of the
+    # quarter: the lists of moves, crowded buys and calls leave them out.
     buys_recent = [
         (
             p.stock_id,
@@ -453,7 +455,7 @@ def _snapshot(
         )
         for p in positions
         for t in p.trades
-        if t.type in _BUYS and last_q - 3 <= t.q <= last_q
+        if t.type in _BUYS and last_q - 3 <= t.q <= last_q and not t.entry
     ]
     until_last = [(q, r) for q, r in rets if q <= last_q]
     perf: dict[str, Performance | None] = {}
@@ -470,7 +472,9 @@ def _snapshot(
         excluded=meta.inactive,
         weights_now=weights(end_q),
         weights_prev=weights(end_q - 1),
-        trades_latest=[(p.stock_id, t) for p in positions for t in p.trades if t.q == last_q],
+        trades_latest=[
+            (p.stock_id, t) for p in positions for t in p.trades if t.q == last_q and not t.entry
+        ],
         pnl_latest={
             p.stock_id: pq.market_move + pq.trade_gain + pq.dividends
             for p in positions

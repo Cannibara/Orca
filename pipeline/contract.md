@@ -138,8 +138,12 @@ fund's name.
 - `crowded.json`: `{"latest_q", "rows": [...]}`. Row: `{"stock_id", "funds_buying", "total_bought",
   "avg_weight_after"}`.
 - `calls_q.json` (last quarter), `calls_y.json` (last four quarters): `{"latest_q", "rows": [...]}`, ordered by
-  the stock's move since the estimated buy, best first. Row: `{"stock_id", "fund_id", "name", "q", "est_price",
+  the stock's move since the estimated buy, best first, and cut to the 50 best followed by the 50 worst when there
+  are more than 100 (the middle is left out). Row: `{"stock_id", "fund_id", "name", "q", "est_price",
   "price_on_filed", "filed"}`.
+- The moves in `conviction.json`, `crowded.json` and the calls lists leave out a fund's first report (the first
+  quarter of its tracking) and a holding valued for the first time: those are positions entering the book, not
+  buys of that quarter.
 
 ### `manifest.json` and `health.json`
 

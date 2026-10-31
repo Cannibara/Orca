@@ -14,7 +14,9 @@ from orca.quarter_px import QuarterPx, last_close_before
 @dataclass(frozen=True, slots=True)
 class Trade:
     """One quarter's share change. `delta` is signed; `low` and `high` are the quarter's price
-    range, None when the stock has no prices in the quarter."""
+    range, None when the stock has no prices in the quarter. `entry` marks a position entering
+    the book without a buy decision of that quarter: the first report of a tracking segment, or a
+    holding valued for the first time (bought at the close, like a first report)."""
 
     q: int
     type: str  # "new" | "add" | "trim" | "exit"
@@ -23,6 +25,7 @@ class Trade:
     low: float | None
     high: float | None
     shares_after: float
+    entry: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +141,7 @@ def compute_position(
                     low=quarter_px.low if quarter_px else None,
                     high=quarter_px.high if quarter_px else None,
                     shares_after=shares,
+                    entry=first_report,
                 )
             )
         realised += realised_q

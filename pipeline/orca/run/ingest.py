@@ -103,9 +103,10 @@ def ingest(
 
 def ingest_bulk(
     lake: Lake, sources: Sources, state: State, flags: list, counts: Counts, budget: Budget
-) -> None:
+) -> dict | None:
     """Ingest the listed bulk ZIPs not ingested yet, in order, until the time budget is spent;
-    the rest wait for the next run (a ZIP is recorded only once its rows are stored)."""
+    the rest wait for the next run (a ZIP is recorded only once its rows are stored). Returns
+    the counts to log: ZIPs and filings ingested."""
     ingested = Manifest(lake.root / "ingested.json")
     try:
         urls = sources.list_bulk_zips()
@@ -118,6 +119,7 @@ def ingest_bulk(
         # The data-sets page lists dozens of ZIPs; none means the page changed shape.
         flags.append({"type": "no_bulk_zips"})
         return
+    done = {"zips": 0, "filings": 0}
     with tempfile.TemporaryDirectory() as tmp:
         for url in urls:
             name = PurePosixPath(urlsplit(url).path).name
@@ -152,15 +154,19 @@ def ingest_bulk(
             ingested.save()
             counts.filings_parsed += filings.height
             counts.add("bulk", stats)
+            done["zips"] += 1
+            done["filings"] += filings.height
+    return done
 
 
 def ingest_live(
     lake: Lake, sources: Sources, state: State, today: date, flags: list, counts: Counts
-) -> None:
+) -> dict | None:
     """Ingest the live filings since the watermark and move it on: to `live_watermark`'s day,
     or to the day before the earliest index day with a failed filing download, so the next run
     reads that day again (for LIVE_RETRY_DAYS; an older failure is given up and flagged). A
-    failed read (SEC throttling included) moves nothing and is flagged."""
+    failed read (SEC throttling included) moves nothing and is flagged. Returns the counts to
+    log."""
     if state.live_watermark is not None:
         since = state.live_watermark + timedelta(days=1)
     else:
@@ -194,3 +200,4 @@ def ingest_live(
     state.save(lake)
     counts.filings_parsed += filings.height
     counts.add("live", stats)
+    return {"filings": filings.height, "failed": stats.get("failed_filings", 0)}
