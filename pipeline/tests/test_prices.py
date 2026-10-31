@@ -19,6 +19,7 @@ from orca.prices import (
     run_parts,
     split_adjust_prices,
     split_adjust_shares,
+    split_factors_by_quarter,
     update_prices,
 )
 from orca.quarters import q_index
@@ -113,6 +114,22 @@ def test_split_adjust_shares_handles_reverse_splits_and_returns_float():
     out = split_adjust_shares(800, q_index(2024, 1), splits)
     assert out == 100.0
     assert isinstance(out, float)
+
+
+def test_split_factors_by_quarter_agree_exactly_with_split_adjust_shares():
+    splits = pl.DataFrame(
+        {
+            "date": [D(2014, 6, 9), D(2020, 8, 31), D(2022, 8, 25), D(2024, 3, 31), D(2024, 4, 1)],
+            "split_factor": [7.0, 5.0, 3.0, 0.1, 2.5],
+        }
+    )
+    factors = split_factors_by_quarter(splits)
+
+    assert max(factors) == q_index(2024, 1)  # no split after a later quarter: absent, 1.0
+    for q in range(0, q_index(2026, 4)):
+        for shares in (1.0, 333.0, 123456789.0, 0.3):
+            assert shares * factors.get(q, 1.0) == split_adjust_shares(shares, q, splits), q
+    assert split_factors_by_quarter(splits.clear()) == {}
 
 
 def test_split_adjust_prices():
@@ -883,3 +900,80 @@ def test_compaction_folds_every_numbered_part_of_every_run(tmp_path):
     assert lake.parts(TABLE) == ["y2023", "y2024"]
     assert read_prices(lake).equals(before)
     assert before.filter(stock_id=2, date=D(2024, 1, 2))["close"].to_list() == [23.5]
+
+
+# --- revisions in the open quarter -----------------------------------------------------------
+
+JUNE = [bar(D(2024, 6, d), 10.0 + d) for d in (24, 25, 26, 27, 28)]
+JULY = [bar(D(2024, 7, d), 40.0 + d) for d in (1, 2, 3)]  # Q3 2024, still open on 5 July
+CLOSED_UNTIL = D(2024, 6, 30)  # the last closed quarter's end
+
+
+def revised(bars, day, **fields):
+    return [dict(b, **fields) if b["date"] == day else b for b in bars]
+
+
+def test_a_revision_in_the_open_quarter_is_not_a_history_change(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*JUNE, *JULY)}), {1: "AAA"}, D(2024, 7, 3))
+    fixed = revised(JULY, D(2024, 7, 2), close=99.0)
+
+    changed = update_prices(
+        lake,
+        FixtureSource({"AAA": daily(*JUNE, *fixed)}),
+        {1: "AAA"},
+        D(2024, 7, 5),
+        history_until=CLOSED_UNTIL,
+    )
+
+    assert changed == []  # no fund's files use the open quarter's prices
+    assert read_prices(lake).filter(date=D(2024, 7, 2))["close"].to_list() == [99.0]  # stored
+
+
+def test_a_revision_on_or_before_the_last_closed_quarter_end_is_a_change(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*JUNE, *JULY)}), {1: "AAA"}, D(2024, 7, 3))
+    fixed = revised(JUNE, D(2024, 6, 28), close=99.0)
+
+    changed = update_prices(
+        lake,
+        FixtureSource({"AAA": daily(*fixed, *JULY)}),
+        {1: "AAA"},
+        D(2024, 7, 5),
+        history_until=CLOSED_UNTIL,
+    )
+
+    assert changed == [1]
+
+
+@pytest.mark.parametrize("before, after", [(1.0, 2.0), (2.0, 1.0), (2.0, 3.0)])
+def test_a_split_factor_change_in_the_open_quarter_is_a_change(tmp_path, before, after):
+    lake = Lake(tmp_path)
+    july = revised(JULY, D(2024, 7, 2), split_factor=before)
+    update_prices(lake, FixtureSource({"AAA": daily(*JUNE, *july)}), {1: "AAA"}, D(2024, 7, 3))
+
+    changed = update_prices(
+        lake,
+        FixtureSource({"AAA": daily(*JUNE, *revised(july, D(2024, 7, 2), split_factor=after))}),
+        {1: "AAA"},
+        D(2024, 7, 5),
+        history_until=CLOSED_UNTIL,
+    )
+
+    assert changed == [1]  # a split re-bases every older price, open quarter or not
+
+
+def test_a_new_split_day_in_the_open_quarter_is_a_change(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(lake, FixtureSource({"AAA": daily(*JUNE, *JULY)}), {1: "AAA"}, D(2024, 7, 3))
+    later = [bar(D(2024, 7, 5), 21.0, split=2.0)]
+
+    changed = update_prices(
+        lake,
+        FixtureSource({"AAA": daily(*JUNE, *JULY, *later)}),
+        {1: "AAA"},
+        D(2024, 7, 5),
+        history_until=CLOSED_UNTIL,
+    )
+
+    assert changed == [1]

@@ -514,21 +514,38 @@ def test_fund_and_home_files_do_not_move_with_a_later_weeks_prices(fixtures, bas
     assert not [p for p in stats.changed if p.startswith(("fund/", "home/", "funds.json"))]
 
 
-def test_benchmark_revision_recomputes_every_fund(fixtures, base_runs, tmp_path):
-    # Every fund's what-if figures use SPY, so a revised SPY bar is an input of every fund.
-    inc = from_base(base_runs, WEEK2, tmp_path)
+def revised_spy(fixtures, day: date):
     revised = fixtures.prices["SPY"].with_columns(
-        close=pl.when(pl.col("date") == date(2026, 10, 21))
-        .then(pl.col("close") * 1.01)
-        .otherwise(pl.col("close"))
+        close=pl.when(pl.col("date") == day).then(pl.col("close") * 1.01).otherwise(pl.col("close"))
     )
-    sources = replace(
+    return replace(
         fixture_sources(fixtures), prices=FixtureSource({**fixtures.prices, "SPY": revised})
     )
 
-    stats = run(inc, sources, WEEK3)
+
+def test_benchmark_revision_recomputes_every_fund(fixtures, tmp_path):
+    # Every fund's what-if figures use SPY, so a revised SPY bar of a closed quarter (here the
+    # last day of Q3 2026, inside the overlap the Monday run fetches again) is an input of every
+    # fund.
+    friday, monday = date(2026, 10, 2), date(2026, 10, 5)
+    run(tmp_path, fixture_sources(fixtures), friday)
+
+    stats = run(tmp_path, revised_spy(fixtures, date(2026, 9, 30)), monday)
 
     assert stats.funds_recomputed == 12
+
+
+def test_a_price_revision_in_the_open_quarter_recomputes_no_fund(fixtures, base_runs, tmp_path):
+    # 21 October is in Q4 2026, which no fund's files use yet: the revised bar is stored and
+    # republished in the weekly and latest prices, but no fund is recomputed.
+    inc = from_base(base_runs, WEEK2, tmp_path)
+
+    stats = run(inc, revised_spy(fixtures, date(2026, 10, 21)), WEEK3)
+
+    assert stats.funds_recomputed == 0
+    spy = Lake(inc / "lake").read("cusip_map").filter(cusip=demo.SPY_CUSIP)["stock_id"][0]
+    assert f"stock/{spy}/weekly.json" in stats.changed
+    assert not [p for p in stats.changed if p.startswith(("fund/", "home/"))]
 
 
 def test_live_reads_again_a_recent_day_that_had_no_index(tmp_path):

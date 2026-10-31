@@ -15,7 +15,7 @@ from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
 from orca.holdings import fill_gaps
 from orca.home import FundSnapshot
-from orca.prices import split_adjust_shares
+from orca.prices import split_factors_by_quarter
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_end
@@ -120,7 +120,8 @@ def split_suspects(holdings: pl.DataFrame, splits: pl.DataFrame) -> list[dict]:
 @dataclass
 class Context:
     """What computing a fund needs beyond its own rows: the security master, the risk-free rate
-    and each loaded stock's quarter prices and split days (today's share basis).
+    and each loaded stock's quarter prices, split days and per-quarter share factors (today's
+    share basis).
 
     Only these small summaries are kept between batches; a stock's daily bars are read when it is
     first needed, PRICE_LOAD_CHUNK stocks at a time, and dropped once summarised. `iter_closes`
@@ -133,6 +134,9 @@ class Context:
     spy_id: int | None
     px: dict[int, dict[int, QuarterPx]] = field(default_factory=dict)
     splits: dict[int, pl.DataFrame] = field(default_factory=dict)
+    share_factors: dict[int, dict[int, float]] = field(
+        default_factory=dict
+    )  # split_factors_by_quarter
 
     @classmethod
     def build(cls, lake: Lake, last_q: int) -> "Context":
@@ -151,11 +155,12 @@ class Context:
                 rows = by_stock.pop((stock_id,), None)
                 if rows is None:
                     self.px[stock_id], self.splits[stock_id] = {}, no_splits
+                    self.share_factors[stock_id] = {}
                     continue
                 self.px[stock_id] = quarter_px(rows)
-                self.splits[stock_id] = rows.filter(pl.col("split_factor") != 1.0).select(
-                    "date", "split_factor"
-                )
+                splits = rows.filter(pl.col("split_factor") != 1.0).select("date", "split_factor")
+                self.splits[stock_id] = splits
+                self.share_factors[stock_id] = split_factors_by_quarter(splits)
 
     def iter_closes(self, stock_ids: Iterable[int]) -> Iterator[dict[int, pl.DataFrame]]:
         """The stocks' daily (date, close) on today's share basis, PRICE_LOAD_CHUNK stocks at a
@@ -378,8 +383,9 @@ def compute_fund(
 def _share_series(
     ctx: Context, shares_rows: pl.DataFrame
 ) -> tuple[dict[int, dict[int, tuple[float, float]]], pl.DataFrame]:
-    """Per stock and quarter the split-adjusted shares and reported value (share classes of one
-    stock summed), and the same as reported (cik, q, stock_id, shares) for the split check."""
+    """Per stock and quarter the split-adjusted shares (`split_adjust_shares`, from the stock's
+    precomputed factors) and reported value (share classes of one stock summed), and the same as
+    reported (cik, q, stock_id, shares) for the split check."""
     summed = (
         shares_rows.group_by("cik", "q", "stock_id")
         .agg(pl.col("shares").sum(), pl.col("value_usd").sum())
@@ -389,7 +395,7 @@ def _share_series(
     for q, stock_id, shares, value in summed.select(
         "q", "stock_id", "shares", "value_usd"
     ).iter_rows():
-        adjusted[stock_id][q] = (split_adjust_shares(shares, q, ctx.splits[stock_id]), value)
+        adjusted[stock_id][q] = (float(shares) * ctx.share_factors[stock_id].get(q, 1.0), value)
     return dict(adjusted), summed.select("cik", "q", "stock_id", "shares")
 
 

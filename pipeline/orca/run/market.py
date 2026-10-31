@@ -17,6 +17,7 @@ from orca.prices import (
     split_adjust_prices,
     update_prices,
 )
+from orca.quarters import q_end, q_of_date
 from orca.run.budget import Budget
 from orca.run.sources import Sources
 from orca.run.state import (
@@ -300,6 +301,7 @@ def refresh_prices(
         run_id=run_id,
         stats=stats,
         should_stop=budget.spent,
+        history_until=q_end(q_of_date(today) - 1),  # the open quarter's bars move no fund file
     )
     if stats["stopped"] == "time budget":
         budget.cut("prices")

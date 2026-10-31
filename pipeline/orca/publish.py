@@ -2,7 +2,7 @@
 
 The files and their fields are specified in `pipeline/contract.md`, which is the one source of
 truth; this module writes exactly that. Every file is minified JSON with sorted keys, brotli
-compressed (quality 11) and stored under its plain public path, so the same bytes can be
+compressed (quality 9) and stored under its plain public path, so the same bytes can be
 served with `Content-Encoding: br`.
 
 Public paths are stable. A run writes its files into a local staging folder (`new_version`),
@@ -54,6 +54,7 @@ _EXIT_COLUMNS = (
 HEALTH_KEYS = ("filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags")
 
 _PRICE_DECIMALS = 4  # prices are published to the hundredth of a cent
+BROTLI_QUALITY = 9  # 11 compresses a few percent better at many times the cost (~10k funds a run)
 _CUSIP_KEYS = frozenset({"cusip", "cusips"})
 _RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -123,7 +124,7 @@ class HomeLists:
 
 
 def write_json(path: Path, obj: object, compress: bool = True) -> str:
-    """Write `obj` as minified JSON with sorted keys, brotli compressed (quality 11) unless
+    """Write `obj` as minified JSON with sorted keys, brotli compressed (quality 9) unless
     `compress` is False, and return the sha256 of the bytes written. NaN and infinity become
     null. The file appears whole or not at all; a `cusip` key anywhere in `obj` is a ValueError
     and nothing is written."""
@@ -131,7 +132,7 @@ def write_json(path: Path, obj: object, compress: bool = True) -> str:
         _json_ready(obj), separators=(",", ":"), sort_keys=True, allow_nan=False
     ).encode("ascii")  # ensure_ascii: any string, even a lone surrogate, encodes
     if compress:
-        payload = brotli.compress(payload, quality=11)
+        payload = brotli.compress(payload, quality=BROTLI_QUALITY)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(path.name + ".tmp")

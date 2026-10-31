@@ -197,6 +197,14 @@ def test_brotli_roundtrip(tmp_path):
     assert read_json(path) == obj
 
 
+def test_brotli_quality_is_9(tmp_path):
+    obj = {"rows": [[q, q * 1.5, "x" * (q % 7)] for q in range(500)]}
+    path = tmp_path / "x.json"
+    write_json(path, obj)
+    payload = json.dumps(obj, separators=(",", ":"), sort_keys=True).encode("ascii")
+    assert path.read_bytes() == brotli.compress(payload, quality=9)
+
+
 def test_write_json_plain_when_not_compressed(tmp_path):
     path = tmp_path / "x.json"
     checksum = write_json(path, {"a": [1, 2]}, compress=False)

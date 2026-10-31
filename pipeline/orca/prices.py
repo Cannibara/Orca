@@ -17,7 +17,7 @@ from urllib.parse import quote
 import polars as pl
 
 from orca.http import Client, FetchError
-from orca.quarters import q_end, q_start
+from orca.quarters import q_end, q_of_date, q_start
 from orca.storage import Lake
 
 log = logging.getLogger(__name__)
@@ -204,6 +204,7 @@ def update_prices(
     stats: dict | None = None,
     flush_every: int = FLUSH_EVERY,
     should_stop: Callable[[], bool] | None = None,
+    history_until: date | None = None,
 ) -> list[int]:
     """Fetch each stock's prices through `today`, in the order of `tickers`, and append the new
     and revised bars to new parts `z<run_id>-0001`, `-0002`, ... (run_id default: today as
@@ -212,8 +213,10 @@ def update_prices(
     A stock is fetched from 5 days before its last stored date, or from 2013-01-01 when it has no
     rows. Returns the sorted stock_ids whose history changed: stocks that got their first rows,
     stocks whose stored bars were revised (a price correction, or a split recorded late) or
-    back-filled, and stocks with a new split day, which re-bases every older price. Plain new days
-    are not a change.
+    back-filled, and stocks with a new or changed split factor, which re-bases every older price.
+    Plain new days are not a change. With `history_until` (the last closed quarter's end), a
+    revised or back-filled day after it is not a change either: no fund's files use the open
+    quarter's prices (the bars are stored all the same).
 
     A ticker whose fetch raises FetchError is logged and skipped; nothing is stored for it, so
     its last stored date stays put and the next run fetches it again. The run stops early, keeping
@@ -271,7 +274,9 @@ def update_prices(
             in_a_row = 0
             fetched = _as_stored(bars, stock_id)
             stats["empty" if fetched.is_empty() else "fetched"] += 1
-            rows, history_changed = _new_rows(fetched, last_date, recent.get((stock_id,)))
+            rows, history_changed = _new_rows(
+                fetched, last_date, recent.get((stock_id,)), history_until
+            )
             if not rows.is_empty():
                 pending.append(rows)
             if history_changed:
@@ -294,23 +299,29 @@ def _as_stored(daily: pl.DataFrame, stock_id: int) -> pl.DataFrame:
 
 
 def _new_rows(
-    fetched: pl.DataFrame, last_date: date | None, recent: pl.DataFrame | None
+    fetched: pl.DataFrame,
+    last_date: date | None,
+    recent: pl.DataFrame | None,
+    history_until: date | None = None,
 ) -> tuple[pl.DataFrame, bool]:
     """The fetched rows to append (those not already stored as they are), and whether they change
-    the stock's history: it has no stored rows yet, a stored day differs or was missing, or a new
-    day carries a split. `last_date` and `recent` are the stock's `_stored_tail` entries."""
+    the stock's history: it has no stored rows yet, a stored day up to `history_until` differs or
+    was missing, or a day's split factor is new or changed. `last_date` and `recent` are the
+    stock's `_stored_tail` entries."""
     if fetched.is_empty():
         return fetched, False
     if last_date is None or recent is None:
         return fetched, True
     rows = _not_yet_stored(fetched, recent)
-    behind_or_split = (pl.col("date") <= last_date) | (pl.col("split_factor") != 1.0)
-    return rows, not rows.filter(behind_or_split).is_empty()
+    behind = last_date if history_until is None else min(last_date, history_until)
+    counts = (pl.col("date") <= behind) | (pl.col("split_factor") != 1.0) | pl.col("_split_changed")
+    return rows.drop("_split_changed"), not rows.filter(counts).is_empty()
 
 
 def _not_yet_stored(fetched: pl.DataFrame, recent: pl.DataFrame) -> pl.DataFrame:
     """The fetched rows that are not already stored as they are: new days, and days whose stored
-    row differs in any field or is missing."""
+    row differs in any field or is missing; `_split_changed` marks a stored day whose split
+    factor is no longer the stored one."""
     values = [c for c in PRICES_SCHEMA.names() if c not in _KEY]
     old = recent.select("date", *[pl.col(c).alias(f"{c}_old") for c in values]).with_columns(
         stored=pl.lit(True)
@@ -318,7 +329,14 @@ def _not_yet_stored(fetched: pl.DataFrame, recent: pl.DataFrame) -> pl.DataFrame
     differs = pl.col("stored").is_null() | pl.any_horizontal(
         pl.col(c).ne_missing(pl.col(f"{c}_old")) for c in values
     )
-    return fetched.join(old, on="date", how="left").filter(differs).select(PRICES_SCHEMA.names())
+    split_changed = pl.col("stored").is_not_null() & pl.col("split_factor").ne_missing(
+        pl.col("split_factor_old")
+    )
+    return (
+        fetched.join(old, on="date", how="left")
+        .filter(differs)
+        .select(*PRICES_SCHEMA.names(), _split_changed=split_changed)
+    )
 
 
 def compact_prices(lake: Lake) -> None:
@@ -370,6 +388,23 @@ def split_adjust_prices(df: pl.DataFrame) -> pl.DataFrame:
         .with_columns(*adjusted, pl.col("volume") * pl.col("_factor"))
         .drop("_factor")
     )
+
+
+def split_factors_by_quarter(splits: pl.DataFrame) -> dict[int, float]:
+    """The factor `split_adjust_shares` applies to a share count of quarter q, for every quarter
+    from 0 up to the last split's: the product of the split factors dated after q's end, in the
+    rows' (date) order, so `shares * factors.get(q, 1.0)` gives exactly the same float. The
+    quarter of the last split and later ones are absent (factor 1). `splits` has one stock's
+    (date, split_factor)."""
+    days = [
+        (day, factor)
+        for day, factor in splits.select("date", "split_factor").iter_rows()
+        if factor is not None
+    ]
+    if not days:
+        return {}
+    last_q = q_of_date(max(day for day, _ in days))
+    return {q: math.prod(factor for day, factor in days if day > q_end(q)) for q in range(last_q)}
 
 
 def split_adjust_shares(shares: float, q: int, splits: pl.DataFrame) -> float:
