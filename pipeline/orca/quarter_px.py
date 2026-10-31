@@ -13,7 +13,7 @@ import polars as pl
 from orca.quarters import BASE_YEAR
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class QuarterPx:
     """One quarter of a stock's prices on today's share basis. The price fields are None only
     when the quarter has rows but none with a close."""

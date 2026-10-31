@@ -1,3 +1,4 @@
+import gc
 import io
 import json
 import shutil
@@ -26,18 +27,14 @@ from orca.engine.position import Trade
 from orca.home import FundSnapshot
 from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
-from orca.publish import FundMeta, read_json
-from orca.quarter_px import QuarterPx
+from orca.publish import FundMeta, FundOutput, read_json
+from orca.quarter_px import QuarterPx, close_on
 from orca.quarters import q_index
 from orca.run import (
     CusipLeakError,
     InvariantError,
-    _decode,
-    _encode,
-    _is_cusip,
-    _State,
-    _update_rf,
     affected_funds,
+    compute,
     copy_published,
     cusip_check_digit,
     deadline_quarter,
@@ -48,7 +45,11 @@ from orca.run import (
     split_suspects,
     strip_query,
     verify,
+    weekly,
 )
+from orca.run.market import update_rf
+from orca.run.publish_step import is_cusip
+from orca.run.state import State, decode, encode
 from orca.securities import FIGI_URL
 from orca.storage import Lake
 
@@ -234,7 +235,7 @@ def test_bridge_failure_aborts_before_manifest(fixtures, base_runs, tmp_path, mo
     inc = from_base(base_runs, WEEK2, tmp_path)
     manifest_bytes = (inc / "out" / "manifest.json").read_bytes()
     state = (inc / "lake" / "state.json").read_text()
-    monkeypatch.setattr("orca.run.check_bridge", lambda fq: False)
+    monkeypatch.setattr("orca.run.compute.check_bridge", lambda fq: False)
 
     with pytest.raises(InvariantError, match="bridge"):
         run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK3, full=True)
@@ -397,7 +398,7 @@ def test_pending_recompute_survives_a_crash(fixtures, base_runs, tmp_path, monke
     def crash(*args, **kwargs):
         raise RuntimeError("killed")
 
-    monkeypatch.setattr("orca.run.publish_fund", crash)
+    monkeypatch.setattr("orca.run.weekly.publish_fund", crash)
     with pytest.raises(RuntimeError, match="killed"):
         run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK2)
     monkeypatch.undo()
@@ -563,7 +564,7 @@ def test_tbill_change_survives_an_aborted_run(fixtures, base_runs, tmp_path, mon
 
     # The next run gets new rates but dies before publishing ...
     new_rates = replace(fixture_sources(fixtures), tbill=lambda: {**fixtures.tbill, 2026: 0.03})
-    monkeypatch.setattr("orca.run.check_bridge", lambda fq: False)
+    monkeypatch.setattr("orca.run.compute.check_bridge", lambda fq: False)
     with pytest.raises(InvariantError):
         run_weekly(Lake(inc / "lake"), inc / "out", new_rates, WEEK3)
     monkeypatch.undo()
@@ -575,7 +576,7 @@ def test_tbill_change_survives_an_aborted_run(fixtures, base_runs, tmp_path, mon
 
 def test_aborted_rebuild_is_finished_by_the_next_run(fixtures, base_runs, tmp_path, monkeypatch):
     inc = from_base(base_runs, WEEK2, tmp_path)
-    monkeypatch.setattr("orca.run.check_bridge", lambda fq: False)
+    monkeypatch.setattr("orca.run.compute.check_bridge", lambda fq: False)
     with pytest.raises(InvariantError):
         run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK3, full=True)
     monkeypatch.undo()
@@ -615,7 +616,9 @@ def test_changed_prices_survive_a_run_killed_during_the_price_update(
     run(inc, replace(fixture_sources(fixtures), prices=FixtureSource(late_split)), WEEK2)
 
     # Week 3's run stores the corrected bar (flushed after each ticker), then is killed.
-    monkeypatch.setattr("orca.run.update_prices", partial(prices.update_prices, flush_every=1))
+    monkeypatch.setattr(
+        "orca.run.market.update_prices", partial(prices.update_prices, flush_every=1)
+    )
     killed = replace(fixture_sources(fixtures), prices=_KilledAfter(fixtures.prices, "CMG"))
     with pytest.raises(KeyboardInterrupt):
         run_weekly(Lake(inc / "lake"), inc / "out", killed, WEEK3)
@@ -654,8 +657,8 @@ def test_stored_fund_state_round_trips_every_field():
     meta = FundMeta(1, "Test Fund LP", 1, 53, date(2026, 8, 1), 1e9, 2, 0.9, 40, False)
     assert {f.name for f in fields(snap)} == set(asdict(snap))  # every field is set above
 
-    assert _decode(json.loads(json.dumps(_encode(snap)))) == snap
-    assert _decode(json.loads(json.dumps(_encode(meta)))) == meta
+    assert decode(json.loads(json.dumps(encode(snap)))) == snap
+    assert decode(json.loads(json.dumps(encode(meta)))) == meta
 
 
 def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path):
@@ -696,21 +699,21 @@ def test_unreadable_zip_is_flagged_by_its_name(tmp_path):
 def test_rf_stays_stale_until_the_table_is_written(tmp_path, monkeypatch):
     lake = Lake(tmp_path / "lake")
     sources = replace(fixture_sources(small_fixtures({})), tbill=lambda: {2024: 0.05})
-    state = _State(rf_stale=True)  # an earlier fetch failed
+    state = State(rf_stale=True)  # an earlier fetch failed
 
     def disk_full(table, df, part=None):
         raise OSError("disk full")
 
     monkeypatch.setattr(lake, "write", disk_full)
     with pytest.raises(OSError, match="disk full"):
-        _update_rf(lake, sources, state, Q2_24, False, [])
+        update_rf(lake, sources, state, Q2_24, False, [])
 
     # The new rates are not stored, so the next run must fetch them again.
-    saved = _State.load(lake)
+    saved = State.load(lake)
     assert saved.rf_stale and saved.pending_all
     monkeypatch.undo()
 
-    _update_rf(lake, sources, state, Q2_24, False, [])
+    update_rf(lake, sources, state, Q2_24, False, [])
 
     assert not state.rf_stale
     assert dict(lake.read("rf").iter_rows()) == {2024: 0.05}
@@ -719,10 +722,10 @@ def test_rf_stays_stale_until_the_table_is_written(tmp_path, monkeypatch):
 def test_stale_flag_clears_when_the_fetched_rates_are_the_stored_ones(tmp_path):
     lake = Lake(tmp_path / "lake")
     sources = replace(fixture_sources(small_fixtures({})), tbill=lambda: {2024: 0.05})
-    _update_rf(lake, sources, _State(), Q2_24, False, [])
-    state = _State(last_q=Q2_24, rf_stale=True)
+    update_rf(lake, sources, State(), Q2_24, False, [])
+    state = State(last_q=Q2_24, rf_stale=True)
 
-    _update_rf(lake, sources, state, Q2_24, False, [])
+    update_rf(lake, sources, state, Q2_24, False, [])
 
     assert not state.rf_stale
     assert not state.pending_all
@@ -732,8 +735,8 @@ def test_stale_flag_clears_when_the_fetched_rates_are_the_stored_ones(tmp_path):
 def test_non_ascii_text_is_never_a_cusip(lead):
     text = lead + "2345678"
     assert len(text) == 8
-    assert not _is_cusip(text + cusip_check_digit("A2345678"))  # a check digit that fits "A..."
-    assert not _is_cusip(text + cusip_check_digit("32345678"))  # ... or "3..."
+    assert not is_cusip(text + cusip_check_digit("A2345678"))  # a check digit that fits "A..."
+    assert not is_cusip(text + cusip_check_digit("32345678"))  # ... or "3..."
 
 
 def test_non_ascii_cusip_does_not_crash_the_leak_scan(tmp_path):
@@ -744,3 +747,59 @@ def test_non_ascii_cusip_does_not_crash_the_leak_scan(tmp_path):
     run(tmp_path, fixture_sources(small), SMALL_TODAY)
 
     assert odd in Lake(tmp_path / "lake").read("cusip_map")["cusip"].to_list()
+
+
+def test_a_full_recompute_holds_at_most_one_batch_of_fund_outputs(fixtures, tmp_path, monkeypatch):
+    # Real books have 50-100M position-quarters: a run must publish each batch's funds as it goes,
+    # not keep every fund's output until the end, and read daily bars a few stocks at a time.
+    monkeypatch.setattr("orca.run.weekly.FUND_BATCH", 3)
+    monkeypatch.setattr("orca.run.compute.PRICE_LOAD_CHUNK", 4)
+    alive, loads = [], []
+    real_publish, real_load = weekly.publish_fund, compute.load_daily
+
+    def counting_publish(out, fund, compress=True):
+        gc.collect()
+        alive.append(sum(type(o) is FundOutput for o in gc.get_objects()))
+        return real_publish(out, fund, compress)
+
+    def recording_load(lake, stock_ids=None, since=None):
+        loads.append(None if stock_ids is None else len(list(stock_ids)))
+        return real_load(lake, stock_ids, since)
+
+    monkeypatch.setattr("orca.run.weekly.publish_fund", counting_publish)
+    monkeypatch.setattr("orca.run.compute.load_daily", recording_load)
+
+    stats = run(tmp_path, fixture_sources(fixtures), WEEK2, full=True)
+
+    assert stats.funds_recomputed == 12 and len(alive) == 12
+    assert max(alive) <= 3  # never more than one batch of outputs alive
+    assert loads and all(n is not None and n <= 4 for n in loads)
+    assert not (tmp_path / "lake" / "fund_state_run").exists() or not list(
+        (tmp_path / "lake" / "fund_state_run").iterdir()
+    )  # the batches' fund state was merged into fund_state
+    assert Lake(tmp_path / "lake").read("fund_state").height == 12
+
+
+def test_closes_on_matches_close_on_for_many_days_at_once(tmp_path):
+    lake = Lake(tmp_path)
+    prices.update_prices(
+        lake,
+        FixtureSource({"WIDG": flat_prices(40.0, splits={date(2024, 6, 3): 2.0})}),
+        {1: "WIDG"},
+        date(2024, 12, 31),
+    )
+    ctx = compute.Context(lake, Q2_24, {}, {}, None)
+    days = [
+        date(2023, 12, 1),
+        date(2024, 1, 2),
+        date(2024, 6, 1),
+        date(2024, 6, 2),
+        date(2025, 3, 1),
+    ]
+    daily = compute.load_daily(lake, [1]).select("date", "close")
+
+    found = ctx.closes_on([(1, d) for d in days] + [(2, days[1])])
+
+    expected = {(1, d): close_on(daily, d) for d in days}
+    assert found == {k: v for k, v in expected.items() if v is not None}
+    assert found[(1, date(2024, 6, 2))] == 20.0  # Friday's close, split-adjusted

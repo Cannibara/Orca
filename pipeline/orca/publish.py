@@ -435,12 +435,22 @@ def publish_shared(
         ("calls_y", home.calls_y),
     ):
         docs[f"home/{name}.json"] = {"latest_q": latest_q, "rows": rows}
-    for stock_id, closes in sorted((weekly or {}).items()):
-        if closes["close"]:
-            docs[f"stock/{stock_id}/weekly.json"] = {
-                "start": closes["start"],
-                "close": [_price(close) for close in closes["close"]],
-            }
+    files = _write_all(out, docs, compress)
+    files.update(publish_weekly(out, weekly or {}, compress))
+    return files
+
+
+def publish_weekly(out: Path, weekly: Mapping[int, dict], compress: bool = True) -> dict[str, str]:
+    """Write stock/{id}/weekly.json under `out` for each stock of `weekly` (stock_id ->
+    `weekly_closes`'s result) that has closes, prices rounded to 4 places; path -> checksum."""
+    docs = {
+        f"stock/{stock_id}/weekly.json": {
+            "start": closes["start"],
+            "close": [_price(close) for close in closes["close"]],
+        }
+        for stock_id, closes in sorted(weekly.items())
+        if closes["close"]
+    }
     return _write_all(out, docs, compress)
 
 
