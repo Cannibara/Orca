@@ -13,7 +13,10 @@ from orca.prices import (
     FixtureSource,
     TiingoSource,
     compact_prices,
+    part_stocks,
+    price_runs,
     read_prices,
+    run_parts,
     split_adjust_prices,
     split_adjust_shares,
     update_prices,
@@ -358,14 +361,14 @@ def test_update_fetches_only_new_days(tmp_path):
     assert prices.height == 10
 
 
-def test_update_stores_one_part_per_run_in_the_documented_types(tmp_path):
+def test_update_stores_numbered_parts_per_run_in_the_documented_types(tmp_path):
     lake = Lake(tmp_path)
     source = FixtureSource({"AAA": daily(*WEEK1, *WEEK2)})
 
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 10))
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), run_id="20240517T0623")
 
-    assert lake.parts(TABLE) == ["z20240510", "z20240517T0623"]  # default id: today
+    assert lake.parts(TABLE) == ["z20240510-0001", "z20240517T0623-0001"]  # default id: today
     assert lake.read(TABLE).schema == PRICES_SCHEMA
     assert read_prices(lake).schema == PRICES_SCHEMA
     assert read_prices(lake).select("stock_id").to_series().unique().to_list() == [1]
@@ -470,7 +473,7 @@ def test_update_with_nothing_new_writes_no_part(tmp_path):
 
     assert update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 12)) == []
 
-    assert lake.parts(TABLE) == ["z20240510"]
+    assert lake.parts(TABLE) == ["z20240510-0001"]
 
 
 def test_update_leaves_stocks_it_is_not_asked_about_alone(tmp_path):
@@ -494,7 +497,7 @@ def test_update_twice_with_one_run_id_keeps_both_runs_rows(tmp_path):
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 8), run_id="r1")
     update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17), run_id="r1")
 
-    assert lake.parts(TABLE) == ["zr1"]
+    assert lake.parts(TABLE) == ["zr1-0001", "zr1-0002"]  # the second goes on numbering
     assert read_prices(lake).height == 10
 
 
@@ -544,7 +547,7 @@ def test_update_change_detection_sees_the_newest_stored_value_across_parts(tmp_p
     assert update_prices(lake, fixed, {1: "AAA"}, today=D(2024, 5, 24)) == []  # 77.0 is current
 
 
-def test_update_change_detection_sees_the_newest_value_within_one_part(tmp_path):
+def test_update_change_detection_sees_the_newest_value_within_one_run(tmp_path):
     lake = Lake(tmp_path)
     first = daily(*WEEK1[:3])  # 6-8 May
     second = daily(bar(D(2024, 5, 8), 55.0), *WEEK1[3:])  # 8 May restated, 9-10 May new
@@ -552,7 +555,7 @@ def test_update_change_detection_sees_the_newest_value_within_one_part(tmp_path)
     update_prices(
         lake, FixtureSource({"AAA": second}), {1: "AAA"}, today=D(2024, 5, 10), run_id="r1"
     )
-    assert lake.parts(TABLE) == ["zr1"]  # the part holds 8 May twice: 55.0 after the original
+    assert lake.parts(TABLE) == ["zr1-0001", "zr1-0002"]  # 8 May twice: 55.0 in the later part
 
     assert (
         update_prices(lake, FixtureSource({"AAA": second}), {1: "AAA"}, today=D(2024, 5, 17)) == []
@@ -687,22 +690,34 @@ def test_progress_is_flushed_every_n_tickers_so_a_crash_keeps_what_was_fetched(t
     with pytest.raises(RuntimeError, match="job killed"):
         update_prices(lake, source, tickers, today=D(2024, 5, 10), flush_every=2)
 
-    # flushed after DDD (4 tickers done); nothing of EEE
+    # flushed after BBB and DDD (2 and 4 tickers done); nothing of EEE
     assert read_prices(lake)["stock_id"].unique(maintain_order=True).to_list() == [1, 2, 3, 4]
-    assert lake.parts(TABLE) == ["z20240510"]
+    assert lake.parts(TABLE) == ["z20240510-0001", "z20240510-0002"]
 
 
-def test_flushing_extends_one_part_and_returns_every_changed_stock(tmp_path):
+def test_each_flush_writes_a_new_part_and_none_is_rewritten(tmp_path, monkeypatch):
     lake = Lake(tmp_path)
     frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC", "DDD", "EEE")}
     tickers = {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD", 5: "EEE"}
+    written, real_write = [], Lake.write
 
+    def recording_write(self, table, df, part=None):
+        written.append((part, df.height))
+        return real_write(self, table, df, part)
+
+    def no_part_read(self, table, part=None):
+        pytest.fail(f"a flush read back {part}")  # extending a part is O(n^2) over a backfill
+
+    monkeypatch.setattr(Lake, "write", recording_write)
+    monkeypatch.setattr(Lake, "read", no_part_read)
     changed = update_prices(
         lake, FixtureSource(frames), tickers, today=D(2024, 5, 10), flush_every=2
     )
+    monkeypatch.undo()
 
     assert changed == [1, 2, 3, 4, 5]
-    assert lake.parts(TABLE) == ["z20240510"]
+    assert written == [("z20240510-0001", 10), ("z20240510-0002", 10), ("z20240510-0003", 5)]
+    assert lake.parts(TABLE) == ["z20240510-0001", "z20240510-0002", "z20240510-0003"]
     assert read_prices(lake).height == 25
 
 
@@ -757,7 +772,7 @@ def test_compaction_keeps_rows(tmp_path):
     frames["AAA"] = daily(*year_end, bar(D(2024, 1, 2), 23.5), *new_year[1:])  # 2 Jan restated
     update_prices(lake, FixtureSource(frames), {1: "AAA", 2: "BBB"}, today=D(2024, 1, 4))
     before = read_prices(lake)
-    assert lake.parts(TABLE) == ["z20240102", "z20240104"]
+    assert lake.parts(TABLE) == ["z20240102-0001", "z20240104-0001"]
 
     compact_prices(lake)
 
@@ -780,7 +795,7 @@ def test_compaction_merges_new_runs_into_existing_yearly_parts(tmp_path):
     update_prices(
         lake, FixtureSource({"AAA": daily(*fixed, *WEEK2)}), {1: "AAA"}, today=D(2024, 5, 17)
     )
-    assert lake.parts(TABLE) == ["y2024", "z20240517"]
+    assert lake.parts(TABLE) == ["y2024", "z20240517-0001"]
     before = read_prices(lake)
 
     compact_prices(lake)
@@ -803,3 +818,68 @@ def test_compaction_is_idempotent_and_ignores_an_empty_lake(tmp_path):
 
     assert lake.parts(TABLE) == ["y2024"]
     assert read_prices(lake).equals(once)
+
+
+def test_tickers_are_fetched_in_the_order_given(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC")}
+    source = Recording(FixtureSource(frames))
+
+    update_prices(lake, source, {3: "CCC", 1: "AAA", 2: "BBB"}, today=D(2024, 5, 10))
+
+    assert [c[0] for c in source.calls] == ["CCC", "AAA", "BBB"]
+
+
+def test_should_stop_ends_the_run_before_the_next_ticker_and_keeps_what_it_has(tmp_path):
+    lake = Lake(tmp_path)
+    frames = {t: daily(*WEEK1) for t in ("AAA", "BBB", "CCC")}
+    source = Recording(FixtureSource(frames))
+    stats: dict = {}
+
+    changed = update_prices(
+        lake,
+        source,
+        {1: "AAA", 2: "BBB", 3: "CCC"},
+        today=D(2024, 5, 10),
+        stats=stats,
+        should_stop=lambda: len(source.calls) >= 2,
+    )
+
+    assert [c[0] for c in source.calls] == ["AAA", "BBB"]
+    assert changed == [1, 2]
+    assert stats["stopped"] == "time budget"
+    assert read_prices(lake)["stock_id"].unique().sort().to_list() == [1, 2]
+
+
+def test_run_parts_and_their_stocks_cover_old_and_numbered_parts(tmp_path):
+    lake = Lake(tmp_path)
+    row = (1, D(2024, 1, 3), 5.0, 1.0, 1.0, 0.0)
+    lake.write(TABLE, stored(row), "y2024")
+    lake.write(TABLE, stored(row), "z20240110")  # a part from before parts were numbered
+    lake.write(TABLE, stored((2, *row[1:])), "z20240110-0001")
+    lake.write(TABLE, stored((3, *row[1:])), "z20240110-0002")
+    lake.write(TABLE, stored((4, *row[1:])), "z20240117-0001")
+
+    assert run_parts(lake, "20240110") == ["z20240110", "z20240110-0001", "z20240110-0002"]
+    assert part_stocks(lake, run_parts(lake, "20240110")) == {1, 2, 3}
+    assert part_stocks(lake, []) == set()
+    assert price_runs(lake) == {"20240110", "20240117"}
+
+
+def test_compaction_folds_every_numbered_part_of_every_run(tmp_path):
+    lake = Lake(tmp_path)
+    year_end = [bar(D(2023, 12, 28), 21.0), bar(D(2023, 12, 29), 22.0)]
+    new_year = [bar(D(2024, 1, 2), 23.0), bar(D(2024, 1, 3), 24.0)]
+    frames = {t: daily(*year_end, *new_year) for t in ("AAA", "BBB", "CCC")}
+    tickers = {1: "AAA", 2: "BBB", 3: "CCC"}
+    update_prices(lake, FixtureSource(frames), tickers, today=D(2024, 1, 2), flush_every=1)
+    frames["BBB"] = daily(*year_end, bar(D(2024, 1, 2), 23.5), *new_year[1:])  # 2 Jan restated
+    update_prices(lake, FixtureSource(frames), tickers, today=D(2024, 1, 4), flush_every=1)
+    assert len(lake.parts(TABLE)) == 6  # three flushes in each run
+    before = read_prices(lake)
+
+    compact_prices(lake)
+
+    assert lake.parts(TABLE) == ["y2023", "y2024"]
+    assert read_prices(lake).equals(before)
+    assert before.filter(stock_id=2, date=D(2024, 1, 2))["close"].to_list() == [23.5]

@@ -6,6 +6,18 @@ name: Pipeline
 # what is published. A failed run leaves the site on the last good version; GitHub's default
 # notifications email the failure.
 #
+# Every run has a time budget (ORCA_TIME_BUDGET_MIN, 270 minutes by default): when it is spent the
+# pipeline stops its long stages cleanly, publishes the funds it computed (nothing, if it got no
+# further than the downloads) and exits successfully; the lake is saved whatever happened, so the
+# next run goes on from there. The pipeline step's own timeout (300) and the job's (330) leave time
+# for the save.
+#
+# Bootstrapping: an empty lake needs more than one run (years of bulk ZIPs, CUSIP lookups and
+# price histories). Leave the schedule off (repository variable ORCA_SCHEDULE_ENABLED unset) and
+# start the workflow by hand (Actions > Pipeline > Run workflow) again after each run finishes,
+# until a run's health.json has no "time_budget" flag. Then set ORCA_SCHEDULE_ENABLED to "true":
+# the cron entries below do nothing until it is.
+#
 # The R2 credentials can write the private lake (it holds CUSIPs) and the public site, so only the
 # steps that run rclone get them (the restore-r2 action and the two upload steps below): not the
 # third-party actions, the dependency install or the pipeline process. Both jobs run in the
@@ -53,7 +65,9 @@ env:
 jobs:
   weekly:
     # These strings must equal the cron entries above.
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 6 * * 0'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.schedule == '23 6 * * 0' && vars.ORCA_SCHEDULE_ENABLED == 'true')
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 330
@@ -68,14 +82,17 @@ jobs:
       - uses: ./.github/actions/setup-rclone
       - name: Install dependencies
         run: uv sync --locked --no-dev
-      - uses: ./.github/actions/restore-r2
+      - id: restore
+        uses: ./.github/actions/restore-r2
         with:
           access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           endpoint: ${{ secrets.R2_ENDPOINT }}
       - name: Run the pipeline
+        timeout-minutes: 300
         env:
           ORCA_COMMAND: ${{ inputs.full && 'rebuild' || 'weekly' }}
+          ORCA_TIME_BUDGET_MIN: ${{ vars.ORCA_TIME_BUDGET_MIN || '270' }}
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
           TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
@@ -88,11 +105,16 @@ jobs:
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
-          # The run stages only the files that changed; the newest folder is this run's.
-          staging="$(find data/out/staging -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          # The run stages only the files that changed; the newest folder is this run's (the
+          # runner starts without one). A run whose time budget ran out before it computed any
+          # fund publishes nothing and makes no folder.
+          staging=""
+          if [ -d data/out/staging ]; then
+            staging="$(find data/out/staging -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          fi
           if [ -z "$staging" ]; then
-            echo "::error::the run left no staging folder"
-            exit 1
+            echo "::notice::nothing to upload: the time budget ran out before any fund was computed"
+            exit 0
           fi
           headers=(
             --header-upload "Content-Encoding: br"
@@ -103,15 +125,25 @@ jobs:
           # Last, so a reader never finds a manifest that names a file not yet uploaded.
           rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
       - name: Save the lake
+        # Also after a failed, cancelled or timed-out step: what the run stored is progress, and the
+        # lake's state says what is still owed. Never when the restore did not complete (a partial
+        # lake must not overwrite the bucket).
+        if: always() && steps.restore.outcome == 'success'
         env:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: rclone sync data/lake "r2:${R2_LAKE_BUCKET}"
+        run: |
+          # Data first, bookkeeping last: the JSON files (state.json, ingested.json, published.json)
+          # say what the data holds, so a save cut off half way leaves old bookkeeping over newer
+          # data (work redone next run), never bookkeeping that claims data the bucket lacks.
+          # Temporary files that a killed write left behind are not saved.
+          rclone sync data/lake "r2:${R2_LAKE_BUCKET}" --exclude "*.json" --exclude "*.tmp"
+          rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "*.json"
 
   verify:
     # These strings must equal the cron entries above.
-    if: github.event.schedule == '41 7 1 * *'
+    if: github.event.schedule == '41 7 1 * *' && vars.ORCA_SCHEDULE_ENABLED == 'true'
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 120

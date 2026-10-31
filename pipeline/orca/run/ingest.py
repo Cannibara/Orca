@@ -15,6 +15,7 @@ import polars as pl
 
 from orca.holdings import build_holdings, select_reports
 from orca.http import FetchError
+from orca.run.budget import Budget
 from orca.run.sources import Sources
 from orca.run.state import RAW_SCHEMA, REPORTS_SCHEMA, State, part_name, scan, strip_query
 from orca.sec.bulk import parse_bulk_zip
@@ -99,7 +100,11 @@ def ingest(
     return affected
 
 
-def ingest_bulk(lake: Lake, sources: Sources, state: State, flags: list, counts: Counts) -> None:
+def ingest_bulk(
+    lake: Lake, sources: Sources, state: State, flags: list, counts: Counts, budget: Budget
+) -> None:
+    """Ingest the listed bulk ZIPs not ingested yet, in order, until the time budget is spent;
+    the rest wait for the next run (a ZIP is recorded only once its rows are stored)."""
     ingested = Manifest(lake.root / "ingested.json")
     try:
         urls = sources.list_bulk_zips()
@@ -117,6 +122,9 @@ def ingest_bulk(lake: Lake, sources: Sources, state: State, flags: list, counts:
             name = PurePosixPath(urlsplit(url).path).name
             if name in ingested:
                 continue
+            if budget.spent():
+                budget.cut("bulk")
+                break
             dest = Path(tmp) / name
             try:
                 sources.download_bulk_zip(url, dest)

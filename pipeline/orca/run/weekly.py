@@ -4,7 +4,9 @@ import logging
 import random
 import statistics
 import tempfile
-from dataclasses import dataclass
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -21,9 +23,10 @@ from orca.publish import (
     write_manifest,
 )
 from orca.quarters import q_end, q_of_date
+from orca.run.budget import Budget
 from orca.run.compute import Context, affected_funds, compute_batch
 from orca.run.ingest import Counts, ingest_bulk, ingest_live
-from orca.run.market import map_new_cusips, refresh_prices, update_rf
+from orca.run.market import map_new_cusips, refresh_prices, retry_lookups, update_rf
 from orca.run.publish_step import (
     CusipLeakError,
     capped,
@@ -64,10 +67,12 @@ FUND_BATCH = 250  # funds computed and published per batch: only one fund's outp
 @dataclass(frozen=True)
 class RunStats:
     """What a run did. `files` maps every file the run wrote to its checksum; `changed` lists the
-    published paths whose bytes changed (the files left in `staging`), plus manifest.json."""
+    published paths whose bytes changed (the files left in `staging`), plus manifest.json.
+    `staging` is None when the time budget ran out before any fund was computed: nothing was
+    published (and no staging folder made)."""
 
     run_id: str
-    staging: Path
+    staging: Path | None
     last_q: int
     files: dict[str, str]
     changed: list[str]
@@ -111,26 +116,50 @@ def _recompute_set(lake: Lake, ctx: Context, state: State, last_q: int) -> set[i
     )
 
 
+def _stage(name: str, budget: Budget, work: Callable[[], object]) -> None:
+    """Run one stage of the run, unless the time budget is already spent (then it is recorded as
+    cut and skipped: what it would have done stays owed in the state)."""
+    if budget.spent():
+        budget.cut(name)
+        log.warning("%s: skipped, the time budget is spent", name)
+        return
+    started = time.monotonic()
+    work()
+    log.info("%s: done in %.1f s", name, time.monotonic() - started)
+
+
 @dataclass
 class _Funds:
     """What computing and publishing the funds left: the files written, each computed fund's
-    header and home snapshot (by CIK), and its data-quality flags. The full outputs are gone."""
+    header and home snapshot (by CIK), its data-quality flags, and the CIKs whose batch was
+    done (computed, or found to have no reports). The full outputs are gone."""
 
-    files: dict[str, str]
-    metas: dict[int, FundMeta]
-    snaps: dict[int, FundSnapshot]
-    flags: list
+    files: dict[str, str] = field(default_factory=dict)
+    metas: dict[int, FundMeta] = field(default_factory=dict)
+    snaps: dict[int, FundSnapshot] = field(default_factory=dict)
+    flags: list = field(default_factory=list)
+    attempted: set[int] = field(default_factory=set)
 
 
-def _publish_funds(ctx: Context, ciks: set[int], staging: Path, compress: bool) -> _Funds:
+def _publish_funds(
+    ctx: Context, ciks: set[int], staging: Path, compress: bool, budget: Budget
+) -> _Funds:
     """Compute the funds of `ciks` FUND_BATCH at a time, writing each fund's files into `staging`
     and each batch's fund state into the lake's FUND_STATE_RUN parts as soon as they exist; only
     the headers, snapshots, flags and checksums are kept. A part left by a run that died is
-    dropped first: it was never published."""
+    dropped first: it was never published. The first batch always runs; no later one starts
+    once the time budget is spent."""
     lake = ctx.lake
     drop_parts(lake, FUND_STATE_RUN)
-    done = _Funds({}, {}, {}, [])
+    done = _Funds()
     for number, batch in enumerate(chunks(sorted(ciks), FUND_BATCH)):
+        if number and budget.spent():
+            budget.cut("compute")
+            log.warning(
+                "compute: stopped after %d funds, the time budget is spent", len(done.attempted)
+            )
+            break
+        done.attempted |= set(batch)
         where = pl.col("cik").is_in(batch)
         holdings = scan(lake, "holdings", HOLDINGS_SCHEMA, where)
         reports = scan(lake, "reports", REPORTS_SCHEMA, where)
@@ -178,11 +207,21 @@ def run_weekly(
     *,
     compress: bool = True,
     built: datetime | None = None,
+    budget: Budget | None = None,
 ) -> RunStats:
     """One pipeline run as of `today`; `full` recomputes and republishes everything (after a
     formula change). Returns what it did. Raises InvariantError or CusipLeakError, before the
     manifest is written, when a recomputed fund breaks an invariant or a staged file would publish
-    a CUSIP; the site then stays on the last good version and the next run retries."""
+    a CUSIP; the site then stays on the last good version and the next run retries.
+
+    `budget` (default: ORCA_TIME_BUDGET_MIN, 270 minutes) bounds the run. When it is spent a long
+    stage stops cleanly between two units of work (a ZIP, a ticker, a lookup, a batch of funds)
+    and the later stages are skipped; the state keeps what is still owed, so the next run goes on
+    from there. If funds were computed, they are published with the shared files and health.json
+    names the stages cut short (`time_budget`); the funds not reached stay pending (a rebuild cut
+    short is finished as an ordinary recompute of them). If the budget ran out before the first
+    fund, nothing is published."""
+    budget = Budget.from_env() if budget is None else budget
     out_root = Path(out_root)
     lake.root.mkdir(parents=True, exist_ok=True)
     state = State.load(lake)
@@ -194,26 +233,49 @@ def run_weekly(
         state.pending_all = True
         state.save(lake)
 
-    ingest_bulk(lake, sources, state, flags, counts)
-    ingest_live(lake, sources, state, today, flags, counts)
-    map_new_cusips(lake, sources, state, flags)
-    refresh_prices(lake, sources, state, today, last_q, run_id, flags)
-    update_rf(lake, sources, state, last_q, full, flags)
+    def securities() -> None:
+        map_new_cusips(lake, sources, state, flags, budget)
+        retry_lookups(lake, sources, state, flags, budget)
+
+    _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))
+    _stage("live", budget, lambda: ingest_live(lake, sources, state, today, flags, counts))
+    _stage("securities", budget, securities)
+    _stage(
+        "prices",
+        budget,
+        lambda: refresh_prices(lake, sources, state, today, last_q, run_id, flags, budget),
+    )
+    _stage("rf", budget, lambda: update_rf(lake, sources, state, last_q, full, flags))
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
         flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
 
+    if budget.spent():  # no fund computed: nothing new to publish, everything owed is in the state
+        budget.cut("compute")
+        flags.append(budget.flag())
+        log.warning(
+            "run %s: the time budget is spent before computing funds; not publishing", run_id
+        )
+        return RunStats(run_id, None, last_q, {}, [], counts.filings_parsed, 0, flags)
+
     ctx = Context.build(lake, last_q)
     recompute = _recompute_set(lake, ctx, state, last_q)
     staging = new_version(out_root, run_id)
-    funds = _publish_funds(ctx, recompute, staging, compress)
+    funds = _publish_funds(ctx, recompute, staging, compress, budget)
     flags += funds.flags
     files, computed = funds.files, set(funds.metas)
+    remaining = recompute - funds.attempted
+    rebuild = full and not remaining  # a whole rebuild replaces what was published before
+    if budget.flag():
+        flags.append(budget.flag())
 
     # The funds not recomputed contribute their stored header and snapshot to the shared files.
     metas, snaps = funds.metas, funds.snaps
     stored = read_table(lake, "fund_state", FUND_STATE_SCHEMA)
-    stored = stored.clear() if full else stored.filter(~pl.col("cik").is_in(sorted(recompute)))
+    if rebuild:
+        stored = stored.clear()
+    else:
+        stored = stored.filter(~pl.col("cik").is_in(sorted(funds.attempted)))
     for cik, meta, snap in stored.iter_rows():
         metas[cik], snaps[cik] = undump(meta), undump(snap)
     del stored
@@ -257,14 +319,15 @@ def run_weekly(
     if leaks:
         raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
 
-    dropped = recompute - computed
-    merged = dict(files) if full else {**previous, **files}
+    dropped = funds.attempted - computed
+    merged = dict(files) if rebuild else {**previous, **files}
     merged = {path: sha for path, sha in merged.items() if not is_fund_path(path, dropped)}
     write_manifest(out_root, run_id, merged, compress, built=built)
 
-    _merge_fund_state(lake, recompute, clear=full)  # recomputed funds replaced, dropped ones gone
+    # Recomputed funds replaced, dropped ones gone.
+    _merge_fund_state(lake, funds.attempted, clear=rebuild)
     write_json_atomic(published_path(lake), merged)
-    state.pending_funds.clear()
+    state.pending_funds = remaining  # what the price and filing changes still owe
     state.pending_stocks.clear()
     state.pending_weekly.clear()
     state.pending_all = False

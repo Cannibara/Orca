@@ -1,13 +1,15 @@
 """Daily prices: Tiingo source, incremental Parquet store, split adjustment.
 
 The lake table `prices_daily` holds raw, unadjusted bars as float32 (volume float64), one row
-per (stock_id, date). Each update run appends one part `z<run id>`; compaction folds the run
-parts into yearly parts `y<year>`. A later part overrides an earlier one, and `z` sorts after
+per (stock_id, date). Each update run appends numbered parts `z<run id>-0001`, `-0002`, ... (a
+new one per flush, so a long run never rewrites what it already stored); compaction folds the
+run parts into yearly parts `y<year>`. A later part overrides an earlier one, and `z` sorts after
 `y`, so `read_prices` keeps the last occurrence of a (stock_id, date) in part order.
 """
 
 import logging
 import math
+from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Protocol
 from urllib.parse import quote
@@ -138,6 +140,32 @@ def _part_path(lake: Lake, part: str):
     return lake.root / TABLE / f"{part}.parquet"
 
 
+def _run_of(part: str) -> str | None:
+    """The run id of a run part (`z<run>-NNNN`, or an older single `z<run>`), else None."""
+    if not part.startswith("z"):
+        return None
+    run, dash, number = part[1:].rpartition("-")
+    return run if dash and len(number) == 4 and number.isdigit() else part[1:]
+
+
+def run_parts(lake: Lake, run_id: str) -> list[str]:
+    """The parts the price run `run_id` wrote, in part order."""
+    return [p for p in lake.parts(TABLE) if _run_of(p) == run_id]
+
+
+def price_runs(lake: Lake) -> set[str]:
+    """The ids of the runs whose parts are not compacted yet."""
+    return {run for p in lake.parts(TABLE) if (run := _run_of(p)) is not None}
+
+
+def part_stocks(lake: Lake, parts: list[str]) -> set[int]:
+    """The stock ids stored in `parts`, read from their stock_id column alone."""
+    frames = [
+        pl.scan_parquet(_part_path(lake, p)).select("stock_id").unique().collect() for p in parts
+    ]
+    return set(pl.concat(frames)["stock_id"].to_list()) if frames else set()
+
+
 def _stored_tail(lake: Lake) -> tuple[dict[int, date], dict[tuple, pl.DataFrame]]:
     """The last stored date of each stock, and its stored bars from 5 days before that date on
     (one row per day, the last occurrence in part order), keyed by (stock_id,). The part files
@@ -175,10 +203,11 @@ def update_prices(
     run_id: str | None = None,
     stats: dict | None = None,
     flush_every: int = FLUSH_EVERY,
+    should_stop: Callable[[], bool] | None = None,
 ) -> list[int]:
-    """Fetch each stock's prices through `today` and append the new and revised bars to the
-    part `z<run_id>` (default: today as YYYYMMDD; a part of that name already in the lake is
-    extended, never replaced).
+    """Fetch each stock's prices through `today`, in the order of `tickers`, and append the new
+    and revised bars to new parts `z<run_id>-0001`, `-0002`, ... (run_id default: today as
+    YYYYMMDD; a run id already in the lake goes on from its last part number).
 
     A stock is fetched from 5 days before its last stored date, or from 2013-01-01 when it has no
     rows. Returns the sorted stock_ids whose history changed: stocks that got their first rows,
@@ -189,9 +218,10 @@ def update_prices(
     A ticker whose fetch raises FetchError is logged and skipped; nothing is stored for it, so
     its last stored date stays put and the next run fetches it again. The run stops early, keeping
     what it has, on a 401, 403 or 429 (the key or the rate limit: every later ticker would fail
-    too) or after 25 failed tickers in a row. The part is written every `flush_every` tickers,
-    so a run that is killed keeps what it fetched so far (but the stocks it had flagged as
-    changed are then lost: the next run finds them unchanged).
+    too), after 25 failed tickers in a row, or when `should_stop()` (asked before each ticker)
+    says so: a time budget is spent. A new part is written every `flush_every` tickers, so a run
+    that is killed keeps what it fetched so far (but the stocks it had flagged as changed are then
+    lost: the next run finds them unchanged).
 
     `stats`, if given, is reset and filled: "fetched" (tickers that returned rows), "empty"
     (tickers that returned none), "failed" (a (stock_id, ticker, HTTP status or None) per failed
@@ -201,21 +231,27 @@ def update_prices(
     failed: list[tuple[int, str, int | None]] = []
     stats.update(fetched=0, empty=0, failed=failed, stopped=None)
     last_by_id, recent = _stored_tail(lake)
-    part = f"z{run_id or today.strftime('%Y%m%d')}"
+    run_id = run_id or today.strftime("%Y%m%d")
+    numbers = [int(p.rpartition("-")[2]) for p in run_parts(lake, run_id) if p != f"z{run_id}"]
+    next_number = max(numbers, default=0) + 1
     changed: list[int] = []
     pending: list[pl.DataFrame] = []
 
     def flush() -> None:
+        nonlocal next_number
         if not pending:
             return
         rows = pl.concat(pending)
         pending.clear()
-        if part in lake.parts(TABLE):
-            rows = pl.concat([lake.read(TABLE, part=part), rows])
-        lake.write(TABLE, rows, part=part)
+        lake.write(TABLE, rows, part=f"z{run_id}-{next_number:04d}")
+        next_number += 1
 
     in_a_row = 0
-    for done, (stock_id, ticker) in enumerate(sorted(tickers.items()), start=1):
+    for done, (stock_id, ticker) in enumerate(tickers.items(), start=1):
+        if should_stop is not None and should_stop():
+            stats["stopped"] = "time budget"
+            log.warning("prices: stopping the run: the time budget is spent")
+            break
         last_date = last_by_id.get(stock_id)
         start = HISTORY_START if last_date is None else last_date - timedelta(days=OVERLAP_DAYS)
         try:
@@ -288,22 +324,23 @@ def _not_yet_stored(fetched: pl.DataFrame, recent: pl.DataFrame) -> pl.DataFrame
 def compact_prices(lake: Lake) -> None:
     """Fold all run parts (`z...`) into yearly parts `y<year>` and delete them. Years the runs
     touch are rewritten with the run rows overriding the old ones; other years are left alone.
-    The yearly parts are written before any run part is deleted, so an interrupted compaction
-    loses nothing."""
-    run_parts = [p for p in lake.parts(TABLE) if p.startswith("z")]
-    if not run_parts:
+    One year is read at a time (a first backfill holds every year). The yearly parts are written
+    before any run part is deleted, so an interrupted compaction loses nothing."""
+    parts = [p for p in lake.parts(TABLE) if p.startswith("z")]
+    if not parts:
         return
-    runs = pl.concat([lake.read(TABLE, part=p) for p in run_parts])  # oldest run first
-    by_year = runs.with_columns(year=pl.col("date").dt.year()).partition_by(
-        "year", as_dict=True, include_key=False
+    paths = [_part_path(lake, p) for p in parts]  # oldest run first
+    year = pl.col("date").dt.year()
+    years = pl.concat(
+        [pl.scan_parquet(path).select(year.unique().alias("year")).collect() for path in paths]
     )
-    for (year,), rows in sorted(by_year.items()):
-        part = f"y{year}"
-        if part in lake.parts(TABLE):
-            rows = pl.concat([lake.read(TABLE, part=part), rows])
-        merged = rows.unique(subset=_KEY, keep="last", maintain_order=True).sort(_KEY)
+    for y in sorted(years["year"].unique().to_list()):
+        part = f"y{y}"
+        frames = [lake.read(TABLE, part=part)] if part in lake.parts(TABLE) else []
+        frames += [pl.scan_parquet(path).filter(year == y).collect() for path in paths]
+        merged = pl.concat(frames).unique(subset=_KEY, keep="last", maintain_order=True).sort(_KEY)
         lake.write(TABLE, merged, part=part)
-    for part in run_parts:
+    for part in parts:
         _part_path(lake, part).unlink()
 
 

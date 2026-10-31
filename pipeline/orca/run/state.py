@@ -126,7 +126,9 @@ class State:
     """What runs hand on to each other (lake/state.json). The pending sets (and `pending_all`, a
     recompute of every fund owed by a rebuild or a new T-bill table) are added to before the work
     that needs them is attempted and cleared only after a successful publish. `prices_in_flight`
-    names a price run that has not finished: its parts may hold changes nobody has recorded."""
+    names a price run that has not finished: its parts may hold changes nobody has recorded.
+    `lookup_retry` holds securities whose SIC code or shares outstanding are still to be fetched
+    (a lookup the time budget cut off)."""
 
     live_watermark: date | None = None
     last_q: int | None = None
@@ -137,6 +139,7 @@ class State:
     rf_stale: bool = False
     pending_all: bool = False
     prices_in_flight: str | None = None
+    lookup_retry: set[int] = field(default_factory=set)
 
     @staticmethod
     def path(lake: Lake) -> Path:
@@ -159,6 +162,7 @@ class State:
             rf_stale=bool(raw.get("rf_stale", False)),
             pending_all=bool(raw.get("pending_all", False)),
             prices_in_flight=raw.get("prices_in_flight"),
+            lookup_retry=set(raw.get("lookup_retry", [])),
         )
 
     def save(self, lake: Lake) -> None:
@@ -174,6 +178,7 @@ class State:
                 "rf_stale": self.rf_stale,
                 "pending_all": self.pending_all,
                 "prices_in_flight": self.prices_in_flight,
+                "lookup_retry": sorted(self.lookup_retry),
             },
         )
 

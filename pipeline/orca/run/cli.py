@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
             date.today(),
             full=args.command == "rebuild",
         )
+        if stats.staging is None:
+            print("published nothing: the time budget ran out before any fund was computed")
+            return 0
         print(f"staging: {stats.staging}")
         print(f"changed: {len(stats.changed)} files, funds recomputed: {stats.funds_recomputed}")
         return 0

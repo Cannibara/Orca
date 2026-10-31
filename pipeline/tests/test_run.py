@@ -47,6 +47,7 @@ from orca.run import (
     verify,
     weekly,
 )
+from orca.run.budget import Budget
 from orca.run.market import update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
@@ -803,3 +804,161 @@ def test_closes_on_matches_close_on_for_many_days_at_once(tmp_path):
     expected = {(1, d): close_on(daily, d) for d in days}
     assert found == {k: v for k, v in expected.items() if v is not None}
     assert found[(1, date(2024, 6, 2))] == 20.0  # Friday's close, split-adjusted
+
+
+# --- the time budget ------------------------------------------------------------------------
+
+
+class StoppedClock:
+    """A clock for Budget that stands still until `run_out()`, which jumps past any budget."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def run_out(self) -> None:
+        self.now = 1e12
+
+
+def budgeted(root: Path, sources, today: date, clock: StoppedClock, **kwargs):
+    return run_weekly(
+        Lake(root / "lake"), root / "out", sources, today, budget=Budget(1.0, clock), **kwargs
+    )
+
+
+def fund_and_home_files(root: Path) -> dict[str, bytes]:
+    return {p: b for p, b in bucket_files(root).items() if p not in NOT_COMPARED}
+
+
+def test_budget_spent_in_bulk_ingest_publishes_nothing_and_the_next_run_goes_on(
+    fixtures, base_runs, tmp_path
+):
+    clock, downloads = StoppedClock(), []
+    sources = fixture_sources(fixtures)
+
+    def download(url, dest):
+        downloads.append(url)
+        sources.download_bulk_zip(url, dest)
+        if len(downloads) == 2:
+            clock.run_out()
+
+    stats = budgeted(tmp_path, replace(sources, download_bulk_zip=download), WEEK1, clock)
+
+    assert stats.staging is None and stats.changed == [] and stats.funds_recomputed == 0
+    assert {
+        "type": "time_budget",
+        "minutes": 1.0,
+        "stages": ["bulk", "live", "securities", "prices", "rf", "compute"],
+    } in stats.flags
+    assert len(downloads) == 2
+    assert len(json.loads((tmp_path / "lake" / "ingested.json").read_text())) == 2
+    assert not (tmp_path / "out" / "manifest.json").exists()
+    assert not (tmp_path / "out" / "staging").exists()
+    assert State.load(Lake(tmp_path / "lake")).pending_funds  # the two ZIPs' funds are owed
+
+    run(tmp_path, fixture_sources(fixtures), WEEK1)  # an unspent budget: the rest of the work
+
+    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
+
+
+def test_budget_spent_in_the_price_backfill_resumes_with_the_stocks_not_fetched(
+    fixtures, base_runs, tmp_path
+):
+    clock, asked = StoppedClock(), []
+
+    class Recording(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append(ticker)
+            if len(asked) == 10:
+                clock.run_out()
+            return super().daily(ticker, start, end)
+
+    sources = replace(fixture_sources(fixtures), prices=Recording(fixtures.prices))
+    stats = budgeted(tmp_path, sources, WEEK1, clock)
+
+    assert stats.staging is None
+    [flag] = [f for f in stats.flags if f["type"] == "prices"]
+    assert flag["stopped"] == "time budget" and flag["fetched"] == 10
+    first = list(asked)
+    assert len(State.load(Lake(tmp_path / "lake")).price_tried) == 10
+
+    asked.clear()
+    run(tmp_path, sources, WEEK1)
+
+    assert not set(asked[:15]) & set(first)  # the 15 stocks never fetched come first
+    assert set(asked) == set(fixtures.prices)  # then the held ones are refreshed
+    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
+
+
+def test_budget_spent_in_compute_publishes_the_funds_done_and_owes_the_rest(
+    fixtures, base_runs, tmp_path, monkeypatch
+):
+    clock = StoppedClock()
+    monkeypatch.setattr("orca.run.weekly.FUND_BATCH", 5)
+    real_publish = weekly.publish_fund
+
+    def publish_then_run_out(out, fund, compress=True):
+        clock.run_out()
+        return real_publish(out, fund, compress)
+
+    monkeypatch.setattr("orca.run.weekly.publish_fund", publish_then_run_out)
+    stats = budgeted(tmp_path, fixture_sources(fixtures), WEEK1, clock)
+    copy_published(stats.staging, tmp_path / "out", tmp_path / "bucket")
+    monkeypatch.undo()
+
+    assert stats.funds_recomputed == 5  # the first batch always runs, no later one starts
+    assert {"type": "time_budget", "minutes": 1.0, "stages": ["compute"]} in health(tmp_path)[
+        "flags"
+    ]
+    assert len(read_json(tmp_path / "bucket" / "funds.json")["id"]) == 5
+    assert len([p for p in manifest(tmp_path) if p.endswith("/summary.json")]) == 5
+    state = State.load(Lake(tmp_path / "lake"))
+    assert len(state.pending_funds) == 7 and not state.pending_all
+    assert state.last_q == q_index(2026, 2)
+
+    resumed = run(tmp_path, fixture_sources(fixtures), WEEK1)
+
+    assert resumed.funds_recomputed == 7
+    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
+    assert set(manifest(tmp_path)) == set(manifest(base_runs[WEEK1]))
+
+
+def test_budget_spent_in_the_security_lookups_retries_them_next_run(fixtures, base_runs, tmp_path):
+    clock, looked_up = StoppedClock(), []
+    sources = fixture_sources(fixtures)
+
+    def sic(cik):
+        looked_up.append(cik)
+        if len(looked_up) == 3:
+            clock.run_out()
+        return sources.sic(cik)
+
+    budgeted(tmp_path, replace(sources, sic=sic), WEEK1, clock)
+
+    lake = Lake(tmp_path / "lake")
+    retry = State.load(lake).lookup_retry
+    # Done: the three stocks whose SIC was asked for, and SPY among them (an ETF has no SIC).
+    assert sorted(retry) == list(range(5, 26))
+    securities = lake.read("securities")
+    assert (
+        securities.filter(pl.col("stock_id").is_in(sorted(retry)))["shares_out"].null_count() == 21
+    )
+
+    run(tmp_path, sources, WEEK1)
+
+    assert State.load(lake).lookup_retry == set()
+    assert lake.read("securities").equals(Lake(base_runs[WEEK1] / "lake").read("securities"))
+    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
+
+
+def test_budget_minutes_come_from_the_environment(monkeypatch):
+    monkeypatch.delenv("ORCA_TIME_BUDGET_MIN", raising=False)
+    assert Budget.from_env().minutes == 270
+    monkeypatch.setenv("ORCA_TIME_BUDGET_MIN", "12.5")
+    assert Budget.from_env().minutes == 12.5
+    for bad in ("0", "-3", "soon", "nan"):
+        monkeypatch.setenv("ORCA_TIME_BUDGET_MIN", bad)
+        with pytest.raises(RuntimeError, match="ORCA_TIME_BUDGET_MIN"):
+            Budget.from_env()

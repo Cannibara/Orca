@@ -9,7 +9,15 @@ import polars as pl
 from orca.holdings import HOLDINGS_SCHEMA
 from orca.http import FetchError
 from orca.prices import TABLE as PRICES_TABLE
-from orca.prices import compact_prices, split_adjust_prices, update_prices
+from orca.prices import (
+    compact_prices,
+    part_stocks,
+    price_runs,
+    run_parts,
+    split_adjust_prices,
+    update_prices,
+)
+from orca.run.budget import Budget
 from orca.run.sources import Sources
 from orca.run.state import (
     CUSIP_MAP_SCHEMA,
@@ -27,7 +35,8 @@ from orca.storage import Lake
 
 BENCHMARK_CUSIP = "78462F103"  # SPY, the benchmark of the what-if figures
 EMPTY_FETCH_WARN = 0.25  # share of tickers answering with no rows that is worth a flag
-COMPACT_AT_RUN_PARTS = 4  # price run parts that trigger a compaction into yearly parts
+COMPACT_AT_RUNS = 4  # price runs not compacted yet that trigger a compaction into yearly parts
+COMPACT_AT_PARTS = 64  # ... or this many run parts (a long backfill flushes many)
 
 
 # --- securities -------------------------------------------------------------------------------
@@ -39,7 +48,7 @@ def stock_of(cusip_map: pl.DataFrame) -> dict[str, int]:
     return dict(zip(mapped["cusip"].to_list(), mapped["stock_id"].to_list()))
 
 
-def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list) -> None:
+def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list, budget: Budget) -> None:
     """Map the share CUSIPs not yet in cusip_map (and the benchmark's), oldest first, give new
     securities ids, sectors and shares outstanding, and mark every fund holding a newly mapped
     CUSIP for recompute. A failed mapping leaves the CUSIPs for the next run."""
@@ -83,7 +92,10 @@ def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list) -> N
     securities = assign_stock_ids(mapped, existing).cast(SECURITIES_TABLE_SCHEMA)
     added = securities.filter(pl.col("stock_id") > old_max)
     securities = pl.concat(
-        [securities.filter(pl.col("stock_id") <= old_max), enrich(added, sources, tickers, flags)]
+        [
+            securities.filter(pl.col("stock_id") <= old_max),
+            enrich(added, sources, tickers, state, flags, budget),
+        ]
     )
 
     new_map = cusip_rows(mapped, securities)
@@ -91,7 +103,7 @@ def map_new_cusips(lake: Lake, sources: Sources, state: State, flags: list) -> N
     if newly:
         holders = scan(lake, "holdings", HOLDINGS_SCHEMA, pl.col("cusip").is_in(newly))
         state.pending_funds |= {int(c) for c in holders["cik"].unique().to_list()}
-        state.save(lake)  # before the map is written, so a crash cannot lose these funds
+    state.save(lake)  # before the map is written, so a crash cannot lose these funds or lookups
     lake.write("securities", securities.sort("stock_id"))
     lake.write("cusip_map", pl.concat([cusip_map, new_map]).sort("cusip"))
 
@@ -117,16 +129,25 @@ def issuer_names(lake: Lake, cusips: list[str]) -> dict[str, str]:
 
 
 def enrich(
-    added: pl.DataFrame, sources: Sources, tickers: pl.DataFrame, flags: list
+    added: pl.DataFrame,
+    sources: Sources,
+    tickers: pl.DataFrame,
+    state: State,
+    flags: list,
+    budget: Budget,
 ) -> pl.DataFrame:
     """Company CIK (from the SEC ticker list), SIC code, sector and shares outstanding of new
-    securities. A failed lookup is flagged and left empty."""
+    securities. A failed lookup is flagged and left empty. Once the time budget is spent the
+    rest are left empty too and kept in `state.lookup_retry` for a later run."""
     cik_of = {t: c for t, c in tickers.select("ticker", "cik").iter_rows()}
     rows = []
     for row in added.iter_rows(named=True):
         cik = cik_of.get(normalise_ticker(row["ticker"])) if row["ticker"] else None
         sic = shares = None
-        if cik is not None:
+        if cik is not None and budget.spent():
+            budget.cut("securities")
+            state.lookup_retry.add(row["stock_id"])
+        elif cik is not None:
             try:
                 sic = None if row["is_etf"] else sources.sic(cik)
                 shares = sources.shares_outstanding(cik)
@@ -148,6 +169,60 @@ def enrich(
             }
         )
     return pl.DataFrame(rows, schema=SECURITIES_TABLE_SCHEMA)
+
+
+def retry_lookups(lake: Lake, sources: Sources, state: State, flags: list, budget: Budget) -> None:
+    """Fetch what earlier runs did not get for the securities of `state.lookup_retry`: the SIC
+    code (and so the sector) of a stock without one, and the shares outstanding. A security
+    leaves the list once its lookups answer; a failed one is flagged and stays."""
+    if not state.lookup_retry:
+        return
+    securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
+    state.lookup_retry &= set(securities["stock_id"].to_list())
+    found: dict[int, tuple[int | None, float | None]] = {}
+    for row in securities.filter(pl.col("stock_id").is_in(sorted(state.lookup_retry))).iter_rows(
+        named=True
+    ):
+        if budget.spent():
+            budget.cut("securities")
+            break
+        sid, cik = row["stock_id"], row["cik"]
+        try:
+            needs_sic = row["sic"] is None and not row["is_etf"]
+            sic = sources.sic(cik) if needs_sic and cik is not None else row["sic"]
+            shares = sources.shares_outstanding(cik) if cik is not None else None
+        except FetchError as err:
+            flags.append({"type": "security_lookup_failed", "stock_id": sid, "status": err.status})
+            continue
+        found[sid] = (sic, shares)
+    if not found:
+        state.save(lake)
+        return
+    update = pl.DataFrame(
+        [(sid, sic, shares) for sid, (sic, shares) in found.items()],
+        schema={"stock_id": pl.Int32, "_sic": pl.Int32, "_shares": pl.Float64},
+        orient="row",
+    )
+    securities = (
+        securities.join(update, on="stock_id", how="left")
+        .with_columns(
+            sic=pl.coalesce("_sic", "sic"),
+            shares_out=pl.coalesce("_shares", "shares_out"),
+        )
+        .drop("_sic", "_shares")
+    )
+    sectors = [
+        sector_for_sic(sic, bool(etf))
+        for sic, etf in securities.select("sic", "is_etf").iter_rows()
+    ]
+    securities = securities.with_columns(
+        sector=pl.when(pl.col("stock_id").is_in(list(found)))
+        .then(pl.Series(sectors, dtype=pl.String))
+        .otherwise(pl.col("sector"))
+    )
+    lake.write("securities", securities.cast(SECURITIES_TABLE_SCHEMA).sort("stock_id"))
+    state.lookup_retry -= set(found)  # only once the answers are stored
+    state.save(lake)
 
 
 def cusip_rows(mapped: pl.DataFrame, securities: pl.DataFrame) -> pl.DataFrame:
@@ -184,35 +259,51 @@ def held_stocks(lake: Lake, stocks: dict[str, int], since_q: int) -> set[int]:
 
 
 def refresh_prices(
-    lake: Lake, sources: Sources, state: State, today: date, last_q: int, run_id: str, flags: list
+    lake: Lake,
+    sources: Sources,
+    state: State,
+    today: date,
+    last_q: int,
+    run_id: str,
+    flags: list,
+    budget: Budget,
 ) -> list[int]:
     """Fetch the prices of the stocks held in the latest quarter, the benchmark and any stock
-    never fetched; record the stocks whose history changed (and those with new rows, for their
-    weekly file) in the state before anything is recomputed from them. Returns the changed ids.
+    never fetched (those first, so a backfill the time budget cut short goes on where it
+    stopped); record the stocks whose history changed (and those with new rows, for their weekly
+    file) in the state before anything is recomputed from them. Returns the changed ids.
 
-    A price run writes its part as it goes but reports the changed stocks only at the end, so the
-    run is marked in flight while it works. If it dies, the next run takes every stock of its part
-    as changed: more recomputing than needed, but no change is lost."""
+    A price run writes its parts as it goes but reports the changed stocks only at the end, so
+    the run is marked in flight while it works. If it dies, the next run takes every stock of its
+    parts as changed: more recomputing than needed, but no change is lost."""
     recover_prices_in_flight(lake, state)
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
     stocks = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
-    wanted = held_stocks(lake, stocks, last_q) | (
-        set(securities["stock_id"].to_list()) - state.price_tried
-    )
+    untried = set(securities["stock_id"].to_list()) - state.price_tried
+    wanted = held_stocks(lake, stocks, last_q) | untried
     if BENCHMARK_CUSIP in stocks:
         wanted.add(stocks[BENCHMARK_CUSIP])
     ticker_of = dict(securities.select("stock_id", "ticker").iter_rows())
-    tickers = {sid: ticker_of[sid] for sid in sorted(wanted) if ticker_of.get(sid)}
-    if sum(p.startswith("z") for p in lake.parts(PRICES_TABLE)) >= COMPACT_AT_RUN_PARTS:
+    ordered = sorted(wanted & untried) + sorted(wanted - untried)
+    tickers = {sid: ticker_of[sid] for sid in ordered if ticker_of.get(sid)}
+    run_part_count = sum(p.startswith("z") for p in lake.parts(PRICES_TABLE))
+    if len(price_runs(lake)) >= COMPACT_AT_RUNS or run_part_count >= COMPACT_AT_PARTS:
         compact_prices(lake)
     stats: dict = {}
     state.prices_in_flight = run_id
     state.save(lake)
-    changed = update_prices(lake, sources.prices, tickers, today, run_id=run_id, stats=stats)
-    part = f"z{run_id}"
-    touched = set()
-    if part in lake.parts(PRICES_TABLE):
-        touched = set(lake.read(PRICES_TABLE, part=part)["stock_id"].unique().to_list())
+    changed = update_prices(
+        lake,
+        sources.prices,
+        tickers,
+        today,
+        run_id=run_id,
+        stats=stats,
+        should_stop=budget.spent,
+    )
+    if stats["stopped"] == "time budget":
+        budget.cut("prices")
+    touched = part_stocks(lake, run_parts(lake, run_id))
     failed = {sid for sid, _, _ in stats["failed"]}
     state.pending_stocks |= set(changed)
     state.pending_weekly |= touched | set(changed)
@@ -238,31 +329,40 @@ def refresh_prices(
             }
         )
     if changed:
-        refresh_shares_outstanding(lake, sources, securities, changed, flags)
+        refresh_shares_outstanding(lake, sources, securities, changed, state, flags, budget)
     return changed
 
 
 def recover_prices_in_flight(lake: Lake, state: State) -> None:
     if state.prices_in_flight is None:
         return
-    part = f"z{state.prices_in_flight}"
-    if part in lake.parts(PRICES_TABLE):
-        stocks = set(lake.read(PRICES_TABLE, part=part)["stock_id"].unique().to_list())
-        state.pending_stocks |= stocks
-        state.pending_weekly |= stocks
+    stocks = part_stocks(lake, run_parts(lake, state.prices_in_flight))
+    state.pending_stocks |= stocks
+    state.pending_weekly |= stocks
     state.prices_in_flight = None
     state.save(lake)
 
 
 def refresh_shares_outstanding(
-    lake: Lake, sources: Sources, securities: pl.DataFrame, stock_ids: list[int], flags: list
+    lake: Lake,
+    sources: Sources,
+    securities: pl.DataFrame,
+    stock_ids: list[int],
+    state: State,
+    flags: list,
+    budget: Budget,
 ) -> None:
-    """A split changes the share count: refetch it for the stocks whose history changed."""
+    """A split changes the share count: refetch it for the stocks whose history changed. Once
+    the time budget is spent the rest wait in `state.lookup_retry`."""
     fresh = {}
     for stock_id, cik in (
         securities.filter(pl.col("stock_id").is_in(stock_ids)).select("stock_id", "cik").iter_rows()
     ):
         if cik is None:
+            continue
+        if budget.spent():
+            budget.cut("prices")
+            state.lookup_retry.add(stock_id)
             continue
         try:
             shares = sources.shares_outstanding(cik)
@@ -284,6 +384,7 @@ def refresh_shares_outstanding(
             .drop("_fresh")
         )
         lake.write("securities", securities.cast(SECURITIES_TABLE_SCHEMA).sort("stock_id"))
+    state.save(lake)
 
 
 def load_daily(
