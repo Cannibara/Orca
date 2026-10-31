@@ -1,0 +1,36 @@
+name: Restore from R2
+description: >-
+  Copy the lake from the private R2 bucket into pipeline/data/lake and, when the site bucket has
+  one, its manifest.json into pipeline/data/out. Needs rclone (setup-rclone) and the calling
+  workflow's R2_LAKE_BUCKET, R2_SITE_BUCKET and RCLONE_CONFIG_R2_* settings; the credentials come
+  in as inputs, so only this action's step sees them.
+
+inputs:
+  access-key-id:
+    description: R2 access key id
+    required: true
+  secret-access-key:
+    description: R2 secret access key
+    required: true
+  endpoint:
+    description: R2 S3 endpoint URL
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the lake and the manifest
+      shell: bash
+      working-directory: pipeline
+      env:
+        RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ inputs.secret-access-key }}
+        RCLONE_CONFIG_R2_ENDPOINT: ${{ inputs.endpoint }}
+      run: |
+        rclone sync "r2:${R2_LAKE_BUCKET}" data/lake
+        mkdir -p data/out
+        # The manifest is absent on the first run. A failed listing stops the step.
+        listing="$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)"
+        if [ -n "$listing" ]; then
+          rclone copy "r2:${R2_SITE_BUCKET}/manifest.json" data/out
+        fi

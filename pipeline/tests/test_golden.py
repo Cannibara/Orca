@@ -10,11 +10,15 @@ A snapshot is only worth anything once a person has checked it against the filin
 missing the test writes it and FAILS, so a snapshot is never accepted unseen. Hand-check, for each
 fund, the share counts of two holdings and one quarter's total value against the 13F on EDGAR,
 note the numbers in the commit message, then commit the files. To refresh a snapshot after a
-deliberate change, delete it and run again. The other tests here run offline and cover the
-helpers that narrow a real run down to two funds.
+deliberate change, delete it and run again. Share counts and prices are on today's share basis,
+so a later split of a held stock changes positions.json: delete the snapshots and hand-check
+again. The other tests here run offline and cover the helpers that narrow a real run down to
+two funds.
 """
 
 import json
+import logging
+import math
 import os
 import re
 import zipfile
@@ -50,6 +54,7 @@ FIRST_Q = LAST_Q - 7  # the latest 8 quarters
 SNAPSHOTS = Path(__file__).parent / "golden"
 SNAPSHOT_FILES = ("summary.json", "positions.json")
 CONCENTRATED_BELOW = 20  # positions
+FLOAT_REL_TOL = 1e-9
 FAILURE_FLAGS = {  # a run that tolerated one of these has fetched less than it should
     "bulk_list_failed",
     "no_bulk_zips",
@@ -65,12 +70,22 @@ ZIP_DIR = "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/"
 # --- the golden test --------------------------------------------------------------------------
 
 
+@pytest.fixture
+def quiet_httpx():
+    """httpx logs each request's URL at INFO, and a FRED URL carries the API key."""
+    log = logging.getLogger("httpx")
+    before = log.level
+    log.setLevel(logging.WARNING)
+    yield
+    log.setLevel(before)
+
+
 @pytest.mark.network
 @pytest.mark.skipif(
     os.environ.get("ORCA_NETWORK") != "1",
     reason="needs the real SEC, OpenFIGI, Tiingo and FRED: set ORCA_NETWORK=1 and the keys",
 )
-def test_golden_funds(tmp_path):
+def test_golden_funds(tmp_path, quiet_httpx):
     stats = run_weekly(
         Lake(tmp_path / "lake"),
         tmp_path / "out",
@@ -301,6 +316,15 @@ def test_first_difference_names_the_path():
     assert first_difference({"a": None}, {"a": 0}) == "$.a: None != 0"
 
 
+def test_first_difference_tolerates_float_noise_only():
+    assert first_difference({"a": [1.0, 2.0e9]}, {"a": [1.0 + 1e-12, 2.0e9 * (1 + 1e-12)]}) is None
+    assert first_difference({"a": 1}, {"a": 1.0}) is None
+    assert first_difference({"a": 100.0}, {"a": 100.0 * (1 + 1e-6)}) == (
+        f"$.a: 100.0 != {100.0 * (1 + 1e-6)!r}"
+    )
+    assert first_difference({"a": True}, {"a": 1}) == "$.a: True != 1"  # a flag is not a number
+
+
 # --- helpers ------------------------------------------------------------------------------------
 
 _MONTHS = {m: i for i, m in enumerate("jan feb mar apr may jun jul aug sep oct nov dec".split(), 1)}
@@ -410,9 +434,13 @@ def broken_bridges(quarters: dict) -> list[int]:
     return broken
 
 
+def _is_number(value) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def first_difference(actual, expected, path: str = "$") -> str | None:
     """Where two JSON documents first differ, as "$.key[3].key: actual != expected"; None when
-    they are equal."""
+    they are equal. Numbers are equal within FLOAT_REL_TOL, so summation noise is no change."""
     if isinstance(actual, dict) and isinstance(expected, dict):
         if actual.keys() != expected.keys():
             return f"{path}: keys differ: {sorted(actual)} vs {sorted(expected)}"
@@ -421,6 +449,10 @@ def first_difference(actual, expected, path: str = "$") -> str | None:
         if len(actual) != len(expected):
             return f"{path}: {len(actual)} items != {len(expected)}"
         pairs = [(f"{path}[{i}]", a, e) for i, (a, e) in enumerate(zip(actual, expected))]
+    elif _is_number(actual) and _is_number(expected):
+        same = math.isclose(actual, expected, rel_tol=FLOAT_REL_TOL)
+        return None if same else f"{path}: {actual!r} != {expected!r}"
     else:
-        return None if actual == expected else f"{path}: {actual!r} != {expected!r}"
+        same = type(actual) is type(expected) and actual == expected  # True is not 1
+        return None if same else f"{path}: {actual!r} != {expected!r}"
     return next((d for p, a, e in pairs if (d := first_difference(a, e, p))), None)

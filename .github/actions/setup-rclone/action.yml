@@ -1,0 +1,32 @@
+name: Set up rclone
+description: >-
+  Install the pinned rclone release, and check that R2_LAKE_BUCKET and R2_SITE_BUCKET (set in the
+  calling workflow's env) are two different buckets. Holds no credentials.
+
+runs:
+  using: composite
+  steps:
+    - name: Install rclone
+      shell: bash
+      env:
+        # rclone release from GitHub, checked against the SHA256SUMS of that release.
+        RCLONE_VERSION: v1.74.4
+        RCLONE_LINUX_AMD64_SHA256: fe435e0c36228e7c2f116a8701f01127bb1f694005fc11d1f27186c8bca4115d
+      run: |
+        url="https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
+        curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/rclone.zip" "$url"
+        echo "${RCLONE_LINUX_AMD64_SHA256}  $RUNNER_TEMP/rclone.zip" | sha256sum --check -
+        unzip -q -j "$RUNNER_TEMP/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$RUNNER_TEMP/rclone-bin"
+        sudo install -m 0755 "$RUNNER_TEMP/rclone-bin/rclone" /usr/local/bin/rclone
+        rclone version
+    - name: Check the buckets
+      shell: bash
+      run: |
+        if [ -z "$R2_LAKE_BUCKET" ] || [ -z "$R2_SITE_BUCKET" ]; then
+          echo "::error::set the repository variables R2_LAKE_BUCKET and R2_SITE_BUCKET"
+          exit 1
+        fi
+        if [ "$R2_LAKE_BUCKET" = "$R2_SITE_BUCKET" ]; then
+          echo "::error::the lake holds CUSIPs and must not be the public site bucket"
+          exit 1
+        fi
