@@ -65,6 +65,10 @@ class Manifest:
     def seen(self, name: str, checksum: str) -> bool:
         return self._entries.get(name) == checksum
 
+    def __contains__(self, name: str) -> bool:
+        """Whether `name` was recorded, whatever its checksum."""
+        return name in self._entries
+
     def mark(self, name: str, checksum: str) -> None:
         self._entries[name] = checksum
 

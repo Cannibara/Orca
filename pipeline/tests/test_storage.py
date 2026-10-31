@@ -102,3 +102,11 @@ def test_write_is_atomic_and_leaves_no_temp_files(tmp_path, monkeypatch):
     lake.write("prices", pl.DataFrame({"px": [2.0, 3.0]}), part="z20261030")
     assert lake.read("prices", part="z20261030")["px"].to_list() == [2.0, 3.0]
     assert [p.name for p in (tmp_path / "prices").iterdir()] == ["z20261030.parquet"]
+
+
+def test_manifest_knows_names_whatever_the_checksum(tmp_path):
+    manifest = Manifest(tmp_path / "manifest.json")
+    manifest.mark("2024q1_form13f.zip", "abc")
+
+    assert "2024q1_form13f.zip" in manifest
+    assert "2024q2_form13f.zip" not in manifest

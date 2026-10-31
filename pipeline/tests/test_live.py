@@ -328,7 +328,7 @@ def test_fetch_new_filings_reads_filings_and_holdings():
     assert holdings["issuer"].to_list() == ["APPLE INC", "TESLA INC", "MICROSOFT CORP"]
     assert holdings["put_call"].to_list() == [None, "PUT", None]
     assert holdings["value_usd"].to_list() == [1_500_000.0, 2_000_000.0, 7.0]
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0}
+    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "no_index_days": []}
     # One index request, then one request per 13F-HR / 13F-HR/A filing; the 10-K, 13F-NT, SC 13G/A are never fetched.
     assert seen == [IDX_URL, ALPHA_URL, BETA_URL]
 
@@ -367,7 +367,7 @@ def test_fetch_new_filings_with_no_index_gives_empty_frames_and_zero_stats():
 
     assert filings.height == 0 and filings.schema == FILINGS_SCHEMA
     assert holdings.height == 0 and holdings.schema == HOLDINGS_SCHEMA
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0}
+    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 0, "no_index_days": [MARCH_31]}
     assert seen == [IDX_URL]
 
 
@@ -388,7 +388,7 @@ def test_fetch_new_filings_counts_and_skips_a_failed_download():
 
     assert filings["accession"].to_list() == [ALPHA]
     assert set(holdings["accession"]) == {ALPHA}
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 1}
+    assert stats == {"dropped_holdings": 0, "dropped_filings": 0, "failed_filings": 1, "no_index_days": []}
 
 
 @pytest.mark.parametrize(
@@ -424,7 +424,7 @@ def test_fetch_new_filings_drops_and_counts_a_filing_it_cannot_read(broken):
 
     assert filings["accession"].to_list() == [ALPHA]
     assert set(holdings["accession"]) == {ALPHA}  # nothing of the broken filing leaks through
-    assert stats == {"dropped_holdings": 0, "dropped_filings": 1, "failed_filings": 0}
+    assert stats == {"dropped_holdings": 0, "dropped_filings": 1, "failed_filings": 0, "no_index_days": []}
 
 
 def test_fetch_new_filings_sums_drops_across_filings():
@@ -507,3 +507,15 @@ def test_fetch_new_filings_clean_run_logs_nothing(caplog):
         fetch_new_filings(client, MARCH_31, MARCH_31)
 
     assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
+
+
+def test_fetch_new_filings_lists_the_days_without_an_index():
+    april_1 = IDX_URL.replace("QTR1/form.20250331", "QTR2/form.20250401")
+    routes = {**day_routes(), april_1: 403}  # March 30 answers 404, March 31 has an index
+    client, _ = make_client(routes)
+    stats: dict = {}
+
+    filings, _ = fetch_new_filings(client, date(2025, 3, 30), date(2025, 4, 1), stats)
+
+    assert filings.height > 0
+    assert stats["no_index_days"] == [date(2025, 3, 30), date(2025, 4, 1)]

@@ -466,13 +466,18 @@ def changed_files(new: Mapping[str, str], previous: Mapping[str, str]) -> list[s
 
 
 def write_manifest(
-    out_root: Path, version: str, files: Mapping[str, str], compress: bool = True
+    out_root: Path,
+    version: str,
+    files: Mapping[str, str],
+    compress: bool = True,
+    built: datetime | None = None,
 ) -> None:
     """Write `out_root/manifest.json`: {"version", "built" (UTC), "files": {path: sha256}}.
     `files` is every published file, not only this run's; call this after every other file of
-    the run is written, so that the manifest is the newest file."""
-    built = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    manifest = {"version": version, "built": built, "files": dict(files)}
+    the run is written, so that the manifest is the newest file. `built` is the build time, now
+    unless given (a fixed time makes a seeded demo build byte for byte repeatable)."""
+    stamp = (built or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    manifest = {"version": version, "built": stamp, "files": dict(files)}
     write_json(Path(out_root) / "manifest.json", manifest, compress)
 
 

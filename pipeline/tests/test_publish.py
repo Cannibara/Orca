@@ -2,7 +2,7 @@ import hashlib
 import json
 import re
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import brotli
 import polars as pl
@@ -1018,3 +1018,13 @@ def test_no_cusip_in_output(tmp_path):
         assert CUSIP not in text, path
         assert "594918104" not in text, path
         assert "cusip" not in text.replace("unmapped_cusips", ""), path
+
+
+def test_manifest_takes_a_fixed_build_time(tmp_path):
+    built = datetime(2026, 10, 30, 6, 23, 5, tzinfo=UTC)
+
+    write_manifest(tmp_path, "v", {"a.json": "abc"}, compress=False, built=built)
+
+    assert (
+        read_json(tmp_path / "manifest.json", compressed=False)["built"] == "2026-10-30T06:23:05Z"
+    )

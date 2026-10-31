@@ -215,21 +215,27 @@ def _daily_index(client: Client, day: date) -> str | None:
         raise
 
 
-def _index_entries(client: Client, since: date, until: date) -> tuple[list[IndexEntry], int]:
-    """13F entries of every day since..until, each filing once, and the count of unusable lines."""
+def _index_entries(
+    client: Client, since: date, until: date
+) -> tuple[list[IndexEntry], int, list[date]]:
+    """13F entries of every day since..until, each filing once, the count of unusable lines, and
+    the days EDGAR had no index for."""
     entries: dict[str, IndexEntry] = {}
     dropped = 0
+    no_index: list[date] = []
     day = since
     while day <= until:
         text = _daily_index(client, day)
-        if text is not None:
+        if text is None:
+            no_index.append(day)
+        else:
             day_stats: dict = {}
             for entry in parse_daily_index(text, day_stats):
                 # A filing with several filers is listed once per filer: keep the first.
                 entries.setdefault(entry.accession, entry)
             dropped += day_stats["dropped_filings"]
         day += timedelta(days=1)
-    return list(entries.values()), dropped
+    return list(entries.values()), dropped, no_index
 
 
 def fetch_new_filings(
@@ -245,9 +251,11 @@ def fetch_new_filings(
     table or report period is missing or unreadable, goes with its holdings; a holding with an
     unusable share type, value or share count goes alone; a filing that cannot be downloaded is
     skipped. If `stats` is given, these are counted in stats["dropped_filings"],
-    stats["dropped_holdings"] and stats["failed_filings"], and one warning names the offenders.
+    stats["dropped_holdings"] and stats["failed_filings"], and one warning names the offenders;
+    stats["no_index_days"] lists the days that had no index, oldest first (a recent one may only
+    not be published yet, so a caller should read it again later).
     """
-    entries, dropped_lines = _index_entries(client, since, until)
+    entries, dropped_lines, no_index_days = _index_entries(client, since, until)
     filing_rows: list[dict] = []
     info_rows: list[dict[str, str | None]] = []
     bad_filings: list[str] = []
@@ -276,6 +284,7 @@ def fetch_new_filings(
         stats["dropped_filings"] = dropped_filings
         stats["dropped_holdings"] = len(bad_holdings)
         stats["failed_filings"] = len(failed_filings)
+        stats["no_index_days"] = no_index_days
     if dropped_filings or bad_holdings or failed_filings:
         offending = list(dict.fromkeys([*bad_filings, *failed_filings, *bad_holdings]))
         log.warning(
