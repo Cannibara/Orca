@@ -15,7 +15,7 @@ from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
 from orca.holdings import fill_gaps
 from orca.home import FundSnapshot
-from orca.prices import split_factors_by_quarter
+from orca.prices import ShareFactors, split_factors_by_quarter
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_end
@@ -134,9 +134,7 @@ class Context:
     spy_id: int | None
     px: dict[int, dict[int, QuarterPx]] = field(default_factory=dict)
     splits: dict[int, pl.DataFrame] = field(default_factory=dict)
-    share_factors: dict[int, dict[int, float]] = field(
-        default_factory=dict
-    )  # split_factors_by_quarter
+    share_factors: dict[int, ShareFactors] = field(default_factory=dict)
 
     @classmethod
     def build(cls, lake: Lake, last_q: int) -> "Context":
@@ -155,7 +153,7 @@ class Context:
                 rows = by_stock.pop((stock_id,), None)
                 if rows is None:
                     self.px[stock_id], self.splits[stock_id] = {}, no_splits
-                    self.share_factors[stock_id] = {}
+                    self.share_factors[stock_id] = ShareFactors()
                     continue
                 self.px[stock_id] = quarter_px(rows)
                 splits = rows.filter(pl.col("split_factor") != 1.0).select("date", "split_factor")
@@ -395,7 +393,7 @@ def _share_series(
     for q, stock_id, shares, value in summed.select(
         "q", "stock_id", "shares", "value_usd"
     ).iter_rows():
-        adjusted[stock_id][q] = (float(shares) * ctx.share_factors[stock_id].get(q, 1.0), value)
+        adjusted[stock_id][q] = (float(shares) * ctx.share_factors[stock_id].of(q), value)
     return dict(adjusted), summed.select("cik", "q", "stock_id", "shares")
 
 
