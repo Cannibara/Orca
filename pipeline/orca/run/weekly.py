@@ -26,7 +26,7 @@ from orca.publish import (
 )
 from orca.quarters import q_end, q_of_date
 from orca.run.budget import Budget
-from orca.run.compute import Context, affected_funds, compute_batch
+from orca.run.compute import Context, compute_batch
 from orca.run.ingest import Counts, ingest_bulk, ingest_live
 from orca.run.market import (
     map_new_cusips,
@@ -61,6 +61,7 @@ from orca.run.state import (
     published_path,
     read_table,
     scan,
+    scan_parts,
     undump,
     write_json_atomic,
 )
@@ -109,20 +110,19 @@ def _recompute_set(lake: Lake, ctx: Context, state: State, last_q: int) -> set[i
     if state.pending_all or state.last_q != last_q or ctx.spy_id in state.pending_stocks:
         return _all_ciks(lake)
     cusips = [c for c, sid in ctx.stock_of.items() if sid in state.pending_stocks]
+    # The funds with a filing to recompute, and those holding (any quarter) a stock whose price
+    # history changed: their CIKs only, a part at a time. After a price backfill nearly every
+    # stock is pending, and the whole holdings rows would not fit in the runner's memory.
     holders = (
-        scan(lake, "holdings", HOLDINGS_SCHEMA, pl.col("cusip").is_in(cusips))
+        scan_parts(
+            lake,
+            "holdings",
+            lambda f: f.filter(pl.col("cusip").is_in(cusips)).select("cik").unique(),
+        )
         if cusips
-        else pl.DataFrame(schema=HOLDINGS_SCHEMA)
+        else []
     )
-    holders = holders.select(
-        "cik",
-        stock_id=pl.col("cusip").replace_strict(ctx.stock_of, default=None, return_dtype=pl.Int32),
-    )
-    return affected_funds(
-        pl.DataFrame({"cik": sorted(state.pending_funds)}, schema={"cik": pl.Int64}),
-        sorted(state.pending_stocks),
-        holders,
-    )
+    return set(state.pending_funds) | {int(c) for frame in holders for c in frame["cik"].to_list()}
 
 
 def _reconcile_published(lake: Lake, out_root: Path, state: State, compress: bool) -> None:
