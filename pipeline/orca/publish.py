@@ -499,9 +499,21 @@ def write_manifest(
 
 
 def read_manifest(out_root: Path, compressed: bool = True) -> dict[str, str]:
-    """The file checksums of `out_root/manifest.json`; empty when there is none (first run)."""
+    """The file checksums of `out_root/manifest.json`; empty when there is none (first run).
+
+    The site's manifest is stored brotli compressed with Content-Encoding: br, and R2 decodes
+    it for a client that does not accept br (rclone): the restored copy is then plain JSON. So
+    a `compressed` manifest that is not brotli is read as plain JSON."""
     path = Path(out_root) / "manifest.json"
-    return read_json(path, compressed)["files"] if path.exists() else {}
+    if not path.exists():
+        return {}
+    data = path.read_bytes()
+    if compressed:
+        try:
+            data = brotli.decompress(data)
+        except brotli.error:
+            pass
+    return json.loads(data)["files"]
 
 
 def write_health(out: Path, stats: Mapping, compress: bool = True) -> dict[str, str]:

@@ -81,5 +81,7 @@ runs:
         # The manifest is absent on the first run. A failed listing stops the step.
         listing="$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)"
         if [ -n "$listing" ]; then
-          rclone copy "r2:${R2_SITE_BUCKET}/manifest.json" data/out
+          # Stored brotli compressed (Content-Encoding: br), it comes back decoded, so its size
+          # and checksum differ from the stored object's; the pipeline reads either form.
+          rclone copyto "r2:${R2_SITE_BUCKET}/manifest.json" data/out/manifest.json --ignore-size --ignore-checksum
         fi

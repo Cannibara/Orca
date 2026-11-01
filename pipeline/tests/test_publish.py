@@ -967,6 +967,14 @@ def test_manifest_uncompressed_roundtrip(tmp_path):
     assert read_manifest(tmp_path, compressed=False) == {"a.json": "abc"}
 
 
+def test_read_manifest_takes_a_manifest_r2_decoded(tmp_path):
+    # R2 serves the brotli manifest decoded to a client without br, so the restore gets JSON.
+    write_manifest(tmp_path, "v", {"a.json": "abc"}, compress=False)
+    assert read_manifest(tmp_path) == {"a.json": "abc"}
+    write_manifest(tmp_path, "v", {"b.json": "def"})
+    assert read_manifest(tmp_path) == {"b.json": "def"}
+
+
 def test_read_manifest_is_empty_on_the_first_run(tmp_path):
     assert read_manifest(tmp_path) == {}
 
