@@ -105,6 +105,10 @@ jobs:
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
+          # Secrets pasted with a trailing line break or space break the Authorization header: strip them.
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
           # The run stages only the files that changed; the newest folder is this run's (the
           # runner starts without one). A run whose time budget ran out before it computed any
           # fund publishes nothing and makes no folder.
@@ -136,6 +140,10 @@ jobs:
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
+          # Secrets pasted with a trailing line break or space break the Authorization header: strip them.
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
           # Data first, bookkeeping last: the JSON files (state.json, ingested.json, published.json)
           # say what the data holds, so a save cut off half way leaves old bookkeeping over newer
           # data (work redone next run), never bookkeeping that claims data the bucket lacks.

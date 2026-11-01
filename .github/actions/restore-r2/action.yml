@@ -33,7 +33,7 @@ runs:
           var="${pair%%:*}"
           value="${!var}"
           if [ "$value" != "$(printf '%s' "$value" | tr -d '[:space:]')" ]; then
-            echo "::error::secret ${pair#*:} has a space or line break in it: paste it again without one"
+            echo "::warning::secret ${pair#*:} has a space or line break in it; it is stripped before use, but paste it again without one"
           fi
         done
         id="$(printf '%s' "$ORCA_R2_KEY_ID" | tr -d '[:space:]')"
@@ -69,6 +69,10 @@ runs:
         RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ inputs.secret-access-key }}
         RCLONE_CONFIG_R2_ENDPOINT: ${{ inputs.endpoint }}
       run: |
+        # Secrets pasted with a trailing line break or space break the Authorization header: strip them.
+        for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+          export "$v=${!v//[[:space:]]/}"
+        done
         if ! rclone sync "r2:${R2_LAKE_BUCKET}" data/lake; then
           echo "::error::R2 refused the lake bucket '${R2_LAKE_BUCKET}'. 401 Unauthorized: the access key id, secret or endpoint is wrong (see any annotations above). 403 Access Denied: the R2 API token does not cover this bucket (give it Object Read & Write on both buckets)."
           exit 1
