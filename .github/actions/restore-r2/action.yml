@@ -42,8 +42,10 @@ runs:
         if [[ ${#id} -eq 64 && ${#secret} -eq 32 ]]; then
           echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY look swapped (the key id is the shorter one)"
         fi
-        if ! [[ $id =~ ^[0-9a-f]{32}$ ]]; then
+        if [[ ${#id} -ne 32 ]]; then
           echo "::error::R2_ACCESS_KEY_ID should be the 32-character 'Access Key ID' shown when the R2 API token was created (it is ${#id} characters)"
+        elif ! [[ $id =~ ^[0-9a-f]{32}$ ]]; then
+          echo "::error::R2_ACCESS_KEY_ID has the right length but holds characters other than 0-9 and a-f; it is not the 'Access Key ID' of an R2 API token"
         fi
         if ! [[ $secret =~ ^[0-9a-f]{64}$ ]]; then
           if [[ ${#secret} -eq 40 ]]; then
