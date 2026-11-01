@@ -82,6 +82,13 @@ jobs:
       - uses: ./.github/actions/setup-rclone
       - name: Install dependencies
         run: uv sync --locked --no-dev
+      - name: Check the API keys
+        # One test request each, so a wrong key fails here in seconds, not after the bulk ingest.
+        env:
+          OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
+          TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+        run: uv run --locked --no-dev python -m orca.run check-keys
       - id: restore
         uses: ./.github/actions/restore-r2
         with:

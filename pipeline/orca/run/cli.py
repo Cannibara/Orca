@@ -1,6 +1,7 @@
 """Command line: `python -m orca.run weekly | rebuild | verify | demo`."""
 
 import argparse
+import json
 import logging
 from datetime import date
 from pathlib import Path
@@ -20,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("weekly", help="ingest new data, recompute affected funds, publish changes")
     commands.add_parser("rebuild", help="recompute and republish every fund")
+    commands.add_parser(
+        "check-keys", help="one test request to OpenFIGI, Tiingo and FRED with the keys set"
+    )
     check = commands.add_parser(
         "verify", help="rebuild a sample of funds and compare with the published files"
     )
@@ -38,6 +42,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)  # its INFO lines print the FRED key
 
+    if args.command == "check-keys":
+        from orca.run.preflight import check_keys, production_probes
+
+        problems = check_keys(production_probes())
+        for problem in problems:
+            print(f"::error::{problem}")
+        print(f"check-keys: {len(problems)} problem(s)")
+        return 1 if problems else 0
     if args.command in ("weekly", "rebuild"):
         stats = run_weekly(
             Lake(config.LAKE_DIR),
@@ -46,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
             date.today(),
             full=args.command == "rebuild",
         )
+        for flag in stats.flags:  # health.json's flags, so the run log says what went wrong
+            print(f"flag: {json.dumps(flag, sort_keys=True)}")
         if stats.staging is None:
             print("published nothing: the time budget ran out before any fund was computed")
             return 0
