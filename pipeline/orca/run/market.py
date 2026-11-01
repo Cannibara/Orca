@@ -677,11 +677,28 @@ def load_daily(
     return split_adjust_prices(raw)
 
 
+LATEST_CLOSE_WINDOW_DAYS = 14  # a stock's latest close is looked for this close to its last bar
+
+
 def latest_closes(lake: Lake) -> dict[int, tuple[date, float]]:
-    """Each stock's latest stored close and its date (raw = today's basis: no split after it)."""
-    frames = scan_parts(lake, PRICES_TABLE, lambda f: f.select("stock_id", "date", "close"))
-    if not frames:
+    """Each stock's latest stored close and its date (raw = today's basis: no split after it),
+    among its bars of the last LATEST_CLOSE_WINDOW_DAYS before its last stored day. Only those
+    bars are read, a part at a time: the whole table (tens of millions of bars) does not fit in
+    the runner's memory next to the funds' results."""
+    lasts = scan_parts(
+        lake, PRICES_TABLE, lambda f: f.group_by("stock_id").agg(last=pl.col("date").max())
+    )
+    if not lasts:
         return {}
+    last = pl.concat(lasts).group_by("stock_id").agg(pl.col("last").max())
+    frames = scan_parts(
+        lake,
+        PRICES_TABLE,
+        lambda f: f.select("stock_id", "date", "close")
+        .join(last.lazy(), on="stock_id", maintain_order="left")  # keep the part's row order
+        .filter(pl.col("date") >= pl.col("last").dt.offset_by(f"-{LATEST_CLOSE_WINDOW_DAYS}d"))
+        .drop("last"),
+    )
     rows = (
         pl.concat(frames)
         .unique(subset=["stock_id", "date"], keep="last", maintain_order=True)

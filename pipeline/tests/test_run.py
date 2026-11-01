@@ -50,7 +50,7 @@ from orca.run import (
     weekly,
 )
 from orca.run.budget import Budget
-from orca.run.market import update_rf
+from orca.run.market import latest_closes, update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
 from orca.sec.live import fetch_new_filings
@@ -1177,6 +1177,37 @@ def test_a_failed_universe_download_keeps_the_stored_vendor_table(fixtures, tmp_
             "status": 503} in stats.flags
     assert Lake(tmp_path / "lake").read("vendor_tickers").equals(stored)
     assert stats.staging is not None
+
+
+def test_latest_closes_read_each_stocks_last_bars_with_later_parts_winning(tmp_path):
+    lake = Lake(tmp_path / "lake")
+
+    def bars(*rows):
+        frame = pl.DataFrame(
+            [(sid, day, close) for sid, day, close in rows],
+            schema={"stock_id": pl.Int32, "date": pl.Date, "close": pl.Float32},
+            orient="row",
+        )
+        return frame.with_columns(
+            *(pl.lit(None, dtype).alias(c) for c, dtype in prices.PRICES_SCHEMA.items()
+              if c not in frame.columns)
+        ).select(list(prices.PRICES_SCHEMA))
+
+    lake.write(prices.TABLE, bars(
+        (1, date(2026, 10, 26), 10.0), (1, date(2026, 10, 27), 11.0),
+        (2, date(2026, 10, 22), 5.0),
+        (3, date(2014, 1, 2), 1.0), (3, date(2015, 6, 30), 2.0),  # delisted long ago
+    ), part="y2026")
+    lake.write(prices.TABLE, bars(
+        (1, date(2026, 10, 27), 12.0),  # a revision: the later part wins
+        (2, date(2026, 10, 23), None),  # no close on its last day: the one before
+    ), part="z20261101-0001")
+
+    assert latest_closes(lake) == {
+        1: (date(2026, 10, 27), 12.0),
+        2: (date(2026, 10, 22), 5.0),
+        3: (date(2015, 6, 30), 2.0),
+    }
 
 
 def test_budget_minutes_left():

@@ -109,9 +109,9 @@ jobs:
           # If memory runs out, the kernel kills the pipeline rather than the runner, so the lake
           # is still saved (a runner that dies takes the save step with it).
           echo 1000 > /proc/self/oom_score_adj
-          # Memory and disk every 5 minutes, so a run that dies shows how close it came.
+          # Memory and disk every minute, so a run that dies shows how close it came.
           (
-            while sleep 300; do
+            while sleep 60; do
               echo "resources: memory $(free -m | awk 'NR==2 {print $3 " of " $2 " MB"}'), disk $(df -h --output=used,avail . | tail -n 1 | xargs) used/free"
             done
           ) &
