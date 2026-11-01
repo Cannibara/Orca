@@ -11,6 +11,7 @@ from orca.http import FetchError
 from orca.prices import TABLE as PRICES_TABLE
 from orca.prices import (
     compact_prices,
+    last_dates,
     part_stocks,
     price_runs,
     run_parts,
@@ -51,6 +52,9 @@ UNMAPPED_RETRY_DAYS = 28  # an unmapped CUSIP is asked about again after four we
 REMAP_DAYS = 28  # a held CUSIP OpenFIGI mapped is asked about again after four weeks ...
 REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
 EXIT_REFRESH_QUARTERS = 8  # prices of stocks sold out this recently are still refreshed
+# The price refresh stops while this much of the budget is left (at most a third of it), so the
+# funds are always computed and published; the stocks it did not reach go first next run.
+PRICES_RESERVE_MIN = 90.0
 
 
 # --- securities -------------------------------------------------------------------------------
@@ -424,11 +428,19 @@ def refresh_prices(
         latest.add(stocks[BENCHMARK_CUSIP])
     exits = held_stocks(lake, stocks, last_q - EXIT_REFRESH_QUARTERS) - latest
     ticker_of = dict(securities.select("stock_id", "ticker").iter_rows())
-    ordered = sorted(first) + sorted(latest - first) + sorted(exits - first)
+    last = last_dates(lake)
+
+    def stalest_first(ids: set[int]) -> list[int]:
+        # Those whose prices are oldest first (so a refresh cut short goes on with what it
+        # missed), then those the vendor had no rows for.
+        return sorted(ids, key=lambda sid: (sid not in last, last.get(sid, date.max), sid))
+
+    ordered = sorted(first) + stalest_first(latest - first) + stalest_first(exits - first)
     tickers = {sid: ticker_of[sid] for sid in ordered if ticker_of.get(sid)}
     run_part_count = sum(p.startswith("z") for p in lake.parts(PRICES_TABLE))
     if len(price_runs(lake)) >= COMPACT_AT_RUNS or run_part_count >= COMPACT_AT_PARTS:
         compact_prices(lake)
+    reserve = min(PRICES_RESERVE_MIN, budget.minutes / 3)
     stats: dict = {}
     state.prices_in_flight = run_id
     state.save(lake)
@@ -439,7 +451,7 @@ def refresh_prices(
         today,
         run_id=run_id,
         stats=stats,
-        should_stop=budget.spent,
+        should_stop=lambda: budget.minutes_left() <= reserve,
         history_until=q_end(q_of_date(today) - 1),  # the open quarter's bars move no fund file
         refetch=refetch,
     )

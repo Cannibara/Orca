@@ -37,6 +37,9 @@ class Budget:
     def spent(self) -> bool:
         return self._clock() >= self._deadline
 
+    def minutes_left(self) -> float:
+        return max(0.0, (self._deadline - self._clock()) / 60)
+
     def cut(self, stage: str) -> None:
         if stage not in self.stages:
             self.stages.append(stage)

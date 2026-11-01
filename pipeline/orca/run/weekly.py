@@ -170,6 +170,7 @@ def _stage(name: str, budget: Budget, work: Callable[[], dict | None]) -> None:
         budget.cut(name)
         log.warning("%s: skipped, the time budget is spent", name)
         return
+    log.info("%s: starting (%.0f minutes of the budget left)", name, budget.minutes_left())
     started = time.monotonic()
     _log_stage(name, started, work())
 

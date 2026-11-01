@@ -167,6 +167,22 @@ def part_stocks(lake: Lake, parts: list[str]) -> set[int]:
     return set(pl.concat(frames)["stock_id"].to_list()) if frames else set()
 
 
+def _last_stored(paths: list) -> pl.DataFrame:
+    """(stock_id, last): each stock's last stored date, from the date column alone."""
+    return (
+        pl.scan_parquet(paths)
+        .group_by("stock_id")
+        .agg(pl.col("date").max().alias("last"))
+        .collect(engine="streaming")
+    )
+
+
+def last_dates(lake: Lake) -> dict[int, date]:
+    """The last stored date of each stock that has bars."""
+    paths = [_part_path(lake, part) for part in lake.parts(TABLE)]
+    return dict(_last_stored(paths).iter_rows()) if paths else {}
+
+
 def _stored_tail(lake: Lake) -> tuple[dict[int, date], dict[tuple, pl.DataFrame]]:
     """The last stored date of each stock, and its stored bars from 5 days before that date on
     (one row per day, the last occurrence in part order), keyed by (stock_id,). The part files
@@ -174,12 +190,7 @@ def _stored_tail(lake: Lake) -> tuple[dict[int, date], dict[tuple, pl.DataFrame]
     paths = [_part_path(lake, part) for part in lake.parts(TABLE)]
     if not paths:
         return {}, {}
-    last = (
-        pl.scan_parquet(paths)
-        .group_by("stock_id")
-        .agg(pl.col("date").max().alias("last"))
-        .collect(engine="streaming")
-    )
+    last = _last_stored(paths)
     windows = [  # in part order, which is the order in which later rows override earlier
         pl.scan_parquet(path)
         .join(last.lazy(), on="stock_id", maintain_order="left")  # keep the file's row order
@@ -293,6 +304,7 @@ def update_prices(
                 changed.append(stock_id)
         if done % flush_every == 0:
             flush()
+            log.info("prices: %d of %d tickers asked", done, len(tickers))
     flush()
     return sorted(changed)
 

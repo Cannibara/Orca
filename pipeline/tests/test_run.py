@@ -1047,6 +1047,47 @@ def test_budget_spent_in_compute_publishes_the_funds_done_and_owes_the_rest(
     assert set(manifest(tmp_path)) == set(manifest(base_runs[WEEK1]))
 
 
+def test_price_refresh_leaves_the_reserve_to_compute_and_the_next_run_goes_on(
+    fixtures, base_runs, tmp_path
+):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    clock, asked = StoppedClock(), []
+
+    class Recording(FixtureSource):
+        def daily(self, ticker, start, end):
+            asked.append(ticker)
+            if len(asked) == 3:
+                clock.now = 126.0  # 0.9 of the budget's 3 minutes left: inside the 1 reserved
+            return super().daily(ticker, start, end)
+
+    sources = replace(fixture_sources(fixtures), prices=Recording(fixtures.prices))
+    stats = run_weekly(
+        Lake(inc / "lake"), inc / "out", sources, WEEK3, budget=Budget(3.0, clock)
+    )
+
+    assert stats.staging is not None  # the funds were still computed and published
+    [flag] = [f for f in stats.flags if f["type"] == "prices"]
+    assert flag["stopped"] == "time budget" and flag["fetched"] == 3
+    assert {"type": "time_budget", "minutes": 3.0, "stages": ["prices"]} in stats.flags
+    cut = list(asked)
+
+    asked.clear()
+    run(inc, sources, WEEK3)
+
+    missed = len(set(asked) - set(cut))
+    assert missed and not set(asked[:missed]) & set(cut)  # the stocks it missed go first
+
+
+def test_budget_minutes_left():
+    clock = StoppedClock()
+    budget = Budget(2.0, clock)
+    assert budget.minutes_left() == 2.0
+    clock.now = 90.0
+    assert budget.minutes_left() == 0.5
+    clock.run_out()
+    assert budget.minutes_left() == 0.0
+
+
 def test_budget_spent_in_the_security_lookups_retries_them_next_run(fixtures, base_runs, tmp_path):
     clock, looked_up = StoppedClock(), []
     sources = fixture_sources(fixtures)
