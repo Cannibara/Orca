@@ -21,10 +21,17 @@ from orca.home import (
     top_funds,
     wins_losses,
 )
-from orca.publish import FundMeta, HomeLists, publish_shared, publish_weekly, weekly_closes
+from orca.publish import (
+    FundMeta,
+    HomeLists,
+    publish_shared,
+    publish_weekly,
+    weekly_closes,
+)
 from orca.run.compute import Context
 from orca.run.market import latest_closes
 from orca.run.state import MAX_FLAGS_PER_KIND, SECURITIES_TABLE_SCHEMA, read_table
+from orca.vendor import VENDOR_SCHEMA, VENDOR_TABLE
 
 KEEP_STAGING = 2  # staging folders kept (this run's and the one before)
 
@@ -106,6 +113,13 @@ def publish_shared_files(
     (`Context.iter_closes`), so no more than a chunk's daily closes are ever held."""
     lake, last_q = ctx.lake, ctx.last_q
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA).sort("stock_id")
+    vendor = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)
+    if vendor.height:  # the ticker the stock trades under ("XLNX", not a foreign "XLNXEUR")
+        securities = (
+            securities.join(vendor.select("stock_id", vt="ticker"), on="stock_id", how="left")
+            .with_columns(ticker=pl.coalesce("vt", "ticker"))
+            .drop("vt")
+        )
     latest = latest_closes(lake)
     asof = max((day for day, _ in latest.values()), default=today)
     latest_prices = {sid: latest.get(sid) for sid in securities["stock_id"].to_list()}

@@ -32,6 +32,7 @@ from orca.run.market import (
     map_new_cusips,
     refresh_prices,
     remap_held_cusips,
+    resolve_vendor_tickers,
     retry_lookups,
     update_rf,
 )
@@ -296,6 +297,7 @@ def run_weekly(
             **(map_new_cusips(lake, sources, state, today, flags, budget) or {}),
             **(retry_lookups(lake, sources, state, flags, budget) or {}),
             **(remap_held_cusips(lake, sources, state, today, last_q, flags, budget) or {}),
+            **(resolve_vendor_tickers(lake, sources, state, flags) or {}),
         }
 
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))

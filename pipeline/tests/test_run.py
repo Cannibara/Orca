@@ -56,6 +56,7 @@ from orca.run.state import State, decode, encode
 from orca.sec.live import fetch_new_filings
 from orca.securities import FIGI_URL
 from orca.storage import Lake
+from orca.vendor import UNIVERSE_SCHEMA
 
 WEEK1, WEEK2, WEEK3 = date(2026, 10, 16), date(2026, 10, 23), date(2026, 10, 30)
 HALYARD, KELPWOOD = 9100002, 9100001  # Halyard restates Q2 2019 on 2026-10-20
@@ -1076,6 +1077,106 @@ def test_price_refresh_leaves_the_reserve_to_compute_and_the_next_run_goes_on(
 
     missed = len(set(asked) - set(cut))
     assert missed and not set(asked[:missed]) & set(cut)  # the stocks it missed go first
+
+
+# --- the price vendor's universe -------------------------------------------------------------
+
+
+def universe_of(fixtures, end_of=None):
+    """The vendor universe that lists every fixture ticker over its bars (`end_of`: ticker ->
+    a last day to list instead)."""
+    rows = []
+    for ticker, frame in fixtures.prices.items():
+        if frame.height:
+            end = (end_of or {}).get(ticker, frame["date"].max())
+            rows.append((ticker, frame["date"].min(), end))
+    return pl.DataFrame(rows, schema=UNIVERSE_SCHEMA, orient="row")
+
+
+class Asking(FixtureSource):
+    def __init__(self, frames):
+        super().__init__(frames)
+        self.asked = []
+
+    def daily(self, ticker, start, end):
+        self.asked.append((ticker, start))
+        return super().daily(ticker, start, end)
+
+
+def test_a_stock_the_vendor_does_not_list_is_never_asked_for(fixtures, tmp_path):
+    missing = sorted(t for t, f in fixtures.prices.items() if f.height)[0]
+    listed = universe_of(fixtures).filter(pl.col("ticker") != missing)
+    source = Asking(fixtures.prices)
+    sources = replace(fixture_sources(fixtures), prices=source, price_universe=lambda: listed)
+
+    run(tmp_path, sources, WEEK1)
+
+    asked = {t for t, _ in source.asked}
+    assert missing not in asked and asked  # the rest were asked
+    vendor = Lake(tmp_path / "lake").read("vendor_tickers")
+    assert missing not in vendor["ticker"].to_list()
+
+
+def test_a_stock_stored_up_to_the_vendors_last_day_is_not_asked_again(fixtures, tmp_path):
+    ticker = sorted(t for t, f in fixtures.prices.items() if f.height)[0]
+    delisted = WEEK1 - timedelta(days=60)
+    listed = universe_of(fixtures, end_of={ticker: delisted})
+    source = Asking(fixtures.prices)
+    sources = replace(fixture_sources(fixtures), prices=source, price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    assert ticker in {t for t, _ in source.asked}  # its whole history, once
+
+    source.asked.clear()
+    stats = run(tmp_path, sources, WEEK2)
+
+    assert ticker not in {t for t, _ in source.asked}
+    assert source.asked  # the stocks still trading were asked for the new week
+    assert stats.staging is not None
+
+
+def test_a_repaired_ticker_fetches_the_history_under_the_vendors_one(fixtures, tmp_path):
+    run(tmp_path, fixture_sources(fixtures), WEEK1)  # no universe: the tickers as mapped
+    lake = Lake(tmp_path / "lake")
+    securities = lake.read("securities")
+    stock_id, ticker = securities.filter(pl.col("ticker").is_not_null()).row(0)[:3:2]
+    lake.write(  # as OpenFIGI names a delisted stock: a foreign listing's ticker
+        "securities",
+        securities.with_columns(
+            ticker=pl.when(pl.col("stock_id") == stock_id)
+            .then(pl.lit(ticker + "EUR"))
+            .otherwise(pl.col("ticker"))
+        ),
+    )
+    source = Asking(fixtures.prices)
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), prices=source, price_universe=lambda: listed)
+
+    stats = run(tmp_path, sources, WEEK2)
+
+    assert (ticker, date(2013, 1, 1)) in source.asked  # the whole history, under its ticker
+    assert not any(t == ticker + "EUR" for t, _ in source.asked)
+    assert stats.staging is not None
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert vendor[stock_id] == ticker
+    shown = read_json(tmp_path / "bucket" / "securities.json")
+    assert shown["ticker"][shown["stock_id"].index(stock_id)] == ticker  # not the foreign one
+
+
+def test_a_failed_universe_download_keeps_the_stored_vendor_table(fixtures, tmp_path):
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    stored = Lake(tmp_path / "lake").read("vendor_tickers")
+
+    def broken():
+        raise FetchError("https://apimedia.tiingo.com/x.zip", 503)
+
+    stats = run(tmp_path, replace(sources, price_universe=broken), WEEK2)
+
+    assert {"type": "price_universe_failed", "url": "https://apimedia.tiingo.com/x.zip",
+            "status": 503} in stats.flags
+    assert Lake(tmp_path / "lake").read("vendor_tickers").equals(stored)
+    assert stats.staging is not None
 
 
 def test_budget_minutes_left():
