@@ -19,6 +19,46 @@ inputs:
 runs:
   using: composite
   steps:
+    # Names the secret that is wrong, never its value: an R2 S3 access key id is 32 hex characters,
+    # its secret 64, and the endpoint https://<account id>.r2.cloudflarestorage.com. Shape problems
+    # are reported as annotations; R2 itself decides in the next step.
+    - name: Check the shape of the R2 secrets
+      shell: bash
+      env:
+        ORCA_R2_KEY_ID: ${{ inputs.access-key-id }}
+        ORCA_R2_SECRET: ${{ inputs.secret-access-key }}
+        ORCA_R2_ENDPOINT: ${{ inputs.endpoint }}
+      run: |
+        for pair in ORCA_R2_KEY_ID:R2_ACCESS_KEY_ID ORCA_R2_SECRET:R2_SECRET_ACCESS_KEY ORCA_R2_ENDPOINT:R2_ENDPOINT; do
+          var="${pair%%:*}"
+          value="${!var}"
+          if [ "$value" != "$(printf '%s' "$value" | tr -d '[:space:]')" ]; then
+            echo "::error::secret ${pair#*:} has a space or line break in it: paste it again without one"
+          fi
+        done
+        id="$(printf '%s' "$ORCA_R2_KEY_ID" | tr -d '[:space:]')"
+        secret="$(printf '%s' "$ORCA_R2_SECRET" | tr -d '[:space:]')"
+        endpoint="$(printf '%s' "$ORCA_R2_ENDPOINT" | tr -d '[:space:]')"
+        if [[ ${#id} -eq 64 && ${#secret} -eq 32 ]]; then
+          echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY look swapped (the key id is the shorter one)"
+        fi
+        if ! [[ $id =~ ^[0-9a-f]{32}$ ]]; then
+          echo "::error::R2_ACCESS_KEY_ID should be the 32-character 'Access Key ID' shown when the R2 API token was created (it is ${#id} characters)"
+        fi
+        if ! [[ $secret =~ ^[0-9a-f]{64}$ ]]; then
+          if [[ ${#secret} -eq 40 ]]; then
+            echo "::error::R2_SECRET_ACCESS_KEY looks like the 40-character 'Token value'; use the 64-character 'Secret Access Key' shown under it"
+          else
+            echo "::error::R2_SECRET_ACCESS_KEY should be the 64-character 'Secret Access Key' shown when the R2 API token was created (it is ${#secret} characters)"
+          fi
+        fi
+        if [[ $endpoint == *r2.dev* || $endpoint == *pages.dev* ]]; then
+          echo "::error::R2_ENDPOINT is a public web address; use the S3 API endpoint https://<account id>.r2.cloudflarestorage.com"
+        elif [[ $endpoint =~ ^https://[0-9a-f]{32}\.(eu\.|fedramp\.)?r2\.cloudflarestorage\.com/.+ ]]; then
+          echo "::error::R2_ENDPOINT has something after .com (a bucket name?); remove it so it ends in r2.cloudflarestorage.com"
+        elif ! [[ $endpoint =~ ^https://[0-9a-f]{32}\.(eu\.|fedramp\.)?r2\.cloudflarestorage\.com/?$ ]]; then
+          echo "::error::R2_ENDPOINT should look like https://<32-character account id>.r2.cloudflarestorage.com"
+        fi
     - name: Restore the lake and the manifest
       shell: bash
       working-directory: pipeline
@@ -27,7 +67,10 @@ runs:
         RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ inputs.secret-access-key }}
         RCLONE_CONFIG_R2_ENDPOINT: ${{ inputs.endpoint }}
       run: |
-        rclone sync "r2:${R2_LAKE_BUCKET}" data/lake
+        if ! rclone sync "r2:${R2_LAKE_BUCKET}" data/lake; then
+          echo "::error::R2 refused the lake bucket '${R2_LAKE_BUCKET}'. 401 Unauthorized: the access key id, secret or endpoint is wrong (see any annotations above). 403 Access Denied: the R2 API token does not cover this bucket (give it Object Read & Write on both buckets)."
+          exit 1
+        fi
         mkdir -p data/out
         # The manifest is absent on the first run. A failed listing stops the step.
         listing="$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)"
