@@ -132,7 +132,10 @@ jobs:
             --header-upload "Content-Type: application/json"
             --header-upload "Cache-Control: public, max-age=300"
           )
-          rclone copy "$staging" "r2:${R2_SITE_BUCKET}" --include "*.json" --ignore-times "${headers[@]}"
+          # The first runs upload tens of thousands of small files: run many at once, and skip the
+          # HEAD request rclone makes after each upload (the PUT's answer already confirms it).
+          rclone copy "$staging" "r2:${R2_SITE_BUCKET}" --include "*.json" --ignore-times \
+            --transfers 64 --checkers 64 --s3-no-head "${headers[@]}"
           # Last, so a reader never finds a manifest that names a file not yet uploaded.
           rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
       - name: Save the lake
