@@ -122,7 +122,16 @@ jobs:
             export "$v=${value//[[:space:]]/}"
           done
           if [[ ! "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID should be the Cloudflare account ID: 32 characters, 0-9 and a-f (it is ${#CLOUDFLARE_ACCOUNT_ID} characters). It is the part before .r2.cloudflarestorage.com in the R2 endpoint, and the Cloudflare dashboard shows it under Workers & Pages (Account ID, right-hand column)."
-            exit 1
+            # A dashboard address or an endpoint pasted whole still holds the id: take it if it is
+            # the only run of exactly 32 hex characters.
+            ids="$(grep -oE '[0-9a-f]+' <<<"$CLOUDFLARE_ACCOUNT_ID" | awk 'length == 32' | sort -u)"
+            if [ -n "$ids" ] && [ "$(wc -l <<<"$ids")" -eq 1 ]; then
+              echo "::add-mask::$ids"
+              echo "::warning::CLOUDFLARE_ACCOUNT_ID holds more than the account ID (${#CLOUDFLARE_ACCOUNT_ID} characters); the 32-character ID inside it is used. Paste just the ID to silence this."
+              export CLOUDFLARE_ACCOUNT_ID="$ids"
+            else
+              echo "::error::CLOUDFLARE_ACCOUNT_ID should be the Cloudflare account ID: 32 characters, 0-9 and a-f (it is ${#CLOUDFLARE_ACCOUNT_ID} characters). It is the part before .r2.cloudflarestorage.com in the R2 endpoint, and the Cloudflare dashboard shows it under Workers & Pages (Account ID, right-hand column)."
+              exit 1
+            fi
           fi
           npx wrangler pages deploy dist --project-name orca
