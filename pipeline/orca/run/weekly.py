@@ -361,6 +361,13 @@ def run_weekly(
 
     cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
     priced = [metas[c].priced_pct for c in order]
+    if priced:
+        log.info(
+            "health: median fund priced %.1f%% of its book, %d of %d funds under 90%%",
+            100 * statistics.median(priced),
+            sum(p < 0.9 for p in priced),
+            len(priced),
+        )
     files.update(
         write_health(
             staging,

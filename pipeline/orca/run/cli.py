@@ -58,7 +58,9 @@ def main(argv: list[str] | None = None) -> int:
             date.today(),
             full=args.command == "rebuild",
         )
-        for flag in stats.flags:  # health.json's flags, so the run log says what went wrong
+        from orca.run.publish_step import capped
+
+        for flag in capped(stats.flags):  # health.json's flags, as many of each kind as it keeps
             print(f"flag: {json.dumps(flag, sort_keys=True)}")
         if stats.staging is None:
             print("published nothing: the time budget ran out before any fund was computed")
