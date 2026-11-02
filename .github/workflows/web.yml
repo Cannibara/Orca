@@ -112,6 +112,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
         run: |
           # Secrets pasted with a trailing line break or space break the request: strip them.
           for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
@@ -134,4 +135,16 @@ jobs:
               exit 1
             fi
           fi
-          npx wrangler pages deploy dist --project-name orca
+          # The Pages project is made on the first deploy if the account does not have it yet.
+          project="${CF_PAGES_PROJECT:-orca}"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 60 \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${project}")"
+          if [ "$status" = 404 ]; then
+            echo "::notice::creating the Cloudflare Pages project '${project}'"
+            npx wrangler pages project create "$project" --production-branch main
+          elif [ "$status" != 200 ]; then
+            echo "::error::Cloudflare answered HTTP ${status} when asked about the Pages project '${project}': the API token needs the permission Account > Cloudflare Pages > Edit."
+            exit 1
+          fi
+          npx wrangler pages deploy dist --project-name "$project" --branch main
