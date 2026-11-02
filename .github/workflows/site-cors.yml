@@ -27,7 +27,7 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BUCKET: ${{ vars.R2_SITE_BUCKET }}
-          SITE_ORIGINS: ${{ vars.SITE_ORIGINS || 'https://orca-eiq.pages.dev http://localhost:5173' }}
+          SITE_ORIGINS: ${{ vars.SITE_ORIGINS || 'https://orca-88p.pages.dev http://localhost:5173' }}
           AWS_DEFAULT_REGION: auto
           # R2 does not take every checksum header newer AWS CLIs send by default.
           AWS_REQUEST_CHECKSUM_CALCULATION: when_required
