@@ -1,9 +1,10 @@
 name: Pipeline
 
-# Weekly: restore the lake from the private R2 bucket, ingest new filings and prices, recompute the
-# funds they touch, upload the changed files to the public R2 bucket (manifest.json last), save the
-# lake back. Monthly: rebuild a sample of funds from the lake's raw filings and compare them with
-# what is published. A failed run leaves the site on the last good version; GitHub's default
+# Monthly, on the 16th (the day after the latest 13F deadline of Feb 14, May 15, Aug 14 and Nov 14,
+# so each quarter's filings are in at once): restore the lake from the private R2 bucket, ingest
+# new filings and prices, recompute the funds they touch, upload the changed files to the public R2
+# bucket (manifest.json last), save the lake back. On the 1st: rebuild a sample of funds from the
+# lake's raw filings and compare them with what is published. A failed run leaves the site on the last good version; GitHub's default
 # notifications email the failure.
 #
 # Every run has a time budget (ORCA_TIME_BUDGET_MIN, 270 minutes by default): when it is spent the
@@ -26,7 +27,7 @@ name: Pipeline
 
 on:
   schedule:
-    - cron: "23 6 * * 0" # weekly run: Sundays 06:23 UTC
+    - cron: "23 6 16 * *" # the run: the 16th of each month, 06:23 UTC
     - cron: "41 7 1 * *" # monthly check: the 1st of each month, 07:41 UTC
   workflow_dispatch:
     inputs:
@@ -67,7 +68,7 @@ jobs:
     # These strings must equal the cron entries above.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.schedule == '23 6 * * 0' && vars.ORCA_SCHEDULE_ENABLED == 'true')
+      (github.event.schedule == '23 6 16 * *' && vars.ORCA_SCHEDULE_ENABLED == 'true')
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 330
