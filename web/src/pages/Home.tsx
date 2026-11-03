@@ -344,7 +344,8 @@ function Conviction({ lookup }: { lookup: Lookup }) {
         header: "vs usual move",
         key: "vs_usual",
         by: (r) => r.vs_usual,
-        cell: (r) => (r.vs_usual === null ? "Quiet" : `${r.vs_usual.toFixed(1)}×`),
+        // A file from before these figures existed has none: a dash, not a crash.
+        cell: (r) => (r.vs_usual === null ? "Quiet" : typeof r.vs_usual === "number" ? `${r.vs_usual.toFixed(1)}×` : DASH),
       },
     ];
   }, [lookup]);
