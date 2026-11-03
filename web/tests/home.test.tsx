@@ -232,6 +232,7 @@ describe("Home", () => {
     const t1 = demo<TopList>("home/top_1y.json");
     const t3 = demo<TopList>("home/top_3y.json");
     const t5 = demo<TopList>("home/top_5y.json");
+    const t10 = demo<TopList>("home/top_10y.json");
     const tMax = demo<TopList>("home/top_max.json");
     renderHome();
     await screen.findByRole("table");
@@ -240,6 +241,7 @@ describe("Home", () => {
     for (const [chip, file, list] of [
       ["1 year", "top_1y", t1],
       ["5 years", "top_5y", t5],
+      ["10 years", "top_10y", t10],
       ["Since start", "top_max", tMax],
       ["3 years", "top_3y", t3],
     ] as const) {
@@ -249,7 +251,75 @@ describe("Home", () => {
       expect(urls).toContain(`/demo-data/home/${file}.json`);
     }
     // the demo lists lead with different funds, so the checks above could not pass by accident
-    expect(new Set([t1, t3, t5, tMax].map((t) => t.eligible[0].name)).size).toBeGreaterThan(1);
+    expect(new Set([t1, t3, t5, t10, tMax].map((t) => t.eligible[0].name)).size).toBeGreaterThan(1);
+  });
+
+  it("the 15-year tab says why no fund qualifies yet", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("table", { name: "Top funds" });
+    await user.click(screen.getByRole("button", { name: "15 years" }));
+    expect(await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.")).toBeInTheDocument();
+  });
+
+  it("opens with the research heading and no rules line or subtitle", async () => {
+    stubData();
+    renderHome();
+    expect(screen.getByRole("heading", { level: 1, name: "Fund Manager Research" })).toBeInTheDocument();
+    expect(screen.getByText("Quarterly 13F Data from SEC.gov")).toBeInTheDocument();
+    await screen.findByRole("table", { name: "Top funds" });
+    expect(screen.queryByText(/Who qualifies/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Orca estimates what they paid/)).not.toBeInTheDocument();
+  });
+
+  it("top funds sort by any column, largest first, and back on a second click", async () => {
+    const t3 = demo<TopList>("home/top_3y.json");
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    const table = await screen.findByRole("table", { name: "Top funds" });
+    const names = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("link")[0].textContent);
+    const byBook = [...t3.eligible].sort((a, b) => b.book - a.book).map((r) => r.name);
+    await user.click(within(table).getByRole("button", { name: "AUM" }));
+    expect(names()).toEqual(byBook);
+    expect(within(table).getByRole("columnheader", { name: "AUM" })).toHaveAttribute("aria-sort", "descending");
+    await user.click(within(table).getByRole("button", { name: "AUM" }));
+    expect(names()).toEqual([...byBook].reverse());
+    await user.click(within(table).getByRole("button", { name: "Fund" }));
+    expect(names()).toEqual([...t3.eligible].map((r) => r.name).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
+  });
+
+  it("top funds show 100 funds a page, with page buttons above and below the table", async () => {
+    const t3 = demo<TopList>("home/top_3y.json");
+    const many: TopRow[] = Array.from({ length: 250 }, (_, i) => ({
+      ...t3.eligible[0],
+      fund_id: 100000 + i,
+      name: `Fund ${String(i + 1).padStart(3, "0")}`,
+      ann_return: 0.5 - i / 1000,
+    }));
+    stubData({ "home/top_3y.json": { ...t3, eligible: many } });
+    const user = userEvent.setup();
+    renderHome();
+    const table = await screen.findByRole("table", { name: "Top funds" });
+    const rows = () => within(table).getAllByRole("row").slice(1);
+    expect(rows()).toHaveLength(100);
+    const pagers = screen.getAllByRole("navigation", { name: "Pages of funds" });
+    expect(pagers).toHaveLength(2);
+    expect(pagers[0]).toHaveTextContent("Showing 1–100 of 250 funds");
+    expect(within(pagers[0]).getByRole("button", { name: "Previous" })).toBeDisabled();
+
+    await user.click(within(pagers[1]).getByRole("button", { name: "Next" }));
+    expect(screen.getAllByRole("navigation", { name: "Pages of funds" })[0]).toHaveTextContent("Showing 101–200 of 250 funds");
+    expect(within(rows()[0]).getAllByRole("link")[0]).toHaveTextContent("Fund 101");
+
+    await user.click(within(pagers[0]).getByRole("button", { name: "Next" }));
+    expect(rows()).toHaveLength(50);
+    expect(within(screen.getAllByRole("navigation", { name: "Pages of funds" })[1]).getByRole("button", { name: "Next" })).toBeDisabled();
+
+    // a new order starts again at the first page
+    await user.click(within(table).getByRole("button", { name: "Fund" }));
+    expect(screen.getAllByRole("navigation", { name: "Pages of funds" })[0]).toHaveTextContent("Showing 1–100 of 250 funds");
   });
 
   it("top funds lists index giants under their own heading and uses the right columns", async () => {
@@ -261,15 +331,15 @@ describe("Home", () => {
     const [main, giants] = screen.getAllByRole("table");
     expect(within(main).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Fund",
-      "13F book",
+      "AUM",
       "Positions",
       "Return / yr",
-      "Worst drop",
+      "Max Drawdown",
       "Sharpe",
     ]);
     const row = within(giants).getAllByRole("row")[1];
     expect(within(row).getByRole("link", { name: "Vanguard-like Giant" })).toHaveAttribute("href", "/fund/7");
-    expect(within(row).getAllByText("—")).toHaveLength(2); // missing worst drop and Sharpe
+    expect(within(row).getAllByText("—")).toHaveLength(2); // missing max drawdown and Sharpe
   });
 
   it("has no giants heading when there are no giants", async () => {
@@ -283,7 +353,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByText(/Who qualifies: 13F book ≥ \$1B/);
+    await screen.findByRole("table", { name: "Top funds" });
 
     const rules: [string, RegExp, string[]][] = [
       ["Conviction moves", /Funds: concentrated active managers \(4–60 positions/, ["Fund", "Stock", "Move", "Weight now", "Change", "Est. price", "Since"]],

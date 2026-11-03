@@ -42,7 +42,7 @@ describe("page title follows the route", () => {
   it("is Orca on the home page, whatever the page shipped with", async () => {
     stubData();
     renderApp("/");
-    await screen.findByRole("heading", { level: 1, name: /See how the big funds/ });
+    await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
     expect(document.title).toBe("Orca");
   });
 
@@ -55,7 +55,7 @@ describe("page title follows the route", () => {
     expect(document.title).toBe("Kelpwood Capital LP · Orca");
 
     await user.click(screen.getByRole("link", { name: "Orca home" }));
-    await screen.findByRole("heading", { level: 1, name: /See how the big funds/ });
+    await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
     expect(document.title).toBe("Orca");
   });
 

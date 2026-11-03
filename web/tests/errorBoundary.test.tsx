@@ -74,7 +74,7 @@ describe("ErrorBoundary", () => {
     expect(screen.getByRole("link", { name: "Orca home" })).toBeInTheDocument(); // the header is outside the boundary
 
     await user.click(screen.getByRole("link", { name: "Home" }));
-    expect(await screen.findByRole("heading", { level: 1, name: /See how the big funds/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

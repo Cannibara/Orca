@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable, type Column } from "../components/DataTable";
+import { Pager } from "../components/Pager";
 import { Signed } from "../components/Signed";
 import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
@@ -16,6 +17,7 @@ import type {
   WinLossRow,
 } from "../data/types";
 import { DASH, count, fmtDate, money, pct, pp, px, qLabel, ratio } from "../lib/format";
+import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
 
@@ -174,47 +176,83 @@ function FundSearch() {
 
 // ---- lists --------------------------------------------------------------------------
 
-type Period = "1y" | "3y" | "5y" | "max";
+type Period = "1y" | "3y" | "5y" | "10y" | "15y" | "max";
 const PERIODS: ChipOption<Period>[] = [
   { id: "1y", label: "1 year" },
   { id: "3y", label: "3 years" },
   { id: "5y", label: "5 years" },
+  { id: "10y", label: "10 years" },
+  { id: "15y", label: "15 years" },
   { id: "max", label: "Since start" },
 ];
 
-const TOP_COLUMNS: Column<TopRow>[] = [
-  { header: "Fund", align: "l", cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
-  { header: "13F book", cell: (r) => money(r.book) },
-  { header: "Positions", cell: (r) => count(r.n_positions) },
-  { header: "Return / yr", cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return)}</Signed> },
-  { header: "Worst drop", cell: (r) => pct(r.max_dd, 0, false) },
-  { header: "Sharpe", cell: (r) => ratio(r.sharpe) },
+/** The SEC's 13F data starts in 2013, so a period this long has no fund yet. */
+const EMPTY: Partial<Record<Period, string>> = {
+  "15y": "No fund has 15 years of 13F data yet: the SEC's data starts in 2013.",
+};
+
+const TOP_COLUMNS: Col<TopRow>[] = [
+  { header: "Fund", key: "name", align: "l", by: (r) => r.name.toLowerCase(), cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
+  { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => money(r.book) },
+  { header: "Positions", key: "positions", by: (r) => r.n_positions, cell: (r) => count(r.n_positions) },
+  { header: "Return / yr", key: "ret", by: (r) => r.ann_return, cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return)}</Signed> },
+  { header: "Max Drawdown", key: "dd", by: (r) => r.max_dd, cell: (r) => pct(r.max_dd, 0, false) },
+  { header: "Sharpe", key: "sharpe", by: (r) => r.sharpe, cell: (r) => ratio(r.sharpe) },
 ];
+
+/** Funds shown on one page of the Top funds table. */
+const PAGE_SIZE = 100;
+
+function TopTable({ rows, label, empty, paged }: { rows: TopRow[]; label: string; empty?: string; paged?: boolean }) {
+  const { sorted, sort, onSort } = useSortedRows(rows, TOP_COLUMNS, { key: "ret", dir: -1 });
+  const [page, setPage] = useState(0);
+  // A new list or a new order starts again at the first page.
+  const [shownFor, setShownFor] = useState(sorted);
+  if (shownFor !== sorted) {
+    setShownFor(sorted);
+    setPage(0);
+  }
+  const shown = useMemo(
+    () => (paged ? sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : sorted),
+    [paged, sorted, page],
+  );
+  const pager = paged ? <Pager page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={setPage} noun="funds" /> : null;
+  return (
+    <>
+      {pager}
+      <DataTable
+        label={label}
+        columns={TOP_COLUMNS}
+        rows={shown}
+        rowKey={(r) => r.fund_id}
+        sort={sort}
+        onSort={onSort}
+        empty={empty}
+      />
+      {pager}
+    </>
+  );
+}
 
 function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
   return (
     <>
       <Chips label="Period" options={PERIODS} value={period} onChange={onPeriod} />
-      <p className="rule">
-        Who qualifies: 13F book ≥ $1B · ≥ 12 quarters filed · ≥ 4 positions · ≥ 80% of book priced · no banks,
-        insurers, pensions or brokers. Index giants sit in a separate list.
-      </p>
       {list.status !== "ready" ? (
         <Status state={list} />
       ) : (
         <>
-          <DataTable
+          <TopTable
             label="Top funds"
-            columns={TOP_COLUMNS}
             rows={list.data.eligible}
-            rowKey={(r) => r.fund_id}
-            empty="No fund qualifies for this period yet."
+            empty={EMPTY[period] ?? "No fund qualifies for this period yet."}
+            paged
           />
           {list.data.giants.length > 0 && (
             <>
               <h3>Index giants</h3>
-              <DataTable label="Index giants" columns={TOP_COLUMNS} rows={list.data.giants} rowKey={(r) => r.fund_id} />
+              <TopTable label="Index giants" rows={list.data.giants} />
             </>
           )}
         </>
@@ -474,12 +512,8 @@ export default function Home() {
     <div className="view">
       <div className="hero">
         <div className="sec">
-          <p className="eyebrow">13F filings, turned into results</p>
-          <h1>See how the big funds really did, stock by stock</h1>
-          <p className="lede">
-            Quarterly SEC filings show what each fund owns. Orca estimates what they paid, what they made, and whether
-            their sells were smart.
-          </p>
+          <p className="eyebrow">Quarterly 13F Data from SEC.gov</p>
+          <h1>Fund Manager Research</h1>
         </div>
         <FundSearch />
       </div>

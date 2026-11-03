@@ -217,7 +217,7 @@ export type TopRow = {
   sharpe: number | null;
 };
 
-/** top_{1y|3y|5y|max}.json */
+/** top_{1y|3y|5y|10y|15y|max}.json */
 export type TopList = {
   latest_q: number;
   period: string;
@@ -287,6 +287,8 @@ export type HomeFiles = {
   top_1y: TopList;
   top_3y: TopList;
   top_5y: TopList;
+  top_10y: TopList;
+  top_15y: TopList;
   top_max: TopList;
   conviction: RowsFile<ConvictionRow>;
   wins_losses: WinsLosses;

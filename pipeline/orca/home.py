@@ -68,7 +68,7 @@ def is_excluded_name(name: str) -> bool:
 
 
 def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
-    """The funds worth ranking over `period` ("1y", "3y", "5y" or "max"), by return per year.
+    """The funds worth ranking over `period` (a key of `config.PERIODS`), by return per year.
 
     A fund needs the top-fund basics (book, quarters filed, priced positions, priced share of
     the book, not a bank or similar) and a performance for the period. Funds holding

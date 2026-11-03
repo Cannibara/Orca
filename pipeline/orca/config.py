@@ -10,7 +10,8 @@ TOP_MIN_QUARTERS = 12  # quarters filed
 TOP_MIN_POSITIONS = 4
 TOP_MIN_PRICED = 0.80  # share of book that must be priced
 GIANT_MIN_POSITIONS = 1000  # index giants are listed separately
-PERIODS = {"1y": 4, "3y": 12, "5y": 20, "max": None}  # quarters per period
+# Quarters per period. The SEC's 13F data starts in 2013, so a 15-year period has no fund until 2028.
+PERIODS = {"1y": 4, "3y": 12, "5y": 20, "10y": 40, "15y": 60, "max": None}
 
 # Funds excluded by name: banks, insurers, pensions, brokers
 EXCLUDE_NAME_WORDS = (

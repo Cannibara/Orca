@@ -33,7 +33,7 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `fund/{id}/contrib.json`: `{"years": [label...], "by_year": {label: {"stock_id": [], "points": [], "pnl": []}}}`
 - `fund/{id}/exits.json`: `{"rows": {"stock_id": [], "status": [], "sold_shares": [], "sold_usd": [], "avg_exit": [], "last_sale_q": [], "one_y": [], "spy_one_y": []}, "summary": {"buys_12m": number|null, "sells_12m": number|null, "beat_spy_pct": number|null}}`
 - `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": []}` (weekly Friday closes, split-adjusted; `close` is `(number | null)[]`)
-- `home/top_{1y|3y|5y|max}.json`, `home/conviction.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
+- `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
 - `manifest.json` at the bucket root: `{"version": "...", "built": "...", "files": {path: sha256}}`; `health.json`: `{"filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags": [...]}`.
 
 ## Field notes
@@ -126,7 +126,7 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
 Each file is an object with `latest_q`, the quarter the lists are about. `name` in every row below is the
 fund's name.
 
-- `top_{period}.json` (`1y`, `3y`, `5y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
+- `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
   best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return", "max_dd",
   "sharpe"}`.
 - `conviction.json`: `{"latest_q", "rows": [...]}`. Row: `{"fund_id", "name", "stock_id", "move", "weight_now",

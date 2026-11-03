@@ -80,7 +80,7 @@ test("the title follows the route when navigating inside the app", async ({ page
   await open(page, `/fund/${fundId}/`);
   await expect(page).toHaveTitle(`${fundName} · Orca`);
   await page.getByRole("link", { name: "Orca home" }).click();
-  await expect(page.locator("h1")).toHaveText(/See how the big funds/);
+  await expect(page.locator("h1")).toHaveText(/Fund Manager Research/);
   await expect(page).toHaveTitle("Orca");
   await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "How it works" }).click();
   await expect(page.locator("h1")).toHaveText(/How Orca estimates/);

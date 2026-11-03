@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
-import { DataTable, type Column, type SortState } from "../components/DataTable";
+import { DataTable } from "../components/DataTable";
 import { Section } from "../components/Section";
 import { Signed } from "../components/Signed";
 import { StockLabel } from "../components/StockLabel";
@@ -13,36 +13,12 @@ import { toRows, yearsSince2013, type Stock } from "../data/api";
 import type { Exits, ExitsRows, PositionRow } from "../data/types";
 import { DASH, count, money, pct, pp, px, qLabel, ratio, shareCount, signClass } from "../lib/format";
 import { heldFlows, irr, missed, positionFlows, profitablePct, returnPct, sinceSale, totalPnl, unrealised } from "../lib/live";
+import { useSortedRows, type Col } from "../lib/sort";
 
 // ---- shared table machinery -----------------------------------------------------
 
 /** Above this many rows a table renders only the rows in view. */
 const VIRTUAL_ABOVE = 500;
-
-/** A sortable column. `by` is the value it sorts on; null (a figure that is missing) sorts last either way. */
-type Col<R> = Column<R> & { key: string; by: (r: R) => number | string | null };
-
-function sortRows<R>(rows: R[], columns: Col<R>[], sort: SortState): R[] {
-  const by = columns.find((c) => c.key === sort.key)?.by;
-  if (!by) return rows;
-  return rows.slice().sort((a, b) => {
-    const x = by(a);
-    const y = by(b);
-    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
-    return x < y ? -sort.dir : x > y ? sort.dir : 0;
-  });
-}
-
-/** The rows in the order of the chosen column. A new column starts ascending for text and largest first for numbers. */
-function useSortedRows<R>(rows: R[], columns: Col<R>[], initial: SortState) {
-  const [sort, setSort] = useState(initial);
-  const sorted = useMemo(() => sortRows(rows, columns, sort), [rows, columns, sort]);
-  const onSort = (key: string) =>
-    setSort((s) =>
-      s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: columns.find((c) => c.key === key)?.align === "l" ? 1 : -1 },
-    );
-  return { sorted, sort, onSort };
-}
 
 /** Runs `f` the first time it is asked and keeps the answer: an IRR is dear and most rows are never looked at. */
 function once<T>(f: () => T): () => T {

@@ -70,6 +70,12 @@ main{padding-block:24px 64px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{font:500 13px/1 var(--f-body);padding:9px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);cursor:pointer;min-height:36px}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip:disabled{opacity:.45;cursor:default}
+/* pager: "Showing 1–100 of 1,234 funds" with Previous / Next, above and below a long table */
+.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;font-size:13px;color:var(--muted)}
+.pager-btns{display:flex;align-items:center;gap:8px}
+.pager-at{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pager-sum{font-variant-numeric:tabular-nums}
 .tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
 .tab{font:600 14px/1 var(--f-body);padding:12px 14px;border:0;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;min-height:44px}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
