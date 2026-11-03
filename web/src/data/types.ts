@@ -235,7 +235,15 @@ export type ConvictionRow = {
   fund_id: number;
   name: string;
   stock_id: number;
-  move: "new" | "add" | "exit";
+  move: "new" | "add" | "trim" | "exit";
+  /** Dollars traded; negative when sold. */
+  usd: number;
+  /** The move over the fund's book last quarter. */
+  size: number;
+  /** The move over the fund's largest holding last quarter. */
+  vs_top: number;
+  /** The move over the fund's biggest move of the four quarters before; null when it was quiet. */
+  vs_usual: number | null;
   weight_now: number;
   change_pts: number;
   est_price: number;

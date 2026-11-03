@@ -15,8 +15,11 @@ from orca.config import (
     CONC_MIN_BOOK,
     CONC_MIN_POS,
     CONC_MIN_TOP10,
-    CONVICTION_JUMP,
-    CONVICTION_WEIGHT,
+    CONVICTION_MAX_TOP,
+    CONVICTION_MIN_MOVE,
+    CONVICTION_QUIET,
+    CONVICTION_USUAL_X,
+    CONVICTION_VS_TOP,
     CROWDED_MIN_FUNDS,
     EXCLUDE_NAME_WORDS,
     GIANT_MIN_POSITIONS,
@@ -42,7 +45,15 @@ class FundSnapshot:
     keyed by stock_id (`weights_prev` is the quarter before `weights_now`). `trades_latest` pairs
     each stock_id with its trade in the latest quarter; `pnl_latest` is the latest quarter's P&L
     per stock; `buys_recent` holds (stock_id, q, est. price, weight after, filed) for recent new
-    and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf` is keyed by period ("1y", "3y", "5y", "max"), None when too short."""
+    and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf`
+    is keyed by period (the keys of `config.PERIODS`), None when too short.
+
+    For the conviction list: `book_prev` is the book at the end of the quarter before `weights_now`
+    (0 without one), `prev_filed` whether the fund filed that quarter (a quarter it skipped is a
+    copy of the one before, with no trades), and `usual_move` its biggest single move of the
+    CONVICTION_LOOKBACK quarters before the latest: dollars traded over the book it started that
+    quarter with, None when it has no such quarter. Snapshots stored before these existed get the
+    defaults, which keep the fund off the list until it is recomputed."""
 
     fund_id: int
     name: str
@@ -59,6 +70,9 @@ class FundSnapshot:
     perf: dict[str, Performance | None]
     filed: date
     period_q: int
+    book_prev: float = 0.0
+    prev_filed: bool = False
+    usual_move: float | None = None
 
 
 def is_excluded_name(name: str) -> bool:
@@ -99,43 +113,69 @@ def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
 
 
 def conviction_moves(snaps: list[FundSnapshot], *, latest_q: int | None = None) -> list[dict]:
-    """Big bets of concentrated active funds in their latest quarter, largest change first. Funds
-    whose `period_q` is not the latest quarter are left out.
+    """Moves of the latest quarter that are large for the fund that made them, largest against
+    the fund's largest holding first. Funds whose `period_q` is not the latest quarter are left
+    out.
 
     `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
     snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale.
 
-    A new or add counts when the stock ends at CONVICTION_WEIGHT or more of the book, or gains
-    CONVICTION_JUMP or more of it; an exit counts when the stock was CONVICTION_WEIGHT or more
-    before. Trims never count. `change_pts` is the weight change in percentage points."""
+    A fund takes part when its book is CONC_MIN_BOOK or more, it is no index giant and not
+    excluded, it filed the quarter before, it has a usual move to compare with, and its largest
+    holding last quarter was CONVICTION_MAX_TOP or less of the book (holding companies and
+    single-stock vehicles are left out). A move (new, add, trim or exit; dollars traded over last
+    quarter's book) counts when it is all of: CONVICTION_MIN_MOVE or more of the book,
+    CONVICTION_USUAL_X times the fund's usual move or more (a usual move under CONVICTION_QUIET
+    counts as CONVICTION_QUIET: the fund was quiet), and CONVICTION_VS_TOP or more of last
+    quarter's largest holding.
+
+    A row's `usd` is the dollars traded (negative: sold), `size` the move over last quarter's
+    book, `vs_top` the move over last quarter's largest holding, `vs_usual` the move over the
+    usual one (None for a quiet fund), `change_pts` the weight change in percentage points."""
     rows = []
     for s in _latest(snaps, latest_q):
-        if not _concentrated(s):
+        top_prev = max(s.weights_prev.values(), default=0.0)
+        if not (
+            s.book >= CONC_MIN_BOOK
+            and s.n_priced < GIANT_MIN_POSITIONS
+            and not _excluded(s)
+            and s.prev_filed
+            and s.usual_move is not None
+            and s.book_prev > 0
+            and 0 < top_prev <= CONVICTION_MAX_TOP
+        ):
             continue
+        quiet = s.usual_move < CONVICTION_QUIET
+        usual = max(s.usual_move, CONVICTION_QUIET)
         for stock_id, t in s.trades_latest:
+            usd = t.delta * t.px
+            size = abs(usd) / s.book_prev
+            # Rounded so a move of exactly a threshold is not lost to float error.
+            if not (
+                round(size - CONVICTION_MIN_MOVE, 12) >= 0
+                and round(size - CONVICTION_USUAL_X * usual, 12) >= 0
+                and round(size - CONVICTION_VS_TOP * top_prev, 12) >= 0
+            ):
+                continue
             now = s.weights_now.get(stock_id, 0.0)
             prev = s.weights_prev.get(stock_id, 0.0)
-            if t.type in _BUYS:
-                counts = now >= CONVICTION_WEIGHT or round(now - prev, 9) >= CONVICTION_JUMP
-            elif t.type == "exit":
-                counts = prev >= CONVICTION_WEIGHT
-            else:
-                counts = False
-            if not counts:
-                continue
             rows.append(
                 {
                     "fund_id": s.fund_id,
                     "name": s.name,
                     "stock_id": stock_id,
                     "move": t.type,
+                    "usd": float(usd),
+                    "size": float(size),
+                    "vs_top": float(size / top_prev),
+                    "vs_usual": None if quiet else float(size / s.usual_move),
                     "weight_now": float(now),
                     "change_pts": float((now - prev) * 100),
                     "est_price": float(t.px),
                     "q": int(t.q),
                 }
             )
-    rows.sort(key=lambda r: (-abs(r["change_pts"]), r["fund_id"], r["stock_id"]))
+    rows.sort(key=lambda r: (-r["vs_top"], r["fund_id"], r["stock_id"]))
     return rows
 
 

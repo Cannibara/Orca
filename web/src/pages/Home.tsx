@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chips, type ChipOption } from "../components/Chips";
-import { DataTable, type Column } from "../components/DataTable";
+import { DataTable, type SortState } from "../components/DataTable";
 import { Pager } from "../components/Pager";
 import { Signed } from "../components/Signed";
 import { StockLabel } from "../components/StockLabel";
@@ -200,13 +200,34 @@ const TOP_COLUMNS: Col<TopRow>[] = [
   { header: "Sharpe", key: "sharpe", by: (r) => r.sharpe, cell: (r) => ratio(r.sharpe) },
 ];
 
-/** Funds shown on one page of the Top funds table. */
+/** Rows shown on one page of a long list. */
 const PAGE_SIZE = 100;
 
-function TopTable({ rows, label, empty, paged }: { rows: TopRow[]; label: string; empty?: string; paged?: boolean }) {
-  const { sorted, sort, onSort } = useSortedRows(rows, TOP_COLUMNS, { key: "ret", dir: -1 });
+/**
+ * A home list: every column sorts (`initial` first), and with `paged` the rows come 100 a page
+ * with page buttons above and below. A new order or a new list starts again at the first page.
+ */
+function ListTable<R>({
+  columns,
+  rows,
+  initial,
+  label,
+  noun,
+  rowKey,
+  empty,
+  paged = false,
+}: {
+  columns: Col<R>[];
+  rows: R[];
+  initial: SortState;
+  label: string;
+  noun: string;
+  rowKey?: (r: R, i: number) => string | number;
+  empty?: string;
+  paged?: boolean;
+}) {
+  const { sorted, sort, onSort } = useSortedRows(rows, columns, initial);
   const [page, setPage] = useState(0);
-  // A new list or a new order starts again at the first page.
   const [shownFor, setShownFor] = useState(sorted);
   if (shownFor !== sorted) {
     setShownFor(sorted);
@@ -216,23 +237,17 @@ function TopTable({ rows, label, empty, paged }: { rows: TopRow[]; label: string
     () => (paged ? sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : sorted),
     [paged, sorted, page],
   );
-  const pager = paged ? <Pager page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={setPage} noun="funds" /> : null;
+  const pager = paged ? <Pager page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={setPage} noun={noun} /> : null;
   return (
     <>
       {pager}
-      <DataTable
-        label={label}
-        columns={TOP_COLUMNS}
-        rows={shown}
-        rowKey={(r) => r.fund_id}
-        sort={sort}
-        onSort={onSort}
-        empty={empty}
-      />
+      <DataTable label={label} columns={columns} rows={shown} rowKey={rowKey} sort={sort} onSort={onSort} empty={empty} />
       {pager}
     </>
   );
 }
+
+const BEST_RETURN: SortState = { key: "ret", dir: -1 };
 
 function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
@@ -243,16 +258,27 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
         <Status state={list} />
       ) : (
         <>
-          <TopTable
+          <ListTable
             label="Top funds"
+            noun="funds"
+            columns={TOP_COLUMNS}
             rows={list.data.eligible}
+            initial={BEST_RETURN}
+            rowKey={(r) => r.fund_id}
             empty={EMPTY[period] ?? "No fund qualifies for this period yet."}
             paged
           />
           {list.data.giants.length > 0 && (
             <>
               <h3>Index giants</h3>
-              <TopTable label="Index giants" rows={list.data.giants} />
+              <ListTable
+                label="Index giants"
+                noun="funds"
+                columns={TOP_COLUMNS}
+                rows={list.data.giants}
+                initial={BEST_RETURN}
+                rowKey={(r) => r.fund_id}
+              />
             </>
           )}
         </>
@@ -261,45 +287,87 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
   );
 }
 
-const MOVE_LABEL: Record<ConvictionRow["move"], string> = { new: "New", add: "Add", exit: "Exit" };
+const MOVE_LABEL: Record<ConvictionRow["move"], string> = { new: "New", add: "Add", trim: "Trim", exit: "Exit" };
+/** Buys before sells when the Buy/Sell column is sorted. */
+const MOVE_ORDER: Record<ConvictionRow["move"], number> = { new: 0, add: 1, trim: 2, exit: 3 };
+
+/** Sort value of a fund or stock name column. */
+const lower = (text: string | undefined) => (text ?? "").toLowerCase();
+
+function fundCol<R>(id: (r: R) => number, name: (r: R) => string): Col<R> {
+  return { header: "Fund", key: "fund", align: "l", by: (r) => lower(name(r)), cell: (r) => <FundLink id={id(r)} name={name(r)} /> };
+}
+
+function stockCol<R>(lookup: Lookup, fund: (r: R) => number, stock: (r: R) => number): Col<R> {
+  return {
+    header: "Stock",
+    key: "stock",
+    align: "l",
+    by: (r) => lower(lookup.stocks.get(stock(r))?.ticker),
+    cell: (r) => <StockLink lookup={lookup} fundId={fund(r)} stockId={stock(r)} />,
+  };
+}
+
+const BIGGEST_FOR_FUND: SortState = { key: "vs_top", dir: -1 };
 
 function Conviction({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("conviction"), []);
-  if (list.status !== "ready") return <Status state={list} />;
-  const columns: Column<ConvictionRow>[] = [
-    { header: "Fund", align: "l", cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
-    { header: "Stock", align: "l", cell: (r) => <StockLink lookup={lookup} fundId={r.fund_id} stockId={r.stock_id} /> },
-    {
-      header: "Move",
-      align: "l",
-      cell: (r) => <span className={`pill ${r.move === "exit" ? "sell" : "buy"}`}>{MOVE_LABEL[r.move]}</span>,
-    },
-    { header: "Weight now", cell: (r) => pct(r.weight_now, 1, false) },
-    { header: "Change", cell: (r) => <Signed v={r.change_pts}>{pp(r.change_pts)}</Signed> },
-    { header: "Est. price", cell: (r) => px(r.est_price) },
-    {
-      header: "Since",
-      cell: (r) => {
-        const since = change(lookup.prices.get(r.stock_id), r.est_price);
-        return <Signed v={since}>{pct(since)}</Signed>;
+  const columns = useMemo<Col<ConvictionRow>[]>(() => {
+    const now = (r: ConvictionRow) => lookup.prices.get(r.stock_id) ?? null;
+    const since = (r: ConvictionRow) => change(lookup.prices.get(r.stock_id), r.est_price);
+    return [
+      fundCol((r) => r.fund_id, (r) => r.name),
+      stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
+      {
+        header: "Buy/Sell",
+        key: "move",
+        align: "l",
+        by: (r) => MOVE_ORDER[r.move],
+        cell: (r) => <span className={`pill ${r.move === "exit" || r.move === "trim" ? "sell" : "buy"}`}>{MOVE_LABEL[r.move]}</span>,
       },
-    },
-  ];
+      { header: "Weight now", key: "weight", by: (r) => r.weight_now, cell: (r) => pct(r.weight_now, 1, false) },
+      { header: "Change", key: "change", by: (r) => r.change_pts, cell: (r) => <Signed v={r.change_pts}>{pp(r.change_pts)}</Signed> },
+      { header: "$ bought / sold", key: "usd", by: (r) => r.usd, cell: (r) => <Signed v={r.usd}>{money(r.usd, true)}</Signed> },
+      { header: "Est. price", key: "est", by: (r) => r.est_price, cell: (r) => px(r.est_price) },
+      { header: "Price now", key: "now", by: now, cell: (r) => px(now(r)) },
+      {
+        header: "Since",
+        key: "since",
+        by: since,
+        cell: (r) => {
+          const s = since(r);
+          return <Signed v={s}>{pct(s)}</Signed>;
+        },
+      },
+      { header: "vs largest holding", key: "vs_top", by: (r) => r.vs_top, cell: (r) => pct(r.vs_top, 0, false) },
+      {
+        header: "vs usual move",
+        key: "vs_usual",
+        by: (r) => r.vs_usual,
+        cell: (r) => (r.vs_usual === null ? "Quiet" : `${r.vs_usual.toFixed(1)}×`),
+      },
+    ];
+  }, [lookup]);
+  if (list.status !== "ready") return <Status state={list} />;
   return (
     <>
       <p className="rule">
-        Funds: concentrated active managers (4–60 positions, top 10 ≥ 50% of book, book ≥ $500M). A move counts if
-        it's a new position or add that takes the stock to ≥ 5% of the book, a weight jump of ≥ 3 points, or the exit
-        of a ≥ 5% position.
+        Moves of ≥ 3% of a fund's AUM that are at least twice its biggest move of the previous 4 quarters and at least
+        half its largest holding. Funds ≥ $500M whose largest holding was ≤ 33%.
       </p>
-      <DataTable
+      <ListTable
         label="Conviction moves"
+        noun="moves"
         columns={columns}
         rows={list.data.rows}
+        initial={BIGGEST_FOR_FUND}
+        rowKey={(r) => `${r.fund_id}-${r.stock_id}`}
         empty="No conviction moves this quarter."
+        paged
       />
       <p className="cap">
-        {qLabel(list.data.latest_q)} filings. "Since" = price change from the estimated trade price to today.
+        {qLabel(list.data.latest_q)} filings. "Since" = price change from the estimated trade price to today. "Quiet" =
+        no move of 1% or more of AUM in the previous 4 quarters.
       </p>
     </>
   );
@@ -307,12 +375,15 @@ function Conviction({ lookup }: { lookup: Lookup }) {
 
 function WinsLosses({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("wins_losses"), []);
+  const columns = useMemo<Col<WinLossRow>[]>(
+    () => [
+      fundCol((r) => r.fund_id, (r) => r.name),
+      stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
+      { header: "Quarter P&L", key: "pnl", by: (r) => r.pnl, cell: (r) => <Signed v={r.pnl}>{money(r.pnl, true)}</Signed> },
+    ],
+    [lookup],
+  );
   if (list.status !== "ready") return <Status state={list} />;
-  const columns: Column<WinLossRow>[] = [
-    { header: "Fund", align: "l", cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
-    { header: "Stock", align: "l", cell: (r) => <StockLink lookup={lookup} fundId={r.fund_id} stockId={r.stock_id} /> },
-    { header: "Quarter P&L", cell: (r) => <Signed v={r.pnl}>{money(r.pnl, true)}</Signed> },
-  ];
   return (
     <>
       <p className="rule">
@@ -320,69 +391,88 @@ function WinsLosses({ lookup }: { lookup: Lookup }) {
         funds.
       </p>
       <h3>Biggest wins</h3>
-      <DataTable label="Biggest wins" columns={columns} rows={list.data.wins} empty="No wins to show." />
+      <ListTable label="Biggest wins" noun="wins" columns={columns} rows={list.data.wins} initial={{ key: "pnl", dir: -1 }} empty="No wins to show." />
       <h3>Biggest losses</h3>
-      <DataTable label="Biggest losses" columns={columns} rows={list.data.losses} empty="No losses to show." />
+      <ListTable label="Biggest losses" noun="losses" columns={columns} rows={list.data.losses} initial={{ key: "pnl", dir: 1 }} empty="No losses to show." />
     </>
   );
 }
 
 function JustFiled({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("just_filed"), []);
+  const columns = useMemo<Col<JustFiledRow>[]>(
+    () => [
+      fundCol((r) => r.fund_id, (r) => r.name),
+      { header: "Filed", key: "filed", by: (r) => r.filed, cell: (r) => fmtDate(r.filed) },
+      { header: "Period", key: "period", by: (r) => r.period_q, cell: (r) => qLabel(r.period_q) },
+      { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => money(r.book) },
+      {
+        header: "Headline change",
+        key: "headline",
+        align: "l",
+        by: (r) => r.headline_change_pts,
+        cell: (r) =>
+          r.headline_stock_id == null ? (
+            DASH
+          ) : (
+            <>
+              <StockLink lookup={lookup} fundId={r.fund_id} stockId={r.headline_stock_id} />{" "}
+              <Signed v={r.headline_change_pts}>{pp(r.headline_change_pts)}</Signed>
+            </>
+          ),
+      },
+    ],
+    [lookup],
+  );
   if (list.status !== "ready") return <Status state={list} />;
-  const columns: Column<JustFiledRow>[] = [
-    { header: "Fund", align: "l", cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
-    { header: "Filed", cell: (r) => fmtDate(r.filed) },
-    { header: "Period", cell: (r) => qLabel(r.period_q) },
-    { header: "13F book", cell: (r) => money(r.book) },
-    {
-      header: "Headline change",
-      align: "l",
-      cell: (r) =>
-        r.headline_stock_id == null ? (
-          DASH
-        ) : (
-          <>
-            <StockLink lookup={lookup} fundId={r.fund_id} stockId={r.headline_stock_id} />{" "}
-            <Signed v={r.headline_change_pts}>{pp(r.headline_change_pts)}</Signed>
-          </>
-        ),
-    },
-  ];
   return (
     <>
       <p className="rule">Newest 13F filings, each with its headline change.</p>
-      <DataTable label="Just filed" columns={columns} rows={list.data.rows} empty="No new filings." />
+      <ListTable
+        label="Just filed"
+        noun="filings"
+        columns={columns}
+        rows={list.data.rows}
+        initial={{ key: "filed", dir: -1 }}
+        empty="No new filings."
+      />
     </>
   );
 }
 
 function Crowded({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("crowded"), []);
+  const columns = useMemo<Col<CrowdedRow>[]>(
+    () => [
+      {
+        header: "Stock",
+        key: "stock",
+        align: "l",
+        by: (r) => lower(lookup.stocks.get(r.stock_id)?.ticker),
+        cell: (r) => (
+          <span className="tick">
+            <StockLabel stock={lookup.stocks.get(r.stock_id)} stockId={r.stock_id} />
+          </span>
+        ),
+      },
+      { header: "Funds buying", key: "funds", by: (r) => r.funds_buying, cell: (r) => count(r.funds_buying) },
+      { header: "Total bought", key: "bought", by: (r) => r.total_bought, cell: (r) => money(r.total_bought) },
+      { header: "Avg weight after", key: "weight", by: (r) => r.avg_weight_after, cell: (r) => pct(r.avg_weight_after, 1, false) },
+    ],
+    [lookup],
+  );
   if (list.status !== "ready") return <Status state={list} />;
-  const columns: Column<CrowdedRow>[] = [
-    {
-      header: "Stock",
-      align: "l",
-      cell: (r) => (
-        <span className="tick">
-          <StockLabel stock={lookup.stocks.get(r.stock_id)} stockId={r.stock_id} />
-        </span>
-      ),
-    },
-    { header: "Funds buying", cell: (r) => count(r.funds_buying) },
-    { header: "Total bought", cell: (r) => money(r.total_bought) },
-    { header: "Avg weight after", cell: (r) => pct(r.avg_weight_after, 1, false) },
-  ];
   return (
     <>
       <p className="rule">
         Stocks bought by several concentrated active funds in the same quarter ({qLabel(list.data.latest_q)}).
       </p>
-      <DataTable
+      <ListTable
         label="Crowded buys"
+        noun="stocks"
         columns={columns}
         rows={list.data.rows}
+        initial={{ key: "funds", dir: -1 }}
         empty="No stock was bought by several funds this quarter."
       />
     </>
@@ -433,19 +523,23 @@ function Calls({
     () => (list.status === "ready" ? rankCalls(list.data.rows, lookup.prices, mode) : []),
     [list, lookup, mode],
   );
-  const columns: Column<Call>[] = [
-    {
-      header: "Stock",
-      align: "l",
-      cell: (c) => <StockLink lookup={lookup} fundId={c.row.fund_id} stockId={c.row.stock_id} />,
-    },
-    { header: "Fund", align: "l", cell: (c) => <FundLink id={c.row.fund_id} name={c.row.name} /> },
-    { header: "Bought", cell: (c) => qLabel(c.row.q) },
-    { header: "Est. buy price", cell: (c) => px(c.row.est_price) },
-    { header: "Price now", cell: (c) => px(c.price ?? null) },
-    { header: "Since fund's buy", cell: (c) => <Signed v={c.sinceBuy}>{pct(c.sinceBuy)}</Signed> },
-    { header: "Since 13F went public", cell: (c) => <Signed v={c.sinceFiled}>{pct(c.sinceFiled)}</Signed> },
-  ];
+  const columns = useMemo<Col<Call>[]>(
+    () => [
+      stockCol(lookup, (c) => c.row.fund_id, (c) => c.row.stock_id),
+      fundCol((c) => c.row.fund_id, (c) => c.row.name),
+      { header: "Bought", key: "q", by: (c) => c.row.q, cell: (c) => qLabel(c.row.q) },
+      { header: "Est. buy price", key: "est", by: (c) => c.row.est_price, cell: (c) => px(c.row.est_price) },
+      { header: "Price now", key: "now", by: (c) => c.price ?? null, cell: (c) => px(c.price ?? null) },
+      { header: "Since fund's buy", key: "since", by: (c) => c.sinceBuy, cell: (c) => <Signed v={c.sinceBuy}>{pct(c.sinceBuy)}</Signed> },
+      {
+        header: "Since 13F went public",
+        key: "filed",
+        by: (c) => c.sinceFiled,
+        cell: (c) => <Signed v={c.sinceFiled}>{pct(c.sinceFiled)}</Signed>,
+      },
+    ],
+    [lookup],
+  );
   return (
     <>
       <div className="chip-groups">
@@ -453,17 +547,20 @@ function Calls({
         <Chips label="Buys from" options={WINDOWS} value={win} onChange={onWin} />
       </div>
       <p className="rule">
-        New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or Conviction moves. Stocks ≥
-        $300M market cap and ≥ $1 a share.
+        New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds.
+        Stocks ≥ $300M market cap and ≥ $1 a share.
       </p>
       {list.status !== "ready" ? (
         <Status state={list} />
       ) : (
         <>
-          <DataTable
+          <ListTable
+            key={mode}
             label={mode === "best" ? "Best calls" : "Worst calls"}
+            noun="buys"
             columns={columns}
             rows={ranked}
+            initial={{ key: "since", dir: mode === "best" ? -1 : 1 }}
             rowKey={(c) => `${c.row.fund_id}-${c.row.stock_id}-${c.row.q}`}
             empty="No buys in this window."
           />

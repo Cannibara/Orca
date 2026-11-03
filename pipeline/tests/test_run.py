@@ -1577,7 +1577,8 @@ def test_weekly_refresh_covers_the_latest_quarter_and_exits_of_the_last_8_quarte
 def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_call(tmp_path):
     # Three concentrated funds file for the first time in the deadline quarter: their first
     # report "buys" everything at the quarter's close, which is no decision of that quarter. A
-    # fund already tracked that buys a fifth stock is a real move.
+    # fund already tracked for two quarters before (so it has a usual move to compare with: none,
+    # it was quiet) that buys a fifth stock is a real move.
     tickers = ["AAAA", "BBBB", "CCCC", "DDDD", "EEEE"]
     cusips = {t: f"00000{i}AA" + cusip_check_digit(f"00000{i}AA") for i, t in enumerate(tickers)}
     stake = {t: Holding(f"{t} INC", cusips[t], 250e6, 5e6) for t in tickers}  # $50 a share
@@ -1587,6 +1588,7 @@ def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_
         for cik in (2001, 2002, 2003)
     ]
     filings += [
+        Filing("0000002004-24-000000", 2004, "Old Fund", Q1_24 - 1, date(2024, 2, 9), book),
         Filing("0000002004-24-000001", 2004, "Old Fund", Q1_24, date(2024, 5, 10), book),
         Filing(
             "0000002004-24-000002",
@@ -1629,6 +1631,48 @@ def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_
     # The first filers' trades are still in their own files.
     positions = read_json(tmp_path / "bucket" / "fund/2001/positions.json")
     assert positions["last_type"] == ["new"] * 4
+
+
+def test_a_conviction_move_is_measured_against_the_fund_s_own_usual_move(tmp_path):
+    # A fund of four $250M stakes ($50 a share) adds $20M of one in Q1 2024 (2% of its $1B book:
+    # its usual move) and buys $150M of a fifth stock in Q2 2024: 14.7% of the $1.02B it started
+    # the quarter with, 7.35 times its usual move and 56% of its largest holding (26.5%).
+    tickers = ["AAAA", "BBBB", "CCCC", "DDDD", "EEEE"]
+    cusips = {t: f"00000{i}BB" + cusip_check_digit(f"00000{i}BB") for i, t in enumerate(tickers)}
+    stake = {t: Holding(f"{t} INC", cusips[t], 250e6, 5e6) for t in tickers}
+    q4 = [stake[t] for t in tickers[:4]]
+    q1 = [Holding("AAAA INC", cusips["AAAA"], 270e6, 5.4e6), *q4[1:]]
+    q2 = [*q1, Holding("EEEE INC", cusips["EEEE"], 150e6, 3e6)]
+    filings = [
+        Filing("0000003001-24-000001", 3001, "Steady Fund", Q1_24 - 1, date(2024, 2, 9), q4),
+        Filing("0000003001-24-000002", 3001, "Steady Fund", Q1_24, date(2024, 5, 10), q1),
+        Filing("0000003001-24-000003", 3001, "Steady Fund", Q2_24, date(2024, 8, 9), q2),
+    ]
+    live_f, live_h = live_frames([])
+    fx = Fixtures(
+        zips={SMALL_ZIP: bulk_zip(filings)},
+        live_filings=live_f,
+        live_holdings=live_h,
+        figi={cusips[t]: listing(f"BBG0STEAD0{i}", t, f"{t} INC") for i, t in enumerate(tickers)},
+        sec_tickers=pl.DataFrame(
+            [(t, 7000 + i, f"{t} INC") for i, t in enumerate(tickers)],
+            schema={"ticker": pl.String, "cik": pl.Int64, "title": pl.String},
+            orient="row",
+        ),
+        sic={7000 + i: 3571 for i in range(5)},
+        shares_out={7000 + i: 1e9 for i in range(5)},
+        prices={t: flat_prices(50.0) for t in tickers},
+        tbill={2024: 0.05},
+    )
+
+    run(tmp_path, fixture_sources(fx), SMALL_TODAY)
+
+    [row] = read_json(tmp_path / "bucket" / "home" / "conviction.json")["rows"]
+    assert (row["fund_id"], row["move"]) == (3001, "new")
+    assert row["usd"] == pytest.approx(150e6)
+    assert row["size"] == pytest.approx(150 / 1020)
+    assert row["vs_usual"] == pytest.approx((150 / 1020) / 0.02)
+    assert row["vs_top"] == pytest.approx((150 / 1020) / (270 / 1020))
 
 
 # --- logs -----------------------------------------------------------------------------------

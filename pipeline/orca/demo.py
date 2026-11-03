@@ -501,6 +501,16 @@ def _simulate(
             _steer(rng, fund, q, held, price, shares_for, universe)
         if q == LAST_Q and fund.name in CROWDED:  # crowded buy of the latest quarter
             held["AVGO"] = held.get("AVGO", 0.0) + shares_for("AVGO", book * 0.07, q)
+        if q == LAST_Q and fund.name.startswith("Seastack"):  # an outsized new bet: a conviction move
+            bet = next(
+                t
+                for t in sorted(universe)
+                if t not in held
+                and t not in history[q - 1]
+                and t != "AVGO"
+                and _tradable(t, q + 1)
+            )
+            held[bet] = shares_for(bet, book * 0.25, q)
         if q == LAST_Q and fund.name.startswith("Driftwood"):  # triples exactly: a split suspect
             target = next(t for t in sorted(history[q - 1]) if t not in SPLITS and _tradable(t, q))
             held[target] = history[q - 1][target] * 3

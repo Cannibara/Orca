@@ -8,7 +8,7 @@ from datetime import date
 
 import polars as pl
 
-from orca.config import PERIODS, PRICE_MISMATCH
+from orca.config import CONVICTION_LOOKBACK, PERIODS, PRICE_MISMATCH
 from orca.engine.fund import FundQuarter, aggregate_fund, check_bridge, contributions, fund_years
 from orca.engine.metrics import Performance, hold_lengths, performance, priced_pct, turnover
 from orca.engine.position import PositionResult, compute_position
@@ -347,6 +347,7 @@ def compute_fund(
         rets,
         end_q,
         sum(start <= q <= end for q in filed_quarters),
+        prev_filed=(end_q - 1) in filed_quarters,
     )
 
     engine_rows = pl.DataFrame(
@@ -424,6 +425,7 @@ def _snapshot(
     rets: list[tuple[int, float]],
     end_q: int,
     quarters_filed: int,
+    prev_filed: bool,
 ) -> FundSnapshot:
     last_q = ctx.last_q
     value_at: dict[int, dict[int, float]] = defaultdict(dict)
@@ -455,6 +457,23 @@ def _snapshot(
         for t in p.trades
         if t.type in _BUYS and last_q - 3 <= t.q <= last_q and not t.entry
     ]
+    # The fund's biggest single move in each of the CONVICTION_LOOKBACK quarters before the
+    # latest: dollars traded over the book it started that quarter with. None when none of those
+    # quarters had a book to start with (a fund this new has nothing to compare a move with).
+    started = {q: end_of.get(q - 1, 0.0) for q in range(end_q - CONVICTION_LOOKBACK, end_q)}
+    usual_move = (
+        max(
+            (
+                abs(t.delta * t.px) / started[t.q]
+                for p in positions
+                for t in p.trades
+                if started.get(t.q, 0.0) > 0 and not t.entry
+            ),
+            default=0.0,
+        )
+        if any(book > 0 for book in started.values())
+        else None
+    )
     until_last = [(q, r) for q, r in rets if q <= last_q]
     perf: dict[str, Performance | None] = {}
     for period, n in PERIODS.items():
@@ -483,4 +502,7 @@ def _snapshot(
         perf=perf,
         filed=meta.filed,
         period_q=meta.period_q,
+        book_prev=end_of.get(end_q - 1, 0.0),
+        prev_filed=prev_filed,
+        usual_move=usual_move,
     )

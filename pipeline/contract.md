@@ -129,8 +129,15 @@ fund's name.
 - `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
   best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return", "max_dd",
   "sharpe"}`.
-- `conviction.json`: `{"latest_q", "rows": [...]}`. Row: `{"fund_id", "name", "stock_id", "move", "weight_now",
-  "change_pts", "est_price", "q"}` (`move` is `"new"`, `"add"` or `"exit"`).
+- `conviction.json`: `{"latest_q", "rows": [...]}`, moves that are large for the fund that made them, largest against
+  the fund's largest holding first. Row: `{"fund_id", "name", "stock_id", "move", "usd", "size", "vs_top",
+  "vs_usual", "weight_now", "change_pts", "est_price", "q"}`. `move` is `"new"`, `"add"`, `"trim"` or `"exit"`;
+  `usd` the dollars traded (negative: sold); `size` that over the fund's book last quarter; `vs_top` the move over
+  last quarter's largest holding; `vs_usual` the move over the fund's biggest single move of the four quarters
+  before, null when it made none of 1% or more (it was quiet). A move is listed when it is 3% or more of the book,
+  at least twice the usual move (taken as 1% for a quiet fund) and at least half the largest holding, by a fund of
+  $500M or more that filed last quarter, whose largest holding then was 33% or less, and that is no index giant,
+  bank, insurer, pension or broker.
 - `wins_losses.json`: `{"latest_q", "wins": [...], "losses": [...]}`. Row: `{"fund_id", "name", "stock_id",
   "pnl"}`.
 - `just_filed.json`: `{"latest_q", "rows": [...]}`. Row: `{"fund_id", "name", "filed", "period_q", "book",

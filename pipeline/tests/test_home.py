@@ -194,93 +194,125 @@ def test_wins_losses_keeps_only_top_n():
 
 
 def conviction_fund(fund_id=10, **kw) -> FundSnapshot:
-    """A concentrated fund: 20 positions, top ten at 50%, $1B book. `weights_now` of the
-    stocks under test are added to its spread."""
+    """A fund the conviction list looks at: $1B book now and last quarter, last quarter filed,
+    20 positions of 5% each last quarter (so its largest holding was 5%), and its biggest single
+    move of the previous four quarters 2% of the book. `now` adds stocks to its weights now."""
     now = spread(20) | kw.pop("now", {})
     name = kw.pop("name", "CONVICTION FUND")
-    return snap(fund_id, name, n_priced=20, book=1e9, weights_now=now, **kw)
+    fields = dict(
+        n_priced=20,
+        book=1e9,
+        book_prev=1e9,
+        prev_filed=True,
+        usual_move=0.02,
+        weights_now=now,
+        weights_prev=spread(20),
+    )
+    fields.update(kw)
+    return snap(fund_id, name, **fields)
+
+
+def bought(usd: float, kind="new", px=10.0, q=LATEST_Q) -> Trade:
+    """A trade of `usd` dollars (negative: sold) at `px`."""
+    return trade(kind, usd / px, px, q)
 
 
 def test_conviction_rules():
     fund = conviction_fund(
-        now={1: 0.05, 2: 0.065, 3: 0.035, 6: 0.07},
-        weights_prev={2: 0.04, 3: 0.01, 4: 0.05, 5: 0.04, 6: 0.10},
+        now={10: 0.06, 11: 0.07, 12: 0.03, 13: 0.025},
+        weights_prev=spread(20) | {1: 0.08, 2: 0.04, 12: 0.08},
         trades_latest=[
-            (1, trade("new", 100, 10.0)),  # new at 5%: counts
-            (2, trade("add", 50, 20.0)),  # 4% -> 6.5%: counts
-            (3, trade("add", 50, 30.0)),  # 1% -> 3.5%: +2.5 points, below 5%: no
-            (4, trade("exit", -100, 40.0)),  # exit of a 5% position: counts
-            (5, trade("exit", -100, 50.0)),  # exit of a 4% position: no
-            (6, trade("trim", -10, 60.0)),  # trims never count
+            (10, bought(60e6, "new")),  # 6% of the book: 3x its usual, 75% of its top holding
+            (11, bought(35e6, "add")),  # 3.5%: under twice its usual 2%
+            (2, bought(-45e6, "exit", px=40.0)),  # 4.5%, 56% of its top holding
+            (12, bought(-50e6, "trim", px=50.0)),  # trims count: 5%, 62.5%
+            (13, bought(25e6, "new")),  # 2.5%: under the 3% floor
         ],
     )
     rows = conviction_moves([fund])
-    assert [(r["stock_id"], r["move"]) for r in rows] == [(1, "new"), (4, "exit"), (2, "add")]
+    assert [(r["stock_id"], r["move"]) for r in rows] == [(10, "new"), (12, "trim"), (2, "exit")]
     by_stock = {r["stock_id"]: r for r in rows}
-    assert by_stock[1]["weight_now"] == 0.05
-    assert by_stock[1]["change_pts"] == pytest.approx(5.0)
-    assert by_stock[1]["est_price"] == 10.0
-    assert by_stock[2]["change_pts"] == pytest.approx(2.5)
-    assert by_stock[4]["weight_now"] == 0.0
-    assert by_stock[4]["change_pts"] == pytest.approx(-5.0)
-    assert by_stock[4]["est_price"] == 40.0
-    assert by_stock[4]["q"] == LATEST_Q
-    assert by_stock[4]["fund_id"] == 10 and by_stock[4]["name"] == "CONVICTION FUND"
+    assert by_stock[10]["usd"] == pytest.approx(60e6)
+    assert by_stock[10]["size"] == pytest.approx(0.06)
+    assert by_stock[10]["vs_top"] == pytest.approx(0.75)
+    assert by_stock[10]["vs_usual"] == pytest.approx(3.0)
+    assert by_stock[10]["weight_now"] == 0.06
+    assert by_stock[10]["change_pts"] == pytest.approx(6.0)
+    assert by_stock[10]["est_price"] == 10.0
+    assert by_stock[2]["usd"] == pytest.approx(-45e6)
+    assert by_stock[2]["weight_now"] == 0.0
+    assert by_stock[2]["change_pts"] == pytest.approx(-4.0)
+    assert by_stock[2]["est_price"] == 40.0
+    assert by_stock[2]["q"] == LATEST_Q
+    assert by_stock[2]["fund_id"] == 10 and by_stock[2]["name"] == "CONVICTION FUND"
     json.dumps(rows)
 
 
-def test_conviction_counts_a_three_point_jump_below_five_percent():
+def test_conviction_thresholds_are_inclusive():
+    # exactly 3% of the book, exactly twice the usual 1.5%, exactly half the 6% top holding
     fund = conviction_fund(
-        now={1: 0.046},
-        weights_prev={1: 0.015},
-        trades_latest=[(1, trade("add", 10, 5.0))],
+        usual_move=0.015,
+        weights_prev=spread(20) | {1: 0.06},
+        trades_latest=[(10, bought(30e6))],
     )
-    assert [r["stock_id"] for r in conviction_moves([fund])] == [1]
+    assert [r["stock_id"] for r in conviction_moves([fund])] == [10]
 
 
-def test_conviction_jump_of_exactly_three_points_is_not_lost_to_float_error():
-    prev, now = 0.0021, 0.0321  # now - prev is 0.029999999999999995 in floats
-    assert now - prev < 0.03
+def test_conviction_quiet_fund_is_labelled_not_given_a_multiple():
+    # no move of 1% or more in a year: the usual move counts as 1%, so any 3% move is unusual
+    quiet = conviction_fund(usual_move=0.004, trades_latest=[(10, bought(35e6))])
+    [row] = conviction_moves([quiet])
+    assert row["vs_usual"] is None
+    assert row["vs_top"] == pytest.approx(0.7)
+
+
+def test_conviction_move_must_be_big_for_the_fund_s_largest_holding():
+    # a quiet fund whose largest holding was 12%: a 3.5% move is under half of it
     fund = conviction_fund(
-        now={1: now}, weights_prev={1: prev}, trades_latest=[(1, trade("add", 10, 5.0))]
+        usual_move=0.0,
+        weights_prev=spread(20) | {1: 0.12},
+        trades_latest=[(10, bought(35e6))],
     )
-    assert [r["stock_id"] for r in conviction_moves([fund])] == [1]
+    assert conviction_moves([fund]) == []
 
 
-def test_conviction_only_from_concentrated_funds():
-    trades = [(1, trade("new", 100, 10.0))]
-    now = {1: 0.06}
-    sixty_one = snap(1, n_priced=61, book=1e9, weights_now=spread(61) | now, trades_latest=trades)
-    sixty = snap(2, n_priced=60, book=1e9, weights_now=spread(60) | now, trades_latest=trades)
-    three = snap(3, n_priced=3, book=1e9, weights_now=spread(3) | now, trades_latest=trades)
-    four_now = {7: 0.5, 8: 0.2, 9: 0.2} | now
-    four = snap(4, n_priced=4, book=1e9, weights_now=four_now, trades_latest=trades)
-    diffuse_now = spread(30, top=0.4) | now
-    diffuse = snap(5, n_priced=30, book=1e9, weights_now=diffuse_now, trades_latest=trades)
-    small = snap(6, n_priced=20, book=4e8, weights_now=spread(20) | now, trades_latest=trades)
-    kw = dict(n_priced=20, book=1e9, weights_now=spread(20) | now, trades_latest=trades)
-    bank = snap(7, "FIRST BANK", **kw)
-    flagged = snap(8, excluded=True, **kw)
-    floor = snap(9, **(kw | {"book": 5e8}))  # the book floor itself is concentrated
-    snaps = [sixty_one, sixty, three, four, diffuse, small, bank, flagged, floor]
-    assert ids(conviction_moves(snaps)) == [2, 4, 9]
+def test_conviction_leaves_out_funds_whose_largest_holding_was_over_a_third():
+    trades = [(10, bought(200e6))]
+    at_limit = conviction_fund(1, weights_prev=spread(20) | {1: 0.33}, trades_latest=trades)
+    over = conviction_fund(2, weights_prev=spread(20) | {1: 0.34}, trades_latest=trades)
+    assert ids(conviction_moves([at_limit, over])) == [1]
 
 
-def test_conviction_sorted_by_absolute_change():
+def test_conviction_needs_a_filed_previous_quarter_and_a_history():
+    trades = [(10, bought(60e6))]
+    ok = conviction_fund(1, trades_latest=trades)
+    carried = conviction_fund(2, prev_filed=False, trades_latest=trades)
+    first = conviction_fund(3, usual_move=None, trades_latest=trades)
+    no_book = conviction_fund(4, book_prev=0.0, trades_latest=trades)
+    nothing_before = conviction_fund(5, weights_prev={}, trades_latest=trades)
+    assert ids(conviction_moves([ok, carried, first, no_book, nothing_before])) == [1]
+
+
+def test_conviction_funds_any_size_of_portfolio_from_500m_but_not_giants_or_banks():
+    trades = [(10, bought(60e6))]
+    wide = conviction_fund(1, n_priced=400, trades_latest=trades)
+    floor = conviction_fund(2, book=5e8, trades_latest=trades)
+    small = conviction_fund(3, book=4.9e8, trades_latest=trades)
+    giant = conviction_fund(4, n_priced=1000, trades_latest=trades)
+    bank = conviction_fund(5, name="FIRST BANK", trades_latest=trades)
+    flagged = conviction_fund(6, excluded=True, trades_latest=trades)
+    assert ids(conviction_moves([wide, floor, small, giant, bank, flagged])) == [1, 2]
+
+
+def test_conviction_sorted_by_size_against_the_largest_holding():
     fund = conviction_fund(
-        now={1: 0.06, 2: 0.09},
-        weights_prev={1: 0.05, 3: 0.07},
-        trades_latest=[
-            (1, trade("add", 10, 1.0)),
-            (2, trade("new", 10, 2.0)),
-            (3, trade("exit", -10, 3.0)),
-        ],
+        trades_latest=[(1, bought(40e6)), (2, bought(90e6)), (3, bought(-60e6, "exit"))]
     )
     assert [r["stock_id"] for r in conviction_moves([fund])] == [2, 3, 1]
 
 
 def test_conviction_ignores_funds_that_have_not_filed_the_latest_quarter():
-    trades = [(1, trade("new", 100, 10.0))]
+    trades = [(1, bought(60e6))]
     fresh = conviction_fund(10, now={1: 0.06}, trades_latest=trades)
     stale = conviction_fund(11, now={1: 0.06}, trades_latest=trades, period_q=LATEST_Q - 1)
     assert ids(conviction_moves([fresh, stale])) == [10]
@@ -452,7 +484,7 @@ def season_snaps():
         conviction_fund(
             fund_id,
             now={7: 0.06},
-            trades_latest=[(7, trade("new", 100, 10.0))],
+            trades_latest=[(7, bought(60e6))],
             pnl_latest={7: 100.0 * fund_id, 8: -50.0 * fund_id},
             buys_recent=[(7, LATEST_Q, 10.0, 0.06, FILED)],
         )
@@ -466,7 +498,7 @@ def early_filer(**kw) -> FundSnapshot:
     return conviction_fund(
         9,
         now={7: 0.06},
-        trades_latest=[(7, trade("new", 100, 10.0, q=LATEST_Q + 1))],
+        trades_latest=[(7, bought(60e6, q=LATEST_Q + 1))],
         pnl_latest={7: 9999.0, 8: -9999.0},
         buys_recent=[(7, LATEST_Q + 1, 10.0, 0.06, FILED)],
         period_q=LATEST_Q + 1,
@@ -507,7 +539,7 @@ def test_fallback_anchor_ignores_excluded_funds():
     current, mcap, latest_px = season_snaps()
     flagged = early_filer(excluded=True)
     bank = conviction_fund(
-        10, name="FIRST BANK", period_q=LATEST_Q + 2, trades_latest=[(7, trade("new", 100, 10.0))]
+        10, name="FIRST BANK", period_q=LATEST_Q + 2, trades_latest=[(7, bought(60e6))]
     )
     assert all_lists([*current, flagged, bank], mcap, latest_px) == INTACT
 

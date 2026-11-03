@@ -356,11 +356,15 @@ describe("Home", () => {
     await screen.findByRole("table", { name: "Top funds" });
 
     const rules: [string, RegExp, string[]][] = [
-      ["Conviction moves", /Funds: concentrated active managers \(4–60 positions/, ["Fund", "Stock", "Move", "Weight now", "Change", "Est. price", "Since"]],
+      [
+        "Conviction moves",
+        /Moves of ≥ 3% of a fund's AUM that are at least twice its biggest move of the previous 4 quarters/,
+        ["Fund", "Stock", "Buy/Sell", "Weight now", "Change", "$ bought / sold", "Est. price", "Price now", "Since", "vs largest holding", "vs usual move"],
+      ],
       ["Big wins & losses", /Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds\./, ["Fund", "Stock", "Quarter P&L"]],
-      ["Just filed", /Newest 13F filings, each with its headline change\./, ["Fund", "Filed", "Period", "13F book", "Headline change"]],
+      ["Just filed", /Newest 13F filings, each with its headline change\./, ["Fund", "Filed", "Period", "AUM", "Headline change"]],
       ["Crowded buys", /Stocks bought by several concentrated active funds in the same quarter \(Q2 2026\)\./, ["Stock", "Funds buying", "Total bought", "Avg weight after"]],
-      ["Best & worst calls", /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or Conviction moves\./, ["Stock", "Fund", "Bought", "Est. buy price", "Price now", "Since fund's buy", "Since 13F went public"]],
+      ["Best & worst calls", /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds\./, ["Stock", "Fund", "Bought", "Est. buy price", "Price now", "Since fund's buy", "Since 13F went public"]],
     ];
     for (const [tab, rule, headers] of rules) {
       await user.click(screen.getByRole("tab", { name: tab }));
@@ -387,10 +391,11 @@ describe("Home", () => {
     expect(within(loss).getByRole("link", { name: /^Seastack/ })).toHaveAttribute("href", "/fund/9100009");
   });
 
-  it("conviction shows weight, change and the move since the estimated trade price", async () => {
+  it("conviction shows the move in dollars and against the fund, with the price now and the move since", async () => {
     const rows: ConvictionRow[] = [
-      { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, move: "exit", weight_now: 0, change_pts: -9.6, est_price: 100, q: 53 },
-      { fund_id: 9100006, name: "Brinestone Value Partners", stock_id: 5, move: "new", weight_now: 0.0924, change_pts: 9.24, est_price: 50, q: 53 },
+      { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, move: "exit", usd: -45e6, size: 0.045, vs_top: 0.5625, vs_usual: 2.25, weight_now: 0, change_pts: -9.6, est_price: 100, q: 53 },
+      { fund_id: 9100006, name: "Brinestone Value Partners", stock_id: 5, move: "new", usd: 60e6, size: 0.06, vs_top: 0.75, vs_usual: null, weight_now: 0.0924, change_pts: 9.24, est_price: 50, q: 53 },
+      { fund_id: 9100006, name: "Brinestone Value Partners", stock_id: 7, move: "trim", usd: -50e6, size: 0.05, vs_top: 0.625, vs_usual: 3.0, weight_now: 0.03, change_pts: -5.0, est_price: 20, q: 53 },
     ];
     const file: RowsFile<ConvictionRow> = { latest_q: 53, rows };
     stubData({ "home/conviction.json": file, "latest_prices.json": pricesWith({ 13: 80, 5: null }) });
@@ -398,17 +403,46 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     await screen.findByText(/Q2 2026 filings/);
-    const [exit, added] = (await screen.findAllByRole("row")).slice(1);
+    // largest against the fund's largest holding first
+    const [added, trimmed, exit] = (await screen.findAllByRole("row")).slice(1);
     expect(within(exit).getByText("Exit")).toBeInTheDocument();
     expect(within(exit).getByText("0.0%")).toBeInTheDocument();
     expect(within(exit).getByText("−9.6 pts")).toBeInTheDocument();
+    expect(within(exit).getByText("−$45M")).toBeInTheDocument();
     expect(within(exit).getByText("$100")).toBeInTheDocument();
+    expect(within(exit).getByText("$80.00")).toBeInTheDocument(); // the price now
     expect(within(exit).getByText("−20.0%")).toBeInTheDocument(); // 80 / 100 - 1
+    expect(within(exit).getByText("56%")).toBeInTheDocument();
+    expect(within(exit).getByText("2.3×")).toBeInTheDocument();
     expect(within(exit).getByRole("link", { name: /UNH/ })).toHaveAttribute("href", "/fund/9100003/stock/13");
     expect(within(added).getByText("New")).toBeInTheDocument();
+    expect(within(added).getByText("+$60M")).toBeInTheDocument();
     expect(within(added).getByText("9.2%")).toBeInTheDocument();
     expect(within(added).getByText("+9.2 pts")).toBeInTheDocument();
-    expect(within(added).getByText("—")).toBeInTheDocument(); // no latest price for this stock
+    expect(within(added).getByText("Quiet")).toBeInTheDocument();
+    expect(within(added).getAllByText("—")).toHaveLength(2); // no price now, so no move since
+    expect(within(trimmed).getByText("Trim")).toHaveClass("sell");
+  });
+
+  it("conviction sorts by any column", async () => {
+    const row = (stock_id: number, usd: number, vs_top: number): ConvictionRow => ({
+      fund_id: 9100003, name: "Lanternfish Capital Management", stock_id, move: usd < 0 ? "exit" : "new",
+      usd, size: Math.abs(usd) / 1e9, vs_top, vs_usual: 2, weight_now: 0.05, change_pts: 5, est_price: 10, q: 53,
+    });
+    const file: RowsFile<ConvictionRow> = { latest_q: 53, rows: [row(13, 40e6, 0.9), row(5, -80e6, 0.7), row(7, 60e6, 0.8)] };
+    stubData({ "home/conviction.json": file });
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
+    const table = await screen.findByRole("table", { name: "Conviction moves" });
+    const dollars = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getByText(/\$\d+M/).textContent);
+    expect(dollars()).toEqual(["+$40M", "+$60M", "−$80M"]); // by vs largest holding
+    await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
+    expect(dollars()).toEqual(["+$60M", "+$40M", "−$80M"]);
+    await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
+    expect(dollars()).toEqual(["−$80M", "+$40M", "+$60M"]);
+    await user.click(within(table).getByRole("button", { name: "Buy/Sell" }));
+    expect(within(within(table).getAllByRole("row")[3]).getByText("Exit")).toBeInTheDocument(); // buys first
   });
 
   it("just filed names the headline stock and its change", async () => {
@@ -436,7 +470,7 @@ describe("Home", () => {
     expect(cells[0].textContent).toContain("AVGO");
     expect(cells[1].textContent).toBe("5");
     expect(cells[2].textContent).toBe("$9.24B");
-    expect(cells[3].textContent).toBe("8.3%");
+    expect(cells[3].textContent).toBe("7.7%");
   });
 
   it("calls computes since-buy from latest price", async () => {
