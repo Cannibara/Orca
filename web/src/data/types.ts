@@ -235,19 +235,17 @@ export type ConvictionRow = {
   fund_id: number;
   name: string;
   stock_id: number;
+  /** The quarter of the move. */
+  q: number;
   move: "new" | "add" | "trim" | "exit";
   /** Dollars traded; negative when sold. */
   usd: number;
-  /** The move over the fund's book last quarter. */
-  size: number;
-  /** The move over the fund's largest holding last quarter. */
-  vs_top: number;
-  /** The move over the fund's biggest move of the four quarters before; null when it was quiet. */
-  vs_usual: number | null;
-  weight_now: number;
+  /** The stock's weight at the end of quarter `q`. */
+  weight_after: number;
   change_pts: number;
   est_price: number;
-  q: number;
+  /** Orders the rows (how unusual the move is for the fund); not shown. */
+  score: number;
 };
 
 export type WinLossRow = {
@@ -298,7 +296,8 @@ export type HomeFiles = {
   top_10y: TopList;
   top_15y: TopList;
   top_max: TopList;
-  conviction: RowsFile<ConvictionRow>;
+  conviction_q: RowsFile<ConvictionRow>;
+  conviction_y: RowsFile<ConvictionRow>;
   wins_losses: WinsLosses;
   just_filed: RowsFile<JustFiledRow>;
   crowded: RowsFile<CrowdedRow>;

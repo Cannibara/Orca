@@ -308,16 +308,25 @@ function stockCol<R>(lookup: Lookup, fund: (r: R) => number, stock: (r: R) => nu
   };
 }
 
-const BIGGEST_FOR_FUND: SortState = { key: "vs_top", dir: -1 };
+/** The order of the file: the most unusual move for its fund first (no column sorts on it). */
+const MOST_UNUSUAL: SortState = { key: "score", dir: -1 };
 
-function Conviction({ lookup }: { lookup: Lookup }) {
-  const list = useLoad(() => loadHome("conviction"), []);
+const MOVE_WINDOWS: ChipOption<CallWindow>[] = [
+  { id: "q", label: "Last quarter" },
+  { id: "y", label: "Last 4 quarters" },
+];
+
+function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; onWin: (w: CallWindow) => void }) {
+  const list = useLoad(() => loadHome(win === "q" ? "conviction_q" : "conviction_y"), [win]);
   const columns = useMemo<Col<ConvictionRow>[]>(() => {
     const now = (r: ConvictionRow) => lookup.prices.get(r.stock_id) ?? null;
     const since = (r: ConvictionRow) => change(lookup.prices.get(r.stock_id), r.est_price);
+    const quarter: Col<ConvictionRow>[] =
+      win === "y" ? [{ header: "Quarter", key: "q", by: (r) => r.q, cell: (r) => qLabel(r.q) }] : [];
     return [
       fundCol((r) => r.fund_id, (r) => r.name),
       stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
+      ...quarter,
       {
         header: "Buy/Sell",
         key: "move",
@@ -325,7 +334,12 @@ function Conviction({ lookup }: { lookup: Lookup }) {
         by: (r) => MOVE_ORDER[r.move],
         cell: (r) => <span className={`pill ${r.move === "exit" || r.move === "trim" ? "sell" : "buy"}`}>{MOVE_LABEL[r.move]}</span>,
       },
-      { header: "Weight now", key: "weight", by: (r) => r.weight_now, cell: (r) => pct(r.weight_now, 1, false) },
+      {
+        header: win === "q" ? "Weight now" : "Weight after",
+        key: "weight",
+        by: (r) => r.weight_after,
+        cell: (r) => pct(r.weight_after, 1, false),
+      },
       { header: "Change", key: "change", by: (r) => r.change_pts, cell: (r) => <Signed v={r.change_pts}>{pp(r.change_pts)}</Signed> },
       { header: "$ bought / sold", key: "usd", by: (r) => r.usd, cell: (r) => <Signed v={r.usd}>{money(r.usd, true)}</Signed> },
       { header: "Est. price", key: "est", by: (r) => r.est_price, cell: (r) => px(r.est_price) },
@@ -339,37 +353,36 @@ function Conviction({ lookup }: { lookup: Lookup }) {
           return <Signed v={s}>{pct(s)}</Signed>;
         },
       },
-      { header: "vs largest holding", key: "vs_top", by: (r) => r.vs_top, cell: (r) => pct(r.vs_top, 0, false) },
-      {
-        header: "vs usual move",
-        key: "vs_usual",
-        by: (r) => r.vs_usual,
-        // A file from before these figures existed has none: a dash, not a crash.
-        cell: (r) => (r.vs_usual === null ? "Quiet" : typeof r.vs_usual === "number" ? `${r.vs_usual.toFixed(1)}×` : DASH),
-      },
     ];
-  }, [lookup]);
-  if (list.status !== "ready") return <Status state={list} />;
+  }, [lookup, win]);
   return (
     <>
+      <Chips label="Moves from" options={MOVE_WINDOWS} value={win} onChange={onWin} />
       <p className="rule">
-        Moves of ≥ 3% of a fund's AUM that are at least twice its biggest move of the previous 4 quarters and at least
-        half its largest holding. Funds ≥ $500M whose largest holding was ≤ 33%.
+        Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before
+        and at least half its largest holding. Funds ≥ $500M; no ETFs.
       </p>
-      <ListTable
-        label="Conviction moves"
-        noun="moves"
-        columns={columns}
-        rows={list.data.rows}
-        initial={BIGGEST_FOR_FUND}
-        rowKey={(r) => `${r.fund_id}-${r.stock_id}`}
-        empty="No conviction moves this quarter."
-        paged
-      />
-      <p className="cap">
-        {qLabel(list.data.latest_q)} filings. "Since" = price change from the estimated trade price to today. "Quiet" =
-        no move of 1% or more of AUM in the previous 4 quarters.
-      </p>
+      {list.status !== "ready" ? (
+        <Status state={list} />
+      ) : (
+        <>
+          <ListTable
+            key={win}
+            label="Conviction moves"
+            noun="moves"
+            columns={columns}
+            rows={list.data.rows}
+            initial={MOST_UNUSUAL}
+            rowKey={(r) => `${r.fund_id}-${r.stock_id}-${r.q}`}
+            empty={win === "q" ? "No conviction moves this quarter." : "No conviction moves in the last 4 quarters."}
+            paged
+          />
+          <p className="cap">
+            {win === "q" ? `${qLabel(list.data.latest_q)} filings` : `The 4 quarters to ${qLabel(list.data.latest_q)}`}, the
+            most unusual move for its fund first. "Since" = price change from the estimated trade price to today.
+          </p>
+        </>
+      )}
     </>
   );
 }
@@ -595,12 +608,13 @@ export default function Home() {
   const [period, setPeriod] = useState<Period>("3y");
   const [mode, setMode] = useState<Mode>("best");
   const [win, setWin] = useState<CallWindow>("q");
+  const [moveWin, setMoveWin] = useState<CallWindow>("q");
   const lookup = useLoad(loadLookup, []);
 
   let panel: ReactNode;
   if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
   else if (lookup.status !== "ready") panel = <Status state={lookup} />;
-  else if (tab === "conviction") panel = <Conviction lookup={lookup.data} />;
+  else if (tab === "conviction") panel = <Conviction lookup={lookup.data} win={moveWin} onWin={setMoveWin} />;
   else if (tab === "wins") panel = <WinsLosses lookup={lookup.data} />;
   else if (tab === "filed") panel = <JustFiled lookup={lookup.data} />;
   else if (tab === "crowded") panel = <Crowded lookup={lookup.data} />;
