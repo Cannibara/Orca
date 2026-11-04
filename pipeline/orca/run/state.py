@@ -14,7 +14,7 @@ import polars as pl
 
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
-from orca.home import FundSnapshot
+from orca.home import ConvictionQuarter, FundSnapshot
 from orca.publish import FundMeta, read_manifest
 from orca.sec.live import FILINGS_SCHEMA
 from orca.securities import SECURITIES_SCHEMA
@@ -219,7 +219,12 @@ def load_published(lake: Lake, out_root: Path, compressed: bool = True) -> dict[
 
 # The stored fund state is JSON written field by field from the dataclasses, so a field added to
 # FundMeta or FundSnapshot (or Trade, Performance) is kept, and a removed one fails loudly.
-_STORED_TYPES = {cls.__name__: cls for cls in (FundMeta, FundSnapshot, Trade, Performance)}
+_STORED_TYPES = {
+    cls.__name__: cls for cls in (FundMeta, FundSnapshot, ConvictionQuarter, Trade, Performance)
+}
+# Fields stored snapshots may still hold that the dataclasses no longer have: dropped on decode
+# (a rebuild cut short by the time budget leaves some funds stored the old way).
+_RETIRED = {"FundSnapshot": {"book_prev", "prev_filed", "usual_move"}}
 
 
 def encode(value: object) -> object:
@@ -252,8 +257,11 @@ def decode(value: object) -> object:
         return tuple(decode(v) for v in value["__tuple__"])
     if "__dict__" in value:
         return {decode(k): decode(v) for k, v in value["__dict__"]}
-    cls = _STORED_TYPES[value["__type__"]]
-    return cls(**{k: decode(v) for k, v in value.items() if k != "__type__"})
+    name = value["__type__"]
+    retired = _RETIRED.get(name, set())
+    return _STORED_TYPES[name](
+        **{k: decode(v) for k, v in value.items() if k != "__type__" and k not in retired}
+    )
 
 
 def dump(value: object) -> str:

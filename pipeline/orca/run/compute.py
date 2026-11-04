@@ -8,13 +8,31 @@ from datetime import date
 
 import polars as pl
 
-from orca.config import CONVICTION_LOOKBACK, PERIODS, PRICE_MISMATCH
-from orca.engine.fund import FundQuarter, aggregate_fund, check_bridge, contributions, fund_years
-from orca.engine.metrics import Performance, hold_lengths, performance, priced_pct, turnover
+from orca.config import (
+    CONVICTION_KEEP,
+    CONVICTION_LOOKBACK,
+    CONVICTION_WINDOW,
+    PERIODS,
+    PRICE_MISMATCH,
+)
+from orca.engine.fund import (
+    FundQuarter,
+    aggregate_fund,
+    check_bridge,
+    contributions,
+    fund_years,
+)
+from orca.engine.metrics import (
+    Performance,
+    hold_lengths,
+    performance,
+    priced_pct,
+    turnover,
+)
 from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
 from orca.holdings import fill_gaps
-from orca.home import FundSnapshot
+from orca.home import ConvictionQuarter, FundSnapshot
 from orca.prices import ShareFactors, split_factors_by_quarter
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
@@ -347,7 +365,7 @@ def compute_fund(
         rets,
         end_q,
         sum(start <= q <= end for q in filed_quarters),
-        prev_filed=(end_q - 1) in filed_quarters,
+        filed_quarters,
     )
 
     engine_rows = pl.DataFrame(
@@ -425,7 +443,7 @@ def _snapshot(
     rets: list[tuple[int, float]],
     end_q: int,
     quarters_filed: int,
-    prev_filed: bool,
+    filed_quarters: set[int],
 ) -> FundSnapshot:
     last_q = ctx.last_q
     value_at: dict[int, dict[int, float]] = defaultdict(dict)
@@ -457,23 +475,7 @@ def _snapshot(
         for t in p.trades
         if t.type in _BUYS and last_q - 3 <= t.q <= last_q and not t.entry
     ]
-    # The fund's biggest single move in each of the CONVICTION_LOOKBACK quarters before the
-    # latest: dollars traded over the book it started that quarter with. None when none of those
-    # quarters had a book to start with (a fund this new has nothing to compare a move with).
-    started = {q: end_of.get(q - 1, 0.0) for q in range(end_q - CONVICTION_LOOKBACK, end_q)}
-    usual_move = (
-        max(
-            (
-                abs(t.delta * t.px) / started[t.q]
-                for p in positions
-                for t in p.trades
-                if started.get(t.q, 0.0) > 0 and not t.entry
-            ),
-            default=0.0,
-        )
-        if any(book > 0 for book in started.values())
-        else None
-    )
+    conviction_quarters = _conviction_quarters(positions, end_of, weights, end_q, filed_quarters)
     until_last = [(q, r) for q, r in rets if q <= last_q]
     perf: dict[str, Performance | None] = {}
     for period, n in PERIODS.items():
@@ -502,7 +504,43 @@ def _snapshot(
         perf=perf,
         filed=meta.filed,
         period_q=meta.period_q,
-        book_prev=end_of.get(end_q - 1, 0.0),
-        prev_filed=prev_filed,
-        usual_move=usual_move,
+        conviction_quarters=conviction_quarters,
     )
+
+
+def _conviction_quarters(
+    positions: list[PositionResult],
+    end_of: dict[int, float],
+    weights,
+    end_q: int,
+    filed_quarters: set[int],
+) -> tuple[ConvictionQuarter, ...]:
+    """The fund's last CONVICTION_LOOKBACK + CONVICTION_WINDOW quarters through `end_q` that end
+    with a book, as the conviction lists need them (`ConvictionQuarter`): moves of CONVICTION_KEEP
+    or more of the quarter's end AUM, entries left out."""
+    first = end_q - CONVICTION_LOOKBACK - CONVICTION_WINDOW + 1
+    weight_at = {q: weights(q) for q in range(first - 1, end_q + 1)}
+    out = []
+    for q in range(first, end_q + 1):
+        end = end_of.get(q, 0.0)
+        if end <= 0:
+            continue
+        prev, now = weight_at[q - 1], weight_at[q]
+        moves = tuple(
+            (p.stock_id, t.type, t.delta * t.px, prev.get(p.stock_id, 0.0), now.get(p.stock_id, 0.0), t.px)
+            for p in positions
+            for t in p.trades
+            if t.q == q and not t.entry and abs(t.delta * t.px) >= CONVICTION_KEEP * end
+        )
+        out.append(
+            ConvictionQuarter(
+                q=q,
+                start=end_of.get(q - 1, 0.0),
+                end=end,
+                top_prev=max(prev.values(), default=0.0),
+                n_held=len(now),
+                filed_pair=q in filed_quarters and q - 1 in filed_quarters,
+                moves=moves,
+            )
+        )
+    return tuple(out)

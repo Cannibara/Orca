@@ -26,7 +26,7 @@ from orca.demo import (
 )
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
-from orca.home import FundSnapshot
+from orca.home import ConvictionQuarter, FundSnapshot
 from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import FundMeta, FundOutput, read_json
@@ -43,6 +43,7 @@ from orca.run import (
     live_watermark,
     main,
     price_flags,
+    run_home,
     run_weekly,
     split_suspects,
     strip_query,
@@ -421,7 +422,7 @@ def test_new_deadline_quarter_recomputes_every_fund(fixtures, base_runs, tmp_pat
 
     assert stats.last_q == q_index(2026, 3)
     assert stats.funds_recomputed == 12
-    home = read_json(inc / "bucket" / "home" / "conviction.json")
+    home = read_json(inc / "bucket" / "home" / "conviction_q.json")
     assert home["latest_q"] == q_index(2026, 3)
 
 
@@ -724,6 +725,9 @@ def test_stored_fund_state_round_trips_every_field():
         perf={"1y": perf, "3y": None},
         filed=date(2026, 8, 1),
         period_q=53,
+        conviction_quarters=(
+            ConvictionQuarter(52, 9e8, 1e9, 0.3, 2, True, ((7, "add", 5e7, 0.5, 0.6, 12.5),)),
+        ),
     )
     meta = FundMeta(1, "Test Fund LP", 1, 53, date(2026, 8, 1), 1e9, 2, 0.9, 40, False)
     assert {f.name for f in fields(snap)} == set(asdict(snap))  # every field is set above
@@ -1622,7 +1626,7 @@ def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_
         return read_json(tmp_path / "bucket" / "home" / f"{name}.json")["rows"]
 
     stock = {t: i + 1 for i, t in enumerate(tickers)}  # ids in first-seen order
-    assert [(r["fund_id"], r["stock_id"], r["move"]) for r in home("conviction")] == [
+    assert [(r["fund_id"], r["stock_id"], r["move"]) for r in home("conviction_q")] == [
         (2004, stock["EEEE"], "new")
     ]
     assert home("crowded") == []
@@ -1634,15 +1638,15 @@ def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_
 
 
 def test_a_conviction_move_is_measured_against_the_fund_s_own_usual_move(tmp_path):
-    # A fund of four $250M stakes ($50 a share) adds $20M of one in Q1 2024 (2% of its $1B book:
-    # its usual move) and buys $150M of a fifth stock in Q2 2024: 14.7% of the $1.02B it started
-    # the quarter with, 7.35 times its usual move and 56% of its largest holding (26.5%).
+    # A fund of four $250M stakes ($50 a share) adds $20M of one in Q1 2024 (1.96% of the $1.02B
+    # it ends that quarter with: its usual move) and buys $200M of a fifth stock in Q2 2024: 16.4%
+    # of the $1.22B it ends with, 8.4 times its usual move and 62% of its largest holding (26.5%).
     tickers = ["AAAA", "BBBB", "CCCC", "DDDD", "EEEE"]
     cusips = {t: f"00000{i}BB" + cusip_check_digit(f"00000{i}BB") for i, t in enumerate(tickers)}
     stake = {t: Holding(f"{t} INC", cusips[t], 250e6, 5e6) for t in tickers}
     q4 = [stake[t] for t in tickers[:4]]
     q1 = [Holding("AAAA INC", cusips["AAAA"], 270e6, 5.4e6), *q4[1:]]
-    q2 = [*q1, Holding("EEEE INC", cusips["EEEE"], 150e6, 3e6)]
+    q2 = [*q1, Holding("EEEE INC", cusips["EEEE"], 200e6, 4e6)]
     filings = [
         Filing("0000003001-24-000001", 3001, "Steady Fund", Q1_24 - 1, date(2024, 2, 9), q4),
         Filing("0000003001-24-000002", 3001, "Steady Fund", Q1_24, date(2024, 5, 10), q1),
@@ -1667,12 +1671,55 @@ def test_a_conviction_move_is_measured_against_the_fund_s_own_usual_move(tmp_pat
 
     run(tmp_path, fixture_sources(fx), SMALL_TODAY)
 
-    [row] = read_json(tmp_path / "bucket" / "home" / "conviction.json")["rows"]
-    assert (row["fund_id"], row["move"]) == (3001, "new")
-    assert row["usd"] == pytest.approx(150e6)
-    assert row["size"] == pytest.approx(150 / 1020)
-    assert row["vs_usual"] == pytest.approx((150 / 1020) / 0.02)
-    assert row["vs_top"] == pytest.approx((150 / 1020) / (270 / 1020))
+    [row] = read_json(tmp_path / "bucket" / "home" / "conviction_q.json")["rows"]
+    assert (row["fund_id"], row["move"], row["q"]) == (3001, "new", Q2_24)
+    assert row["usd"] == pytest.approx(200e6)
+    assert row["score"] == pytest.approx((200 / 1220) / (20 / 1020))
+    assert row["weight_after"] == pytest.approx(200 / 1220)
+    assert row["change_pts"] == pytest.approx(100 * 200 / 1220)
+    year = read_json(tmp_path / "bucket" / "home" / "conviction_y.json")["rows"]
+    assert [(r["fund_id"], r["stock_id"], r["q"]) for r in year] == [(3001, row["stock_id"], Q2_24)]
+
+
+def test_stored_snapshots_from_before_the_conviction_records_still_decode():
+    snap = FundSnapshot(
+        fund_id=1, name="Old Fund", book=1e9, n_priced=2, priced_pct=1.0, quarters_filed=8,
+        excluded=False, weights_now={7: 1.0}, weights_prev={7: 1.0}, trades_latest=[],
+        pnl_latest={}, buys_recent=[], perf={}, filed=date(2026, 8, 1), period_q=53,
+    )
+    stored = encode(snap)
+    del stored["conviction_quarters"]
+    stored.update(book_prev=1e9, prev_filed=True, usual_move=0.02)  # as an older run stored it
+    assert decode(json.loads(json.dumps(stored))) == snap  # no conviction records: off the lists
+
+
+def test_home_command_republishes_the_home_lists_from_the_stored_state(
+    fixtures, base_runs, tmp_path, monkeypatch
+):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    before = read_json(inc / "bucket" / "home" / "conviction_q.json")["rows"]
+    monkeypatch.setattr("orca.home.CONVICTION_MAX_ROWS", 0)  # a rule change: no rows at all
+
+    stats = run_home(Lake(inc / "lake"), inc / "out", WEEK2)
+    copy_published(stats.staging, inc / "out", inc / "bucket")
+
+    after = read_json(inc / "bucket" / "home" / "conviction_q.json")["rows"]
+    assert before and after == []
+    assert stats.funds_recomputed == 0
+    assert "home/conviction_q.json" in stats.changed
+    assert not [p for p in stats.changed if p.startswith(("fund/", "stock/"))]
+    assert set(manifest(inc)) == set(manifest(base_runs[WEEK2]))
+
+
+def test_home_command_refuses_when_a_weekly_run_is_owed(fixtures, base_runs, tmp_path):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    with pytest.raises(RuntimeError, match="deadline quarter"):
+        run_home(Lake(inc / "lake"), inc / "out", date(2026, 11, 16))
+    state = State.load(Lake(inc / "lake"))
+    state.pending_funds = {HALYARD}
+    state.save(Lake(inc / "lake"))
+    with pytest.raises(RuntimeError, match="owed"):
+        run_home(Lake(inc / "lake"), inc / "out", WEEK2)
 
 
 # --- logs -----------------------------------------------------------------------------------

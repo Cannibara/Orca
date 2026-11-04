@@ -8,7 +8,7 @@ from pathlib import Path
 
 from orca import config
 from orca.run.sources import production_sources
-from orca.run.weekly import run_weekly, verify
+from orca.run.weekly import run_home, run_weekly, verify
 from orca.storage import Lake
 
 DESCRIPTION = (
@@ -21,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("weekly", help="ingest new data, recompute affected funds, publish changes")
     commands.add_parser("rebuild", help="recompute and republish every fund")
+    commands.add_parser(
+        "home", help="republish the home lists from the stored fund state (no fetch, no recompute)"
+    )
     commands.add_parser(
         "check-keys", help="one test request to OpenFIGI, Tiingo and FRED with the keys set"
     )
@@ -50,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::error::{problem}")
         print(f"check-keys: {len(problems)} problem(s)")
         return 1 if problems else 0
+    if args.command == "home":
+        stats = run_home(Lake(config.LAKE_DIR), config.OUT_DIR, date.today())
+        print(f"staging: {stats.staging}")
+        print(f"changed: {len(stats.changed)} files, funds recomputed: 0")
+        return 0
     if args.command in ("weekly", "rebuild"):
         stats = run_weekly(
             Lake(config.LAKE_DIR),

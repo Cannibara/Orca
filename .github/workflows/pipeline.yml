@@ -35,6 +35,10 @@ on:
         description: Rebuild everything (recompute and republish every fund)
         type: boolean
         default: false
+      home_only:
+        description: Home lists only (republish them from the stored funds; no fetch, no recompute)
+        type: boolean
+        default: false
 
 # One run at a time, and a run in progress is never cancelled: it reads the lake from R2 and writes
 # it back, so two at once would lose work.
@@ -58,6 +62,13 @@ env:
   RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true" # an object-only R2 token cannot create buckets
   RCLONE_TRANSFERS: "16"
   RCLONE_CHECKERS: "16"
+  # A transfer that stalls is dropped after a minute and tried again (the default waits five
+  # minutes in silence), and every transfer prints its progress every 30 seconds.
+  RCLONE_TIMEOUT: 60s
+  RCLONE_CONTIMEOUT: 15s
+  RCLONE_STATS: 30s
+  RCLONE_STATS_ONE_LINE: "true"
+  RCLONE_STATS_LOG_LEVEL: NOTICE
   R2_LAKE_BUCKET: ${{ vars.R2_LAKE_BUCKET }}
   R2_SITE_BUCKET: ${{ vars.R2_SITE_BUCKET }}
   ORCA_LAKE_DIR: data/lake
@@ -99,7 +110,7 @@ jobs:
       - name: Run the pipeline
         timeout-minutes: 300
         env:
-          ORCA_COMMAND: ${{ inputs.full && 'rebuild' || 'weekly' }}
+          ORCA_COMMAND: ${{ inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly') }}
           ORCA_TIME_BUDGET_MIN: ${{ vars.ORCA_TIME_BUDGET_MIN || '270' }}
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
@@ -167,6 +178,15 @@ jobs:
           for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
             export "$v=${!v//[[:space:]]/}"
           done
+          # A cancelled run leaves the pipeline running: stop it first, so it cannot write to the
+          # lake while the lake is being saved.
+          if pgrep -f "[-]m orca[.]run" > /dev/null; then
+            echo "::notice::stopping the pipeline that is still running"
+            pkill -TERM -f "[-]m orca[.]run" || true
+            for _ in $(seq 30); do pgrep -f "[-]m orca[.]run" > /dev/null || break; sleep 1; done
+            pkill -KILL -f "[-]m orca[.]run" || true
+          fi
+          echo "lake: $(find data/lake -type f | wc -l) files, $(du -sh data/lake | cut -f1)"
           # Data first, bookkeeping last: the JSON files (state.json, ingested.json, published.json)
           # say what the data holds, so a save cut off half way leaves old bookkeeping over newer
           # data (work redone next run), never bookkeeping that claims data the bucket lacks.

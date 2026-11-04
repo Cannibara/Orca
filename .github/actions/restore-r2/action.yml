@@ -73,10 +73,21 @@ runs:
         for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
           export "$v=${!v//[[:space:]]/}"
         done
-        if ! rclone sync "r2:${R2_LAKE_BUCKET}" data/lake; then
-          echo "::error::R2 refused the lake bucket '${R2_LAKE_BUCKET}'. 401 Unauthorized: the access key id, secret or endpoint is wrong (see any annotations above). 403 Access Denied: the R2 API token does not cover this bucket (give it Object Read & Write on both buckets)."
+        # A sync that has not finished in 15 minutes (it takes under a minute) is stopped and run
+        # again, which picks up where it stopped: at most three tries.
+        restored=""
+        for attempt in 1 2 3; do
+          if timeout 15m rclone sync "r2:${R2_LAKE_BUCKET}" data/lake; then
+            restored=1
+            break
+          fi
+          echo "::warning::restoring the lake failed or stalled (try ${attempt} of 3)"
+        done
+        if [ -z "$restored" ]; then
+          echo "::error::R2 refused the lake bucket '${R2_LAKE_BUCKET}', or the restore kept stalling. 401 Unauthorized: the access key id, secret or endpoint is wrong (see any annotations above). 403 Access Denied: the R2 API token does not cover this bucket (give it Object Read & Write on both buckets)."
           exit 1
         fi
+        echo "lake: $(find data/lake -type f | wc -l) files, $(du -sh data/lake | cut -f1)"
         mkdir -p data/out
         # The manifest is absent on the first run. A failed listing stops the step.
         listing="$(rclone lsf "r2:${R2_SITE_BUCKET}" --files-only --include manifest.json)"

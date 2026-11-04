@@ -112,7 +112,8 @@ class HomeLists:
 
     latest_q: int
     top: dict[str, dict[str, list[dict]]]
-    conviction: list[dict]
+    conviction_q: list[dict]
+    conviction_y: list[dict]
     wins_losses: dict[str, list[dict]]
     just_filed: list[dict]
     crowded: list[dict]
@@ -435,7 +436,8 @@ def publish_shared(
         "losses": home.wins_losses["losses"],
     }
     for name, rows in (
-        ("conviction", home.conviction),
+        ("conviction_q", home.conviction_q),
+        ("conviction_y", home.conviction_y),
         ("just_filed", home.just_filed),
         ("crowded", home.crowded),
         ("calls_q", home.calls_q),

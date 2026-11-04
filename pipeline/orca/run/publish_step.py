@@ -31,6 +31,7 @@ from orca.publish import (
 from orca.run.compute import Context
 from orca.run.market import latest_closes
 from orca.run.state import MAX_FLAGS_PER_KIND, SECURITIES_TABLE_SCHEMA, read_table
+from orca.securities import ETF_SECTOR
 from orca.vendor import VENDOR_SCHEMA, VENDOR_TABLE
 
 KEEP_STAGING = 2  # staging folders kept (this run's and the one before)
@@ -120,6 +121,12 @@ def publish_shared_files(
             .with_columns(ticker=pl.coalesce("vt", "ticker"))
             .drop("vt")
         )
+    # ETFs are no stock pick: the conviction lists leave them out.
+    etfs = frozenset(
+        securities.filter(pl.col("is_etf").fill_null(False) | (pl.col("sector") == ETF_SECTOR))[
+            "stock_id"
+        ].to_list()
+    )
     latest = latest_closes(lake)
     asof = max((day for day, _ in latest.values()), default=today)
     latest_prices = {sid: latest.get(sid) for sid in securities["stock_id"].to_list()}
@@ -143,7 +150,8 @@ def publish_shared_files(
     home = HomeLists(
         latest_q=last_q,
         top={period: top_funds(snaps, period) for period in PERIODS},
-        conviction=conviction_moves(snaps, latest_q=last_q),
+        conviction_q=conviction_moves(snaps, "q", latest_q=last_q, not_stocks=etfs),
+        conviction_y=conviction_moves(snaps, "y", latest_q=last_q, not_stocks=etfs),
         wins_losses=wins_losses(snaps, latest_q=last_q),
         just_filed=just_filed(snaps),
         crowded=crowded_buys(snaps, latest_q=last_q),

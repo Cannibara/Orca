@@ -33,7 +33,7 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `fund/{id}/contrib.json`: `{"years": [label...], "by_year": {label: {"stock_id": [], "points": [], "pnl": []}}}`
 - `fund/{id}/exits.json`: `{"rows": {"stock_id": [], "status": [], "sold_shares": [], "sold_usd": [], "avg_exit": [], "last_sale_q": [], "one_y": [], "spy_one_y": []}, "summary": {"buys_12m": number|null, "sells_12m": number|null, "beat_spy_pct": number|null}}`
 - `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": []}` (weekly Friday closes, split-adjusted; `close` is `(number | null)[]`)
-- `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
+- `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction_q.json`, `home/conviction_y.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
 - `manifest.json` at the bucket root: `{"version": "...", "built": "...", "files": {path: sha256}}`; `health.json`: `{"filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags": [...]}`.
 
 ## Field notes
@@ -129,15 +129,17 @@ fund's name.
 - `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
   best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return", "max_dd",
   "sharpe"}`.
-- `conviction.json`: `{"latest_q", "rows": [...]}`, moves that are large for the fund that made them, largest against
-  the fund's largest holding first. Row: `{"fund_id", "name", "stock_id", "move", "usd", "size", "vs_top",
-  "vs_usual", "weight_now", "change_pts", "est_price", "q"}`. `move` is `"new"`, `"add"`, `"trim"` or `"exit"`;
-  `usd` the dollars traded (negative: sold); `size` that over the fund's book last quarter; `vs_top` the move over
-  last quarter's largest holding; `vs_usual` the move over the fund's biggest single move of the four quarters
-  before, null when it made none of 1% or more (it was quiet). A move is listed when it is 3% or more of the book,
-  at least twice the usual move (taken as 1% for a quiet fund) and at least half the largest holding, by a fund of
-  $500M or more that filed last quarter, whose largest holding then was 33% or less, and that is no index giant,
-  bank, insurer, pension or broker.
+- `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
+  "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
+  `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`
+  is `"new"`, `"add"`, `"trim"` or `"exit"`; `usd` the dollars traded (negative: sold); `weight_after` the stock's
+  weight at the end of quarter `q`; `score` orders the rows and is not meant for display. A move's size is the
+  dollars traded over the fund's AUM at the end of the quarter; its usual move the biggest single move of the four
+  quarters before, measured the same way (under 1% counts as 1%). A move is listed when it is 3% or more of the AUM,
+  at least twice the usual move and at least half the fund's largest holding at the start of the quarter; `score`
+  is the move over the usual one. Funds of $500M or more that filed the quarter and the one before, whose AUM
+  neither more than doubled nor more than halved in it, whose largest holding at its start was 33% or less, and
+  that are no index giant, bank, insurer or broker. ETFs are neither listed nor set a usual move.
 - `wins_losses.json`: `{"latest_q", "wins": [...], "losses": [...]}`. Row: `{"fund_id", "name", "stock_id",
   "pnl"}`.
 - `just_filed.json`: `{"latest_q", "rows": [...]}`. Row: `{"fund_id", "name", "filed", "period_q", "book",
@@ -148,7 +150,7 @@ fund's name.
   the stock's move since the estimated buy, best first, and cut to the 50 best followed by the 50 worst when there
   are more than 100 (the middle is left out). Row: `{"stock_id", "fund_id", "name", "q", "est_price",
   "price_on_filed", "filed"}`.
-- The moves in `conviction.json`, `crowded.json` and the calls lists leave out a fund's first report (the first
+- The moves in the conviction lists, `crowded.json` and the calls lists leave out a fund's first report (the first
   quarter of its tracking) and a holding valued for the first time: those are positions entering the book, not
   buys of that quarter.
 

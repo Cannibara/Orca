@@ -15,11 +15,15 @@ from orca.config import (
     CONC_MIN_BOOK,
     CONC_MIN_POS,
     CONC_MIN_TOP10,
+    CONVICTION_LOOKBACK,
+    CONVICTION_MAX_BOOK_CHANGE,
+    CONVICTION_MAX_ROWS,
     CONVICTION_MAX_TOP,
     CONVICTION_MIN_MOVE,
     CONVICTION_QUIET,
     CONVICTION_USUAL_X,
     CONVICTION_VS_TOP,
+    CONVICTION_WINDOW,
     CROWDED_MIN_FUNDS,
     EXCLUDE_NAME_WORDS,
     GIANT_MIN_POSITIONS,
@@ -48,12 +52,10 @@ class FundSnapshot:
     and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf`
     is keyed by period (the keys of `config.PERIODS`), None when too short.
 
-    For the conviction list: `book_prev` is the book at the end of the quarter before `weights_now`
-    (0 without one), `prev_filed` whether the fund filed that quarter (a quarter it skipped is a
-    copy of the one before, with no trades), and `usual_move` its biggest single move of the
-    CONVICTION_LOOKBACK quarters before the latest: dollars traded over the book it started that
-    quarter with, None when it has no such quarter. Snapshots stored before these existed get the
-    defaults, which keep the fund off the list until it is recomputed."""
+    `conviction_quarters` holds what the conviction lists need of each of the fund's last
+    CONVICTION_LOOKBACK + CONVICTION_WINDOW quarters (`ConvictionQuarter`), so their rules apply at
+    publish time and changing one needs no recompute. A snapshot stored before it existed has none,
+    which keeps the fund off those lists until it is recomputed."""
 
     fund_id: int
     name: str
@@ -70,13 +72,30 @@ class FundSnapshot:
     perf: dict[str, Performance | None]
     filed: date
     period_q: int
-    book_prev: float = 0.0
-    prev_filed: bool = False
-    usual_move: float | None = None
+    conviction_quarters: tuple["ConvictionQuarter", ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ConvictionQuarter:
+    """One quarter of a fund as the conviction lists see it: its AUM (priced book) at the start
+    and end, its largest holding at the start (a share of the book), how many positions it held at
+    the end, whether it filed both this quarter and the one before (a quarter it skipped is a copy
+    of the one before, with no trades), and its moves of CONVICTION_KEEP or more of the end AUM:
+    (stock_id, type, usd, w_prev, w_after, px), `usd` the dollars traded (negative: sold), `w_prev`
+    and `w_after` the stock's weight at the start and end, `px` the estimated trade price. Entry
+    trades (a first report, a holding priced for the first time) are no move and are left out."""
+
+    q: int
+    start: float
+    end: float
+    top_prev: float
+    n_held: int
+    filed_pair: bool
+    moves: tuple[tuple[int, str, float, float, float, float], ...]
 
 
 def is_excluded_name(name: str) -> bool:
-    """Whether a fund name marks a bank, insurer, pension or broker: one of EXCLUDE_NAME_WORDS
+    """Whether a fund name marks a bank, insurer or broker: one of EXCLUDE_NAME_WORDS
     at the start of a word (case-insensitive)."""
     return _EXCLUDED.search(name.upper()) is not None
 
@@ -112,71 +131,109 @@ def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
     return out
 
 
-def conviction_moves(snaps: list[FundSnapshot], *, latest_q: int | None = None) -> list[dict]:
-    """Moves of the latest quarter that are large for the fund that made them, largest against
-    the fund's largest holding first. Funds whose `period_q` is not the latest quarter are left
-    out.
+def conviction_moves(
+    snaps: list[FundSnapshot],
+    window: str,
+    *,
+    latest_q: int | None = None,
+    not_stocks: frozenset[int] = frozenset(),
+) -> list[dict]:
+    """Moves large for the fund that made them, in the latest quarter (`window` "q") or in each of
+    the latest CONVICTION_WINDOW quarters ("y"), the most unusual first, at most
+    CONVICTION_MAX_ROWS. `not_stocks` (the ETFs) are neither listed nor set a usual move.
 
-    `latest_q` is the quarter the list is about; when None it is the newest `period_q` among the
-    snapshots not excluded by name or flag, so one early or bad filer cannot make the rest stale.
+    `latest_q` is the quarter the lists are about; when None it is the newest `period_q` among
+    the snapshots not excluded by name or flag, so one early or bad filer cannot make the rest
+    stale. Quarters after it are never listed.
 
-    A fund takes part when its book is CONC_MIN_BOOK or more, it is no index giant and not
-    excluded, it filed the quarter before, it has a usual move to compare with, and its largest
-    holding last quarter was CONVICTION_MAX_TOP or less of the book (holding companies and
-    single-stock vehicles are left out). A move (new, add, trim or exit; dollars traded over last
-    quarter's book) counts when it is all of: CONVICTION_MIN_MOVE or more of the book,
-    CONVICTION_USUAL_X times the fund's usual move or more (a usual move under CONVICTION_QUIET
-    counts as CONVICTION_QUIET: the fund was quiet), and CONVICTION_VS_TOP or more of last
-    quarter's largest holding.
-
-    A row's `usd` is the dollars traded (negative: sold), `size` the move over last quarter's
-    book, `vs_top` the move over last quarter's largest holding, `vs_usual` the move over the
-    usual one (None for a quiet fund), `change_pts` the weight change in percentage points."""
+    A move's size is the dollars traded in the stock over the fund's AUM at the end of the
+    quarter; the fund's usual move is its biggest single move of the CONVICTION_LOOKBACK quarters
+    before, measured the same way (only quarters it started with a book count; with none, there
+    is nothing to compare with and the quarter is skipped). A move is listed when it is
+    CONVICTION_MIN_MOVE or more of the AUM, CONVICTION_USUAL_X times the usual move or more (a
+    usual move under CONVICTION_QUIET counts as CONVICTION_QUIET) and CONVICTION_VS_TOP or more of
+    the largest holding at the quarter's start, in a quarter `_conviction_quarter` accepts, by a
+    fund not excluded. `score` (the move over the usual one) orders the rows; trims and exits
+    count like buys."""
+    anchor = _anchor(snaps, latest_q)
+    if anchor is None:
+        return []
+    span = 1 if window == "q" else CONVICTION_WINDOW
+    wanted = range(anchor - span + 1, anchor + 1)
     rows = []
-    for s in _latest(snaps, latest_q):
-        top_prev = max(s.weights_prev.values(), default=0.0)
-        if not (
-            s.book >= CONC_MIN_BOOK
-            and s.n_priced < GIANT_MIN_POSITIONS
-            and not _excluded(s)
-            and s.prev_filed
-            and s.usual_move is not None
-            and s.book_prev > 0
-            and 0 < top_prev <= CONVICTION_MAX_TOP
-        ):
+    for s in snaps:
+        if _excluded(s):
             continue
-        quiet = s.usual_move < CONVICTION_QUIET
-        usual = max(s.usual_move, CONVICTION_QUIET)
-        for stock_id, t in s.trades_latest:
-            usd = t.delta * t.px
-            size = abs(usd) / s.book_prev
-            # Rounded so a move of exactly a threshold is not lost to float error.
-            if not (
-                round(size - CONVICTION_MIN_MOVE, 12) >= 0
-                and round(size - CONVICTION_USUAL_X * usual, 12) >= 0
-                and round(size - CONVICTION_VS_TOP * top_prev, 12) >= 0
-            ):
+        records = {r.q: r for r in s.conviction_quarters}
+        for q in wanted:
+            r = records.get(q)
+            if r is None or not _conviction_quarter(r):
                 continue
-            now = s.weights_now.get(stock_id, 0.0)
-            prev = s.weights_prev.get(stock_id, 0.0)
-            rows.append(
-                {
-                    "fund_id": s.fund_id,
-                    "name": s.name,
-                    "stock_id": stock_id,
-                    "move": t.type,
-                    "usd": float(usd),
-                    "size": float(size),
-                    "vs_top": float(size / top_prev),
-                    "vs_usual": None if quiet else float(size / s.usual_move),
-                    "weight_now": float(now),
-                    "change_pts": float((now - prev) * 100),
-                    "est_price": float(t.px),
-                    "q": int(t.q),
-                }
-            )
-    rows.sort(key=lambda r: (-r["vs_top"], r["fund_id"], r["stock_id"]))
-    return rows
+            usual = _usual_move(records, q, not_stocks)
+            if usual is None:
+                continue
+            floor = max(usual, CONVICTION_QUIET)
+            for stock_id, kind, usd, w_prev, w_after, px in r.moves:
+                if stock_id in not_stocks:
+                    continue
+                size = abs(usd) / r.end
+                # Rounded so a move of exactly a threshold is not lost to float error.
+                if not (
+                    round(size - CONVICTION_MIN_MOVE, 12) >= 0
+                    and round(size - CONVICTION_USUAL_X * floor, 12) >= 0
+                    and round(size - CONVICTION_VS_TOP * r.top_prev, 12) >= 0
+                ):
+                    continue
+                rows.append(
+                    {
+                        "fund_id": s.fund_id,
+                        "name": s.name,
+                        "stock_id": stock_id,
+                        "q": q,
+                        "move": kind,
+                        "usd": float(usd),
+                        "weight_after": float(w_after),
+                        "change_pts": float((w_after - w_prev) * 100),
+                        "est_price": float(px),
+                        "score": float(size / floor),
+                    }
+                )
+    rows.sort(key=lambda r: (-r["score"], r["fund_id"], r["stock_id"], r["q"]))
+    return rows[:CONVICTION_MAX_ROWS]
+
+
+def _conviction_quarter(r: ConvictionQuarter) -> bool:
+    """A quarter whose moves can count: filed with the one before, an AUM of CONC_MIN_BOOK or
+    more that neither grew nor shrank more than CONVICTION_MAX_BOOK_CHANGE times (a jump comes
+    from holdings priced for the first time, restructurings or reporting errors, not trading),
+    no index giant, and a largest holding at the start of CONVICTION_MAX_TOP or less (holding
+    companies and single-stock vehicles are left out)."""
+    return (
+        r.filed_pair
+        and r.start > 0
+        and r.end >= CONC_MIN_BOOK
+        and 1 / CONVICTION_MAX_BOOK_CHANGE <= r.end / r.start <= CONVICTION_MAX_BOOK_CHANGE
+        and r.n_held < GIANT_MIN_POSITIONS
+        and 0 < r.top_prev <= CONVICTION_MAX_TOP
+    )
+
+
+def _usual_move(
+    records: dict[int, ConvictionQuarter], q: int, not_stocks: frozenset[int]
+) -> float | None:
+    """The biggest single move of the CONVICTION_LOOKBACK quarters before `q` that the fund
+    started with a book, each over its own quarter's AUM; None when there is no such quarter."""
+    before = [
+        records[p]
+        for p in range(q - CONVICTION_LOOKBACK, q)
+        if p in records and records[p].start > 0
+    ]
+    if not before:
+        return None
+    return max(
+        (abs(m[2]) / r.end for r in before for m in r.moves if m[0] not in not_stocks),
+        default=0.0,
+    )
 
 
 def wins_losses(

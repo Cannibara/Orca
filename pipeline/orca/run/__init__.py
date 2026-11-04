@@ -36,7 +36,7 @@ from orca.run.ingest import live_watermark
 from orca.run.publish_step import CusipLeakError, copy_published, cusip_check_digit
 from orca.run.sources import Sources, production_sources
 from orca.run.state import strip_query
-from orca.run.weekly import RunStats, deadline_quarter, run_weekly, verify
+from orca.run.weekly import RunStats, deadline_quarter, run_home, run_weekly, verify
 
 __all__ = [
     "CusipLeakError",
@@ -51,6 +51,7 @@ __all__ = [
     "main",
     "price_flags",
     "production_sources",
+    "run_home",
     "run_weekly",
     "split_suspects",
     "strip_query",

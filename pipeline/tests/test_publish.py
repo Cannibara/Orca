@@ -744,7 +744,8 @@ def home_lists(latest_q=53) -> HomeLists:
     return HomeLists(
         latest_q=latest_q,
         top={p: {"eligible": [top_row], "giants": []} for p in PERIODS},
-        conviction=[{"fund_id": 7, "stock_id": 1, "move": "new"}],
+        conviction_q=[{"fund_id": 7, "stock_id": 1, "move": "new"}],
+        conviction_y=[{"fund_id": 7, "stock_id": 2, "move": "exit"}],
         wins_losses={"wins": [{"fund_id": 7, "stock_id": 1, "pnl": 5.0}], "losses": []},
         just_filed=[{"fund_id": 7, "filed": "2026-08-14"}],
         crowded=[{"stock_id": 1, "funds_buying": 3}],
@@ -788,7 +789,10 @@ def test_shared_files_follow_the_contract(tmp_path):
             "latest_prices.json",
             "stock/1/weekly.json",
             *(f"home/top_{p}.json" for p in PERIODS),
-            *(f"home/{n}.json" for n in ("conviction", "wins_losses", "just_filed", "crowded")),
+            *(
+                f"home/{n}.json"
+                for n in ("conviction_q", "conviction_y", "wins_losses", "just_filed", "crowded")
+            ),
             "home/calls_q.json",
             "home/calls_y.json",
         ]
@@ -823,10 +827,13 @@ def test_home_files_carry_latest_q_and_the_lists(tmp_path):
     assert set(top) == {"latest_q", "period", "eligible", "giants"}
     assert (top["latest_q"], top["period"], top["giants"]) == (53, "3y", [])
     assert top["eligible"][0]["fund_id"] == 7
-    assert decoded(tmp_path, "home/conviction.json") == {
+    assert decoded(tmp_path, "home/conviction_q.json") == {
         "latest_q": 53,
         "rows": [{"fund_id": 7, "stock_id": 1, "move": "new"}],
     }
+    assert decoded(tmp_path, "home/conviction_y.json")["rows"] == [
+        {"fund_id": 7, "stock_id": 2, "move": "exit"}
+    ]
     assert decoded(tmp_path, "home/wins_losses.json") == {
         "latest_q": 53,
         "wins": [{"fund_id": 7, "stock_id": 1, "pnl": 5.0}],

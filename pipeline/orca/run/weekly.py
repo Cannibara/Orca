@@ -421,6 +421,64 @@ def run_weekly(
     )
 
 
+def run_home(
+    lake: Lake,
+    out_root: Path,
+    today: date,
+    *,
+    compress: bool = True,
+    built: datetime | None = None,
+) -> RunStats:
+    """Publish the shared files again (search index, securities, latest prices, home lists) from
+    the funds' stored state, recomputing no fund and fetching nothing: for a change to how the
+    home lists are made from it, which then takes minutes instead of a rebuild. The fund and
+    weekly files stay as they are. Raises RuntimeError, before anything is written, when the
+    deadline quarter has moved on since the last run or anything is owed (the site behind the
+    lake, funds or prices pending): a weekly run must come first."""
+    out_root = Path(out_root)
+    state = State.load(lake)
+    _reconcile_published(lake, out_root, state, compress)
+    last_q = deadline_quarter(today)
+    if state.last_q != last_q:
+        raise RuntimeError(
+            f"the deadline quarter is {last_q}, the last run's was {state.last_q}: run weekly first"
+        )
+    if state.pending_all or state.pending_funds or state.pending_stocks or state.pending_weekly:
+        raise RuntimeError("funds or prices are owed a recompute: run weekly first")
+    ctx = Context.build(lake, last_q)
+    metas, snaps = {}, {}
+    for cik, meta, snap in read_table(lake, "fund_state", FUND_STATE_SCHEMA).iter_rows():
+        metas[cik], snaps[cik] = undump(meta), undump(snap)
+    order = sorted(metas)
+    run_id = today.strftime("%Y%m%d")
+    staging = new_version(out_root, run_id)
+    files = publish_shared_files(
+        ctx, staging, [metas[c] for c in order], [snaps[c] for c in order], set(), today, compress
+    )
+    previous = load_published(lake, out_root, compress)
+    changed = changed_files(files, previous)
+    keep_only(staging, set(changed))
+    cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
+    leaks = cusip_leaks(staging, {c for c in cusip_map["cusip"].to_list() if is_cusip(c)}, compress)
+    if leaks:
+        raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
+    merged = {**previous, **files}
+    write_manifest(out_root, run_id, merged, compress, built=built)
+    write_json_atomic(published_path(lake), merged)
+    prune_staging(out_root)
+    log.info("run %s: home lists republished, %d files changed", run_id, len(changed))
+    return RunStats(
+        run_id=run_id,
+        staging=staging,
+        last_q=last_q,
+        files=files,
+        changed=sorted([*changed, "manifest.json"]),
+        filings_parsed=0,
+        funds_recomputed=0,
+        flags=[],
+    )
+
+
 # --- verify ---------------------------------------------------------------------------------
 
 

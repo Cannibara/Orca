@@ -13,15 +13,13 @@ GIANT_MIN_POSITIONS = 1000  # index giants are listed separately
 # Quarters per period. The SEC's 13F data starts in 2013: no fund has 15 years until 2028.
 PERIODS = {"1y": 4, "3y": 12, "5y": 20, "10y": 40, "15y": 60, "max": None}
 
-# Funds excluded by name: banks, insurers, pensions, brokers
+# Funds excluded by name: banks, insurers, brokers (pensions and endowments are managed: they count)
 EXCLUDE_NAME_WORDS = (
     "BANK",
     "BANCORP",
     "TRUST CO",
     "INSURANCE",
     "ASSURANCE",
-    "PENSION",
-    "RETIREMENT SYSTEM",
     "SECURITIES LLC",
     "BROKERAGE",
 )
@@ -32,13 +30,20 @@ CONC_MAX_POS = 60
 CONC_MIN_TOP10 = 0.50  # top-10 weight
 CONC_MIN_BOOK = 5e8  # dollars
 
-# Conviction moves: a move (dollars traded over last quarter's book) large for the fund that made it
-CONVICTION_MIN_MOVE = 0.03  # at least this share of the book
-CONVICTION_USUAL_X = 2.0  # at least this many times the fund's biggest move of the lookback
-CONVICTION_LOOKBACK = 4  # quarters before the latest that set the usual move
+# Conviction moves: a move (dollars traded in one stock over the fund's AUM at the end of that
+# quarter) large for the fund that made it
+CONVICTION_MIN_MOVE = 0.03  # at least this share of the AUM
+CONVICTION_USUAL_X = 2.0  # at least this many times the fund's usual move
+CONVICTION_LOOKBACK = 4  # the usual move: the biggest single move of this many quarters before
 CONVICTION_QUIET = 0.01  # a usual move under this counts as this: the fund was quiet
-CONVICTION_VS_TOP = 0.50  # at least this share of last quarter's largest holding
-CONVICTION_MAX_TOP = 0.33  # funds whose largest holding last quarter was more are left out
+CONVICTION_VS_TOP = 0.50  # at least this share of the fund's largest holding at the quarter's start
+CONVICTION_MAX_TOP = 0.33  # a quarter whose largest holding at the start was more is left out
+CONVICTION_MAX_BOOK_CHANGE = 2.0  # ... and so is one whose AUM grew or shrank more than this many times
+CONVICTION_WINDOW = 4  # quarters of the "last 4 quarters" list
+CONVICTION_MAX_ROWS = 200  # rows of each conviction list
+# Moves a fund's snapshot keeps, as a share of the quarter's AUM. Smaller ones can never be
+# listed or set a usual move above the quiet floor, so the lists come out the same without them.
+CONVICTION_KEEP = 0.01
 
 # Crowded buys
 CROWDED_MIN_FUNDS = 3
