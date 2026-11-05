@@ -80,10 +80,13 @@ class ConvictionQuarter:
     """One quarter of a fund as the conviction lists see it: its AUM (priced book) at the start
     and end, its largest holding at the start (a share of the book), how many positions it held at
     the end, whether it filed both this quarter and the one before (a quarter it skipped is a copy
-    of the one before, with no trades), and its moves of CONVICTION_KEEP or more of the end AUM:
-    (stock_id, type, usd, w_prev, w_after, px), `usd` the dollars traded (negative: sold), `w_prev`
-    and `w_after` the stock's weight at the start and end, `px` the estimated trade price. Entry
-    trades (a first report, a holding priced for the first time) are no move and are left out."""
+    of the one before, with no trades), its net flow (`flow`: the dollars of every trade of the
+    quarter, sales negative; money coming in or going out), and its moves of CONVICTION_KEEP or
+    more of the smaller of its start and end AUM: (stock_id, type, usd, w_prev, w_after, px),
+    `usd` the dollars traded (negative: sold), `w_prev` and `w_after` the stock's weight at the
+    start and end, `px` the estimated trade price. Entry trades (a first report, a holding priced
+    for the first time) are no move and are left out. A record stored before `flow` existed reads
+    back with no flow: its moves count as traded until the fund is recomputed."""
 
     q: int
     start: float
@@ -92,6 +95,7 @@ class ConvictionQuarter:
     n_held: int
     filed_pair: bool
     moves: tuple[tuple[int, str, float, float, float, float], ...]
+    flow: float = 0.0
 
 
 def is_excluded_name(name: str) -> bool:
@@ -146,10 +150,11 @@ def conviction_moves(
     the snapshots not excluded by name or flag, so one early or bad filer cannot make the rest
     stale. Quarters after it are never listed.
 
-    A move's size is the dollars traded in the stock over the fund's AUM at the end of the
-    quarter; the fund's usual move is its biggest single move of the CONVICTION_LOOKBACK quarters
-    before, measured the same way (only quarters it started with a book count; with none, there
-    is nothing to compare with and the quarter is skipped). A move is listed when it is
+    A move's size is `_move_size`: a buy over the fund's AUM at the end of the quarter, a sale
+    over its AUM at the start, with the fund's money in or out taken out of adds and trims. The
+    fund's usual move is its biggest single move of the CONVICTION_LOOKBACK quarters before,
+    measured the same way (only quarters it started with a book count; with none, there is
+    nothing to compare with and the quarter is skipped). A move is listed when it is
     CONVICTION_MIN_MOVE or more of the AUM, CONVICTION_USUAL_X times the usual move or more (a
     usual move under CONVICTION_QUIET counts as CONVICTION_QUIET) and CONVICTION_VS_TOP or more of
     the largest holding at the quarter's start, in a quarter `_conviction_quarter` accepts, by a
@@ -176,7 +181,7 @@ def conviction_moves(
             for stock_id, kind, usd, w_prev, w_after, px in r.moves:
                 if stock_id in not_stocks:
                     continue
-                size = abs(usd) / r.end
+                size = _move_size(r, kind, usd, w_prev)
                 # Rounded so a move of exactly a threshold is not lost to float error.
                 if not (
                     round(size - CONVICTION_MIN_MOVE, 12) >= 0
@@ -231,9 +236,29 @@ def _usual_move(
     if not before:
         return None
     return max(
-        (abs(m[2]) / r.end for r in before for m in r.moves if m[0] not in not_stocks),
+        (
+            _move_size(r, kind, usd, w_prev)
+            for r in before
+            for stock_id, kind, usd, w_prev, *_ in r.moves
+            if stock_id not in not_stocks
+        ),
         default=0.0,
     )
+
+
+def _move_size(r: ConvictionQuarter, kind: str, usd: float, w_prev: float) -> float:
+    """One move as a share of the fund: a buy over the AUM it ends the quarter with, a sale over
+    the AUM it was sold out of (the start). An add or a trim first loses its pro-rata share of
+    the quarter's money in or out (`flow` times the stock's weight at the start): new money spread
+    over the book, or a redemption taken from every holding, is no decision about the stock. The
+    flow only ever shrinks a move, never enlarges or flips it. A new position or an exit counts as
+    traded."""
+    counted = usd
+    if kind in ("add", "trim"):
+        counted = usd - r.flow * w_prev
+        counted = min(max(counted, 0.0), usd) if usd > 0 else max(min(counted, 0.0), usd)
+    base = r.end if usd > 0 else r.start
+    return abs(counted) / base if base > 0 else 0.0
 
 
 def wins_losses(

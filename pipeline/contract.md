@@ -134,8 +134,11 @@ fund's name.
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`
   is `"new"`, `"add"`, `"trim"` or `"exit"`; `usd` the dollars traded (negative: sold); `weight_after` the stock's
   weight at the end of quarter `q`; `score` orders the rows and is not meant for display. A move's size is the
-  dollars traded over the fund's AUM at the end of the quarter; its usual move the biggest single move of the four
-  quarters before, measured the same way (under 1% counts as 1%). A move is listed when it is 3% or more of the AUM,
+  dollars traded over the fund's AUM: a buy over the AUM at the end of the quarter, a sale over the AUM at its start.
+  An add or a trim first loses its pro-rata share of the quarter's money in or out (the net dollars of all the
+  fund's trades times the stock's weight at the start), never more than the move; new positions and exits count as
+  traded. The usual move is the biggest single move of the four quarters before, measured the same way (under 1%
+  counts as 1%). A move is listed when it is 3% or more of the AUM,
   at least twice the usual move and at least half the fund's largest holding at the start of the quarter; `score`
   is the move over the usual one. Funds of $500M or more that filed the quarter and the one before, whose AUM
   neither more than doubled nor more than halved in it, whose largest holding at its start was 33% or less, and

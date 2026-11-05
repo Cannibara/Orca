@@ -516,8 +516,9 @@ def _conviction_quarters(
     filed_quarters: set[int],
 ) -> tuple[ConvictionQuarter, ...]:
     """The fund's last CONVICTION_LOOKBACK + CONVICTION_WINDOW quarters through `end_q` that end
-    with a book, as the conviction lists need them (`ConvictionQuarter`): moves of CONVICTION_KEEP
-    or more of the quarter's end AUM, entries left out."""
+    with a book, as the conviction lists need them (`ConvictionQuarter`): the net flow of the
+    quarter's trades and its moves of CONVICTION_KEEP or more of the smaller of its start and end
+    AUM (a move is sized on one of the two), entries left out."""
     first = end_q - CONVICTION_LOOKBACK - CONVICTION_WINDOW + 1
     weight_at = {q: weights(q) for q in range(first - 1, end_q + 1)}
     out = []
@@ -526,21 +527,31 @@ def _conviction_quarters(
         if end <= 0:
             continue
         prev, now = weight_at[q - 1], weight_at[q]
+        start = end_of.get(q - 1, 0.0)
+        floor = CONVICTION_KEEP * (min(start, end) if start > 0 else end)
+        trades = [(p, t) for p in positions for t in p.trades if t.q == q and not t.entry]
         moves = tuple(
-            (p.stock_id, t.type, t.delta * t.px, prev.get(p.stock_id, 0.0), now.get(p.stock_id, 0.0), t.px)
-            for p in positions
-            for t in p.trades
-            if t.q == q and not t.entry and abs(t.delta * t.px) >= CONVICTION_KEEP * end
+            (
+                p.stock_id,
+                t.type,
+                t.delta * t.px,
+                prev.get(p.stock_id, 0.0),
+                now.get(p.stock_id, 0.0),
+                t.px,
+            )
+            for p, t in trades
+            if abs(t.delta * t.px) >= floor
         )
         out.append(
             ConvictionQuarter(
                 q=q,
-                start=end_of.get(q - 1, 0.0),
+                start=start,
                 end=end,
                 top_prev=max(prev.values(), default=0.0),
                 n_held=len(now),
                 filed_pair=q in filed_quarters and q - 1 in filed_quarters,
                 moves=moves,
+                flow=sum(t.delta * t.px for _, t in trades),
             )
         )
     return tuple(out)

@@ -197,10 +197,12 @@ def test_wins_losses_keeps_only_top_n():
 # --- concentrated funds and conviction moves ----------------------------------------------
 
 
-def record(q=LATEST_Q, start=1e9, end=1e9, top_prev=0.05, n_held=20, filed_pair=True, moves=()):
+def record(
+    q=LATEST_Q, start=1e9, end=1e9, top_prev=0.05, n_held=20, filed_pair=True, moves=(), flow=0.0
+):
     return ConvictionQuarter(
         q=q, start=start, end=end, top_prev=top_prev, n_held=n_held, filed_pair=filed_pair,
-        moves=tuple(moves),
+        moves=tuple(moves), flow=flow,
     )
 
 
@@ -223,7 +225,9 @@ def conviction_fund(
     records.append(record(at, moves=moves, **(latest or {})))
     now = spread(20) | kw.pop("now", {})
     name = kw.pop("name", "CONVICTION FUND")
-    return snap(fund_id, name, n_priced=20, weights_now=now, conviction_quarters=tuple(records), **kw)
+    return snap(
+        fund_id, name, n_priced=20, weights_now=now, conviction_quarters=tuple(records), **kw
+    )
 
 
 def listed(snaps, window="q", **kw):
@@ -270,6 +274,60 @@ def test_conviction_move_is_sized_against_this_quarter_s_aum():
     fund = conviction_fund(latest={"end": 2e9}, moves=[mv(1, 100e6)])
     [row] = conviction_moves([fund], "q")
     assert row["score"] == pytest.approx(0.05 / 0.02)
+
+
+def test_conviction_sells_are_sized_against_last_quarter_s_aum():
+    # $100M sold out of last quarter's $1B (10%), though the fund ends the quarter at $600M
+    fund = conviction_fund(latest={"start": 1e9, "end": 0.6e9}, moves=[mv(1, -100e6, w_prev=0.1)])
+    [row] = conviction_moves([fund], "q")
+    assert row["score"] == pytest.approx(0.10 / 0.02)
+
+
+def test_conviction_takes_out_the_funds_money_in_and_out():
+    # $400M of new money spread pro rata: a 10% holding topped up by $40M is no move; $140M is
+    # $100M beyond its share, 7.1% of the $1.4B the fund ends with
+    inflow = {"start": 1e9, "end": 1.4e9, "flow": 400e6}
+    pro_rata = conviction_fund(1, latest=inflow, moves=[mv(1, 40e6, "add", 0.1, 0.1)])
+    beyond = conviction_fund(2, latest=inflow, moves=[mv(1, 140e6, "add", 0.1, 0.17)])
+    # $200M taken out pro rata: a 10% holding trimmed by $20M is no move; $80M is $60M beyond
+    outflow = {"start": 1e9, "end": 0.8e9, "flow": -200e6}
+    redeemed = conviction_fund(3, latest=outflow, moves=[mv(1, -20e6, "trim", 0.1, 0.1)])
+    sold = conviction_fund(4, latest=outflow, moves=[mv(1, -80e6, "trim", 0.1, 0.03)])
+    rows = {r["fund_id"]: r for r in conviction_moves([pro_rata, beyond, redeemed, sold], "q")}
+    assert set(rows) == {2, 4}
+    assert rows[2]["score"] == pytest.approx((100 / 1400) / 0.02)
+    assert rows[4]["score"] == pytest.approx((60 / 1000) / 0.02)
+    assert rows[2]["usd"] == pytest.approx(140e6)  # the row shows the dollars actually traded
+
+
+def test_conviction_counts_new_positions_and_exits_in_full_whatever_the_flow():
+    flows = {"start": 1e9, "end": 0.7e9, "flow": -300e6}
+    fund = conviction_fund(latest=flows, moves=[mv(1, -100e6, w_prev=0.1), mv(2, 50e6)])
+    rows = {r["stock_id"]: r for r in conviction_moves([fund], "q")}
+    assert rows[1]["score"] == pytest.approx(0.10 / 0.02)  # the exit, not 10% less its share
+    assert rows[2]["score"] == pytest.approx((50 / 700) / 0.02)  # the new position
+
+
+def test_conviction_flow_never_enlarges_or_flips_a_move():
+    # selling into inflows or buying into outflows counts as traded, not more
+    into_inflow = conviction_fund(
+        1, latest={"end": 1.5e9, "flow": 500e6}, moves=[mv(1, -40e6, "trim", 0.1, 0.03)]
+    )
+    into_outflow = conviction_fund(
+        2, latest={"end": 0.6e9, "flow": -500e6}, moves=[mv(1, 40e6, "add", 0.1, 0.2)]
+    )
+    rows = {r["fund_id"]: r for r in conviction_moves([into_inflow, into_outflow], "q")}
+    assert rows[1]["score"] == pytest.approx((40 / 1000) / 0.02)
+    assert rows[2]["score"] == pytest.approx((40 / 600) / 0.02)
+
+
+def test_conviction_usual_move_takes_out_money_in_and_out_too():
+    # last quarter's only moves were pro-rata top-ups from new money: the fund was quiet
+    fund = conviction_fund(history=(), moves=[mv(1, 35e6)])
+    topped_up = record(LATEST_Q - 1, flow=300e6, moves=[mv(901, 30e6, "add", 0.1, 0.1)])
+    fund = replace(fund, conviction_quarters=(topped_up, *fund.conviction_quarters))
+    [row] = conviction_moves([fund], "q")
+    assert row["score"] == pytest.approx(3.5)  # 3.5% against the 1% quiet floor
 
 
 def test_conviction_thresholds_are_inclusive():

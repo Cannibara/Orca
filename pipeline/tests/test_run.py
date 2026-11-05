@@ -1638,9 +1638,10 @@ def test_a_concentrated_first_filer_is_not_a_conviction_move_a_crowded_buy_or_a_
 
 
 def test_a_conviction_move_is_measured_against_the_fund_s_own_usual_move(tmp_path):
-    # A fund of four $250M stakes ($50 a share) adds $20M of one in Q1 2024 (1.96% of the $1.02B
-    # it ends that quarter with: its usual move) and buys $200M of a fifth stock in Q2 2024: 16.4%
-    # of the $1.22B it ends with, 8.4 times its usual move and 62% of its largest holding (26.5%).
+    # A fund of four $250M stakes ($50 a share) adds $20M of one in Q1 2024, its only trade: $20M
+    # of money in, of which the stake's pro-rata 25% is no decision, so $15M counts (1.47% of the
+    # $1.02B it ends that quarter with: its usual move). It buys $200M of a fifth stock in Q2 2024:
+    # 16.4% of the $1.22B it ends with, 11.2 times its usual move, 62% of its largest holding.
     tickers = ["AAAA", "BBBB", "CCCC", "DDDD", "EEEE"]
     cusips = {t: f"00000{i}BB" + cusip_check_digit(f"00000{i}BB") for i, t in enumerate(tickers)}
     stake = {t: Holding(f"{t} INC", cusips[t], 250e6, 5e6) for t in tickers}
@@ -1674,7 +1675,7 @@ def test_a_conviction_move_is_measured_against_the_fund_s_own_usual_move(tmp_pat
     [row] = read_json(tmp_path / "bucket" / "home" / "conviction_q.json")["rows"]
     assert (row["fund_id"], row["move"], row["q"]) == (3001, "new", Q2_24)
     assert row["usd"] == pytest.approx(200e6)
-    assert row["score"] == pytest.approx((200 / 1220) / (20 / 1020))
+    assert row["score"] == pytest.approx((200 / 1220) / (15 / 1020))
     assert row["weight_after"] == pytest.approx(200 / 1220)
     assert row["change_pts"] == pytest.approx(100 * 200 / 1220)
     year = read_json(tmp_path / "bucket" / "home" / "conviction_y.json")["rows"]
