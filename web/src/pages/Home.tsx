@@ -12,11 +12,10 @@ import type {
   ConvictionRow,
   CrowdedRow,
   FundsIndex,
-  JustFiledRow,
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { DASH, count, fmtDate, money, pct, pp, px, qLabel, ratio } from "../lib/format";
+import { count, money, pct, pp, px, qLabel, ratio } from "../lib/format";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
@@ -412,48 +411,6 @@ function WinsLosses({ lookup }: { lookup: Lookup }) {
   );
 }
 
-function JustFiled({ lookup }: { lookup: Lookup }) {
-  const list = useLoad(() => loadHome("just_filed"), []);
-  const columns = useMemo<Col<JustFiledRow>[]>(
-    () => [
-      fundCol((r) => r.fund_id, (r) => r.name),
-      { header: "Filed", key: "filed", by: (r) => r.filed, cell: (r) => fmtDate(r.filed) },
-      { header: "Period", key: "period", by: (r) => r.period_q, cell: (r) => qLabel(r.period_q) },
-      { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => money(r.book) },
-      {
-        header: "Headline change",
-        key: "headline",
-        align: "l",
-        by: (r) => r.headline_change_pts,
-        cell: (r) =>
-          r.headline_stock_id == null ? (
-            DASH
-          ) : (
-            <>
-              <StockLink lookup={lookup} fundId={r.fund_id} stockId={r.headline_stock_id} />{" "}
-              <Signed v={r.headline_change_pts}>{pp(r.headline_change_pts)}</Signed>
-            </>
-          ),
-      },
-    ],
-    [lookup],
-  );
-  if (list.status !== "ready") return <Status state={list} />;
-  return (
-    <>
-      <p className="rule">Newest 13F filings, each with its headline change.</p>
-      <ListTable
-        label="Just filed"
-        noun="filings"
-        columns={columns}
-        rows={list.data.rows}
-        initial={{ key: "filed", dir: -1 }}
-        empty="No new filings."
-      />
-    </>
-  );
-}
-
 function Crowded({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("crowded"), []);
   const columns = useMemo<Col<CrowdedRow>[]>(
@@ -591,12 +548,11 @@ function Calls({
 
 // ---- page ----------------------------------------------------------------------------
 
-type TabId = "top" | "conviction" | "wins" | "filed" | "crowded" | "calls";
+type TabId = "top" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
   { id: "top", label: "Top funds" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
-  { id: "filed", label: "Just filed" },
   { id: "crowded", label: "Crowded buys" },
   { id: "calls", label: "Best & worst calls" },
 ];
@@ -616,7 +572,6 @@ export default function Home() {
   else if (lookup.status !== "ready") panel = <Status state={lookup} />;
   else if (tab === "conviction") panel = <Conviction lookup={lookup.data} win={moveWin} onWin={setMoveWin} />;
   else if (tab === "wins") panel = <WinsLosses lookup={lookup.data} />;
-  else if (tab === "filed") panel = <JustFiled lookup={lookup.data} />;
   else if (tab === "crowded") panel = <Crowded lookup={lookup.data} />;
   else panel = <Calls lookup={lookup.data} mode={mode} onMode={setMode} win={win} onWin={setWin} />;
 

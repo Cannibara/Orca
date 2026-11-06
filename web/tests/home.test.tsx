@@ -91,7 +91,6 @@ const TAB_NAMES = [
   "Top funds",
   "Conviction moves",
   "Big wins & losses",
-  "Just filed",
   "Crowded buys",
   "Best & worst calls",
 ];
@@ -105,7 +104,7 @@ beforeEach(() => clearDataCache());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Home", () => {
-  it("shows six tabs in order", async () => {
+  it("shows five tabs in order", async () => {
     stubData();
     renderHome();
     await screen.findByRole("table"); // Top funds has loaded
@@ -362,7 +361,6 @@ describe("Home", () => {
         ["Fund", "Stock", "Buy/Sell", "Weight now", "Change", "$ bought / sold", "Est. price", "Price now", "Since"],
       ],
       ["Big wins & losses", /Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds\./, ["Fund", "Stock", "Quarter P&L"]],
-      ["Just filed", /Newest 13F filings, each with its headline change\./, ["Fund", "Filed", "Period", "AUM", "Headline change"]],
       ["Crowded buys", /Stocks bought by several concentrated active funds in the same quarter \(Q2 2026\)\./, ["Stock", "Funds buying", "Total bought", "Avg weight after"]],
       ["Best & worst calls", /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds\./, ["Stock", "Fund", "Bought", "Est. buy price", "Price now", "Since fund's buy", "Since 13F went public"]],
     ];
@@ -423,6 +421,32 @@ describe("Home", () => {
     expect(within(trimmed).getByText("Trim")).toHaveClass("sell");
   });
 
+  it("conviction shows the same page bar in both views, even on a single page", async () => {
+    const row = (q: number): ConvictionRow => ({
+      fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q, move: "new",
+      usd: 60e6, weight_after: 0.06, change_pts: 6, est_price: 10, score: 3,
+    });
+    stubData({
+      "home/conviction_q.json": { latest_q: 53, rows: [row(53), { ...row(53), stock_id: 5 }] },
+      "home/conviction_y.json": { latest_q: 53, rows: [row(51)] },
+    });
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
+    await screen.findByRole("table", { name: "Conviction moves" });
+    let bars = screen.getAllByRole("navigation", { name: "Pages of moves" });
+    expect(bars).toHaveLength(2); // above and below the table
+    expect(bars[0]).toHaveTextContent("Showing 1–2 of 2 moves");
+    expect(bars[0]).toHaveTextContent("Page 1 of 1");
+    expect(within(bars[0]).getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(within(bars[0]).getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Last 4 quarters" }));
+    await screen.findByText(/The 4 quarters to Q2 2026/);
+    bars = screen.getAllByRole("navigation", { name: "Pages of moves" });
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveTextContent("Showing 1–1 of 1 moves");
+  });
+
   it("conviction sorts by any column", async () => {
     const row = (stock_id: number, usd: number, score: number): ConvictionRow => ({
       fund_id: 9100003, name: "Lanternfish Capital Management", stock_id, q: 53, move: usd < 0 ? "exit" : "new",
@@ -464,21 +488,6 @@ describe("Home", () => {
     expect(within(table).getByRole("columnheader", { name: "Quarter" })).toBeInTheDocument();
     expect(within(table).getByRole("columnheader", { name: "Weight after" })).toBeInTheDocument();
     expect(within(within(table).getAllByRole("row")[1]).getByText("Q4 2025")).toBeInTheDocument();
-  });
-
-  it("just filed names the headline stock and its change", async () => {
-    stubData();
-    const user = userEvent.setup();
-    renderHome();
-    await user.click(screen.getByRole("tab", { name: "Just filed" }));
-    const first = (await screen.findAllByRole("row"))[1];
-    const cells = within(first).getAllByRole("cell");
-    expect(within(cells[0]).getByRole("link", { name: "Orcinus Lane Capital" })).toHaveAttribute("href", "/fund/9100011");
-    expect(cells[1].textContent).toBe("14 Oct 2026");
-    expect(cells[2].textContent).toBe("Q3 2026"); // period_q 54
-    expect(cells[3].textContent).toBe("$14.2B");
-    expect(within(cells[4]).getByRole("link", { name: /JPM/ })).toHaveAttribute("href", "/fund/9100011/stock/15");
-    expect(cells[4].textContent).toContain("−8.2 pts");
   });
 
   it("crowded buys lists funds buying, total bought and average weight", async () => {
@@ -570,7 +579,7 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load/i);
-    expect(screen.getAllByRole("tab")).toHaveLength(6); // the page is still there
+    expect(screen.getAllByRole("tab")).toHaveLength(5); // the page is still there
     await user.click(screen.getByRole("tab", { name: "Top funds" })); // and the other lists still work
     expect(await screen.findByRole("table")).toBeInTheDocument();
   });

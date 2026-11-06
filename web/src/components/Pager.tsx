@@ -10,10 +10,11 @@ type Props = {
   noun: string;
 };
 
-/** "Showing 101–200 of 1,234 funds" with Previous and Next buttons; nothing when everything fits on one page. */
+/** "Showing 101–200 of 1,234 funds" with Previous and Next buttons, also when everything fits on one
+ * page (both buttons then disabled), so every paged list reads the same; nothing for an empty list. */
 export function Pager({ page, pageSize, total, onPage, noun }: Props) {
   const pages = Math.ceil(total / pageSize);
-  if (pages <= 1) return null;
+  if (total === 0) return null;
   const first = page * pageSize + 1;
   const last = Math.min(total, (page + 1) * pageSize);
   return (
