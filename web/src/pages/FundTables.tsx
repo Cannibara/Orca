@@ -63,9 +63,9 @@ const lastChangeCell = (p: PositionRow | undefined) =>
   p === undefined ? (
     DASH
   ) : (
-    <>
+    <span className="two-line">
       <Signed v={p.last_usd}>{lastChangeText(p)}</Signed> <span className="cap">{qLabel(p.last_q)}</span>
-    </>
+    </span>
   );
 
 // ---- positions ----------------------------------------------------------------------
@@ -102,7 +102,7 @@ const POSITION_COLUMNS: Col<PosRow>[] = [
     header: "Held",
     key: "held",
     by: (r) => r.p.from_q,
-    cell: (r) => `${qLabel(r.p.from_q)} → ${r.p.to_q == null ? "now" : qLabel(r.p.to_q)}`,
+    cell: (r) => <span className="two-line">{`${qLabel(r.p.from_q)} → ${r.p.to_q == null ? "now" : qLabel(r.p.to_q)}`}</span>,
   },
   { header: "Avg cost", key: "avg_cost", by: (r) => r.p.avg_cost, cell: (r) => px(r.p.avg_cost) },
   { header: "Current price", key: "price", by: (r) => r.price ?? null, cell: (r) => px(r.price ?? null) },

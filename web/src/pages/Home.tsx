@@ -56,7 +56,11 @@ function change(price: number | undefined, base: number): number | null {
 }
 
 function FundLink({ id, name }: { id: number; name: string }) {
-  return <Link to={`/fund/${id}`}>{name}</Link>;
+  return (
+    <Link className="trunc" to={`/fund/${id}`} title={name}>
+      {name}
+    </Link>
+  );
 }
 
 /** Ticker with the name beside it, linking to the stock's page within a fund. */

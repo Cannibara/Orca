@@ -4,11 +4,15 @@ import type { Stock } from "../data/api";
 export function StockLabel({ stock, stockId }: { stock: Stock | undefined; stockId: number }) {
   return (
     <>
-      <span className="mono">{stock?.ticker ?? `#${stockId}`}</span>
+      <span className="mono" title={stock?.ticker}>
+        {stock?.ticker ?? `#${stockId}`}
+      </span>
       {stock && (
         <>
           {" "}
-          <span className="cap">{stock.name}</span>
+          <span className="cap" title={stock.name}>
+            {stock.name}
+          </span>
         </>
       )}
     </>
