@@ -1,9 +1,8 @@
-// The bottom of the Fund page: "Every stock they've owned" and "What if they'd kept it".
-// Every figure that depends on the latest price (unrealised, total P&L, return, IRR, since sale,
-// $ missed / dodged) is computed here from the price map; a stock without a price shows "—".
-import { useMemo, useState } from "react";
+// The bottom of the Fund page: "What if they'd kept it" (the positions table itself is src/fund/PositionsPanel).
+// Every figure that depends on the latest price (return, IRR, since sale, $ missed / dodged) is computed
+// here from the price map; a stock without a price shows "—".
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Chips, type ChipOption } from "../components/Chips";
 import { DataTable } from "../components/DataTable";
 import { Section } from "../components/Section";
 import { Signed } from "../components/Signed";
@@ -11,8 +10,8 @@ import { StockLabel } from "../components/StockLabel";
 import { Tile, Tiles } from "../components/Tiles";
 import { toRows, yearsSince2013, type Stock } from "../data/api";
 import type { Exits, ExitsRows, PositionRow } from "../data/types";
-import { DASH, count, money, pct, pp, px, qLabel, ratio, shareCount, signClass } from "../lib/format";
-import { heldFlows, irr, missed, positionFlows, profitablePct, returnPct, sinceSale, totalPnl, unrealised } from "../lib/live";
+import { DASH, count, money, pct, pp, px, qLabel, shareCount, signClass } from "../lib/format";
+import { heldFlows, irr, missed, positionFlows, returnPct, sinceSale, totalPnl, unrealised } from "../lib/live";
 import { useSortedRows, type Col } from "../lib/sort";
 
 // ---- shared table machinery -----------------------------------------------------
@@ -32,8 +31,6 @@ function once<T>(f: () => T): () => T {
     return value;
   };
 }
-
-const mean = (xs: number[]): number | null => (xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length);
 
 // ---- cells ------------------------------------------------------------------------
 
@@ -94,139 +91,6 @@ function posRow(p: PositionRow, stock: Stock | undefined, price: number | undefi
     ret: returnPct(p, price),
     irr: once(() => irr(positionFlows(p.trades, p.shares_now, price, nowT))),
   };
-}
-
-const POSITION_COLUMNS: Col<PosRow>[] = [
-  { header: "Stock", key: "stock", align: "l", by: (r) => r.ticker, cell: (r) => stockCell(r.stock, r.p.stock_id) },
-  {
-    header: "Held",
-    key: "held",
-    by: (r) => r.p.from_q,
-    cell: (r) => <span className="two-line">{`${qLabel(r.p.from_q)} → ${r.p.to_q == null ? "now" : qLabel(r.p.to_q)}`}</span>,
-  },
-  { header: "Avg cost", key: "avg_cost", by: (r) => r.p.avg_cost, cell: (r) => px(r.p.avg_cost) },
-  { header: "Current price", key: "price", by: (r) => r.price ?? null, cell: (r) => px(r.price ?? null) },
-  { header: "Avg exit", key: "avg_exit", by: (r) => r.p.avg_exit, cell: (r) => px(r.p.avg_exit) },
-  { header: "Return", key: "return", by: (r) => r.ret, cell: (r) => pctCell(r.ret) },
-  { header: "IRR", key: "irr", by: (r) => r.irr(), cell: (r) => pctCell(r.irr()) },
-  { header: "Last change", key: "last_change", by: (r) => lastChangeKey(r.p), cell: (r) => lastChangeCell(r.p) },
-  {
-    header: "Last change $",
-    key: "last_usd",
-    by: (r) => r.p.last_usd,
-    cell: (r) => moneyCell(r.p.last_usd),
-  },
-  { header: "$ in", key: "invested", by: (r) => r.p.invested, cell: (r) => money(r.p.invested) },
-  { header: "Realised", key: "realised", by: (r) => r.p.realised, cell: (r) => moneyCell(r.p.realised) },
-  { header: "Unrealised", key: "unrealised", by: (r) => r.unreal, cell: (r) => moneyCell(r.unreal) },
-  { header: "Total P&L", key: "total", by: (r) => r.total, cell: (r) => moneyCell(r.total) },
-];
-
-type Filter = "all" | "held" | "sold";
-const FILTERS: ChipOption<Filter>[] = [
-  { id: "all", label: "All" },
-  { id: "held", label: "Still held" },
-  { id: "sold", label: "Sold" },
-];
-
-/** R26: the whole fund, whatever the filter shows. */
-function PositionTiles({ rows, profitable }: { rows: PosRow[]; profitable: number | null }) {
-  const s = useMemo(() => {
-    let realised = 0;
-    let unreal = 0;
-    let heldPriced = 0;
-    let known = 0;
-    let wins = 0;
-    let won = 0;
-    let lost = 0;
-    const winners: number[] = [];
-    const losers: number[] = [];
-    let best: PosRow | undefined;
-    let worst: PosRow | undefined;
-    for (const r of rows) {
-      realised += r.p.realised;
-      if (r.unreal !== null) {
-        unreal += r.unreal;
-        heldPriced++;
-      }
-      if (r.total === null) continue;
-      known++;
-      if (best === undefined || r.total > (best.total as number)) best = r;
-      if (worst === undefined || r.total < (worst.total as number)) worst = r;
-      if (r.total > 0) {
-        wins++;
-        won += r.total;
-        if (r.ret !== null) winners.push(r.ret);
-      } else if (r.total < 0) {
-        lost -= r.total;
-        if (r.ret !== null) losers.push(r.ret);
-      }
-    }
-    return { realised, unreal, heldPriced, known, wins, won, lost, winners: mean(winners), losers: mean(losers), best, worst };
-  }, [rows]);
-
-  return (
-    <Tiles label="Position statistics">
-      <Tile label="Profitable" value={pct(profitable, 0, false)} sub={s.known > 0 ? `${count(s.wins)} of ${count(s.known)}` : undefined} />
-      <Tile label="Realised P&L" value={money(s.realised, true)} tone={signClass(s.realised)} />
-      {/* With no held position priced there is nothing to add up: a dash, not $0. */}
-      <Tile
-        label="Unrealised P&L"
-        value={s.heldPriced > 0 ? money(s.unreal, true) : DASH}
-        sub="at latest prices"
-        tone={s.heldPriced > 0 ? signClass(s.unreal) : ""}
-      />
-      <Tile label="Avg winner / loser" value={`${pct(s.winners, 0)} / ${pct(s.losers, 0)}`} />
-      <Tile label="$ won per $ lost" value={s.lost > 0 ? `${ratio(s.won / s.lost)}×` : DASH} />
-      <Tile label="Best position" value={s.best?.ticker ?? DASH} sub={s.best ? money(s.best.total, true) : undefined} />
-      <Tile label="Worst position" value={s.worst?.ticker ?? DASH} sub={s.worst ? money(s.worst.total, true) : undefined} />
-    </Tiles>
-  );
-}
-
-function PositionsSection({
-  rows,
-  positions,
-  prices,
-  onOpen,
-}: {
-  rows: PosRow[];
-  positions: PositionRow[];
-  prices: Map<number, number>;
-  onOpen: (stockId: number) => void;
-}) {
-  const [filter, setFilter] = useState<Filter>("all");
-  const profitable = useMemo(() => profitablePct(positions, prices), [positions, prices]);
-  const shown = useMemo(
-    () => (filter === "all" ? rows : rows.filter((r) => (r.p.shares_now > 0) === (filter === "held"))),
-    [rows, filter],
-  );
-  const { sorted, sort, onSort } = useSortedRows(shown, POSITION_COLUMNS, { key: "total", dir: -1 });
-  return (
-    <Section
-      id="fund-positions"
-      title="Every stock they've owned"
-      intro={<Chips label="Show positions" options={FILTERS} value={filter} onChange={setFilter} />}
-    >
-      <PositionTiles rows={rows} profitable={profitable} />
-      <DataTable
-        label="Positions by stock"
-        columns={POSITION_COLUMNS}
-        rows={sorted}
-        sort={sort}
-        onSort={onSort}
-        onRow={(r) => onOpen(r.p.stock_id)}
-        virtual={sorted.length > VIRTUAL_ABOVE}
-        rowKey={(r) => r.p.stock_id}
-        empty="No stock to show here."
-      />
-      <p className="cap">
-        Click a row for the position detail. Prices are 13F estimates: each quarter's trades are assumed at that quarter's
-        volume-weighted average price. Current price, unrealised and total P&amp;L use the latest close; a dash means the
-        stock has no price.
-      </p>
-    </Section>
-  );
 }
 
 // ---- what if they'd kept it ------------------------------------------------------------
@@ -408,7 +272,7 @@ type Props = {
   asof: string;
 };
 
-export function FundTables({ fundId, positions, exits, prices, stocks, asof }: Props) {
+export function WhatIf({ fundId, positions, exits, prices, stocks, asof }: Props) {
   const navigate = useNavigate();
   const nowT = yearsSince2013(asof);
   const posRows = useMemo(
@@ -416,11 +280,5 @@ export function FundTables({ fundId, positions, exits, prices, stocks, asof }: P
     [positions, stocks, prices, nowT],
   );
   const sales = useMemo(() => saleRows(exits, posRows, stocks, prices, nowT), [exits, posRows, stocks, prices, nowT]);
-  const open = (stockId: number) => navigate(`/fund/${fundId}/stock/${stockId}`);
-  return (
-    <>
-      <PositionsSection rows={posRows} positions={positions} prices={prices} onOpen={open} />
-      <SalesSection rows={sales} summary={exits.summary} onOpen={open} />
-    </>
-  );
+  return <SalesSection rows={sales} summary={exits.summary} onOpen={(stockId) => navigate(`/fund/${fundId}/stock/${stockId}`)} />;
 }

@@ -28,6 +28,9 @@
 .fp .tabs .ind{position:absolute;left:0;bottom:-1px;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40))}
 .fp .tabs .cnt{font:500 11px/1 var(--f-mono);color:var(--ink3);background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-1);padding:3px 5px}
 
+/* the Positions tab scrolls here; keep the panel clear of the sticky top bar */
+.fp #posPanel{scroll-margin-top:72px}
+
 /* ---------- KPI tiles ---------- */
 .fp .kpi-cap{padding:0 2px 2px;font-size:12px;line-height:1.45;color:var(--ink3)}
 .fp .kpi-cap b{color:var(--ink);font-weight:600}

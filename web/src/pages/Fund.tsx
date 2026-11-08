@@ -22,10 +22,12 @@ import { AumPanel } from "../fund/AumPanel";
 import { DrivePanel } from "../fund/DrivePanel";
 import { FundHeader } from "../fund/FundHeader";
 import { KpiStrip } from "../fund/KpiStrip";
+import { MoreFigures } from "../fund/MoreFigures";
 import { PositionsPanel } from "../fund/PositionsPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
 import type { Span } from "../fund/span";
+import { WhatIf } from "./FundTables";
 import NotFound from "./NotFound";
 
 // ---- loading ----------------------------------------------------------------
@@ -101,6 +103,8 @@ function FundView({ data }: { data: FundData }) {
         <DrivePanel series={series} win={win} contrib={contrib} stocks={stocks} sel={sel} cr={cr} onCr={setCr} />
         <AumPanel series={series} win={win} />
         <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={asof} />
+        <MoreFigures summary={summary} profitable={data.profitable} />
+        <WhatIf fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={stocks} asof={asof} />
       </div>
     </div>
   );
