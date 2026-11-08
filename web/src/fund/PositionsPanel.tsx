@@ -5,7 +5,7 @@ import { fmtLong } from "./fmt";
 import { PeriodPicker } from "./PeriodPicker";
 import { PositionsTable } from "./PositionsTable";
 import { defaultPeriod, endDate, periodOf, withSortedTrades, type Timeline } from "./positions";
-import { usePositionData } from "./usePositionData";
+import { WeeklyStoreContext, usePositionData, useWeeklyStore } from "./usePositionData";
 import "./positions.css";
 
 export type PositionsPanelProps = {
@@ -24,7 +24,9 @@ export type PositionsPanelProps = {
  * Every position of the fund as it stood at the end of a chosen period (a quarter, a year or a custom
  * run of quarters): the 13-column table, with a price chart and the trades under an opened row.
  * The newest quarter is the default and needs only the latest prices; an earlier period reads each
- * stock's weekly series for the prices at its end.
+ * stock's weekly series for the prices at its end. Once the page has landed and the browser is idle, the
+ * weekly series of every position are fetched quietly in the background (see usePositionData), so stepping
+ * back through the quarters is instant; a step taken before they are in asks for the files it needs first.
  */
 export function PositionsPanel(props: PositionsPanelProps) {
   // A new fund starts again from its newest quarter.
@@ -39,12 +41,23 @@ function Panel({ fundId, summary, positions, prices, stocks, asof }: PositionsPa
   const [period, setPeriod] = useState(() => defaultPeriod(tl));
   const sorted = useMemo(() => withSortedTrades(positions), [positions]);
   const { qs, qe } = periodOf(period, tl);
-  const data = usePositionData({ positions: sorted, tl, prices, stocks, qs, qe });
+  const store = useWeeklyStore(sorted, tl, prices);
+  const data = usePositionData({ positions: sorted, tl, prices, stocks, qs, qe, store });
 
   return (
-    <section className="panel" id="posPanel" aria-labelledby="posTitle">
-      <PeriodPicker state={period} onChange={setPeriod} tl={tl} asOf={fmtLong(endDate(tl, qe))} />
-      <PositionsTable fundId={fundId} rows={data.rows} pending={data.pending} failed={data.failed} mode={period.mode} latest={prices} />
-    </section>
+    <WeeklyStoreContext.Provider value={store}>
+      <section className="panel" id="posPanel" aria-labelledby="posTitle">
+        <PeriodPicker state={period} onChange={setPeriod} tl={tl} asOf={fmtLong(endDate(tl, qe))} />
+        <PositionsTable
+          fundId={fundId}
+          rows={data.rows}
+          pending={data.pending}
+          failed={data.failed}
+          progress={data.progress}
+          mode={period.mode}
+          latest={prices}
+        />
+      </section>
+    </WeeklyStoreContext.Provider>
   );
 }

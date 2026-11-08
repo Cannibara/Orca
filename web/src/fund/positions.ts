@@ -322,6 +322,27 @@ export function neededStocks(positions: PositionRow[], qs: number, qe: number, t
 }
 
 /**
+ * Stock ids in the order their weekly files are worth prefetching: the positions held at the newest quarter
+ * first (largest first, as the newest table lists them), then every other position by how recently the
+ * fund last traded it. The first steps back in time touch the first group; the old exits come last.
+ */
+export function prefetchOrder(positions: PositionRow[], tl: Timeline, prices: ReadonlyMap<number, number>): number[] {
+  const held: { id: number; value: number }[] = [];
+  const gone: { id: number; q: number; invested: number }[] = [];
+  for (const p of positions) {
+    if (sharesAt(p.trades, tl.latest) > 0) {
+      const px = prices.get(p.stock_id);
+      held.push({ id: p.stock_id, value: px === undefined ? p.cost_now : p.shares_now * px });
+    } else {
+      gone.push({ id: p.stock_id, q: p.trades.length > 0 ? p.trades[p.trades.length - 1].q : p.last_q, invested: p.invested });
+    }
+  }
+  held.sort((a, b) => b.value - a.value);
+  gone.sort((a, b) => b.q - a.q || b.invested - a.invested);
+  return [...held, ...gone].map((x) => x.id);
+}
+
+/**
  * The table's rows for the period qs..qe: every position held at its end, held just before it
  * or traded in it, with its figures at the end of the period. `dw` is the change of the
  * position's weight in the whole book at the period's end prices, so it moves only with shares.

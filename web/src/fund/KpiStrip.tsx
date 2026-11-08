@@ -1,12 +1,18 @@
 import type { ReactNode } from "react";
+import type { Summary } from "../data/types";
+import { pct, ratio } from "../lib/format";
 import { f1, fPct } from "./fmt";
 import { returnYears, spanKpi, spanName, type Series, type SpanKpi, type Win } from "./series";
 import { resolveBracket, type Span } from "./span";
 import "./returns.css";
 
-// The four tiles under the header. They follow the bracket of the Annual returns chart: the
-// figures are for the calendar years from its left arrow to its right arrow, computed from the
-// quarterly returns inside them (series.spanKpi). Each tile has a small picture of the same span.
+// The eight tiles under the header, in two rows of four.
+// Row 1 follows the bracket of the Annual returns chart: the figures are for the calendar years from
+// its left arrow to its right arrow, computed from the quarterly returns inside them (series.spanKpi).
+// Each of those tiles has a small picture of the same span.
+// Row 2 covers the whole tracked period, straight from summary.metrics (Sharpe and Sortino use 3-month
+// T-bill rates the site does not have, so they cannot follow the bracket). No pictures there, except
+// the thin bar of the profitable share.
 
 const W = 84; // sparkline viewBox, in px
 const H = 30;
@@ -54,6 +60,14 @@ export function sizeSpark(rets: number[]) {
 
 const dash = "–";
 
+const fin = (x: number | null | undefined): x is number => x != null && Number.isFinite(x);
+/** A published ratio with real minus signs; "–" when the metric is missing. */
+const ratioText = (x: number | null) => (fin(x) ? ratio(x) : dash);
+/** A share as a whole percentage without a plus sign; "–" when missing. */
+const shareText = (x: number | null) => (fin(x) ? pct(x, 0, false) : dash);
+/** Years with one decimal: 8.04 → "8.0"; null when missing. */
+const yearsNum = (x: number | null) => (fin(x) ? x.toFixed(1) : null);
+
 function Spark({ children }: { children: ReactNode }) {
   return (
     <div className="kpi-s">
@@ -64,7 +78,30 @@ function Spark({ children }: { children: ReactNode }) {
   );
 }
 
-export function KpiStrip({ series, win, br }: { series: Series; win: Win; br: Span | null }) {
+/** The "Whole period" tag of a row 2 tile; the tile hides it when it has no room (returns.css). */
+function WholeTag() {
+  return <span className="kpi-wp">Whole period</span>;
+}
+
+export function KpiStrip({
+  series,
+  win,
+  br,
+  summary,
+  profitable,
+}: {
+  series: Series;
+  win: Win;
+  br: Span | null;
+  /** Its metrics fill the tiles of the whole tracked period. */
+  summary: Summary;
+  /** Share of positions in profit at the latest prices (lib/live profitablePct); null when it cannot be computed. */
+  profitable: number | null;
+}) {
+  const m = summary.metrics;
+  const holdAll = yearsNum(m.hold_all);
+  const holdSold = yearsNum(m.hold_sold);
+  const share = fin(profitable) ? Math.min(1, Math.max(0, profitable)) : null;
   const ry = returnYears(win);
   const labels = ry.map((y) => y.label);
   const bs = resolveBracket(labels, br);
@@ -83,7 +120,8 @@ export function KpiStrip({ series, win, br }: { series: Series; win: Win; br: Sp
       <p className="kpi-cap">
         {k ? (
           <>
-            Tiles follow the Annual returns bracket: <b>{spanName(labels[bs.a], labels[bs.b])}</b>.
+            The first four tiles follow the Annual returns bracket: <b>{spanName(labels[bs.a], labels[bs.b])}</b>. The rest cover the whole
+            tracked period.
           </>
         ) : (
           "No year with a return yet."
@@ -160,6 +198,74 @@ export function KpiStrip({ series, win, br }: { series: Series; win: Win; br: Sp
               ))}
             </Spark>
           </div>
+        </article>
+        <article className="kpi kpi-w kpi-risk">
+          <div className="kpi-l">
+            Risk-adjusted return
+            <WholeTag />
+          </div>
+          <dl className="kpi-trio">
+            <div>
+              <dt>Sharpe</dt>
+              <dd>{ratioText(m.sharpe)}</dd>
+            </div>
+            <div>
+              <dt>Sortino</dt>
+              <dd>{ratioText(m.sortino)}</dd>
+            </div>
+            <div>
+              <dt>Calmar</dt>
+              <dd>{ratioText(m.calmar)}</dd>
+            </div>
+          </dl>
+          <div className="kpi-b">
+            <div className="kpi-n">Sharpe and Sortino use 3-month T-bill rates; Calmar = return per year ÷ max drawdown</div>
+          </div>
+        </article>
+        <article className="kpi kpi-w">
+          <div className="kpi-l">
+            Turnover per year
+            <WholeTag />
+          </div>
+          <div className="kpi-v">{shareText(m.turnover)}</div>
+          <div className="kpi-b">
+            <div className="kpi-n">of fund size · lesser of buys or sells</div>
+          </div>
+        </article>
+        <article className="kpi kpi-w">
+          <div className="kpi-l">
+            Average hold length
+            <WholeTag />
+          </div>
+          <div className="kpi-v">
+            {holdAll != null ? (
+              <>
+                {holdAll}
+                <span className="vh"> </span>
+                <small>yrs</small>
+              </>
+            ) : (
+              dash
+            )}
+          </div>
+          <div className="kpi-b">
+            <div className="kpi-n">sold positions only: {holdSold != null ? holdSold + " yrs" : dash}</div>
+          </div>
+        </article>
+        <article className="kpi kpi-w">
+          <div className="kpi-l">
+            Positions profitable
+            <WholeTag />
+          </div>
+          <div className="kpi-v">{shareText(profitable)}</div>
+          <div className="kpi-b">
+            <div className="kpi-n">of stocks ever held, at latest prices</div>
+          </div>
+          {share != null && (
+            <div className="kpi-bar" aria-hidden="true">
+              {share > 0 && <i style={{ width: share * 100 + "%" }} />}
+            </div>
+          )}
         </article>
       </section>
     </>

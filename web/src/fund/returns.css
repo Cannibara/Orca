@@ -32,11 +32,12 @@
 .fp #posPanel{scroll-margin-top:72px}
 
 /* ---------- KPI tiles ---------- */
+/* Eight tiles: four columns by two rows; two columns when narrow, one only when very narrow. The hairlines are
+   the grid's 1px gap over the strip's own line colour, so they stay right when a tile spans two columns. */
 .fp .kpi-cap{padding:0 2px 2px;font-size:12px;line-height:1.45;color:var(--ink3)}
 .fp .kpi-cap b{color:var(--ink);font-weight:600}
-.fp .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
-.fp .kpi{padding:16px var(--ppad) 14px;display:flex;flex-direction:column;gap:4px;min-width:0;border-left:1px solid var(--line)}
-.fp .kpi:first-child{border-left:0}
+.fp .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
+.fp .kpi{container-type:inline-size;padding:16px var(--ppad) 14px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--surface)}
 .fp .kpi-l{font:500 12px/16px var(--f-sans);color:var(--ink3);display:flex;align-items:center;gap:6px}
 .fp .kpi-v{font:600 28px/34px var(--f-sans);letter-spacing:-.025em;white-space:nowrap;font-variant-numeric:tabular-nums}
 .fp .kpi-v small{font-size:15px;font-weight:500;color:var(--ink3);letter-spacing:0;margin-left:3px}
@@ -53,19 +54,39 @@
 .fp .spk-loss{fill:var(--loss)}
 .fp .spk-neutral{fill:var(--ink3)}
 .fp .spk-neutral.hi{fill:var(--ink)}
+
+/* row 2, the whole tracked period: no pictures, only the profitable share's bar */
+.fp .kpi-w .kpi-b{min-height:0}
+.fp .kpi-wp{margin-left:auto;flex:none;font:400 11px/16px var(--f-sans);color:var(--ink3);white-space:nowrap}
+/* only where label and tag fit on one line */
+@container (max-width:214px){.fp .kpi-wp{display:none}}
+.fp .kpi-w:not(.kpi-risk) .kpi-v{padding-top:6px}
+/* Sharpe, Sortino and Calmar side by side: a small label over each number */
+.fp .kpi-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
+.fp .kpi-trio dt{font:500 11px/14px var(--f-sans);color:var(--ink3)}
+.fp .kpi-trio dd{font:600 22px/26px var(--f-sans);letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+@container (max-width:219px){.fp .kpi-trio dd{font-size:19px}}
+/* the share of positions in profit: gain colour for the profitable part, loss colour for the rest */
+.fp .kpi-bar{height:6px;margin-top:6px;border-radius:3px;overflow:hidden;background:var(--loss)}
+.fp .kpi-bar i{display:block;height:100%;background:var(--gain);box-shadow:1px 0 0 var(--surface)}
+
 @container app (max-width:899px){
   .fp .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .fp .kpi:nth-child(odd){border-left:0}
-  .fp .kpi:nth-child(n+3){border-top:1px solid var(--line)}
 }
 @container app (max-width:559px){
   .fp .kpis{border-radius:0;border-left:0;border-right:0}
   .fp .kpi-s{width:64px}
   .fp .kpi-v{font-size:24px;line-height:30px}
+  /* the three ratios and the bar want the whole row */
+  .fp .kpi-risk,.fp .kpi-w:last-child{grid-column:1/-1}
 }
 @container app (max-width:419px){
   .fp .kpi-b{flex-direction:column;align-items:flex-start;gap:6px}
+  .fp .kpi-w .kpi-b{gap:0}
   .fp .kpi-s{width:80px}
+}
+@container app (max-width:359px){
+  .fp .kpis{grid-template-columns:minmax(0,1fr)}
 }
 
 /* ---------- Annual returns: bracket and chart ---------- */

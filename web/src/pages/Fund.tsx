@@ -23,7 +23,6 @@ import { AumPanel } from "../fund/AumPanel";
 import { DrivePanel } from "../fund/DrivePanel";
 import { FundHeader } from "../fund/FundHeader";
 import { KpiStrip } from "../fund/KpiStrip";
-import { MoreFigures } from "../fund/MoreFigures";
 import { PositionsPanel } from "../fund/PositionsPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
@@ -101,12 +100,11 @@ function FundView({ data }: { data: FundData }) {
     <div className="fp">
       <div className="fp-main">
         <FundHeader summary={summary} positionsEver={positions.length} />
-        <KpiStrip series={series} win={win} br={br} />
+        <KpiStrip series={series} win={win} br={br} summary={summary} profitable={data.profitable} />
         <ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />
         <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
         <AumPanel series={series} win={win} />
         <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={names} asof={asof} />
-        <MoreFigures summary={summary} profitable={data.profitable} />
         <WhatIf fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} />
       </div>
     </div>

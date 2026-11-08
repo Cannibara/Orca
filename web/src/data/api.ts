@@ -37,19 +37,27 @@ export function clearDataCache(): void {
   cache.clear();
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+async function fetchJson(url: string, priority?: LoadOptions["priority"]): Promise<unknown> {
+  const res = await (priority ? fetch(url, { priority }) : fetch(url));
   if (res.status === 404) throw new NotFoundError(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
 }
 
+/**
+ * Options of a load. `priority: "low"` asks the browser to fetch behind everything else (background
+ * prefetching). It applies only to the request this call starts: a URL already loading or cached keeps
+ * the request it has, and every caller shares its one promise (so a caller that needs the file now simply
+ * awaits a background request that is already under way).
+ */
+export type LoadOptions = { priority?: "low" };
+
 /** One request per URL. A rejected request leaves the cache, so a retry refetches. */
-function getJson<T>(path: string): Promise<T> {
+function getJson<T>(path: string, opts?: LoadOptions): Promise<T> {
   const url = `${baseUrl()}/${path}`;
   let p = cache.get(url);
   if (!p) {
-    const fresh: Promise<unknown> = fetchJson(url).catch((err: unknown) => {
+    const fresh: Promise<unknown> = fetchJson(url, opts?.priority).catch((err: unknown) => {
       if (cache.get(url) === fresh) cache.delete(url);
       throw err;
     });
@@ -66,7 +74,7 @@ export const loadSummary = (id: number) => getJson<Summary>(`fund/${id}/summary.
 export const loadPositions = (id: number) => getJson<Positions>(`fund/${id}/positions.json`);
 export const loadContrib = (id: number) => getJson<Contrib>(`fund/${id}/contrib.json`);
 export const loadExits = (id: number) => getJson<Exits>(`fund/${id}/exits.json`);
-export const loadWeekly = (stockId: number) => getJson<Weekly>(`stock/${stockId}/weekly.json`);
+export const loadWeekly = (stockId: number, opts?: LoadOptions) => getJson<Weekly>(`stock/${stockId}/weekly.json`, opts);
 export const loadHome = <N extends HomeName>(name: N) => getJson<HomeFiles[N]>(`home/${name}.json`);
 
 /**
