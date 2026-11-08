@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -38,12 +38,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+// The title is set by an effect, which React may run a tick after the heading is on screen: wait for it.
 describe("page title follows the route", () => {
   it("is Orca on the home page, whatever the page shipped with", async () => {
     stubData();
     renderApp("/");
     await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
-    expect(document.title).toBe("Orca");
+    await waitFor(() => expect(document.title).toBe("Orca"));
   });
 
   it("names the fund on its page, and goes back to Orca on the way home", async () => {
@@ -52,31 +53,31 @@ describe("page title follows the route", () => {
     document.title = "Orca";
     renderApp(`/fund/${FUND}`);
     await screen.findByRole("heading", { level: 1, name: "Kelpwood Capital LP" });
-    expect(document.title).toBe("Kelpwood Capital LP · Orca");
+    await waitFor(() => expect(document.title).toBe("Kelpwood Capital LP · Orca"));
 
     await user.click(screen.getByRole("link", { name: "Orca home" }));
     await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
-    expect(document.title).toBe("Orca");
+    await waitFor(() => expect(document.title).toBe("Orca"));
   });
 
   it("names the stock and the fund on a position page", async () => {
     stubData();
     renderApp(`/fund/${FUND}/stock/${STOCK}`);
     await screen.findByRole("heading", { level: 1, name: /NVDA/ });
-    expect(document.title).toBe("NVDA · Kelpwood Capital LP · Orca");
+    await waitFor(() => expect(document.title).toBe("NVDA · Kelpwood Capital LP · Orca"));
   });
 
   it("is 'How it works · Orca' on the methodology page", async () => {
     stubData();
     renderApp("/how-it-works");
     await screen.findByRole("heading", { level: 1, name: /How Orca estimates/ });
-    expect(document.title).toBe("How it works · Orca");
+    await waitFor(() => expect(document.title).toBe("How it works · Orca"));
   });
 
   it.each(["/no-such-page", "/fund/424242", "/fund/abc"])("is 'Not found · Orca' on %s", async (path) => {
     stubData();
     renderApp(path);
     await screen.findByRole("heading", { level: 1, name: "Page not found" });
-    expect(document.title).toBe("Not found · Orca");
+    await waitFor(() => expect(document.title).toBe("Not found · Orca"));
   });
 });
