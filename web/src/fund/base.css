@@ -1,0 +1,197 @@
+/* Fund page, shared part: what more than one panel uses. Ported from the approved
+   artifact's style.css. Every selector sits under `.fp` (the page root) except the
+   tooltip, which lives at the document level (#tip) and is styled as `#tip.tip`.
+   Tokens come from ../tokens.css; nothing is redefined here. Each panel keeps its own
+   chart-specific rules in its own file (returns.css, drive.css, aum.css, positions.css).
+
+   Markup contracts for the pieces below:
+   - panel:  .panel > .ph(.ph-t(.pt,.ps), .ph-c) + .pb(.chart)
+   - tables: .tbl-box > table.tbl-mini > caption, thead th[scope=col], tbody tr(.is-sel)[th[scope=row], td]; .tl on a cell = left-aligned
+   - svg:    <svg class="viz …"> with rect.selband, rect.hovband(.on), line.grid + text.tick, line.zero,
+             path.bar.gain|loss|tot, text.blab(.sel), selpill + text.clab(.sel), rect.hit
+   - motion: the svg gets " pre" then " run" from useGrowOnce; each .bar/.blab carries style="--i:index",
+             the svg style="--y0:zero-line-y px;--step:ms" (waterfalls: also class "wf")
+   The page root `.fp` is a size container named both `app` and `fp`, so panels may write
+   `@container fp (max-width:559px)`; --pad/--ppad/--gap follow its width. */
+
+.fp{
+  container:app fp / inline-size;
+  --pad:24px;--ppad:20px;--gap:16px;
+  color:var(--ink);font:400 14px/1.5 var(--f-sans);
+  -webkit-font-smoothing:antialiased;text-size-adjust:100%;
+}
+@container app (max-width:719px){.fp>*{--pad:16px;--ppad:16px;--gap:12px}}
+@container app (max-width:559px){.fp>*{--pad:12px;--ppad:12px;--gap:12px}}
+
+/* ---------- resets inside the page ---------- */
+.fp *,.fp *::before,.fp *::after{box-sizing:border-box}
+.fp :is(h1,h2,h3,h4,p,ul,ol,dl,dd,figure){margin:0}
+.fp :is(ul,ol){padding:0;list-style:none}
+.fp :is(button,input,select){font:inherit;color:inherit}
+.fp button{cursor:pointer}
+.fp svg{display:block}
+.fp :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.fp [hidden]{display:none!important}
+.fp .ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fp .ico.s20{width:20px;height:20px}
+.fp .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* page column: header, tiles and panels stacked with the page gap (the gap follows the container width) */
+.fp .fp-main{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+
+/* ---------- buttons ---------- */
+.fp .btn{--h:32px;height:var(--h);padding:0 12px;border-radius:var(--r-2);font:500 13px/1 var(--f-sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;white-space:nowrap;text-decoration:none;user-select:none;position:relative}
+.fp .btn.sm{--h:28px;padding:0 10px;font-size:12px}
+.fp .btn-primary{background:var(--inv);color:var(--invfg)}
+.fp .btn-primary:hover{background:var(--inv-hover)}
+.fp .btn-primary:active{background:var(--inv-press)}
+.fp .btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line2)}
+.fp .btn-secondary:hover{background:var(--hover);border-color:var(--control)}
+.fp .btn-secondary:active{background:var(--band)}
+.fp .btn-ghost{background:transparent;color:var(--ink2)}
+.fp .btn-ghost:hover{background:var(--hover);color:var(--ink)}
+.fp .btn-ghost:active{background:var(--band);color:var(--ink)}
+.fp .btn:disabled,.fp .btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.fp .btn.icon{width:var(--h);padding:0}
+
+/* segmented control with a sliding thumb (Seg.tsx) */
+.fp .seg{position:relative;display:inline-flex;padding:2px;gap:0;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-2);max-width:100%}
+.fp .seg button{position:relative;z-index:1;height:26px;padding:0 10px;border:0;background:transparent;color:var(--ink2);font:500 12px/1 var(--f-sans);border-radius:4px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fp .seg button:hover{color:var(--ink)}
+.fp .seg button[aria-pressed="true"],.fp .seg button[aria-selected="true"]{color:var(--ink)}
+.fp .seg button:disabled{opacity:.45;cursor:not-allowed}
+.fp .seg .thumb{position:absolute;z-index:0;left:2px;top:2px;bottom:2px;width:var(--w,60px);transform:translateX(var(--x,0px));background:var(--surface);border-radius:4px;box-shadow:0 0 0 1px var(--line2)}
+
+/* tag */
+.fp .tag{height:20px;padding:0 6px;border-radius:var(--r-1);border:1px solid var(--line);background:var(--sunken);color:var(--ink2);font:500 11px/1 var(--f-sans);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.fp .tag .ico{width:11px;height:11px;stroke-width:2}
+.fp .tag.hollow{background:transparent;border-style:dashed;border-color:var(--control)}
+
+/* period stepper (prev / value / next); the positions window pieces are in positions.css */
+.fp .stepper{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);padding:1px}
+.fp .stepper button{width:26px;height:26px;border:0;border-radius:4px;background:transparent;color:var(--ink2);display:grid;place-items:center}
+.fp .stepper button:hover:not(:disabled):not([aria-disabled="true"]){background:var(--hover);color:var(--ink)}
+.fp .stepper button:disabled{opacity:.35;cursor:not-allowed}
+.fp .stepper button[aria-disabled="true"]{opacity:.35;cursor:default}
+.fp .stepper output{min-width:62px;text-align:center;font:600 12px/1 var(--f-sans);font-variant-numeric:tabular-nums}
+
+/* ---------- panel ---------- */
+.fp .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);min-width:0;display:flex;flex-direction:column}
+.fp .ph{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:space-between;align-items:flex-start;padding:16px var(--ppad) 0}
+.fp .ph-t{min-width:0;flex:1 1 240px}
+.fp .pt{font:600 16px/22px var(--f-sans);letter-spacing:-.015em}
+.fp .ps{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;text-wrap:pretty}
+.fp .ph-c{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fp .pb{padding:12px var(--ppad) 6px;min-width:0;flex:1}
+.fp .pf{padding:6px var(--ppad) 16px;font-size:12px;line-height:1.5;color:var(--ink3);max-width:80ch;text-wrap:pretty}
+.fp .strip{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:12px var(--ppad) 0}
+.fp .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2)}
+.fp .lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fp .lg i{width:10px;height:10px;border-radius:2px;display:block;flex:none}
+.fp .lg i.gain{background:var(--gain)}
+.fp .lg i.loss{background:var(--loss)}
+.fp .chart{position:relative;min-width:0;width:100%}
+@container app (max-width:559px){
+  .fp .panel{border-radius:0;border-left:0;border-right:0}
+}
+
+/* ---------- empty and error state ---------- */
+.fp .state{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:24px 20px;border:1px dashed var(--line2);border-radius:var(--r-3);background:var(--surface)}
+.fp .state .ic{width:36px;height:36px;border-radius:var(--r-2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--ink2);background:var(--sunken)}
+.fp .state h4{font:600 14px/1.3 var(--f-sans);letter-spacing:-.01em}
+.fp .state p{font-size:13px;color:var(--ink2);max-width:46ch;line-height:1.5}
+.fp .state code{font-size:12px;color:var(--ink3);background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-1);padding:2px 6px;font-family:var(--f-mono)}
+.fp .state .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.fp .state.err .ic{color:var(--crit)}
+
+/* skeleton */
+.fp .sk{position:relative;overflow:hidden;background:var(--sunken);border-radius:4px;display:block}
+.fp .sk::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--shimmer),transparent);transform:translateX(-100%)}
+.fp .sk.dark{background:var(--band)}
+.fp .skbars{display:flex;align-items:flex-end;gap:7px;height:150px;border-bottom:1px solid var(--line2);padding:0 4px}
+.fp .skbars .sk{flex:1;border-radius:3px 3px 0 0}
+
+/* ---------- accessible tables (the "Show the numbers" views) ---------- */
+.fp .tbl-mini{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.fp .tbl-mini caption{text-align:left;font-size:12px;color:var(--ink3);padding:8px 10px}
+.fp .tbl-mini th{font:500 12px/1.2 var(--f-sans);color:var(--ink3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;background:var(--sunken)}
+.fp .tbl-mini td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.fp .tbl-mini th:first-child,.fp .tbl-mini td:first-child{text-align:left}
+.fp .tbl-mini tr.is-sel td{background:var(--band)}
+.fp .tbl-mini td .tag{margin-left:6px}
+.fp .tbl-mini tbody th[scope="row"]{text-align:left;font-weight:500;background:inherit;position:static;border-bottom:1px solid var(--line);padding:7px 10px;color:var(--ink);white-space:nowrap}
+.fp .tbl-mini .tl{text-align:left}
+.fp .tbl-box{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-2)}
+.fp .tbl-box .tbl-mini thead th{position:sticky;top:0}
+
+/* ---------- charts: base ---------- */
+.fp .viz{display:block;width:100%;height:auto;overflow:visible;font-family:var(--f-sans);font-variant-numeric:tabular-nums;-webkit-user-select:none;user-select:none}
+.fp .viz .grid{stroke:var(--line);stroke-width:1}
+.fp .viz .zero{stroke:var(--ink3);stroke-width:1}
+.fp .viz .sepl{stroke:var(--line2);stroke-width:1}
+.fp .viz .tick{fill:var(--ink3);font-size:11px}
+.fp .viz .selband{fill:var(--band)}
+.fp .viz .hovband{fill:var(--band);opacity:0}
+.fp .viz .hovband.on{opacity:.6}
+.fp .viz .bar.gain{fill:var(--gain)}
+.fp .viz .bar.loss{fill:var(--loss)}
+.fp .viz .bar.tot{fill:var(--ink2)}
+.fp .viz .blab{fill:var(--ink);font-size:11.5px;font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.fp .viz .blab.sel{stroke:var(--band);font-size:12.5px;font-weight:700}
+.fp .viz .clab{fill:var(--ink3);font-size:12px}
+.fp .viz .clab.sel{fill:var(--invfg);font-weight:600}
+.fp .viz .selpill{fill:var(--inv)}
+.fp .viz .hit{fill:transparent;cursor:pointer;outline:none}
+.fp .viz .hit:focus-visible{stroke:var(--focus);stroke-width:2}
+.fp .viz .bh{touch-action:none}
+.fp .viz .brk-g{fill:transparent;cursor:ew-resize}
+.fp .viz.drag,.fp .viz.drag .bh{cursor:grabbing}
+
+/* period strip (PeriodStrip.tsx) */
+.fp .scrub{padding:10px var(--ppad) 0}
+.fp .scrub svg{display:block;width:100%;height:auto;overflow:visible;-webkit-user-select:none;user-select:none}
+.fp .viz .scr-win{fill:color-mix(in srgb,var(--ink) 7%,transparent);stroke:var(--ink);stroke-width:1.25;cursor:grab}
+.fp .viz .sc-hit{fill:transparent;cursor:pointer}
+.fp .viz .sc-hit:hover{fill:color-mix(in srgb,var(--ink) 5%,transparent)}
+.fp .viz .scr-tick{stroke:var(--line2);stroke-width:1}
+.fp .viz .scr-tick.in{stroke:var(--ink)}
+.fp .viz .scr-h{fill:var(--surface);stroke:var(--ink);stroke-width:1.5;cursor:ew-resize;outline:none}
+.fp .viz .scr-h:focus-visible{stroke:var(--focus);stroke-width:3}
+
+/* ---------- tooltip (document level, outside .fp) ---------- */
+#tip.tip{position:fixed;z-index:90;left:0;top:0;pointer-events:none;background:var(--inv);color:var(--invfg);border-radius:var(--r-2);padding:8px 10px;font:400 12px/1.35 var(--f-sans);box-shadow:var(--shadow-1);max-width:240px}
+#tip.tip[hidden]{display:none}
+#tip.tip .t{color:var(--inv2);font-size:12px;font-weight:500;margin:0;display:flex;gap:6px;align-items:center}
+#tip.tip .tag{height:20px;padding:0 6px;border-radius:var(--r-1);border:1px dashed var(--inv2);background:transparent;color:var(--inv2);font:500 11px/1 var(--f-sans);display:inline-flex;align-items:center;white-space:nowrap}
+#tip.tip .v{display:flex;align-items:center;gap:7px;margin-top:3px;font-variant-numeric:tabular-nums}
+#tip.tip .v i{width:10px;height:3px;border-radius:2px;display:block;flex:none}
+#tip.tip .v .vl{color:var(--inv2);font-weight:500;flex:1;padding-right:12px}
+#tip.tip .v .vv{font-weight:600;font-size:13px}
+#tip.tip .v.big .vv{font-size:14px}
+#tip.tip .v.sum{border-top:1px solid var(--inv2);padding-top:4px;margin-top:5px}
+#tip.tip .x{color:var(--inv2);margin-top:3px;font-size:11.5px}
+
+/* ---------- motion (transform and opacity only) ---------- */
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .fp .btn{transition:transform var(--d-fast) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .fp .btn:active{transform:scale(.97)}
+  :root:not([data-motion="reduce"]) .fp .seg.ready .thumb{transition:transform var(--d-base) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .fp .viz .hovband{transition:opacity 80ms linear}
+  :root:not([data-motion="reduce"]) .fp .swap{animation:fade var(--d-fast) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .fp .sk::after{animation:shimmer 1.4s linear infinite}
+  /* chart intro: bars grow from the zero line, labels follow */
+  :root:not([data-motion="reduce"]) .fp .viz .bar{transform-box:view-box;transform-origin:0 var(--y0,0)}
+  :root:not([data-motion="reduce"]) .fp .viz.h .bar{transform-origin:var(--x0,0) 0}
+  :root:not([data-motion="reduce"]) .fp .viz.wf .bar{transform-box:fill-box}
+  :root:not([data-motion="reduce"]) .fp .viz.pre .bar{transform:scaleY(0)}
+  :root:not([data-motion="reduce"]) .fp .viz.h.pre .bar{transform:scaleX(0)}
+  :root:not([data-motion="reduce"]) .fp .viz.run .bar{animation:growY var(--d-grow) var(--ease-out) backwards;animation-delay:calc(var(--i) * var(--step))}
+  :root:not([data-motion="reduce"]) .fp .viz.h.run .bar{animation-name:growX}
+  :root:not([data-motion="reduce"]) .fp .viz.pre :is(.blab,.late){opacity:0}
+  :root:not([data-motion="reduce"]) .fp .viz.run .blab{animation:fade 300ms ease-out backwards;animation-delay:calc(var(--i) * var(--step) + 450ms)}
+  :root:not([data-motion="reduce"]) .fp .viz.run .late{animation:fade 400ms ease-out backwards;animation-delay:900ms}
+}
+@keyframes growY{from{transform:scaleY(0)}}
+@keyframes growX{from{transform:scaleX(0)}}
+@keyframes fade{from{opacity:0}}
+@keyframes shimmer{to{transform:translateX(100%)}}

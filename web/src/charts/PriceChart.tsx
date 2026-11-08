@@ -25,7 +25,7 @@ const LEGEND = [
   { label: "Weekly close", color: "var(--ink2)", kind: "lk" as const },
   { label: "Buy (est. price)", color: "var(--s1)", kind: "dot" as const },
   { label: "Sell (est. price)", color: "var(--s2)", kind: "dot" as const },
-  { label: "Quarter low–high", color: "var(--band)", kind: "sw" as const },
+  { label: "Quarter low–high", color: "var(--range)", kind: "sw" as const },
 ];
 
 // Quarter q covers calendar quarter q % 4 of year 2013 + floor(q / 4).
@@ -145,7 +145,7 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
                   width={8}
                   height={Math.max(2, Y(t.low) - Y(t.high))}
                   rx={4}
-                  style={{ fill: "var(--band)" }}
+                  style={{ fill: "var(--range)" }}
                 />
               ),
           )}

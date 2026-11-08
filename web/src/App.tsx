@@ -14,13 +14,10 @@ export default function App() {
       <header className="top">
         <div className="wrap topbar">
           <Link className="brand" to="/" aria-label="Orca home">
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path
-                d="M3 19c3-8 11-12 19-10 3 .8 5 2.6 7 5-2 0-3.4.6-4.6 1.8.9 2.4.3 5-2 6.6-3 2-7 1.6-10.4 0L9 25l.6-4C7 21.2 4.8 20.6 3 19z"
-                fill="var(--ink)"
-              />
-              <path d="M19 17.5c1.6-.3 3 .2 3.8 1.4-1.4 1-3.2 1.1-4.8.5z" fill="var(--surface)" />
-              <circle cx="22.5" cy="13" r="1.2" fill="var(--surface)" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect width="24" height="24" rx="6" fill="var(--inv)" />
+              <ellipse cx="15.6" cy="9" rx="4.6" ry="2.5" transform="rotate(-24 15.6 9)" fill="var(--invfg)" />
+              <path d="M4.5 16.2c3.4 1.8 9.2 2 15-.6" fill="none" stroke="var(--invfg)" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
             Orca
           </Link>

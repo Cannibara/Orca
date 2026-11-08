@@ -196,9 +196,9 @@ describe("ColumnChart", () => {
     await user.hover(hits[1]);
     expect(tipEl().hidden).toBe(false);
     expect(tipEl().querySelector(".t")!.textContent).toBe("2022");
-    const rows = Array.from(tipEl().querySelectorAll(".r")).map((r) => r.textContent);
-    expect(rows).toEqual(["-5%Return", "2%SPY", "$1Bend value"]);
-    expect((tipEl().querySelector("i.lk") as HTMLElement).style.background).toBe("var(--s1)");
+    const rows = Array.from(tipEl().querySelectorAll(".v")).map((r) => r.textContent);
+    expect(rows).toEqual(["Return-5%", "SPY2%", "end value$1B"]);
+    expect((tipEl().querySelector(".v i") as HTMLElement).style.background).toBe("var(--s1)");
     await user.unhover(hits[1]);
     expect(tipEl().hidden).toBe(true);
   });
@@ -312,9 +312,9 @@ describe("DivergingBars", () => {
     const { container } = withTip(<DivergingBars items={items} fmt={ptsFmt} label="c" />);
     await user.hover(container.querySelectorAll("rect.hit")[0]);
     expect(tipEl().querySelector(".t")!.textContent).toBe("AAA · Alpha Corp");
-    expect(Array.from(tipEl().querySelectorAll(".r")).map((r) => r.textContent)).toEqual([
-      "2.5 ptscontribution",
-      "$1.2MP&L",
+    expect(Array.from(tipEl().querySelectorAll(".v")).map((r) => r.textContent)).toEqual([
+      "contribution2.5 pts",
+      "P&L$1.2M",
     ]);
     await user.unhover(container.querySelectorAll("rect.hit")[0]);
     expect(tipEl().hidden).toBe(true);
@@ -418,7 +418,7 @@ describe("PriceChart", () => {
     expect(bands).toHaveLength(3);
     bands.forEach((b) => {
       expect(num(b, "width")).toBe(8);
-      expect((b as SVGElement).style.fill).toBe("var(--band)");
+      expect((b as SVGElement).style.fill).toBe("var(--range)");
     });
   });
 
@@ -455,7 +455,7 @@ describe("PriceChart", () => {
     expect(container.querySelector("circle.crosshair-dot")).not.toBeNull();
     expect(tipEl().hidden).toBe(false);
     expect(tipEl().querySelector(".t")!.textContent).toBe("19 Feb 2021");
-    expect(tipEl().querySelector(".r")!.textContent).toBe(`$${closesFull[59].toFixed(2)}weekly close`);
+    expect(tipEl().querySelector(".v")!.textContent).toBe(`weekly close$${closesFull[59].toFixed(2)}`);
 
     // Far left: the first week.
     fireEvent.pointerMove(overlay, { clientX: 52, clientY: 100 });
@@ -471,7 +471,7 @@ describe("PriceChart", () => {
     closes[0] = null;
     const { container } = withTip(<PriceChart closes={closes} start={START} trades={trades} />);
     fireEvent.pointerMove(container.querySelector("rect.overlay")!, { clientX: 52, clientY: 100 });
-    expect(tipEl().querySelector(".r")!.textContent).toBe("—no close");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("no close—");
     expect(container.querySelector("circle.crosshair-dot")).toBeNull();
   });
 
@@ -483,25 +483,25 @@ describe("PriceChart", () => {
     await user.tab(); // first tab stop is the first dot
     expect(document.activeElement).toBe(dots[0]);
     expect(tipEl().querySelector(".t")!.textContent).toBe("New · Q1 2020");
-    expect(Array.from(tipEl().querySelectorAll(".r")).map((r) => r.textContent)).toEqual([
-      "$11.00est. price (VWAP)",
-      "$9.50 – $12.50quarter range",
-      "+100shares",
+    expect(Array.from(tipEl().querySelectorAll(".v")).map((r) => r.textContent)).toEqual([
+      "est. price (VWAP)$11.00",
+      "quarter range$9.50 – $12.50",
+      "shares+100",
     ]);
 
     await user.hover(dots[1]); // no range for this quarter
     expect(tipEl().querySelector(".t")!.textContent).toBe("Add · Q2 2020");
-    expect(Array.from(tipEl().querySelectorAll(".r")).map((r) => r.textContent)).toEqual([
-      "$12.00est. price (VWAP)",
-      "+50shares",
+    expect(Array.from(tipEl().querySelectorAll(".v")).map((r) => r.textContent)).toEqual([
+      "est. price (VWAP)$12.00",
+      "shares+50",
     ]);
 
     await user.hover(dots[2]);
     expect(tipEl().querySelector(".t")!.textContent).toBe("Trim · Q3 2020");
     await user.hover(dots[3]);
     expect(tipEl().querySelector(".t")!.textContent).toBe("Exit · Q4 2020");
-    expect(tipEl().querySelector(".r")!.textContent).toContain("$14.00");
-    expect(tipEl().textContent).toContain("−100shares");
+    expect(tipEl().querySelector(".v")!.textContent).toContain("$14.00");
+    expect(tipEl().textContent).toContain("shares−100");
   });
 
   test("shows year labels on the x axis", () => {
@@ -570,16 +570,16 @@ describe("StepChart", () => {
     fireEvent.pointerMove(overlay, { clientX: xOf(25), clientY: 40 });
     expect(container.querySelector("line.crosshair")).not.toBeNull();
     expect(tipEl().querySelector(".t")!.textContent).toBe("Q2 2019");
-    expect(tipEl().querySelector(".r")!.textContent).toBe("2,500,000shares held");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("shares held2,500,000");
 
     fireEvent.pointerMove(overlay, { clientX: xOf(19), clientY: 40 }); // before the first change
-    expect(tipEl().querySelector(".r")!.textContent).toBe("0shares held");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("shares held0");
 
     fireEvent.pointerMove(overlay, { clientX: xOf(20), clientY: 40 }); // the change quarter itself
-    expect(tipEl().querySelector(".r")!.textContent).toBe("1,000,000shares held");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("shares held1,000,000");
 
     fireEvent.pointerMove(overlay, { clientX: xOf(33), clientY: 40 }); // after the exit
-    expect(tipEl().querySelector(".r")!.textContent).toBe("0shares held");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("shares held0");
 
     fireEvent.pointerLeave(overlay);
     expect(tipEl().hidden).toBe(true);
