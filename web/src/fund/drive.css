@@ -11,6 +11,3 @@
 
 /* "Show all N" under the numbers table */
 .fp .tbl-more{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding-top:8px;font-size:12px;color:var(--ink3)}
-
-/* the numbers table: the page-wide th/td rules of styles.css must not set its row height */
-.fp .tbl-mini :is(th,td){height:auto;line-height:normal;vertical-align:middle}

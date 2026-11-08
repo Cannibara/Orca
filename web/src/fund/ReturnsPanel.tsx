@@ -409,7 +409,12 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
               <tr key={y.label} className={i === selI ? "is-sel" : undefined} aria-current={i === selI ? "true" : undefined}>
                 <th scope="row">
                   {y.label}
-                  {y.part && <span className="tag hollow">Part year</span>}
+                  {y.part && (
+                    <>
+                      {" "}
+                      <span className="tag hollow">Part year</span>
+                    </>
+                  )}
                 </th>
                 <td>{fPct(vals[i])}</td>
                 <td className="tl">{vals[i] >= 0 ? "Gain" : "Loss"}</td>

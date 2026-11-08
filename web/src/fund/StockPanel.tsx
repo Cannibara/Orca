@@ -129,7 +129,7 @@ function Chart({
           <title>{m.title}</title>
         </path>
       ))}
-      <circle className="dot" cx={X(iLast).toFixed(1)} cy={Y(last).toFixed(1)} r={3.5} />
+      <circle className="pxdot" cx={X(iLast).toFixed(1)} cy={Y(last).toFixed(1)} r={3.5} />
       <text className="blab" x={(X(iLast) - 8).toFixed(1)} y={(Y(last) - 9).toFixed(1)} textAnchor="end">
         {"$" + last.toFixed(2)}
       </text>
@@ -211,7 +211,7 @@ export function StockPanel({ row, fundId, width, latestPrice }: StockPanelProps)
             {trades.map(({ t, move }) => (
               <tr key={t.q}>
                 <td>{qLabelFull(t.q)}</td>
-                <td>
+                <td className="tl">
                   <span className="tag">
                     <Sign plus={t.delta > 0} />
                     {MOVE_WORD[move]}
