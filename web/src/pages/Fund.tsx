@@ -14,6 +14,7 @@ import {
   type Stock,
 } from "../data/api";
 import type { Contrib, Exits, PositionRow, Summary } from "../data/types";
+import { tidyName } from "../lib/format";
 import { positionRows, profitablePct } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
@@ -82,6 +83,8 @@ function FundView({ data }: { data: FundData }) {
   const [br, setBr] = useState<Span | null>(null);
   const [cr, setCr] = useState<Span | null>(null);
   const win = useMemo(() => windowYears(series, range), [series, range]);
+  // SEC names come in capitals with legal suffixes; the new panels print them tidied.
+  const names = useMemo(() => new Map([...stocks].map(([id, s]) => [id, { ...s, name: tidyName(s.name) }])), [stocks]);
 
   const setRange = (r: Range) => {
     setRangeState(r);
@@ -100,9 +103,9 @@ function FundView({ data }: { data: FundData }) {
         <FundHeader summary={summary} positionsEver={positions.length} />
         <KpiStrip series={series} win={win} br={br} />
         <ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />
-        <DrivePanel series={series} win={win} contrib={contrib} stocks={stocks} sel={sel} cr={cr} onCr={setCr} />
+        <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
         <AumPanel series={series} win={win} />
-        <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={asof} />
+        <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={names} asof={asof} />
         <MoreFigures summary={summary} profitable={data.profitable} />
         <WhatIf fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={stocks} asof={asof} />
       </div>

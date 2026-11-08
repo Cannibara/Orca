@@ -1,4 +1,4 @@
-import { count, fmtDate, money, pct, pp, printsZero, px, qLabel, ratio, sgn, shareCount, signClass } from "../src/lib/format";
+import { count, fmtDate, money, pct, pp, printsZero, px, qLabel, ratio, sgn, shareCount, signClass, tidyName } from "../src/lib/format";
 
 test("money", () => {
   expect(money(1_234_000_000)).toBe("$1.23B");
@@ -221,4 +221,21 @@ test("count: thousands separators, and the noun in the right number", () => {
   expect(count(1234567, "holding")).toBe("1,234,567 holdings");
   expect(count(null)).toBe("—");
   expect(count(NaN, "position")).toBe("—");
+});
+
+describe("tidyName", () => {
+  test("title-cases a capitalised SEC name and drops the legal suffix", () => {
+    expect(tidyName("ALPHABET INC")).toBe("Alphabet");
+    expect(tidyName("GENERAL ELECTRIC CO")).toBe("General Electric");
+    expect(tidyName("COSTCO WHSL CORP NEW")).toBe("Costco Whsl");
+    expect(tidyName("JPMORGAN CHASE & CO")).toBe("Jpmorgan Chase");
+    expect(tidyName("AMAZON COM INC")).toBe("Amazon");
+    expect(tidyName("FREEPORT-MCMORAN INC")).toBe("Freeport-Mcmoran");
+  });
+  test("keeps acronyms and mixed-case names, and never returns an empty name", () => {
+    expect(tidyName("SPDR S&P 500 ETF TR")).toBe("SPDR S&P 500 ETF");
+    expect(tidyName("Apple Inc")).toBe("Apple Inc");
+    expect(tidyName("INC")).toBe("Inc");
+    expect(tidyName("")).toBe("");
+  });
 });

@@ -91,6 +91,8 @@
 .fp .xleg .xlink{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control);font-weight:500}
 .fp .xleg .xlink:hover{text-decoration-color:var(--ink)}
 .fp .x-none{font-size:13px;color:var(--ink3);padding:24px 0;text-align:center}
+/* a fixed height: the opened row must not change size with the panel width, or a scrollbar appearing (which narrows the panel) could flip back and forth */
+.fp .viz.px{height:210px}
 .fp .viz.px .pxline{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round}
 .fp .viz.px .mk{stroke:var(--surface);stroke-width:1.5}
 .fp .viz.px .mk.buy{fill:var(--gain)}
