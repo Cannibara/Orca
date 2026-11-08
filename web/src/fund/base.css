@@ -76,7 +76,7 @@
 .fp .stepper output{min-width:62px;text-align:center;font:600 12px/1 var(--f-sans);font-variant-numeric:tabular-nums}
 
 /* ---------- panel ---------- */
-.fp .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);min-width:0;display:flex;flex-direction:column}
+.fp .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:0;min-width:0;display:flex;flex-direction:column}
 .fp .ph{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:space-between;align-items:flex-start;padding:16px var(--ppad) 0}
 .fp .ph-t{min-width:0;flex:1 1 240px}
 .fp .pt{font:600 16px/22px var(--f-sans);letter-spacing:-.015em}
@@ -119,6 +119,12 @@
 .fp .tbl-mini th:first-child,.fp .tbl-mini td:first-child{text-align:left}
 .fp .tbl-mini tr.is-sel td{background:var(--band)}
 .fp .tbl-mini td .tag{margin-left:6px}
+/* the app-wide table rules (38px cells, sticky head, row hover) must not reach these small accessible tables */
+.fp .tbl-mini th,.fp .tbl-mini td{height:auto;line-height:normal}
+.fp .tbl-mini thead th{position:static;vertical-align:middle}
+.fp .tbl-mini tbody tr:last-child td{border-bottom:1px solid var(--line)}
+.fp .tbl-mini tbody tr:hover td{background:transparent}
+.fp .tbl-mini tbody tr.is-sel:hover td{background:var(--band)}
 .fp .tbl-mini tbody th[scope="row"]{text-align:left;font-weight:500;background:inherit;position:static;border-bottom:1px solid var(--line);padding:7px 10px;color:var(--ink);white-space:nowrap}
 .fp .tbl-mini .tl{text-align:left}
 .fp .tbl-box{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-2)}

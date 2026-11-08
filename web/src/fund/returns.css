@@ -1,0 +1,86 @@
+/* Fund page, top part: header with tabs, the four tiles and the Annual returns panel.
+   Ported from the approved artifact's style.css (.fh .meta .pill .dot .tabs .kpi* .spk-* .brk-*).
+   Every selector sits under `.fp`; tokens come from ../tokens.css and the shared pieces
+   (panel, seg, btn, tag, tables, .viz) from base.css. */
+
+/* ---------- header ---------- */
+.fp .fh-wrap{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+.fp .fh{display:flex;flex-wrap:wrap;gap:14px 24px;justify-content:space-between;align-items:flex-end;min-width:0}
+.fp .fh-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.fp .fh h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
+.fp .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:var(--ink2)}
+/* a separator stays with the item before it, so a wrapped line never starts with a dot */
+.fp .meta .mi{display:inline-flex;align-items:center;gap:14px;min-width:0}
+.fp .meta .sep{width:3px;height:3px;border-radius:50%;background:var(--control);flex:none}
+.fp .pill{height:24px;padding:0 10px 0 8px;border-radius:var(--r-pill);border:1px solid var(--line2);background:var(--surface);font:500 12px/1 var(--f-sans);color:var(--ink2);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.fp .pill.badge{padding:0 10px;border-color:color-mix(in srgb,var(--warn) 60%,var(--line2));background:color-mix(in srgb,var(--warn) 18%,var(--surface));color:var(--ink)}
+.fp .dot{position:relative;width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+.fp .dot.live::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--good);opacity:0}
+.fp .fh-note{background:var(--surface);border:1px solid var(--line2);border-left:3px solid var(--warn);border-radius:var(--r-2);padding:10px 12px;font-size:13px;line-height:1.5;color:var(--ink);text-wrap:pretty}
+
+/* tabs: Overview / Positions with a sliding underline */
+.fp .tabs{position:relative;display:flex;gap:2px;padding:0;border-bottom:1px solid var(--line);box-shadow:none;overflow-x:auto;scrollbar-width:none}
+.fp .tabs::-webkit-scrollbar{display:none}
+.fp .tabs button{border:0;background:transparent;height:38px;padding:0 12px;font:500 13px/1 var(--f-sans);color:var(--ink3);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;position:relative}
+.fp .tabs button:hover{color:var(--ink)}
+.fp .tabs button[aria-selected="true"]{color:var(--ink)}
+.fp .tabs button:focus-visible{outline-offset:-3px}
+.fp .tabs .ind{position:absolute;left:0;bottom:-1px;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40))}
+.fp .tabs .cnt{font:500 11px/1 var(--f-mono);color:var(--ink3);background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-1);padding:3px 5px}
+
+/* ---------- KPI tiles ---------- */
+.fp .kpi-cap{padding:0 2px 2px;font-size:12px;line-height:1.45;color:var(--ink3)}
+.fp .kpi-cap b{color:var(--ink);font-weight:600}
+.fp .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
+.fp .kpi{padding:16px var(--ppad) 14px;display:flex;flex-direction:column;gap:4px;min-width:0;border-left:1px solid var(--line)}
+.fp .kpi:first-child{border-left:0}
+.fp .kpi-l{font:500 12px/16px var(--f-sans);color:var(--ink3);display:flex;align-items:center;gap:6px}
+.fp .kpi-v{font:600 28px/34px var(--f-sans);letter-spacing:-.025em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fp .kpi-v small{font-size:15px;font-weight:500;color:var(--ink3);letter-spacing:0;margin-left:3px}
+.fp .kpi-b{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;min-height:30px}
+.fp .kpi-n{font-size:12px;line-height:16px;color:var(--ink3);min-width:0}
+.fp .kpi-s{flex:none;width:84px;height:30px}
+.fp .kpi-s svg{width:100%;height:100%;overflow:visible}
+.fp .spk-line{fill:none;stroke:var(--ink2);stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.fp .spk-dot{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.fp .spk-zero{stroke:var(--line2);stroke-width:1}
+.fp .spk-area-loss{fill:color-mix(in srgb,var(--loss) 20%,transparent);stroke:none}
+.fp .spk-ln-loss{fill:none;stroke:var(--loss);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.fp .spk-gain{fill:var(--gain)}
+.fp .spk-loss{fill:var(--loss)}
+.fp .spk-neutral{fill:var(--ink3)}
+.fp .spk-neutral.hi{fill:var(--ink)}
+@container app (max-width:899px){
+  .fp .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fp .kpi:nth-child(odd){border-left:0}
+  .fp .kpi:nth-child(n+3){border-top:1px solid var(--line)}
+}
+@container app (max-width:559px){
+  .fp .kpis{border-radius:0;border-left:0;border-right:0}
+  .fp .kpi-s{width:64px}
+  .fp .kpi-v{font-size:24px;line-height:30px}
+}
+@container app (max-width:419px){
+  .fp .kpi-b{flex-direction:column;align-items:flex-start;gap:6px}
+  .fp .kpi-s{width:80px}
+}
+
+/* ---------- Annual returns: bracket and chart ---------- */
+.fp .viz .brk-l{stroke:var(--ink2);stroke-width:1.25;fill:none;pointer-events:none}
+.fp .viz .brk-d{stroke:var(--ink2);stroke-width:1.75;stroke-dasharray:.1 5;stroke-linecap:round;fill:none;pointer-events:none}
+.fp .viz .brk-leg{stroke:transparent;stroke-width:16;cursor:ew-resize}
+.fp .viz .brk-m{stroke:transparent;stroke-width:22;cursor:grab;pointer-events:stroke}
+.fp .viz .brk-pill{fill:var(--surface);stroke:var(--ink2);stroke-width:1;cursor:grab}
+.fp .viz .brk-t{fill:var(--ink);font-size:12px;font-weight:700;pointer-events:none}
+.fp .viz .brk-h{fill:var(--ink);stroke:transparent;stroke-width:2;stroke-linejoin:round;cursor:ew-resize;outline:none}
+.fp .viz .brk-h:focus-visible{stroke:var(--focus);stroke-width:3}
+/* styles.css still has a padded `.panel`; the panel's own padding lives in .ph / .pb */
+.fp #retPanel{padding:0}
+.fp #retPanel .chart{min-height:120px}
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .fp .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .fp .dot.live::after{animation:fp-ping 2.6s var(--ease-out) infinite}
+}
+@keyframes fp-ping{0%{transform:scale(.5);opacity:.7}80%,100%{transform:scale(1.5);opacity:0}}

@@ -1,0 +1,105 @@
+/* Positions panel: period picker, the 13-column table, the expanded stock row. Ported from the
+   approved artifact's style.css. Every selector sits under `.fp`; tokens and the shared pieces
+   (.panel, .seg, .stepper, .tag, .tbl-mini, .viz, .scrub) come from base.css. The table sets every
+   property it cares about itself, so the generic table rules of styles.css never leak into it. */
+
+/* ---------- header and tools ---------- */
+.fp .asof{font-size:12px;color:var(--ink3)}
+.fp .ptools{display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:space-between;align-items:center;padding:12px var(--ppad) 12px}
+
+/* the stepper's window: three periods in full, the edge of the ones either side peeking in */
+.fp .stepper .pwin{position:relative;display:inline-block;width:242px;height:26px;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 13px,#000 calc(100% - 13px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 13px,#000 calc(100% - 13px),transparent 100%)}
+.fp .stepper .ptrack{position:absolute;left:-34px;top:0;display:flex;height:26px}
+.fp .stepper .pi{position:relative;flex:none;width:62px;height:26px;padding:0 4px;border:0;border-radius:4px;background:transparent;color:var(--ink2);font:500 12px/1 var(--f-sans);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:3px}
+.fp .stepper .pi:hover{background:var(--hover);color:var(--ink)}
+.fp .stepper .pi.on{background:var(--inv);color:var(--invfg);font-weight:600}
+.fp .stepper .pi.edge{color:var(--ink3)}
+.fp .stepper .pi.hole{cursor:default;pointer-events:none}
+.fp .stepper .pi .caret{width:11px;height:11px;stroke-width:2;flex:none}
+.fp .stepper .pi .psel-o{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:14px;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0}
+.fp .stepper .whint{display:inline-flex;align-items:center;padding:0 7px 0 6px;margin-left:2px;border-left:1px solid var(--line);color:var(--ink3);height:18px}
+.fp .stepper .whint svg{width:10px;height:15px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round}
+.fp .stepper:hover .whint{color:var(--ink)}
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .fp .stepper .whint .wd{animation:wheelnudge 1.5s ease-in-out 3}
+  :root:not([data-motion="reduce"]) .fp .stepper:hover .whint .wd{animation:wheelnudge 1.1s ease-in-out infinite}
+}
+@keyframes wheelnudge{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(3px);opacity:.35}}
+
+/* ---------- the table ---------- */
+.fp .twrap{overflow:auto;max-height:620px;border-top:1px solid var(--line);position:relative}
+.fp .twrap:focus-visible{outline-offset:-2px}
+.fp table.t{border-collapse:separate;border-spacing:0;width:100%;min-width:1064px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.fp .t thead th{position:sticky;top:0;z-index:2;background:var(--sunken);height:36px;padding:0 8px;text-align:right;font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom:1px solid var(--line2);white-space:nowrap;vertical-align:middle}
+.fp .t thead th:first-child,.fp .t tbody td:first-child{text-align:left;padding-left:var(--ppad)}
+.fp .t thead th:last-child,.fp .t tbody td:last-child{padding-right:var(--ppad)}
+.fp .t .sort{position:relative;display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;padding:6px 0;height:100%;color:inherit;font:inherit;white-space:nowrap;text-decoration:none;letter-spacing:normal}
+.fp .t .sort .ico{position:absolute;right:calc(100% + 1px);width:12px;height:12px;stroke-width:2}
+.fp .t th:first-child .sort .ico,.fp .t th.held .sort .ico{right:auto;left:calc(100% + 1px)}
+.fp .t .sort:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.fp .t th[aria-sort="ascending"] .sort,.fp .t th[aria-sort="descending"] .sort{color:var(--ink);font-weight:600}
+.fp .t tbody td{height:var(--row);padding:0 8px;overflow:hidden;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface);vertical-align:middle}
+.fp .t tbody tr:hover td{background:var(--hover)}
+.fp .t tbody tr.is-sel td{background:var(--band)}
+.fp .t tbody tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.fp .t tbody tr:last-child td{border-bottom:0}
+/* the Stock column stays in view while the rest scrolls sideways */
+.fp .t thead th:first-child,.fp .t tbody td:first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
+.fp .t thead th:first-child{z-index:3}
+.fp .t td.held,.fp .t th.held{text-align:left;color:var(--ink2);font-size:12.5px}
+.fp .t th.held{font-size:12px;color:var(--ink3)}
+.fp .t .hd{display:block;line-height:14px;white-space:nowrap}
+.fp .t .hd2{display:flex;align-items:center;gap:4px;color:var(--ink3)}
+.fp .t .elb{display:block;width:11px;height:11px;fill:none;stroke:var(--ink3);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fp .t td.lastc{display:table-cell;white-space:nowrap}
+.fp .t .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
+.fp .t .lc .lw{font-size:11.5px;color:var(--ink2)}
+.fp .t .lc b{font:600 14px/18px var(--f-sans);letter-spacing:-.01em;color:var(--ink)}
+.fp .t .lc.add{background:color-mix(in srgb,var(--gain) 11%,var(--surface))}
+.fp .t .lc.trim{background:color-mix(in srgb,var(--loss) 12%,var(--surface))}
+.fp .t .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+.fp .t .lc-none{color:var(--ink3)}
+.fp .t .stk{display:flex;flex-direction:column;align-items:stretch;gap:1px;min-width:0;width:100%}
+.fp .t .stk b{font:600 13px/15px var(--f-mono);letter-spacing:-.01em;display:inline-block}
+.fp .t .stk span{color:var(--ink3);font-size:11.5px;line-height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%}
+.fp .t tbody tr[data-t]{cursor:pointer}
+.fp .t .wcell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;justify-content:center;width:56px}
+.fp .t .wcell .wn{line-height:14px}
+.fp .t .mb{display:block;height:5px;border-radius:2.5px;background:var(--ink3);flex:none}
+.fp .t .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
+.fp .twrap.is-loading .t tbody{opacity:.5}
+/* a zero-height sticky line before the table: the note floats over the dimmed rows */
+.fp .twrap .t-load{position:sticky;top:46px;left:0;height:0;z-index:5;pointer-events:none}
+.fp .twrap .t-load span{display:inline-block;margin-left:var(--ppad);padding:5px 10px;border-radius:var(--r-2);background:var(--inv);color:var(--invfg);font-size:12px;line-height:16px;font-weight:500;box-shadow:var(--shadow-1)}
+.fp .t-more{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px var(--ppad);border-top:1px solid var(--line);font-size:12px;color:var(--ink3)}
+.fp .t-note{padding:8px var(--ppad);font-size:12px;line-height:18px;color:var(--ink3);border-top:1px solid var(--line)}
+
+/* ---------- the expanded row ---------- */
+.fp .t .xrow td{padding:0;height:auto;text-align:left;background:var(--sunken);border-bottom:1px solid var(--line2);overflow:visible}
+.fp .t .xrow td:first-child{position:static;box-shadow:none}
+.fp .xpanel{position:sticky;left:0;padding:16px 20px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;box-sizing:border-box;white-space:normal}
+.fp .xhead{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
+.fp .xhead b{font:600 14px/1 var(--f-mono)}
+.fp .xhead span{color:var(--ink3);font-size:13px}
+.fp .xleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2);align-items:center}
+.fp .xleg .tri{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;margin-right:5px;vertical-align:middle}
+.fp .xleg .tri.up{border-bottom:9px solid var(--gain)}
+.fp .xleg .tri.dn{border-top:9px solid var(--loss)}
+.fp .xleg .xlink{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control);font-weight:500}
+.fp .xleg .xlink:hover{text-decoration-color:var(--ink)}
+.fp .x-none{font-size:13px;color:var(--ink3);padding:24px 0;text-align:center}
+.fp .viz.px .pxline{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round}
+.fp .viz.px .mk{stroke:var(--surface);stroke-width:1.5}
+.fp .viz.px .mk.buy{fill:var(--gain)}
+.fp .viz.px .mk.sell{fill:var(--loss)}
+.fp .viz.px .dot{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.fp .xtbl{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-2);background:var(--surface)}
+/* the generic table rules (height, sticky heads) are not wanted in the trade list */
+.fp .xtbl .tbl-mini :is(th,td){height:auto}
+.fp .xtbl .tbl-mini thead th{position:static;white-space:nowrap;vertical-align:middle}
+.fp .xtbl .tbl-mini td:first-child,.fp .xtbl .tbl-mini th:first-child{padding-left:10px}
+.fp .xtbl .tbl-mini td:last-child,.fp .xtbl .tbl-mini th:last-child{padding-right:10px}
+
+@container app (max-width:559px){
+  .fp .t .stk span{font-size:11.5px;max-width:112px}
+}
