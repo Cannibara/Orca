@@ -393,3 +393,13 @@ describe("nearestEdge", () => {
     expect(nearestEdge(3, 3, 3)).toEqual({ a: 3, b: 3 });
   });
 });
+
+const { fMoney1 } = fmt;
+describe("fMoney1", () => {
+  test("one decimal in billions like the artifact, adaptive below a billion", () => {
+    expect(fMoney1(1.5e9)).toBe("$1.5B");
+    expect(fMoney1(11141121260)).toBe("$11.1B");
+    expect(fMoney1(-2.04e9)).toBe("−$2.0B");
+    expect(fMoney1(3.4e8)).toBe("$340M");
+  });
+});

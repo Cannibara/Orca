@@ -126,6 +126,11 @@ export function fMoney(v: number): string {
   return money(v);
 }
 
+/** A bar label: billions to one decimal like the artifact ("$1.5B", "$11.1B"); below a billion as fMoney ("$340M"). */
+export function fMoney1(v: number): string {
+  return Math.abs(v) >= 1e9 ? (v < 0 ? MINUS : "") + "$" + (Math.abs(v) / 1e9).toFixed(1) + "B" : money(v);
+}
+
 /** Signed dollars: 1.23e9 → "+$1.23B", -3.4e8 → "−$340M"; no sign on a figure that prints as $0. */
 export function fMoneySigned(v: number): string {
   return money(v, true);

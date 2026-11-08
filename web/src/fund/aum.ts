@@ -2,7 +2,7 @@
 // aumParts / aumSvg (app.js), with money in dollars (the artifact drew billions) and
 // the labels in adaptive units ($340M, $1.23B, $11.1B).
 
-import { axisMoney, fMoney, fMoneySigned } from "./fmt";
+import { axisMoney, fMoney, fMoney1, fMoneySigned } from "./fmt";
 import { endRound, niceTicks, overlap, slots, stepFor, textW, xLabelItems, xLabels, type Box, type Slots, type XLabelItem } from "./geometry";
 import type { Win, YearPoint } from "./series";
 
@@ -112,7 +112,7 @@ export function aumLayout(win: Pick<Win, "years" | "offset">, W: number): AumLay
 
   // Label text: the full form, then the form without "$" (the axis says dollars), then rotated.
   const LS = 11.5;
-  const full = parts.map((p) => fMoney(p.E));
+  const full = parts.map((p) => fMoney1(p.E));
   const short = full.map((s) => s.replace(/^\$/, ""));
   const widest = (a: string[], px: number) => Math.max(0, ...a.map((s) => textW(s, px)));
   let form: "full" | "short" = "full";

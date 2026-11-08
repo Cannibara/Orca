@@ -131,7 +131,7 @@ describe("AumPanel: the chart", () => {
     expect(ticks.every((t) => /^\$\d+(\.\d+)?B$|^\$0$/.test(t ?? ""))).toBe(true);
     const labels = Array.from(container.querySelectorAll("text.blab")).map((t) => t.textContent);
     expect(labels).toContain("$11.1B");
-    expect(labels).toContain("$1.50B");
+    expect(labels).toContain("$1.5B");
     expect(container.querySelectorAll("text.blab[aria-hidden='true']").length).toBe(labels.length);
   });
 
