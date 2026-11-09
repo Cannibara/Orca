@@ -62,6 +62,7 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 | Item | Fact |
 |---|---|
 | Schedule | `pipeline.yml`: `23 6 16 * *` (the job is named `weekly` but runs monthly), `41 7 1 * *` runs `verify`; both need `vars.ORCA_SCHEDULE_ENABLED == 'true'`; manual inputs `full`, `home_only`; concurrency group `pipeline` |
+| Prices | daily bars from each stock's last stored date to today (`prices.TiingoSource`, `startDate`/`endDate`); targets: latest-quarter holdings, SPY, exits within `EXIT_REFRESH_QUARTERS = 6`, never-fetched stocks; stalest first (`run/market.refresh_prices`) |
 | Timeouts | job 330 min, step 300 min; budget `ORCA_TIME_BUDGET_MIN` (default 270, `run/budget.py`); the price stage stops with `min(90, budget/3)` min left (`run/market.py` `PRICES_RESERVE_MIN`) |
 | SEC | `SEC_RATE_PER_SEC = 8.0` (`http.py`); User-Agent `Orca research {ORCA_CONTACT}`, `RuntimeError` if unset |
 | Others | OpenFIGI keyed 25 req/6 s × 100 jobs (anonymous 25/60 s × 10); Tiingo 2.5/s default; FRED 2/s; timeout 30 s |

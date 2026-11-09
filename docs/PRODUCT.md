@@ -12,6 +12,11 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 - Business model: free at launch. A paid tier ($10/month) is planned, not built. A gated Excel export idea is parked (spec)(chat).
 - Use cases: find a fund by name; see its yearly returns, risk and what drove them; inspect its positions at any past quarter; see a stock's trades with buy/sell markers; spot big conviction moves, crowded buys and best/worst calls across funds; check what selling cost the fund (what-if).
 
+## Data cadence
+- Holdings are quarterly. Funds file a 13F within 45 days of each quarter end, and the 16th-of-the-month run after each deadline (Feb, May, Aug, Nov) brings a quarter in at once. Later monthly runs pick up late filings and amendments (code `pipeline.yml`, `weekly.deadline_quarter`)(chat).
+- Prices are daily bars. Each monthly run fetches every day since the last stored one. It covers stocks held in the latest quarter, SPY, stocks sold within the last 6 quarters, and stocks never fetched (code `orca/run/market.py` `refresh_prices`, `orca/prices.py`).
+- The site's "latest price" is the newest stored close, so it can be up to about a month old. `latest_prices.json` dates each close (code)(contract).
+
 ## Features
 | Status | Feature | Where |
 |---|---|---|

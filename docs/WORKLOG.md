@@ -11,7 +11,8 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | Added `CLAUDE.md`, `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/WORKLOG.md`, backfilled from this chat, the code and git log (chat) | Future sessions onboard from a few files instead of scanning the codebase (chat) | the five files above |
 
-Open issues: chat history of the 2026-10-30..11-06 sessions was not available; those entries come from git and the rulings doc only.
+Open issues: chat history of the 2026-10-30..11-06 sessions was not available; those entries come from git and the rulings doc only. A prompt was handed to the owner to backfill them from that chat (chat).
+Owner clarified: holdings are quarterly, prices refresh monthly; added "Data cadence" to `docs/PRODUCT.md` (chat).
 
 ## 2026-11-09 — Domain move, hardening, SEO (PR #2 merged, PR #3 open)
 
