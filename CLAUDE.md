@@ -65,7 +65,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 - Commits: `area: what changed` with a body explaining why. Branch work goes to the session's assigned branch; PRs are squash-merged.
 
 ## Gotchas
-- Merging to `main` deploys production (Web workflow). PR #3 is open as of 2026-11-09.
+- Merging to `main` deploys production (Web workflow). PR #3 was squash-merged as a2a1554 on 2026-11-09.
 - After a squash merge, merge `main` into the working branch; force-push is blocked in cloud sessions.
 - The CSP is strict (`web/scripts/prerender.mjs`). A new external script, font or fetch host must be added there, and Cloudflare Web Analytics must stay off.
 - `VITE_DATA_URL` must be a bare origin (no trailing slash or space); a bad value fails the build. `SITE_URL` likewise.

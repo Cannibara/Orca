@@ -85,6 +85,34 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 | Unpriced | a held unpriced stock enters the book at its first priced close; fallback chain last close → implied price; > 10× mismatch flagged (`engine/position.compute_position`) |
 | Duplicates | SUBMISSION/COVERPAGE de-duplicated by accession; share classes summed per `stock_id` |
 | Confidential treatment | UNKNOWN / not handled in code |
+| Notice filings | 13F-NT / 13F-NT/A carry no holdings and are skipped (`sec/bulk.KEPT_FORMS`); a fund that only filed a notice shows its previous quarter (Pershing Square Q2 2026) (code)(chat) |
+| Value in thousands after 2023 | some filers kept reporting thousands; ~1,000 `price_mismatch` flags, often exactly 1000× (chat) |
+| Invalid CUSIPs | ~29,000 filing CUSIPs (often a dropped leading zero) get an OpenFIGI error → method "error", no name match, left out (`securities.py`) (code)(chat) |
+| Delisted stocks | OpenFIGI drops the US ticker and returns a foreign listing (`XLNXEUR`, `TWTRUSD`); repaired by stripping `vendor.CURRENCY_SUFFIXES` (code) |
+| Reused tickers | a vendor ticker counts only over dates overlapping the stock's held span (`vendor.resolve`; `FB` today is not Facebook) (code) |
+| Holding companies and corporates | single-stock vehicles jump 0 → 96%+; filers like Alphabet Inc. report huge new stakes; book jumps from newly priced holdings or restructurings (Woodbridge $737M → $25.2bn). Conviction skips largest holding > 33% and AUM change outside ½–2× (code `home._conviction_quarter`)(chat) |
+| Share-count errors | some BRK-A share counts were off 15–28× (chat) |
+| Spin-offs, in-kind transfers | shares received in a spin-off or moved in kind by a wealth-management client look like trades; not separable in 13F data (chat) |
+
+### Home lists and conviction (code)
+- Each fund snapshot (`home.FundSnapshot`) carries `conviction_quarters`: `ConvictionQuarter` records for its last 8 quarters (`q, start, end, top_prev, n_held, filed_pair, moves[(stock_id, kind, usd, w_prev, w_after, px)], flow`), built by `run/compute._conviction_quarters`. A move under `CONVICTION_KEEP` (1% of the smaller of start and end AUM) is not stored.
+- `home.conviction_moves` applies the thresholds at publish: `_conviction_quarter` (eligibility), `_usual_move` (biggest move of the 4 quarters before), `_move_size` (buys ÷ end AUM, sales ÷ start AUM; adds/trims minus `flow × w_prev`, clipped). ETFs = `securities.is_etf` or `sector == ETF_SECTOR` (`run/publish_step.py`).
+- `python -m orca.run home` (`run/weekly.run_home`) rebuilds `funds.json`, `securities.json`, `latest_prices.json` and `home/*.json` from stored `fund_state` with no fetch or recompute; it refuses when the deadline quarter moved or work is owed. Pipeline input `home_only` runs it (~5 min vs ~2 h rebuild, chat).
+
+### Workflow resilience (code `.github/workflows/pipeline.yml`, `.github/actions/*`)
+| Guard | Why (chat) |
+|---|---|
+| rclone install variables named `ORCA_RCLONE_*` | rclone reads every `RCLONE_*` env var as an option (run 1 failed) |
+| Secrets stripped of whitespace; malformed R2 key id named; Cloudflare account id = the 32-hex part of whatever was pasted; Pages project created if missing (`web.yml`) | runs 2–4 and the first deploys failed on pasted secrets |
+| `check-keys` step (`run/preflight.py`) before the restore | a bad OpenFIGI/Tiingo/FRED key otherwise fails an hour in |
+| Manifest restored with `copyto --ignore-size --ignore-checksum`; reader accepts plain JSON | R2 hands brotli files back decoded (run 6) |
+| `RCLONE_TIMEOUT=60s`, `RCLONE_CONTIMEOUT=15s`, stats every 30 s; restore retried 3× under `timeout 15m` | a 41-min silent restore stall |
+| Upload 64 at a time with `--s3-no-head` | the first full upload took ~75 min |
+| `echo 1000 > /proc/self/oom_score_adj`; memory/disk logged every 60 s | an out-of-memory runner loses the save step with it |
+| Save step kills a leftover `orca.run` (TERM, then KILL after 30 s) and runs only if the restore succeeded | a cancelled run kept writing the lake during the save |
+| `_recompute_set` scans CIKs only; `latest_closes` reads the last `LATEST_CLOSE_WINDOW_DAYS = 14` days of bars per stock | both loaded whole tables and killed the 8 GB runner (runs 9–12) |
+
+Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 min, memory peak ~4.5 GB of the public repo's 16 GB / 4-core runner; restores 15–64 s; fund compute ~48 min on one core.
 
 ### Engine formulas
 | Figure | Formula (function) |
@@ -120,7 +148,7 @@ Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.pu
 - Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `/how-it-works`, `*`.
 - Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files. `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
 - Row budget for big tables: `web/src/fund/loading.ts` (50 / 200 / 25 / 100).
-- Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3) it also writes `sitemap.xml`, `robots.txt` and canonical links. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.
+- Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3, merged a2a1554) it also writes `sitemap.xml`, `robots.txt` and canonical links. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.
 
 ## Cloudflare setup
 | Service | Setting |
@@ -147,3 +175,8 @@ Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest,
 - A big fund fetches ~2,000+ `weekly.json` files when stepping back a quarter before the prefetch is done (about 7 s measured). A per-fund quarter-end price file would fix that (chat).
 - A plain `<table>` with all rows: layout cost grows with rows; capped by `loading.ts`, not virtualised (chat).
 - No server-side gating is possible while all data is public (chat).
+- Fund compute runs on one core (~48 min); parallel compute was estimated at 17–20 min, not built (chat)(code).
+- `home/just_filed.json` is built and published with no reader since 2026-11-06 (code).
+- `.trunc` and `.two-line` in `web/src/styles.css` have no users since PR #1 (code).
+- A hard cap on files uploaded per run was offered (2026-11-01) and not built (chat)(code).
+- Conviction cannot tell spin-off receipts or in-kind client transfers from trades (chat).
