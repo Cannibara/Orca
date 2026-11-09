@@ -61,8 +61,8 @@
 
 .fp .wi .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
 .fp .wi-more{padding:10px var(--ppad);border-top:1px solid var(--line);font-size:12px;line-height:18px;color:var(--ink3)}
-.fp .wi-foot{padding-top:10px;border-top:1px solid var(--line);max-width:none}
-.fp .wi-more+.wi-foot{border-top:0;padding-top:0}
+.fp .pf.wi-foot{padding-top:10px;border-top:1px solid var(--line);max-width:none}
+.fp .wi-more+.pf.wi-foot{border-top:0;padding-top:0}
 
 /* ---------- the opened row ---------- */
 .fp .wi>tbody>tr.xrow>td{padding:0;height:auto;text-align:left;background:var(--sunken);border-bottom:1px solid var(--line2);overflow:visible}

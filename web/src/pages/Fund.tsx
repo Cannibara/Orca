@@ -24,10 +24,10 @@ import { DrivePanel } from "../fund/DrivePanel";
 import { FundHeader } from "../fund/FundHeader";
 import { KpiStrip } from "../fund/KpiStrip";
 import { PositionsPanel } from "../fund/PositionsPanel";
+import { WhatIfPanel } from "../fund/WhatIfPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
 import type { Span } from "../fund/span";
-import { WhatIf } from "./FundTables";
 import NotFound from "./NotFound";
 
 // ---- loading ----------------------------------------------------------------
@@ -105,7 +105,7 @@ function FundView({ data }: { data: FundData }) {
         <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
         <AumPanel series={series} win={win} />
         <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={names} asof={asof} />
-        <WhatIf fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} />
+        <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
         <p className="fp-foot">
           Source: SEC Form 13F-HR filings, quarterly. Every figure is an Orca estimate built from quarter-end holdings, so risk numbers
           understate swings inside a quarter.

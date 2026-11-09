@@ -7,6 +7,7 @@ import App from "../src/App";
 import { StepChart } from "../src/charts/StepChart";
 import { clearDataCache } from "../src/data/api";
 import type { FundsIndex, LatestPrices, Positions, Securities, Summary, TradeTuple } from "../src/data/types";
+import { tidyName } from "../src/lib/format";
 
 // The step chart is the real one; the spy only records the props the page gives it.
 vi.mock("../src/charts/StepChart", async (importOriginal) => {
@@ -112,7 +113,7 @@ const positionPath = (stockId: number | string, fundId: number | string = FUND) 
 function titleOf(stockId: number): string {
   const sec = demo<Securities>("securities.json");
   const at = sec.stock_id.indexOf(stockId);
-  return `${sec.ticker[at]} · ${sec.name[at]}`;
+  return `${sec.ticker[at]} · ${tidyName(sec.name[at])}`;
 }
 
 /** Wait until the page has loaded a position (its h1 holds the ticker). */
@@ -145,7 +146,7 @@ describe("Position page", () => {
   it("renders trades table rows", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
 
     const table = screen.getByRole("table", { name: "Trades by quarter" });
     expect(within(table).getAllByRole("columnheader").map((th) => th.textContent)).toEqual([
@@ -170,7 +171,7 @@ describe("Position page", () => {
   it("shows each move in a tinted box and the shares signed, in the gain or loss colour", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     const table = screen.getByRole("table", { name: "Trades by quarter" });
     const rows = within(table).getAllByRole("row").slice(1);
     // New and Added are tinted as gains, Sold all as neutral; Trimmed would be a loss.
@@ -192,7 +193,7 @@ describe("Position page", () => {
       ),
     );
     renderApp(positionPath(SOLO));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     const rows = within(screen.getByRole("table", { name: "Trades by quarter" })).getAllByRole("row").slice(1);
     expect(rows[1].querySelector(".lc")).toHaveClass("trim");
     expect(rows[1].querySelectorAll("td")[2].querySelector("span")).toHaveClass("down");
@@ -201,7 +202,7 @@ describe("Position page", () => {
   it("puts the sector, the years held and the latest price in three pills under the title", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    const h1 = await loaded("GOOGL · ALPHABET INC");
+    const h1 = await loaded("GOOGL · Alphabet");
     const pills = Array.from(h1.closest(".pos-head")!.querySelectorAll(".pos-meta .pill")).map((p) => p.textContent);
     expect(pills).toEqual(["Sector Tech", "Held Q1 2023 – now", "Latest price $137 · 30 Oct 2026"]);
     expect(screen.getByRole("group", { name: "This position" })).toBeInTheDocument();
@@ -218,7 +219,7 @@ describe("Position page", () => {
       ),
     );
     renderApp(positionPath(SOLO));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(tradeRows()).toEqual([
       ["Q1 ’13", "New", "+100", "$10.00", "—", "$1,000", "100"], // under a million: plain dollars, not "$0m"
       ["Q1 ’14", "Trimmed", "−40", "$12.00", "$11.00–$13.50", "$480", "60"],
@@ -228,7 +229,7 @@ describe("Position page", () => {
   it("names the position: back link, ticker, name, sector, years held and the latest price with its date", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    const h1 = await loaded("GOOGL · ALPHABET INC");
+    const h1 = await loaded("GOOGL · Alphabet");
 
     const back = screen.getByRole("link", { name: "← Kelpwood Capital LP" });
     expect(back).toHaveAttribute("href", `/fund/${FUND}`);
@@ -251,7 +252,7 @@ describe("Position page", () => {
   it("shows the tiles of an open position from its file and the live price", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
 
     expect(tileValue("Shares now")).toBe("17,744,439");
     expect(tileSub("Shares now")).toBe("worth $2.43B");
@@ -275,7 +276,7 @@ describe("Position page", () => {
   ])("irr tile uses live price (%s)", async (price, expected) => {
     stubData(soloFund([[0, 100, 10, 9, 11, 100]], price, {}, "2014-01-01"));
     renderApp(positionPath(SOLO));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(tileValue("IRR")).toBe(expected);
     expect(tile("IRR").querySelector(".kpi-v")).toHaveClass(price > 10 ? "up" : "down");
   });
@@ -283,7 +284,7 @@ describe("Position page", () => {
   it("total P&L is realised + unrealised + dividends at the live price, with the return on dollars in", async () => {
     stubData(soloFund([[0, 100, 10, 9, 11, 100]], 20, { dividends: 50 }, "2014-01-01"));
     renderApp(positionPath(SOLO));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(tileValue("Shares now")).toBe("100");
     expect(tileSub("Shares now")).toBe("worth $2,000");
     expect(tileValue("Avg cost")).toBe("$10.00");
@@ -306,7 +307,7 @@ describe("Position page", () => {
       ),
     );
     renderApp(positionPath(SOLO));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(tileValue("IRR")).toBe("+100%");
     expect(tileValue("Total P&L")).toBe("+$1,000");
     expect(tileValue("Shares now")).toBe("0");
@@ -316,7 +317,7 @@ describe("Position page", () => {
   it("shows a dash wherever the missing latest price is needed", async () => {
     stubData(soloFund([[0, 100, 10, 9, 11, 100]], null, { dividends: 50 }));
     renderApp(positionPath(SOLO));
-    const h1 = await loaded("GOOGL · ALPHABET INC");
+    const h1 = await loaded("GOOGL · Alphabet");
     expect(h1.closest(".pos-head")!.querySelector(".pos-meta")!.textContent).toMatch(/Latest price —$/);
     expect(tileValue("Total P&L")).toBe("—");
     expect(tileSub("Total P&L")).toBe("incl. $50 dividends");
@@ -331,7 +332,7 @@ describe("Position page", () => {
   it("draws the price chart and the shares chart, the shares running to the latest filed quarter for an open position (R28)", async () => {
     stubData();
     renderApp(positionPath(GOOGL));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
 
     expect(screen.getByRole("heading", { level: 2, name: "Price and estimated trades" })).toBeInTheDocument();
     expect(chart("Weekly price with estimated trade prices")).not.toBeNull();
@@ -354,7 +355,7 @@ describe("Position page", () => {
   it("says there is no price history when the stock has no weekly file (R28), and still shows the rest", async () => {
     stubData({ [`stock/${GOOGL}/weekly.json`]: MISSING });
     renderApp(positionPath(GOOGL));
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(screen.getByText("No price history")).toBeInTheDocument();
     expect(chart("Weekly price with estimated trade prices")).toBeNull();
     expect(chart("Shares held by quarter")).not.toBeNull();
@@ -367,7 +368,7 @@ describe("Position page", () => {
     stubData();
     renderApp(positionPath(GOOGL));
     expect(screen.getByRole("status")).toHaveTextContent("Loading…");
-    await loaded("GOOGL · ALPHABET INC");
+    await loaded("GOOGL · Alphabet");
     expect(screen.queryByRole("status")).toBeNull();
   });
 

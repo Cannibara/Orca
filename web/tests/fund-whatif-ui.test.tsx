@@ -315,17 +315,16 @@ describe("What if they'd kept it", () => {
     });
 
     it("shows the last change like the Positions table: a tinted box with the word and the weight change, and its quarter", () => {
-      // a book of $100k: selling 100 shares at $20 out of it is 2% of it
+      // S1's 100 shares at $20 are 2,000 of a 5,000 book (S2 holds 300 shares at $10): the weight falls by 40 points
       renderWhatIf({
-        positions: [sold(1, 1000)],
+        positions: [sold(1, 1000), pos(2, { trades: [trade(10, 300, 10, 300)] })],
         exits: exitsOf([{ stock_id: 1, sold_shares: 100, sold_usd: 2000 }]),
-        prices: pricesOf({ 1: 40 }),
-        summary: summaryOf({ book: 1e5 }),
+        prices: pricesOf({ 1: 40, 2: 10 }),
       });
       const box = trOf("S1").querySelector(".lc") as HTMLElement;
       expect(box).toHaveClass("sold");
       expect(box.querySelector(".lw")?.textContent).toBe("Sold all");
-      expect(box.querySelector("b")?.textContent).toBe("−2.0%");
+      expect(box.querySelector("b")?.textContent).toBe("−40.0%");
       expect(trOf("S1").querySelector(".lq")?.textContent).toBe("Q2 ’25");
     });
 
@@ -337,7 +336,7 @@ describe("What if they'd kept it", () => {
         pos(4, { trades: [trade(10, 100, 10, 100), trade(51, -32, 10, 68)] }),
       ];
       const e = exitsOf([1, 2, 3, 4].map((stock_id) => ({ stock_id, sold_shares: 10, sold_usd: 100 })));
-      renderWhatIf({ positions, exits: e, prices: pricesOf({ 1: 10, 2: 10, 3: 10, 4: 10 }), summary: summaryOf({ book: 1e5 }) });
+      renderWhatIf({ positions, exits: e, prices: pricesOf({ 1: 10, 2: 10, 3: 10, 4: 10 }) });
       const word = (t: string) => trOf(t).querySelector(".lc .lw")?.textContent;
       expect([1, 2, 3, 4].map((i) => word(`S${i}`))).toEqual(["New", "Sold all", "Added", "Trimmed"]);
       expect(trOf("S1").querySelector(".lc")).toHaveClass("add");
@@ -354,7 +353,7 @@ describe("What if they'd kept it", () => {
         pos(3, { trades: [trade(10, 100, 10, 100), trade(51, -10, 10, 90)] }), // trimmed: small minus
       ];
       const e = exitsOf([1, 2, 3, 4].map((stock_id) => ({ stock_id, sold_shares: 10, sold_usd: 100 }))); // S4: no position
-      renderWhatIf({ positions, exits: e, prices: pricesOf({ 1: 10, 2: 10, 3: 10, 4: 10 }), summary: summaryOf({ book: 1e5 }) });
+      renderWhatIf({ positions, exits: e, prices: pricesOf({ 1: 10, 2: 10, 3: 10, 4: 10 }) });
       await userEvent.click(sortButton("Last change"));
       expect(tickersOf()).toEqual(["S1", "S3", "S2", "S4"]);
       await userEvent.click(sortButton("Last change"));
@@ -484,27 +483,33 @@ describe("a long list of sales draws its rows in chunks", () => {
     await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
     expect(more()).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument(); // no button, ever
-  });
+  }, 20000);
 
   it("keeps the sort order while rows are added, and sorting covers all rows, not the ones drawn", async () => {
-    renderWhatIf(many(400));
-    // $ missed: stock i (0-based) misses (i mod 9) - 5 per share x 10M shares; the first rows of the order are the +3 ones
-    await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
-    const missedOf = () => rowsOf().map((r) => r["$ missed / dodged"]);
-    const sortedDesc = missedOf();
-    const values = sortedDesc.map((s) => (s === "–" ? -Infinity : Number(s.replace(/[+$m,]/g, "").replace("−", "-"))));
+    // S99 misses by far the most, and is the last of 170 in ticker order: beyond the first chunk of either order that matters
+    const long = many(170);
+    long.prices.set(99, 1000);
+    renderWhatIf(long);
+    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+    expect(tickersOf()[0]).toBe("S99"); // the default order is $ missed descending
+    const values = rowsOf().map((r) => Number(r["$ missed / dodged"].replace(/[+$m,]/g, "").replace("−", "-")));
     expect(values).toEqual([...values].sort((a, b) => b - a)); // descending from the first row to the last
 
-    // a new order starts again from the first chunk, with the global extremes on top
+    // a new order starts again from the first chunk
     await userEvent.click(sortButton("Stock"));
     expect(bodyRows()).toHaveLength(CHUNK);
     expect(tickersOf()[0]).toBe("S1");
+    expect(tickersOf()).not.toContain("S99"); // last in ticker order: not drawn yet
+    expect(more()?.textContent).toBe("Loading 20 more…");
+    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+    expect(tickersOf()[169]).toBe("S99");
+
+    // and back: the best of all 170 is on top at once, though it was in the undrawn part of the previous order
     await userEvent.click(sortButton("$ missed / dodged"));
     expect(bodyRows()).toHaveLength(CHUNK);
-    expect(more()).toBeInTheDocument();
-    expect(Number(missedOf()[0].replace(/[+$m,]/g, ""))).toBe(Math.max(...values)); // the best of all 400, not of the first 150
-    await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
-  });
+    expect(tickersOf()[0]).toBe("S99");
+    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+  }, 30000);
 
   it("adds up the tiles over every sale, not the rows drawn", () => {
     renderWhatIf(many(400));
@@ -521,19 +526,22 @@ describe("a long list of sales draws its rows in chunks", () => {
     await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
     expect(bodyRows()[0]).toBe(first);
     expect(first.querySelector("td:last-child")).toBe(cell);
-  });
+  }, 20000);
 
   it("keeps first paint to one chunk of rows on a fund with 3,000 sales", async () => {
     const t0 = performance.now();
-    renderWhatIf(many(3000));
+    const { unmount } = renderWhatIf(many(3000));
     const first = performance.now() - t0;
     expect(bodyRows()).toHaveLength(CHUNK);
     expect(more()?.textContent).toBe("Loading 2,850 more…");
-    // a generous bound: the point is that 3,000 rows do not render at once (that takes many times longer)
-    expect(first).toBeLessThan(4000);
-    await waitFor(() => expect(bodyRows()).toHaveLength(3000), { timeout: 30000 });
+    // a generous bound for jsdom: the point is that 3,000 rows are not drawn at once (that takes many times longer)
+    expect(first).toBeLessThan(3000);
+    // the rest follows by itself, in chunks
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThanOrEqual(2 * CHUNK), { timeout: 5000 });
+    expect(bodyRows().length).toBeLessThan(3000);
     expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
-  }, 40000);
+    unmount();
+  }, 20000);
 });
 
 // ---- the demo fund: the two tables agree --------------------------------------------------

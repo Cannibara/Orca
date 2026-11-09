@@ -73,12 +73,12 @@ export function exitsOf(rows: ExitIn[], summary: Partial<ExitsSummary> = {}): Ex
 
 export const NO_EXITS = exitsOf([]);
 
-/** The summary fields the panel reads: newest quarter 53, tracked from quarter 0, a book of $1bn (or `book`) at every quarter end. */
-export function summaryOf(over: Partial<Pick<Summary, "period_q" | "tracked_since_q">> & { book?: number } = {}): Summary {
+/** A summary with the fields the panel reads: newest quarter 53, tracked from quarter 0 (the rest is filler for the type). */
+export function summaryOf(over: Partial<Pick<Summary, "period_q" | "tracked_since_q">> = {}): Summary {
   const period_q = over.period_q ?? NEWEST;
   const q = Array.from({ length: period_q + 1 }, (_, i) => i);
   const col = (v: number) => q.map(() => v);
-  const book = over.book ?? 1e9;
+  const book = 1e9;
   return {
     id: FUND,
     name: "Test Fund",

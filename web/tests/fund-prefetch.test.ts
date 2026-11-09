@@ -1,6 +1,7 @@
 import { createPriorityQueue, networkIsConstrained, startPrefetch, whenIdle, type PageLike, type Priority } from "../src/fund/prefetch";
 import { prefetchOrder, type Timeline } from "../src/fund/positions";
 import type { PositionRow, Trade } from "../src/data/types";
+import { clearDataCache, loadWeekly } from "../src/data/api";
 
 /** A loader the test controls: every call is recorded and stays in flight until it is settled by hand. */
 function loader() {
@@ -479,5 +480,35 @@ describe("the prefetch order", () => {
   test("a stock the fund sold out before the newest quarter is not 'held' however its row reads", () => {
     const rows = [pos(1, [tr(10, 5, 5), tr(52, -5, 0)], { shares_now: 5 }), pos(2, [tr(53, 5, 5)], { shares_now: 5 })];
     expect(prefetchOrder(rows, tl, new Map())).toEqual([2, 1]);
+  });
+});
+
+describe("the fetch helper's low-priority option", () => {
+  const stub = () => {
+    const fn = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 200, json: async () => ({ start: "2020-01-03", close: [1] }) }));
+    vi.stubGlobal("fetch", fn);
+    return fn;
+  };
+  beforeEach(() => clearDataCache());
+  afterEach(() => vi.unstubAllGlobals());
+
+  test("only a background load asks for low priority; an ordinary load is the plain call it always was", async () => {
+    const fn = stub();
+    await loadWeekly(1, { priority: "low" });
+    await loadWeekly(2);
+    expect(fn.mock.calls).toEqual([
+      ["/demo-data/stock/1/weekly.json", { priority: "low" }],
+      ["/demo-data/stock/2/weekly.json"],
+    ]);
+  });
+
+  test("one request per URL: a load that is needed now awaits the low-priority request already under way", async () => {
+    const fn = stub();
+    const background = loadWeekly(3, { priority: "low" });
+    const now = loadWeekly(3);
+    expect(now).toBe(background);
+    await now;
+    await loadWeekly(3, { priority: "low" });
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

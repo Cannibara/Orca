@@ -7,7 +7,7 @@
 import { toRows, yearsSince2013, type Stock } from "../data/api";
 import type { Exits, ExitsRows, ExitStatus, PositionRow, Summary } from "../data/types";
 import { heldFlows, irr, missed, sinceSale, tradeMove, type Move } from "../lib/live";
-import { buildRows, withSortedTrades, type PosRow, type PriceSource, type Tag, type Timeline } from "./positions";
+import { buildRows, sharesAt, withSortedTrades, type PosRow, type PriceSource, type Tag, type Timeline } from "./positions";
 
 /** Rows drawn at first paint, and appended per idle chunk after it. */
 export const CHUNK = 150;
@@ -34,7 +34,7 @@ export type LastChange = {
   q: number;
   /** Change of the position's weight in the book over that quarter, percentage points; null when unpriced. */
   dw: number | null;
-  /** True when it is the Positions table's own figure (the newest quarter), false when estimated from the trade price. */
+  /** True when it is the Positions table's own figure (the newest quarter), false when estimated (see weightChangesAt). */
   exact: boolean;
 };
 
@@ -71,27 +71,54 @@ type ExitIn = { [K in keyof ExitsRows]: ExitsRows[K][number] };
 const TAG_OF: Record<Move, Tag> = { New: "new", Add: "add", Trim: "trim", Exit: "exit" };
 
 /**
- * Weight change over quarter `q` when the book's value at the quarter's end is known but the quarter-end
- * prices of the other positions are not (they would need every weekly series): the trade's price stands in
- * for the stock's quarter-end close and `end` is the fund's book at that quarter end. Same formula as the
- * Positions table's `dw` (after-weight less before-weight), percentage points.
+ * The Positions table's weight change (after-weight less before-weight, percentage points of the priced
+ * book) for the wanted stocks at the end of an earlier quarter, one entry per stock id -> its quarter.
+ * That table needs every position's close at the quarter end, i.e. every weekly series; here each
+ * position's last trade price up to the quarter stands in for its close (the table does the same for a
+ * stock with no weekly file), so the figure is an estimate that is close to the table's but not its digits.
+ * One pass over the positions per distinct quarter, which is cheap: the fund has at most ~60 quarters.
  */
-export function estimateWeightChange(sharesBefore: number, sharesAfter: number, px: number, end: number | undefined): number | null {
-  if (end === undefined || !(end > 0) || !(px > 0)) return null;
-  const after = Math.max(0, sharesAfter) * px;
-  const before = Math.max(0, sharesBefore) * px;
-  const wAfter = after / end;
-  const priorBook = end - after + before;
-  const wBefore = priorBook > 0 ? before / priorBook : 0;
-  return (wAfter - wBefore) * 100;
+export function weightChangesAt(positions: PositionRow[], wanted: ReadonlyMap<number, number>): Map<number, number | null> {
+  const byQ = new Map<number, Set<number>>();
+  for (const [id, q] of wanted) {
+    const ids = byQ.get(q);
+    if (ids) ids.add(id);
+    else byQ.set(q, new Set([id]));
+  }
+  const out = new Map<number, number | null>();
+  for (const [q, ids] of byQ) {
+    let vb = 0;
+    const mine: { id: number; a: number; b: number; px: number | null }[] = [];
+    for (const p of positions) {
+      let px: number | null = null;
+      for (const t of p.trades) {
+        if (t.q > q) break;
+        px = t.px;
+      }
+      const b = sharesAt(p.trades, q - 1);
+      if (px !== null) vb += b * px;
+      if (ids.has(p.stock_id)) mine.push({ id: p.stock_id, a: sharesAt(p.trades, q), b, px });
+    }
+    for (const { id, a, b, px } of mine) {
+      if (px === null) {
+        out.set(id, null);
+        continue;
+      }
+      const A = a * px;
+      const B = b * px;
+      const den = vb - B + A;
+      out.set(id, ((den > 0 ? A / den : 0) - (vb > 0 ? B / vb : 0)) * 100);
+    }
+  }
+  return out;
 }
 
 /** The fields of the page's data this model reads. */
 export type WhatIfInput = {
   positions: PositionRow[];
   exits: Exits;
-  /** period_q (the newest quarter), tracked_since_q, and the book at each quarter end. */
-  summary: Pick<Summary, "period_q" | "tracked_since_q" | "quarters">;
+  /** period_q (the newest quarter) and tracked_since_q: the timeline of the as-of model. */
+  summary: Pick<Summary, "period_q" | "tracked_since_q">;
   /** Latest close of every stock that has one. */
   prices: Map<number, number>;
   stocks: Map<number, Stock>;
@@ -166,7 +193,14 @@ export function buildSaleRows(input: WhatIfInput): SaleRow[] {
   const newest = new Map<number, PosRow>();
   if (tradedNow) for (const r of buildRows(positions, tl.latest, tl.latest, src, stocks)) if (wanted.has(r.id)) newest.set(r.id, r);
 
-  const bookAt = new Map(summary.quarters.q.map((q, i) => [q, summary.quarters.end[i]]));
+  // The weight change of a last trade in an earlier quarter: estimated (the newest quarter's is exact).
+  const older = new Map<number, number>();
+  for (const e of sales) {
+    const p = asOfNow.get(e.stock_id)?.pos;
+    const t = p && p.trades.length > 0 ? p.trades[p.trades.length - 1] : undefined;
+    if (t && t.q < tl.latest) older.set(e.stock_id, t.q);
+  }
+  const estimated = older.size > 0 ? weightChangesAt(positions, older) : new Map<number, number | null>();
 
   return sales.map((e): SaleRow => {
     const stock = stocks.get(e.stock_id);
@@ -182,8 +216,7 @@ export function buildSaleRows(input: WhatIfInput): SaleRow[] {
       if (exact && exact.tag && t.q === tl.latest) {
         last = { tag: exact.tag, q: t.q, dw: exact.dw, exact: true };
       } else {
-        const dw = estimateWeightChange(t.sharesAfter - t.delta, t.sharesAfter, t.px, bookAt.get(t.q));
-        last = { tag: TAG_OF[tradeMove(t)], q: t.q, dw, exact: false };
+        last = { tag: TAG_OF[tradeMove(t)], q: t.q, dw: estimated.get(e.stock_id) ?? null, exact: false };
       }
     }
 

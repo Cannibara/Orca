@@ -1,11 +1,11 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { priceMap, stockMap, yearsSince2013 } from "../src/data/api";
-import type { Exits, LatestPrices, Positions, Securities, Summary } from "../src/data/types";
+import type { Exits, LatestPrices, Positions, Securities, Summary, Weekly } from "../src/data/types";
 import { heldFlows, irr, missed, positionFlows, positionRows, returnPct, sinceSale } from "../src/lib/live";
 import { buildRows, type PriceSource, type Timeline } from "../src/fund/positions";
-import { buildSaleRows, estimateWeightChange, sortSales, tileFigures, type SaleKey, type SaleRow } from "../src/fund/whatif";
+import { buildSaleRows, sortSales, tileFigures, weightChangesAt, type LastChange, type SaleKey, type SaleRow } from "../src/fund/whatif";
 import { ASOF, NEWEST, exitsOf, pos, pricesOf, sold, stocksTo, summaryOf, trade } from "./fund-whatif-fixtures";
 
 // The pure model of the What-if panel (src/fund/whatif.ts). The panel is tested in fund-whatif-ui.test.tsx.
@@ -153,24 +153,23 @@ describe("last change", () => {
     expect(rows[0].last?.dw).toBeCloseTo((4000 / 5000 - 6000 / 7000) * 100, 9);
   });
 
-  it("estimates an older quarter from the trade price and the book at that quarter's end", () => {
-    // Q2 2025 (q 49): 100 of 100 shares sold at $20 out of a $1bn book
-    const rows = build({ positions: [sold(1, 1000)], exits: ex([1]), prices: pricesOf({ 1: 40 }), summary: summaryOf() });
+  it("estimates an older quarter the Positions table's way, with the last trade prices standing in for the closes", () => {
+    // Q2 2025 (q 49): S1 sells its 100 shares at $20; S2 (300 shares, last traded at $10) stays. Book before: 2,000 + 3,000.
+    const p1 = sold(1, 1000);
+    const p2 = pos(2, { trades: [trade(10, 300, 10, 300)] });
+    const rows = build({ positions: [p1, p2], exits: ex([1]), prices: pricesOf({ 1: 40, 2: 10 }) });
     const last = rows[0].last;
     expect(last?.exact).toBe(false);
-    // after 0, before 2,000 of a book that was 1e9 - 0 + 2,000 before the sale
-    expect(last?.dw).toBeCloseTo(-(2000 / (1e9 + 2000)) * 100, 9);
-    expect(estimateWeightChange(100, 0, 20, 1e9)).toBeCloseTo(last?.dw as number, 12);
+    expect(last?.dw).toBeCloseTo(-(2000 / 5000) * 100, 9);
+    // the table's own formula at that quarter, priced from trades (what it does for a stock with no weekly file)
+    const tl: Timeline = { qmin: 0, latest: NEWEST, asof: ASOF };
+    const table = buildRows([p1, p2], 49, 49, { tl, prices: pricesOf({ 1: 40, 2: 10 }), weekly: new Map() }, stocksTo(20)).find((r) => r.id === 1);
+    expect(last?.dw).toBeCloseTo(table?.dw as number, 9);
+    expect(weightChangesAt([p1, p2], new Map([[1, 49]])).get(1)).toBeCloseTo(table?.dw as number, 9);
   });
 
-  it("has no weight change without a book or a price to size it against", () => {
-    expect(estimateWeightChange(100, 0, 20, undefined)).toBeNull();
-    expect(estimateWeightChange(100, 0, 20, 0)).toBeNull();
-    expect(estimateWeightChange(100, 0, 0, 1e9)).toBeNull();
-    const s = summaryOf();
-    s.quarters.q = s.quarters.q.filter((q) => q !== 49);
-    s.quarters.end = s.quarters.end.slice(1);
-    expect(build({ positions: [sold(1, 1000)], exits: ex([1]), summary: s })[0].last?.dw).toBeNull();
+  it("has no weight change for a stock that was never priced by then", () => {
+    expect(weightChangesAt([pos(1, { trades: [trade(10, 100, 10, 100)] })], new Map([[1, 5]])).get(1)).toBeNull();
   });
 
   it("sorts on the weight change, the unknown last", () => {
@@ -218,12 +217,24 @@ describe("the demo fund", () => {
     expect(JSON.stringify(rows.map((r) => [r.ac, r.px, r.ax, r.ret]))).not.toMatch(/NaN|Infinity/);
   });
 
-  it("estimates the weight change of older quarters to within a tenth of a point of the Positions table's", () => {
-    // The table at quarter q would need every position's weekly series; the demo keeps the files, so test the estimate here.
-    // The check is the size of the estimate: a position is a small share of the book.
+  it("estimates an older quarter's weight change to within 1.5 points of the Positions table's, which reads every weekly series", () => {
+    const weekly = new Map<number, Weekly | null>();
+    for (const p of positions) {
+      const file = join(DEMO, `stock/${p.stock_id}/weekly.json`);
+      weekly.set(p.stock_id, existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Weekly) : null);
+    }
+    const tl: Timeline = { qmin: summary.tracked_since_q, latest: summary.period_q, asof: latest.asof };
     const olds = rows.filter((r) => r.last && !r.last.exact);
-    expect(olds.length).toBeGreaterThan(0);
-    for (const r of olds) expect(Math.abs(r.last?.dw as number)).toBeLessThan(25);
+    expect(olds.length).toBeGreaterThan(5);
+    let worst = 0;
+    for (const r of olds) {
+      const q = (r.last as LastChange).q;
+      const table = buildRows(positions, q, q, { tl, prices, weekly }, stocks).find((x) => x.id === r.id);
+      const gap = Math.abs((r.last?.dw as number) - (table?.dw as number));
+      worst = Math.max(worst, gap);
+      expect(table?.tag, `${r.ticker} q${q}`).toBe(r.last?.tag);
+    }
+    expect(worst).toBeLessThan(1.5);
   });
 
   it("takes the exact weight change for a stock traded in the newest quarter", () => {

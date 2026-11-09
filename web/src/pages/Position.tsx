@@ -19,7 +19,7 @@ import {
 } from "../data/api";
 import type { PositionRow, Summary, Trade, Weekly } from "../data/types";
 import { fMm, qShort } from "../fund/fmt";
-import { DASH, fmtDate, money, pct, printsZero, px, qLabel, sgn, shareCount, signClass } from "../lib/format";
+import { DASH, fmtDate, money, pct, printsZero, px, qLabel, sgn, shareCount, signClass, tidyName } from "../lib/format";
 import { irr, positionFlows, positionRows, returnPct, totalPnl, tradeMove, type Move } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
@@ -166,7 +166,7 @@ function Header({ data }: { data: PositionData }) {
       </Link>
       <h1>
         <span className="mono">{security?.ticker ?? `#${p.stock_id}`}</span>
-        {security && ` · ${security.name}`}
+        {security && ` · ${tidyName(security.name)}`}
       </h1>
       <div className="pos-meta">
         <span className="pill">
