@@ -97,8 +97,7 @@ describe("the two-priority queue", () => {
     await l.finish(1);
     expect(l.started()).toEqual([1, 2, 3]);
     await l.finish(2);
-    expect(l.started()).toEqual([1, 2, 3, 4]); // the demand line is empty now ...
-    expect(l.started("background")).toEqual([50]); // ... and the background plan begins, one at a time
+    expect(l.started()).toEqual([1, 2, 3, 4, 50]); // the demand line is empty now: the background plan begins, one at a time
     await l.finish(50);
     expect(l.started()).toEqual([1, 2, 3, 4, 50, 51]);
   });

@@ -532,13 +532,10 @@ describe("background prefetch of every position's weekly file", () => {
 
   /** Weekly loads that stay in flight until the test lets them go. */
   function held() {
-    const open = new Map<number, () => void>();
-    weeklyMock.mockImplementation((id: number) => new Promise<Weekly>((ok) => open.set(id, () => ok(flat(id)))));
+    const open: { id: number; go: () => void }[] = [];
+    weeklyMock.mockImplementation((id: number) => new Promise<Weekly>((ok) => open.push({ id, go: () => ok(flat(id)) })));
     const release = async (n = Infinity) => {
-      for (const [id, go] of [...open].slice(0, n)) {
-        open.delete(id);
-        go();
-      }
+      open.splice(0, n).forEach((o) => o.go());
       await flush();
     };
     return { open, release };
@@ -560,10 +557,10 @@ describe("background prefetch of every position's weekly file", () => {
     expect(calledIds()).toEqual(plan.slice(0, 3));
     expect(plan.slice(0, 9).every((id) => positions.find((p) => p.stock_id === id)!.shares_now > 0)).toBe(true); // the 9 held now come first
     for (const c of weeklyMock.mock.calls) expect(c[1]).toEqual({ priority: "low" });
-    expect(open.size).toBe(3);
+    expect(open).toHaveLength(3);
     for (let i = 0; i < 30 && calledIds().length < plan.length; i++) {
       await release();
-      expect(open.size).toBeLessThanOrEqual(3);
+      expect(open.length).toBeLessThanOrEqual(3);
     }
     expect(calledIds()).toEqual(plan);
   });
@@ -594,7 +591,7 @@ describe("background prefetch of every position's weekly file", () => {
     await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
     await release();
     expect(calledIds()).toHaveLength(3); // nothing new while hidden
-    expect(open.size).toBe(0);
+    expect(open).toHaveLength(0);
     hidden = false;
     await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
     expect(calledIds()).toEqual(plan.slice(0, 6));
@@ -616,7 +613,7 @@ describe("background prefetch of every position's weekly file", () => {
     await release();
     await flush();
     expect(calledIds()).toHaveLength(calls);
-    expect(open.size).toBe(0);
+    expect(open).toHaveLength(0);
     expect(err).not.toHaveBeenCalled();
   });
 
@@ -630,7 +627,7 @@ describe("background prefetch of every position's weekly file", () => {
   });
 
   test("a new fund (the panel is keyed by it) starts a plan of its own and drops the old one", async () => {
-    const { open } = held();
+    const { release } = held();
     const props = { summary, positions, prices, stocks, asof: latest.asof };
     const view = render(
       <MemoryRouter>
@@ -638,16 +635,17 @@ describe("background prefetch of every position's weekly file", () => {
       </MemoryRouter>,
     );
     await flushIdle();
-    expect(calledIds()).toHaveLength(3);
+    expect(calledIds()).toEqual(plan.slice(0, 3));
     view.rerender(
       <MemoryRouter>
         <PositionsPanel fundId={9100003} {...props} />
       </MemoryRouter>,
     );
+    expect(idle.pending.size).toBeGreaterThan(0); // the new panel waits for idle
     await flushIdle();
-    // the old plan stopped (its three loads finish, nothing more of it starts); the new panel begins at the top again
-    expect(calledIds()).toEqual([...plan.slice(0, 3), ...plan.slice(0, 3)].filter((id, i) => i < 3 || !open.has(id) || true));
-    expect(weeklyMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(calledIds()).toEqual([...plan.slice(0, 3), ...plan.slice(0, 3)]); // it begins at the top again
+    await release(); // everything in flight lands: the old panel starts nothing more, the new one carries on
+    expect(calledIds()).toEqual([...plan.slice(0, 3), ...plan.slice(0, 3), ...plan.slice(3, 6)]);
   });
 
   test("stepping back after the prefetch has finished makes no new requests and never shows 'Loading prices…'", async () => {
@@ -702,15 +700,16 @@ describe("background prefetch of every position's weekly file", () => {
     const ids = calledIds();
     expect(new Set(ids).size).toBe(ids.length);
     const demandCalls = weeklyMock.mock.calls.filter((c) => c.length === 1).map((c) => c[0]);
-    expect(demandCalls.length).toBe(8);
+    expect(demandCalls.length).toBe(5); // 8 demand loads in flight: the 3 promoted ones and 5 new
     expect(demandCalls.every((id) => need.includes(id))).toBe(true);
-    expect(weeklyMock.mock.calls.filter((c) => c.length === 2)).toHaveLength(3); // no new background load: the three slots are taken
+    expect(underWay.every((id) => need.includes(id))).toBe(true);
+    expect(weeklyMock.mock.calls.filter((c) => c.length === 2)).toHaveLength(3); // no new background load while demand waits
     // some arrive: the count follows (it updates a few times a second, and at once at the end)
     await release(6);
     await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Loading prices… [1-9]\d* of /));
     for (let i = 0; i < 40 && screen.queryByRole("status"); i++) await release();
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
-    expect(open.size).toBeLessThanOrEqual(3);
+    expect(open.length).toBeLessThanOrEqual(3);
     expect(rowsOf().length).toBeGreaterThan(0);
   });
 
