@@ -73,8 +73,8 @@ Write down any change you make to these here.
 3. **R2 > the public bucket > Settings > Custom domains**: `data.orcaetf.com`. The public `r2.dev`
    address can be switched off once everything uses the custom domain (it has no cache).
 4. **Cache rule for `data.orcaetf.com`** (Caching > Cache Rules): host equals `data.orcaetf.com`;
-   eligible for cache; Edge TTL 30 days (ignore the origin's setting); Browser TTL 1 hour (override).
-   The Pipeline clears the 30 days after each upload, which is why it is safe.
+   eligible for cache; Edge TTL 1 month (ignore the origin's setting); Browser TTL 2 hours (override).
+   The Pipeline clears the month after each upload, which is why it is safe.
 5. **DNS > Settings > DNSSEC**: on. If the domain is registered elsewhere, add the DS record Cloudflare
    shows at the registrar.
 6. **SSL/TLS > Overview**: encryption mode **Full (strict)**. **SSL/TLS > Edge Certificates**: **Always Use
@@ -86,11 +86,12 @@ Write down any change you make to these here.
    site's own scripts, so Cloudflare's injected analytics script would be blocked (and show an error in
    the browser console).
 
-9. **Response header rule for the data site** (Rules > Transform Rules > Modify Response Header > Create
-   rule): if host equals `data.orcaetf.com`, **Set static** header `Access-Control-Allow-Origin` = `*`. The
-   data is public anyway, and this stops a cached copy that was first fetched without an `Origin` header
-   from reaching a browser without its CORS header (Cloudflare caches R2 answers, and R2 adds that header
-   only when the request carries an `Origin`). The bucket's own CORS policy (Site CORS workflow) can stay.
+9. **Response header rule for the data site (optional, not needed today)**: R2 answers with `Vary: Origin`, and
+   Cloudflare keeps a separate cached copy per site address (checked 9 Nov 2026 with `curl -H 'Origin: ...'`
+   for the www, bare and pages.dev addresses: each got its own `Access-Control-Allow-Origin` and a cache HIT).
+   If a browser console ever shows CORS errors while the data file opens fine, add Rules > Transform Rules >
+   Modify Response Header: if host equals `data.orcaetf.com`, **Set static** `Access-Control-Allow-Origin` = `*`
+   (the data is public anyway).
 
 ## Order for the move (first time)
 
