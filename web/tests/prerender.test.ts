@@ -146,9 +146,168 @@ describe("prerender: fund pages from demo data", () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
     expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
-    expect(readdirSync(dist).sort()).toEqual(["fund", "index.html"]);
+    expect(readdirSync(dist).sort()).toEqual(["_headers", "fund", "index.html"]);
     expect(existsSync(join(dist, "404.html"))).toBe(false);
     expect(existsSync(join(dist, "_redirects"))).toBe(false);
+  });
+});
+
+/** The default policy's text: what the app needs when its data comes from the site itself. */
+const csp = (connect: string) =>
+  `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`;
+
+const headersText = (connect: string) => `/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: ${csp(connect)}
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+`;
+
+/** A _headers file as {path pattern: {header name: value}}, the way Cloudflare Pages reads it. */
+function parseHeaders(text: string): Record<string, Record<string, string>> {
+  const rules: Record<string, Record<string, string>> = {};
+  let current: Record<string, string> | undefined;
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    if (!/^\s/.test(line)) {
+      current = rules[line.trim()] = {};
+    } else {
+      const colon = line.indexOf(":");
+      current![line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+    }
+  }
+  return rules;
+}
+
+const generated = (dist: string) => read(join(dist, "_headers"));
+
+describe("prerender: dist/_headers", () => {
+  it("with the default data URL: the security headers, a CSP that allows only the site itself, the assets cache", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    expect(r.code).toBe(0);
+    expect(generated(dist)).toBe(headersText("'self'"));
+  });
+
+  it("an absolute https data URL adds exactly its origin to connect-src, whatever follows the host", async () => {
+    for (const value of ["https://data.orcaetf.com", "https://data.orcaetf.com/", "HTTPS://Data.OrcaETF.com/site/v1/"]) {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: value });
+      expect(r.code, value).toBe(0);
+      expect(generated(dist), value).toBe(headersText("'self' https://data.orcaetf.com"));
+    }
+  });
+
+  it("keeps a port, drops a default port, and accepts http (a local data server)", async () => {
+    const cases: [string, string][] = [
+      ["http://127.0.0.1:8788", "http://127.0.0.1:8788"],
+      ["https://data.example.com:8443/x", "https://data.example.com:8443"],
+      ["https://data.example.com:443", "https://data.example.com"],
+      ["http://localhost:4000/", "http://localhost:4000"],
+      ["http://[::1]:9000", "http://[::1]:9000"],
+    ];
+    for (const [value, origin] of cases) {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: value });
+      expect(r.code, value).toBe(0);
+      expect(generated(dist), value).toBe(headersText(`'self' ${origin}`));
+    }
+  });
+
+  it("a path on the site (VITE_DATA_URL=/data/) adds nothing to connect-src", async () => {
+    const dist = makeDist();
+    mkdirSync(join(dist, "data"));
+    copyFileSync(DEMO_FUNDS, join(dist, "data", "funds.json"));
+    const r = await run(dist, { VITE_DATA_URL: "/data/" });
+    expect(r.code).toBe(0);
+    expect(generated(dist)).toBe(headersText("'self'"));
+  });
+
+  it("is also written when no fund page is (PRERENDER_MAX=0), and reported on stdout", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, PRERENDER_MAX: "0", VITE_DATA_URL: "https://data.orcaetf.com" });
+    expect(r.code).toBe(0);
+    expect(existsSync(join(dist, "_headers"))).toBe(true);
+    expect(r.stdout).toContain("prerender: wrote _headers (data origin: https://data.orcaetf.com)");
+  });
+
+  it("parses as two rules: /* with four headers, /assets/* with the immutable cache and nothing else", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com" });
+    const rules = parseHeaders(generated(dist));
+    expect(Object.keys(rules)).toEqual(["/*", "/assets/*"]);
+    expect(Object.keys(rules["/*"]).sort()).toEqual([
+      "Content-Security-Policy",
+      "Permissions-Policy",
+      "Referrer-Policy",
+      "X-Content-Type-Options",
+    ]);
+    expect(rules["/*"]["X-Content-Type-Options"]).toBe("nosniff");
+    expect(rules["/*"]["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    expect(rules["/*"]["Permissions-Policy"]).toBe("camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+    // content-hashed files never change: cache them for a year, and only them (the pages revalidate)
+    expect(rules["/assets/*"]).toEqual({ "Cache-Control": "public, max-age=31536000, immutable" });
+  });
+
+  it("the CSP has no unsafe-inline, unsafe-eval or wildcard, and every directive appears once", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com" });
+    const policy = parseHeaders(generated(dist))["/*"]["Content-Security-Policy"];
+    expect(policy).not.toMatch(/unsafe-|\*|blob:|http:\/\/\*|https:(?!\/\/)/);
+    const names = policy.split(";").map((d) => d.trim().split(" ")[0]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names.sort()).toEqual(
+      ["base-uri", "connect-src", "default-src", "font-src", "form-action", "frame-ancestors", "img-src", "object-src", "script-src", "style-src"],
+    );
+    expect(policy).toContain("connect-src 'self' https://data.orcaetf.com;");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("object-src 'none'");
+  });
+
+  it("stays within Cloudflare's limits: lines of at most 2,000 characters, no carriage returns, a final newline", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: `https://${"a".repeat(60)}.example.com` });
+    const text = generated(dist);
+    expect(text.endsWith("\n")).toBe(true);
+    expect(text).not.toContain("\r");
+    for (const line of text.split("\n")) expect(line.length).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe("prerender: a malformed VITE_DATA_URL never reaches a header", () => {
+  const malicious: [string, string][] = [
+    ["a second directive after a semicolon", "https://data.orcaetf.com; script-src *"],
+    ["a line break and a header", "https://data.orcaetf.com\nX-Evil: 1"],
+    ["a carriage return and a rule", "https://data.orcaetf.com\r\n/evil\n  Set-Cookie: a=b"],
+    ["a second origin after a space", "https://data.orcaetf.com https://evil.example"],
+    ["trailing white space", "https://data.orcaetf.com "],
+    ["a comma", "https://data.orcaetf.com,https://evil.example"],
+    ["a semicolon in the host", "https://a;b.example"],
+    ["quotes", "https://data.orcaetf.com/'unsafe-inline'"],
+    ["a backslash", "https://data.orcaetf.com\\evil.example"],
+    ["a script URL", "javascript:alert(1)"],
+    ["a data URL", "data:text/html,x"],
+    ["another scheme", "ftp://data.orcaetf.com"],
+    ["a protocol-relative address", "//evil.example/data"],
+    ["no scheme", "data.orcaetf.com"],
+    ["a relative path", "demo-data"],
+    ["a user name and password", "https://user:secret@data.orcaetf.com"],
+    ["an underscore in the host", "https://a_b.example"],
+    ["no host", "https://"],
+    ["a whole CSP", "'self' https://evil.example; default-src *"],
+  ];
+
+  it.each(malicious)("stops the build and writes no _headers: %s", async (_why, value) => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: value });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^prerender: VITE_DATA_URL ".*" is not usable: /s);
+    expect(r.stderr).toContain("https://data.orcaetf.com");
+    expect(r.stdout).toBe("");
+    expect(existsSync(join(dist, "_headers"))).toBe(false);
+    expect(pageDirs(dist)).toEqual([]);
   });
 });
 

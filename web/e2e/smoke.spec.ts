@@ -24,8 +24,9 @@ const routes = [
 ];
 const widths = [1280, 400];
 
-// The shell links Google Fonts. Answer those requests here so the run needs no network (the
-// fallback fonts are used) and a font outage cannot fail a build.
+// The fonts are the site's own files (src/fonts.css), so nothing asks Google for them any more. This
+// stub is a leftover safety net: should a font request to Google ever come back, it is answered here
+// (the run needs no network) and the "fonts are the site's own" test below fails on it.
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
@@ -107,6 +108,31 @@ test("the title follows the route when navigating inside the app", async ({ page
   await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "How it works" }).click();
   await expect(page.locator("h1")).toHaveText(/How Orca estimates/);
   await expect(page).toHaveTitle("How it works · Orca");
+});
+
+// Instrument Sans and Geist Mono are variable fonts served from the site (hashed files under
+// /assets/). A page asks no other host for anything, and the faces it uses are loaded, not the
+// fallbacks.
+test("the fonts are the site's own: nothing is requested from another host, and both faces load", async ({ page }) => {
+  const hosts = new Set<string>();
+  const fonts: string[] = [];
+  page.on("request", (req) => {
+    const url = new URL(req.url());
+    if (url.protocol !== "data:") hosts.add(url.host);
+    if (req.resourceType() === "font") fonts.push(url.pathname);
+  });
+  await open(page, `/fund/${fundId}`);
+  await page.evaluate(() => document.fonts.ready);
+  const loaded = await page.evaluate(() =>
+    [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family.replace(/["']/g, "")),
+  );
+  expect([...hosts]).toEqual([new URL(page.url()).host]);
+  expect(loaded).toContain("Instrument Sans");
+  expect(loaded).toContain("Geist Mono");
+  expect(fonts.length).toBeGreaterThan(0);
+  for (const file of fonts) expect(file).toMatch(/^\/assets\/(instrument-sans|geist-mono)-latin(-ext)?-wght-normal-[\w-]+\.woff2$/);
+  // the preload in the page head is for the file the stylesheet uses: one request, not two
+  expect(fonts.filter((f) => f.includes("instrument-sans-latin-wght"))).toHaveLength(1);
 });
 
 test("the page follows the colour scheme", async ({ page, colorScheme }) => {
