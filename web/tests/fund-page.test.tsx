@@ -386,9 +386,9 @@ describe("Fund page", () => {
       const held = column(within(region("Positions")).getByRole("table", { name: "Positions" }), "Price");
       expect(held).toHaveLength(10);
       expect(held.every((p) => p === "$1")).toBe(true);
-      const sales = column(within(region("What if they'd kept it")).getByRole("table", { name: "Sold or trimmed stocks" }), "Current price");
+      const sales = column(within(region("What if they'd kept it")).getByRole("table", { name: "Sold or trimmed stocks" }), "Price");
       expect(sales).toHaveLength(22);
-      expect(sales.every((p) => p === "$1.00")).toBe(true);
+      expect(sales.every((p) => p === "$1")).toBe(true);
       const positions = positionRows(demo<Positions>(`fund/${FUND}/positions.json`));
       const prices = new Map(lp.stock_id.map((id) => [id, 1] as [number, number]));
       const share = profitablePct(positions, prices) as number;
