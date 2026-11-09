@@ -13,10 +13,10 @@ export const DEFAULT_DATA_URL = "/demo-data";
 
 // scheme://host[:port], nothing else: letters, digits, dots and hyphens in the host (a name, an
 // IPv4 address, or an IPv6 address in brackets), as the URL parser prints it.
-const ORIGIN = /^https?:\/\/(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:]+\])(?::\d{1,5})?$/;
+export const ORIGIN = /^https?:\/\/(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:]+\])(?::\d{1,5})?$/;
 // Anything in a value that has no business in an address, or that a header, a CSP list or a shell
 // would treat as structure: white space, control characters, ; , quotes, angle brackets, \ and `.
-const FORBIDDEN = /[\s\u0000-\u001f\u007f;,"'<>\\`]/;
+export const FORBIDDEN = /[\s\u0000-\u001f\u007f;,"'<>\\`]/;
 
 const HELP = "Set it to the data site's address, like https://data.orcaetf.com, or to a path on the site, like /demo-data.";
 
