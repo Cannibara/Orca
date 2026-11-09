@@ -2,34 +2,67 @@
 // more they add by themselves once the page is idle, and how many a click adds. One module, so both
 // tables behave the same and the numbers live in one place.
 //
-// The rule: a visitor lands, sees what they normally look for (the biggest holdings, as many as a few
-// screens), and gets the details later. Nothing is added after first paint unless it is cheap, and
-// whatever is left is one click away. A fund with fewer rows than AUTO_FILL_MAX behaves as if every row
-// fills in by itself.
+// The rule: a visitor lands, sees what they normally look for (the biggest holdings, a few screens of
+// them), and gets the details later. Nothing is added after first paint unless it is cheap, and whatever is
+// left is one click away. A table with no more rows than AUTO_FILL_MAX fills in completely by itself and
+// never shows a button.
 //
-// WHERE THE NUMBERS COME FROM (Chromium, production build, synthetic funds of 3,000 positions served with
-// 8 ms latency; 4x is CDP CPU throttling, a mid-range phone; the table is a plain <table> with 13 or 14
-// columns and fixed 38px rows, and the browser's layout and paint of the whole table grow with the number of
-// rows in it, so what one added chunk costs depends on how many rows are already there):
+// WHERE THE NUMBERS COME FROM. Chromium, production build, a synthetic fund of 3,000 positions (1,600 sales)
+// served with 8 ms latency; "4x" is CDP CPU throttling, a mid-range phone. Both tables of the page grow
+// at once. The table is a plain <table>: React's work for a chunk is small and time-sliced (see below), but
+// the browser's layout, paint and layerize of the page after each commit grow with the number of rows in
+// the table, so what one added chunk costs depends on how many rows are already there. A "task" below is
+// the longest single main-thread task a chunk causes (the rendering task after its commit).
 //
-//   TABLE_MEASUREMENTS_PLACEHOLDER
+//   INITIAL_ROWS  first paint (navigation start to the table painted), median of 7, positions + sales table
+//                  rows in first paint    10     30     50     100    150
+//                  1x                    350    389    386    437    544   ms
+//                  4x                   1202   1273   1391   1781   2080   ms
+//                50 is the knee: 3+ screens of the table (15 rows are visible at its 620px height), 160 ms (1x) and
+//                690 ms (4x) faster than the old 150, and only 120 ms (4x) slower than 30. The top 50 holdings are
+//                about half the book of a large fund (Zipf-shaped funds of 1,000-3,000 positions: 42-69%); every
+//                fund of 50 positions or fewer, which is nearly all of them (the demo funds hold 7-18), is complete.
+//   AUTO_FILL_MAX, CHUNK  task per added chunk, median / worst of 3 runs, by rows already in the table
+//                  rows in table      51-100     101-200    201-300    301-400
+//                  1x, chunk 25       32 / 47    34 / 51    33 / 59    47 / 95   ms
+//                  1x, chunk 50       36 / 47    38 / 49    40 / 54    47 / 67   ms
+//                  1x, chunk 100        -        53 / 60    71 / 79    71 / 94   ms
+//                  4x, chunk 25       85 / 141  101 / 140  124 / 179  134 / 252  ms
+//                  4x, chunk 50      122 / 128  137 / 211  140 / 220  230 / 255  ms
+//                  4x, chunk 100        -       210 / 229  248 / 314  218 / 234  ms
+//                On a desktop every chunk of 25 stays at the 50 ms long-task line up to about 200-300 rows and
+//                breaks it beyond; bigger chunks break it sooner. The rendering floor of this page is 35-50 ms
+//                at 4x with almost no rows, so no cap meets 50 ms there: 200 rows keep a phone's worst task
+//                near 140 ms (chunk 25), 300 rows near 180. Small chunks win at every size: the task a chunk causes
+//                grows with the chunk (25 to 100 rows doubles it at 1x and nearly triples it at 4x).
+//   MORE_STEP     one click, rows appended at once, to a table of 200 (React renders it as a transition, so the
+//                  click itself returns at once and input stays live; what remains is the browser's layout)
+//                  rows added                100       250       500
+//                  1x, longest task       40-57 ms  115-122 ms     -
+//                  4x, longest task      181-386 ms 405-454 ms     -
+//                100 keeps a click inside the 50 ms line on a desktop; 250 doubles it.
+//   Time-sliced rendering also replaces the old "halve the chunk when it is slow" rule: with a transition the
+//   chunk's own commit is a few ms (2-10 ms at 4x), so there is nothing left for halving to save.
+//
+// The weekly price files are another matter and are not capped by these numbers: stepping back to an earlier
+// quarter needs the price of EVERY position of the fund, because every weight is a share of the whole book,
+// whether or not its row is on screen. See usePositionData.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { whenIdle } from "./prefetch";
 
 /** Rows in the first paint. */
 export const INITIAL_ROWS = 50;
-/** Rows the table adds by itself after landing, in total (including the first paint); the rest wait for a click. */
-export const AUTO_FILL_MAX = 400;
+/** Rows the table has after the automatic fill (the first paint included); the rest wait for a click. */
+export const AUTO_FILL_MAX = 200;
 /** Rows added by each idle step of the automatic fill. */
-export const CHUNK = 50;
+export const CHUNK = 25;
 /** Rows a click on "Show more" adds, at once. */
-export const MORE_STEP = 250;
+export const MORE_STEP = 100;
 
-/** A chunk that takes longer than this to commit halves the next one (a slow device); one under FAST_MS lets it grow back. */
-const SLOW_MS = 40;
-const FAST_MS = 15;
-const MIN_CHUNK = 10;
+/** How many tables are still adding rows by themselves: the price prefetch waits for this to reach zero (see usePositionData). */
+let fills = 0;
+export const rowsAreFilling = (): boolean => fills > 0;
 
 export type RowBudget = {
   /** How many of the sorted rows to draw now. */
@@ -55,32 +88,30 @@ export function useRowBudget(total: number, restartKey: unknown): RowBudget {
   const limit = Math.min(total, n);
   const target = Math.min(total, AUTO_FILL_MAX);
 
-  // How big the next idle chunk is: CHUNK, less on a device that drew the last one slowly.
-  const pace = useRef({ size: CHUNK, from: 0, rows: 0 });
+  const filling = Math.max(0, target - limit);
+  useEffect(() => {
+    if (!filling) return;
+    fills++;
+    return () => void fills--;
+  }, [filling > 0]); // only the start and the end of a fill matter
+
   useEffect(() => {
     if (limit >= target) return;
     return whenIdle(
-      () => {
-        pace.current.from = performance.now();
-        pace.current.rows = pace.current.size;
-        setGrown((g) => ({ key: restartKey, n: Math.min(target, (g.key === restartKey ? g.n : INITIAL_ROWS) + pace.current.size) }));
-      },
+      () =>
+        // a transition: React draws the chunk in slices that give way to input, and commits it in one go
+        startTransition(() =>
+          setGrown((g) => ({ key: restartKey, n: Math.min(target, (g.key === restartKey ? g.n : INITIAL_ROWS) + CHUNK) })),
+        ),
       { timeout: 1000, fallback: 16 },
     );
   }, [limit, target, restartKey]);
-  useLayoutEffect(() => {
-    const p = pace.current;
-    if (p.from === 0) return;
-    const ms = performance.now() - p.from; // React's render and commit of the chunk
-    p.from = 0;
-    p.size = ms > SLOW_MS ? Math.max(MIN_CHUNK, Math.floor(p.rows / 2)) : ms < FAST_MS ? Math.min(CHUNK, p.rows * 2) : p.rows;
-  }, [limit]);
 
   const more = useCallback(
-    () => setGrown((g) => ({ key: restartKey, n: (g.key === restartKey ? g.n : INITIAL_ROWS) + MORE_STEP })),
+    () => startTransition(() => setGrown((g) => ({ key: restartKey, n: (g.key === restartKey ? g.n : INITIAL_ROWS) + MORE_STEP }))),
     [restartKey],
   );
-  return { limit, filling: Math.max(0, target - limit), left: total - Math.max(limit, target), more };
+  return { limit, filling, left: total - Math.max(limit, target), more };
 }
 
 /** The "Show more" button's words: "Show 250 more · 1,420 left"; just "Show 120 more" when that is all there is. */

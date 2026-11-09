@@ -10,7 +10,9 @@ import { PeriodPicker } from "../src/fund/PeriodPicker";
 import { PositionsPanel } from "../src/fund/PositionsPanel";
 import { PositionsTable } from "../src/fund/PositionsTable";
 import { defaultPeriod, neededStocks, prefetchOrder, withSortedTrades, type PeriodState, type PosRow, type Timeline } from "../src/fund/positions";
+import { AUTO_FILL_MAX, CHUNK, INITIAL_ROWS, MORE_STEP, rowsAreFilling } from "../src/fund/loading";
 import { createWeeklyStore, useWeeklyPrices } from "../src/fund/usePositionData";
+import { installIdle } from "./idle";
 
 vi.mock("../src/data/api", async (importOriginal) => {
   const real = await importOriginal<typeof import("../src/data/api")>();
@@ -41,23 +43,11 @@ beforeAll(() => {
 });
 
 /** requestIdleCallback the tests drive by hand: nothing runs "when the browser is idle" until flushIdle says so. */
-const idle = { next: 1, pending: new Map<number, () => void>() };
-/** Runs the idle callbacks registered so far (those they register in turn wait for the next flush). */
-const flushIdle = () =>
-  act(async () => {
-    const run = [...idle.pending.values()];
-    idle.pending.clear();
-    run.forEach((cb) => cb());
-  });
+let idle: ReturnType<typeof installIdle>;
+const flushIdle = () => idle.flush();
 
 beforeEach(() => {
-  idle.pending.clear();
-  vi.stubGlobal("requestIdleCallback", (cb: () => void) => {
-    const id = idle.next++;
-    idle.pending.set(id, cb);
-    return id;
-  });
-  vi.stubGlobal("cancelIdleCallback", (id: number) => idle.pending.delete(id));
+  idle = installIdle({ fastClock: false });
   // The segmented control places its thumb in an animation frame; run it at once, inside the render's act.
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     cb(0);
@@ -379,123 +369,169 @@ describe("a fund with thousands of positions", () => {
       irr: () => null,
     };
   };
-  const rows = Array.from({ length: 400 }, (_, i) => mk(i + 1));
-  // jsdom draws rows far slower than a browser: give the pacing a fast clock, so chunks stay 150 unless a test says otherwise
+  // The cap, one "Show more" step and a remainder of 40: the table has to be told apart at every stage.
+  const TOTAL = AUTO_FILL_MAX + MORE_STEP + 40;
+  const rows = Array.from({ length: TOTAL }, (_, i) => mk(i + 1));
+  // jsdom draws rows far slower than a browser: give the pacing a fast clock, so chunks stay CHUNK unless a test says otherwise
   beforeEach(() => void vi.spyOn(performance, "now").mockReturnValue(1000));
   afterEach(() => void vi.restoreAllMocks());
 
-  test("draws 150 rows, then more on request; sorting always covers all rows", () => {
-    render(
-      <MemoryRouter>
-        <PositionsTable fundId={1} rows={rows} pending={false} failed={0} mode="quarter" latest={new Map()} />
-      </MemoryRouter>,
-    );
-    expect(rowsOf()).toHaveLength(150);
-    expect(screen.getByText("150 of 400 positions shown")).toBeInTheDocument();
-    // default sort is Weight descending (value order): T0400 first even though it is the last row of the input
-    expect(tickers()[0]).toBe("T0400");
-    fireEvent.click(screen.getByRole("button", { name: "Stock" }));
-    expect(tickers()[0]).toBe("T0001");
-    fireEvent.click(screen.getByRole("button", { name: "Show 150 more" }));
-    expect(rowsOf()).toHaveLength(300);
-    fireEvent.click(screen.getByRole("button", { name: "Show 100 more" }));
-    expect(rowsOf()).toHaveLength(400);
-    expect(screen.queryByRole("button", { name: /Show .* more/ })).toBeNull();
-  });
-
-  const table = (r: PosRow[] = rows) => (
+  const table = (r: PosRow[] = rows, failed = 0) => (
     <MemoryRouter>
-      <PositionsTable fundId={1} rows={r} pending={false} failed={0} mode="quarter" latest={new Map()} />
+      <PositionsTable fundId={1} rows={r} pending={false} failed={failed} mode="quarter" latest={new Map()} />
     </MemoryRouter>
   );
-  const byWeight = rows.map((r) => r.ticker).reverse(); // Weight descending: T0400, T0399, ...
-  const quietLine = () => document.querySelector(".t-more")?.textContent;
+  const byWeight = rows.map((r) => r.ticker).reverse(); // Weight descending: the last row first
+  const byTicker = [...byWeight].sort();
+  const footer = () => document.querySelector(".t-more")?.textContent;
+  const showMore = () => screen.queryByRole("button", { name: /^Show / });
+  const n = (v: number) => v.toLocaleString("en-US");
+  const label = (left: number) => `Show ${n(Math.min(MORE_STEP, left))} more` + (left > MORE_STEP ? ` · ${n(left)} left` : "");
+  /** Idle until the automatic fill is done. */
+  const fill = () => idle.flushAll();
 
-  test("nothing but the first page before the browser is idle: no extra rows, the button and its count", () => {
-    render(table());
-    expect(rowsOf()).toHaveLength(150);
-    expect(idle.pending.size).toBe(1); // the chunk is only waiting for idle
-    expect(screen.getByRole("button", { name: "Show 150 more" })).toBeInTheDocument();
-    expect(quietLine()).toMatch(/150 of 400 positions shown/);
+  test("the numbers: a first page of a few screens, an automatic fill of a few hundred rows, a click adds more", () => {
+    expect(INITIAL_ROWS).toBeGreaterThanOrEqual(30); // at least two screens of the table
+    expect(INITIAL_ROWS).toBeLessThanOrEqual(100);
+    expect(AUTO_FILL_MAX).toBeGreaterThan(INITIAL_ROWS);
+    expect(AUTO_FILL_MAX).toBeLessThan(1000);
+    expect(CHUNK).toBeLessThanOrEqual(INITIAL_ROWS);
+    expect(MORE_STEP).toBeGreaterThanOrEqual(CHUNK);
   });
 
-  test("once idle, the rest follows 150 at a time in the sorted order; the button gives way to a quiet 'Loading N more…' line", async () => {
+  test("nothing but the first rows before the browser is idle: no more rows, no button, a quiet line says what is coming", () => {
+    render(table());
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS);
+    expect(tickers()).toEqual(byWeight.slice(0, INITIAL_ROWS));
+    expect(idle.pending.size).toBe(1); // the first chunk is only waiting for idle
+    expect(showMore()).toBeNull();
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - INITIAL_ROWS} more…`);
+    expect(document.querySelector(".t-more .btn, .t-more svg, .t-more [role=progressbar]")).toBeNull(); // quiet: no spinner
+  });
+
+  test("once idle, rows follow CHUNK at a time in the sorted order up to the cap, and the line counts down", async () => {
     render(table());
     await flushIdle();
-    expect(rowsOf()).toHaveLength(300);
-    expect(tickers()).toEqual(byWeight.slice(0, 300));
-    expect(screen.queryByRole("button", { name: /Show .* more/ })).toBeNull();
-    expect(quietLine()).toBe("Loading 100 more…");
-    expect(document.querySelector(".t-more .btn, .t-more svg, .t-more [role=progressbar]")).toBeNull(); // quiet: no spinner
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(400);
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS + CHUNK);
+    expect(tickers()).toEqual(byWeight.slice(0, INITIAL_ROWS + CHUNK));
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - INITIAL_ROWS - CHUNK} more…`);
+    await fill();
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX);
+    expect(tickers()).toEqual(byWeight.slice(0, AUTO_FILL_MAX));
+    expect(idle.pending.size).toBe(0); // and nothing more is scheduled: the rest waits for a click
+  });
+
+  test("at the cap the line gives way to 'Show N more · M left'; the rows beyond it are not drawn", async () => {
+    render(table());
+    await fill();
+    expect(footer()).toBe(label(TOTAL - AUTO_FILL_MAX));
+    expect(showMore()).toBeInTheDocument();
+    expect(screen.queryByText(/Loading/)).toBeNull();
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX);
+  });
+
+  test("'Show more' adds MORE_STEP rows at once, in the sorted order of all rows; the last click says just how many are left", async () => {
+    render(table());
+    await fill();
+    fireEvent.click(showMore()!);
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
+    expect(tickers()).toEqual(byWeight.slice(0, AUTO_FILL_MAX + MORE_STEP));
+    expect(footer()).toBe("Show 40 more"); // the last 40: no '· left' when that is all there is
+    expect(idle.pending.size).toBe(0); // clicking does not restart the automatic fill
+    fireEvent.click(showMore()!);
+    expect(rowsOf()).toHaveLength(TOTAL);
     expect(tickers()).toEqual(byWeight);
     expect(document.querySelector(".t-more")).toBeNull(); // everything is shown: no button, no line
-    expect(idle.pending.size).toBe(0); // and nothing more is scheduled
   });
 
-  test("'Show more' before idle still works, and the fill carries on from there", async () => {
+  test("the button is there only once the cap is reached: clicking cannot jump ahead of the fill", async () => {
     render(table());
-    fireEvent.click(screen.getByRole("button", { name: "Show 150 more" }));
-    expect(rowsOf()).toHaveLength(300);
+    expect(showMore()).toBeNull();
     await flushIdle();
-    expect(rowsOf()).toHaveLength(400);
-    expect(tickers()).toEqual(byWeight);
+    expect(showMore()).toBeNull();
   });
 
-  test("a re-sort starts again from the first chunk, and the chunks keep the new order of every row", async () => {
+  test("what a click added survives re-renders that keep the same rows", async () => {
+    const view = render(table());
+    await fill();
+    fireEvent.click(showMore()!);
+    view.rerender(table(rows, 3)); // another prop changed, the rows are the very same
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
+    expect(footer()).toBe("Show 40 more");
+    await act(async () => void fireEvent.click(rowsOf()[0])); // opening a row is a re-render too
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
+  });
+
+  test("a re-sort starts again from the first rows, whatever was added, and the order covers every row", async () => {
     render(table());
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(300);
+    await fill();
+    fireEvent.click(showMore()!);
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
     fireEvent.click(screen.getByRole("button", { name: "Stock" }));
-    expect(rowsOf()).toHaveLength(150);
-    expect(quietLine()).toBe("Loading 250 more…"); // already filling: no flicker back to the button
-    expect(tickers()).toEqual([...byWeight].sort().slice(0, 150));
-    await flushIdle();
-    expect(tickers()).toEqual([...byWeight].sort().slice(0, 300));
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS); // a click's rows are forgotten with the order they belonged to
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - INITIAL_ROWS} more…`);
+    expect(tickers()).toEqual(byTicker.slice(0, INITIAL_ROWS)); // the smallest tickers of ALL rows, drawn or not before
+    await fill();
+    expect(tickers()).toEqual(byTicker.slice(0, AUTO_FILL_MAX));
+    expect(footer()).toBe(label(TOTAL - AUTO_FILL_MAX));
     fireEvent.click(screen.getByRole("button", { name: "Stock" })); // descending
-    expect(tickers()).toEqual([...byWeight].sort().reverse().slice(0, 150));
-    await flushIdle();
-    await flushIdle();
-    expect(tickers()).toEqual([...byWeight].sort().reverse());
+    expect(tickers()).toEqual([...byTicker].reverse().slice(0, INITIAL_ROWS));
+    await fill();
+    fireEvent.click(showMore()!);
+    fireEvent.click(showMore()!);
+    expect(tickers()).toEqual([...byTicker].reverse());
   });
 
-  test("a new period (new rows) starts again from the first chunk", async () => {
+  test("a new period (new rows) starts again from the first rows", async () => {
     const { rerender } = render(table());
-    await flushIdle();
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(400);
-    rerender(table(rows.slice(0, 380)));
-    expect(rowsOf()).toHaveLength(150);
-    expect(quietLine()).toBe("Loading 230 more…");
-    await flushIdle();
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(380);
+    await fill();
+    fireEvent.click(showMore()!);
+    rerender(table(rows.slice(0, AUTO_FILL_MAX + 60)));
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS);
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - INITIAL_ROWS} more…`);
+    await fill();
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX);
+    expect(footer()).toBe("Show 60 more");
   });
 
-  test("a row that is open stays open while chunks arrive, and the rows before it are not redrawn", async () => {
+  test("a table that fits under the cap fills in completely by itself, with no button at all", async () => {
+    render(table(rows.slice(0, AUTO_FILL_MAX - 20)));
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - 20 - INITIAL_ROWS} more…`);
+    await fill();
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX - 20);
+    expect(document.querySelector(".t-more")).toBeNull();
+    expect(showMore()).toBeNull();
+    expect(idle.pending.size).toBe(0);
+  });
+
+  test("a table that fits in the first rows has no footer and schedules nothing", () => {
+    render(table(rows.slice(0, INITIAL_ROWS)));
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS);
+    expect(document.querySelector(".t-more")).toBeNull();
+    expect(idle.pending.size).toBe(0);
+  });
+
+  test("a row that is open stays open while chunks arrive and rows are added, and the rows before it are not redrawn", async () => {
     render(table());
     const first = rowsOf()[0];
     fireEvent.click(first);
     expect(first).toHaveAttribute("aria-expanded", "true");
-    await flushIdle();
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(400);
+    await fill();
+    fireEvent.click(showMore()!);
+    expect(rowsOf()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
     expect(rowsOf()[0]).toBe(first); // the same element: React kept it
     expect(first).toHaveAttribute("aria-expanded", "true");
     expect(document.querySelectorAll(".xrow")).toHaveLength(1);
   });
 
-  test("a chunk that takes long to draw makes the next one smaller (a slow device is never blocked for long)", async () => {
+  test("every chunk is CHUNK rows, however slow the clock: the browser slices the work, the size does not shrink", async () => {
     let t = 0;
     vi.spyOn(performance, "now").mockImplementation(() => (t += 100));
-    render(table(Array.from({ length: 700 }, (_, i) => mk(i + 1))));
+    render(table());
     await flushIdle();
-    expect(rowsOf()).toHaveLength(300); // the first chunk is a full 150 ...
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS + CHUNK);
     await flushIdle();
-    expect(rowsOf()).toHaveLength(375); // ... it was slow, so the next is half
-    await flushIdle();
-    expect(rowsOf()).toHaveLength(375 + 37);
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS + 2 * CHUNK);
   });
 
   test("unmounting stops the fill: the idle callback is cancelled", () => {
@@ -503,6 +539,21 @@ describe("a fund with thousands of positions", () => {
     expect(idle.pending.size).toBe(1);
     unmount();
     expect(idle.pending.size).toBe(0);
+  });
+
+  test("while rows are still being added the page says so (the price prefetch waits for it); not at the cap, not after unmount", async () => {
+    const { unmount } = render(table());
+    expect(rowsAreFilling()).toBe(true);
+    await flushIdle();
+    expect(rowsAreFilling()).toBe(true);
+    await fill();
+    expect(rowsAreFilling()).toBe(false); // the button waits for a click: nothing is being added by itself
+    unmount();
+    expect(rowsAreFilling()).toBe(false);
+    const again = render(table());
+    expect(rowsAreFilling()).toBe(true);
+    again.unmount(); // unmounted in the middle of a fill
+    expect(rowsAreFilling()).toBe(false);
   });
 
   test("'Loading prices…' says how far the files are", () => {
@@ -563,6 +614,28 @@ describe("background prefetch of every position's weekly file", () => {
       expect(open.length).toBeLessThanOrEqual(3);
     }
     expect(calledIds()).toEqual(plan);
+  });
+
+  test("when the table has rows still to draw, the prefetch waits until it is done with them", async () => {
+    // 120 held positions: the table draws 50, then 25, 25 and 20 more in idle time
+    const held = sorted.find((p) => p.shares_now > 0)!;
+    const many = Array.from({ length: 120 }, (_, i) => ({ ...held, stock_id: 1000 + i }));
+    const prices2 = new Map(many.map((p) => [p.stock_id, 10 + (p.stock_id % 7)] as [number, number]));
+    const stocks2 = new Map(many.map((p) => [p.stock_id, { ticker: "X" + p.stock_id, name: "X" + p.stock_id }] as const));
+    render(
+      <MemoryRouter>
+        <PositionsPanel fundId={9100002} summary={summary} positions={many} prices={prices2} stocks={stocks2} asof={latest.asof} />
+      </MemoryRouter>,
+    );
+    expect(rowsOf()).toHaveLength(INITIAL_ROWS);
+    for (let i = 0; i < 3; i++) {
+      await flushIdle(); // a chunk of rows, and the prefetch asking whether it may begin yet
+      expect(weeklyMock).not.toHaveBeenCalled();
+    }
+    expect(rowsOf()).toHaveLength(120);
+    await flushIdle(); // the rows are all in: now the prices
+    expect(weeklyMock).toHaveBeenCalled();
+    expect(weeklyMock.mock.calls[0][1]).toEqual({ priority: "low" });
   });
 
   test("Save-Data and 2G: no background prefetch at all", async () => {

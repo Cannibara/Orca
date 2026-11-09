@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { NotFoundError, loadWeekly, type Stock } from "../data/api";
 import type { PositionRow, Weekly } from "../data/types";
 import { buildRows, neededStocks, prefetchOrder, type PosRow, type Timeline } from "./positions";
+import { rowsAreFilling } from "./loading";
 import { createPriorityQueue, startPrefetch, type PriorityQueue } from "./prefetch";
 
 /** Weekly series by stock id; a settled value of null = the stock has no file (or it could not be loaded). */
@@ -30,13 +31,18 @@ export const WeeklyStoreContext = createContext<WeeklyStore | null>(null);
 
 /**
  * The panel's weekly queue. Once the browser is idle after the panel has landed, it plans the weekly file
- * of every position of the fund in the background (held now first, then the rest by latest trade), unless
+ * of every position of the fund in the background (held now first, then the rest by latest trade; once the
+ * tables have finished adding their rows, or after 4 seconds at the latest), unless
  * the visitor saves data or is on a 2G connection; it pauses while the tab is hidden. Unmounting (or a new
  * fund, which re-keys the panel) drops everything that has not started.
  */
 export function useWeeklyStore(positions: PositionRow[], tl: Timeline, prices: Map<number, number>): WeeklyStore {
   const [store] = useState(createWeeklyStore);
-  useEffect(() => startPrefetch(store, () => prefetchOrder(positions, tl, prices)), [store, positions, tl, prices]);
+  useEffect(
+    // the tables add their rows first: both want the main thread, and the rows are what the visitor is looking at
+    () => startPrefetch(store, () => prefetchOrder(positions, tl, prices), undefined, { ready: () => !rowsAreFilling() }),
+    [store, positions, tl, prices],
+  );
   useEffect(() => () => store.cancel(), [store]);
   return store;
 }

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -10,7 +10,8 @@ import type { Exits, LatestPrices, Positions, Securities, Summary, Weekly } from
 import { missed, positionRows } from "../src/lib/live";
 import { PositionsPanel } from "../src/fund/PositionsPanel";
 import { WhatIfPanel } from "../src/fund/WhatIfPanel";
-import { CHUNK } from "../src/fund/whatif";
+import { AUTO_FILL_MAX, CHUNK, INITIAL_ROWS, MORE_STEP } from "../src/fund/loading";
+import { installIdle } from "./idle";
 import { ASOF, FUND, NEWEST, NO_EXITS, exitsOf, pos, pricesOf, sold, stocksTo, summaryOf, trade, type ExitIn } from "./fund-whatif-fixtures";
 
 // "What if they'd kept it" (src/fund/WhatIfPanel.tsx): the sales table at the foot of the fund page.
@@ -473,42 +474,93 @@ describe("a long list of sales draws its rows in chunks", () => {
     stocks: stocksTo(n),
     positions: Array.from({ length: n }, (_, i) => sold(i + 1, 100)),
   });
-  const more = () => screen.queryByText(/^Loading [\d,]+ more…$/);
+  // the cap, one "Show more" step and a remainder of 40
+  const TOTAL = AUTO_FILL_MAX + MORE_STEP + 40;
+  const footer = () => document.querySelector(".wi-more")?.textContent;
+  const showMore = () => screen.queryByRole("button", { name: /^Show / });
+  const n = (v: number) => v.toLocaleString("en-US");
+  const label = (left: number) => `Show ${n(Math.min(MORE_STEP, left))} more` + (left > MORE_STEP ? ` · ${n(left)} left` : "");
+  let idle: ReturnType<typeof installIdle>;
+  beforeEach(() => void (idle = installIdle()));
+  afterEach(() => void vi.restoreAllMocks());
 
-  it("draws no more than one chunk at first, then the rest in idle time, and says so meanwhile", async () => {
-    renderWhatIf(many(400));
-    expect(bodyRows()).toHaveLength(CHUNK);
-    expect(more()?.textContent).toBe("Loading 250 more…");
+  it("draws no more than the first rows at first, then the rest in idle time up to the cap, and says so meanwhile", async () => {
+    renderWhatIf(many(AUTO_FILL_MAX - 30));
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS);
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - 30 - INITIAL_ROWS} more…`);
     expect(salesTable().closest("[aria-busy]")).toHaveAttribute("aria-busy", "true");
-    await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
-    expect(more()).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument(); // no button, ever
-  }, 20000);
+    await idle.flush();
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS + CHUNK);
+    await idle.flushAll();
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX - 30);
+    expect(footer()).toBeUndefined(); // everything fits under the cap: no button, ever
+    expect(showMore()).not.toBeInTheDocument();
+    expect(salesTable().closest("[aria-busy]")).toHaveAttribute("aria-busy", "false");
+    expect(idle.pending.size).toBe(0);
+  });
+
+  it("stops filling at the cap; 'Show N more · M left' adds the next rows at once, in the same order, until none are left", async () => {
+    renderWhatIf(many(TOTAL));
+    await idle.flushAll();
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX);
+    expect(showMore()).toBeInTheDocument();
+    expect(footer()).toBe(label(TOTAL - AUTO_FILL_MAX));
+    expect(salesTable().closest("[aria-busy]")).toHaveAttribute("aria-busy", "false");
+    const before = tickersOf();
+    await userEvent.click(showMore()!);
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
+    expect(tickersOf().slice(0, AUTO_FILL_MAX)).toEqual(before); // the rows already there stay where they were
+    expect(footer()).toBe("Show 40 more");
+    expect(idle.pending.size).toBe(0);
+    await userEvent.click(showMore()!);
+    expect(bodyRows()).toHaveLength(TOTAL);
+    expect(document.querySelector(".wi-more")).toBeNull();
+  }, 30000);
 
   it("keeps the sort order while rows are added, and sorting covers all rows, not the ones drawn", async () => {
-    // S99 misses by far the most, and is the last of 170 in ticker order: beyond the first chunk of either order that matters
+    // S99 misses by far the most, and is the last of 170 in ticker order: beyond the first rows of either order that matters
     const long = many(170);
     long.prices.set(99, 1000);
     renderWhatIf(long);
-    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+    await idle.flushAll();
+    expect(bodyRows()).toHaveLength(170);
     expect(tickersOf()[0]).toBe("S99"); // the default order is $ missed descending
     const values = rowsOf().map((r) => Number(r["$ missed / dodged"].replace(/[+$m,]/g, "").replace("−", "-")));
     expect(values).toEqual([...values].sort((a, b) => b - a)); // descending from the first row to the last
 
-    // a new order starts again from the first chunk
+    // a new order starts again from the first rows
     await userEvent.click(sortButton("Stock"));
-    expect(bodyRows()).toHaveLength(CHUNK);
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS);
     expect(tickersOf()[0]).toBe("S1");
     expect(tickersOf()).not.toContain("S99"); // last in ticker order: not drawn yet
-    expect(more()?.textContent).toBe("Loading 20 more…");
-    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+    expect(footer()).toBe(`Loading ${170 - INITIAL_ROWS} more…`);
+    await idle.flushAll();
+    expect(bodyRows()).toHaveLength(170);
     expect(tickersOf()[169]).toBe("S99");
 
     // and back: the best of all 170 is on top at once, though it was in the undrawn part of the previous order
     await userEvent.click(sortButton("$ missed / dodged"));
-    expect(bodyRows()).toHaveLength(CHUNK);
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS);
     expect(tickersOf()[0]).toBe("S99");
-    await waitFor(() => expect(bodyRows()).toHaveLength(170), { timeout: 10000 });
+    await idle.flushAll();
+    expect(bodyRows()).toHaveLength(170);
+  }, 30000);
+
+  it("a sort starts again from the first rows, forgets what a click added, and still covers all rows beyond the cap", async () => {
+    renderWhatIf(many(TOTAL));
+    await idle.flushAll();
+    await userEvent.click(showMore()!);
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
+    await userEvent.click(sortButton("Stock"));
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS);
+    const byTicker = Array.from({ length: TOTAL }, (_, i) => "S" + (i + 1)).sort();
+    expect(tickersOf()).toEqual(byTicker.slice(0, INITIAL_ROWS));
+    await idle.flushAll();
+    expect(tickersOf()).toEqual(byTicker.slice(0, AUTO_FILL_MAX));
+    expect(footer()).toBe(label(TOTAL - AUTO_FILL_MAX));
+    await userEvent.click(showMore()!);
+    await userEvent.click(showMore()!);
+    expect(tickersOf()).toEqual(byTicker);
   }, 30000);
 
   it("adds up the tiles over every sale, not the rows drawn", () => {
@@ -518,30 +570,36 @@ describe("a long list of sales draws its rows in chunks", () => {
     expect(tileValue("Losses dodged")).toBe("−$6.74B"); // (44 x 15 + 14) x 10M
   });
 
-  it("re-renders none of the drawn rows when the next chunk arrives", async () => {
+  it("re-renders none of the drawn rows when the next chunk arrives or more are shown", async () => {
     // memoised rows: the cells of a row already there are the very same DOM nodes after the next chunk
-    renderWhatIf(many(400));
+    renderWhatIf(many(TOTAL));
     const first = bodyRows()[0];
     const cell = first.querySelector("td:last-child") as HTMLElement;
-    await waitFor(() => expect(bodyRows()).toHaveLength(400), { timeout: 5000 });
+    await idle.flushAll();
+    await userEvent.click(showMore()!);
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX + MORE_STEP);
     expect(bodyRows()[0]).toBe(first);
     expect(first.querySelector("td:last-child")).toBe(cell);
-  }, 20000);
+  }, 30000);
 
-  it("keeps first paint to one chunk of rows on a fund with 3,000 sales", async () => {
+  it("keeps first paint to the first rows on a fund with 3,000 sales, and never draws them all without a click", async () => {
     const t0 = performance.now();
     const { unmount } = renderWhatIf(many(3000));
     const first = performance.now() - t0;
-    expect(bodyRows()).toHaveLength(CHUNK);
-    expect(more()?.textContent).toBe("Loading 2,850 more…");
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS);
+    expect(footer()).toBe(`Loading ${AUTO_FILL_MAX - INITIAL_ROWS} more…`);
     // a generous bound for jsdom: the point is that 3,000 rows are not drawn at once (that takes many times longer)
     expect(first).toBeLessThan(3000);
-    // the rest follows by itself, in chunks
-    await waitFor(() => expect(bodyRows().length).toBeGreaterThanOrEqual(2 * CHUNK), { timeout: 5000 });
-    expect(bodyRows().length).toBeLessThan(3000);
+    await idle.flush(); // the rest follows by itself, in chunks ...
+    expect(bodyRows()).toHaveLength(INITIAL_ROWS + CHUNK);
+    await idle.flushAll(); // ... up to the cap
+    expect(bodyRows()).toHaveLength(AUTO_FILL_MAX);
+    expect(footer()).toBe(label(3000 - AUTO_FILL_MAX));
+    expect(footer()).toMatch(/^Show \d+ more · [\d,]+ left$/);
     expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
     unmount();
-  }, 20000);
+    expect(idle.pending.size).toBe(0);
+  }, 30000);
 });
 
 // ---- the demo fund: the two tables agree --------------------------------------------------

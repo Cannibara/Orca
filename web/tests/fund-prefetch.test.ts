@@ -384,6 +384,54 @@ describe("when to run background work", () => {
     expect(l.started()).toEqual([1, 2, 3]);
   });
 
+  test("with `ready`, the plan waits (idle moment by idle moment) until it says so, but not longer than maxWait", () => {
+    let idle: (() => void)[] = [];
+    vi.stubGlobal("requestIdleCallback", (cb: () => void) => (idle.push(cb), idle.length));
+    vi.stubGlobal("cancelIdleCallback", () => {});
+    let clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    const l = loader();
+    const q = createPriorityQueue<number, string>({ load: l.load });
+    let ready = false;
+    startPrefetch(q, keys(5), page(), { ready: () => ready, maxWait: 1000 });
+    const flush = () => {
+      const run = idle;
+      idle = [];
+      run.forEach((cb) => cb());
+    };
+    flush();
+    flush();
+    expect(l.calls).toHaveLength(0);
+    expect(idle).toHaveLength(1); // still asking
+    ready = true;
+    flush();
+    expect(l.started()).toEqual([1, 2, 3]);
+    expect(idle).toHaveLength(0);
+
+    // never ready: it begins anyway once maxWait is over
+    const l2 = loader();
+    const q2 = createPriorityQueue<number, string>({ load: l2.load });
+    startPrefetch(q2, keys(5), page(), { ready: () => false, maxWait: 1000 });
+    flush();
+    expect(l2.calls).toHaveLength(0);
+    clock = 1500;
+    flush();
+    expect(l2.started()).toEqual([1, 2, 3]);
+    vi.restoreAllMocks();
+  });
+
+  test("stopping while it waits for `ready` cancels the pending idle callback", () => {
+    const cic = vi.fn();
+    vi.stubGlobal("requestIdleCallback", () => 9);
+    vi.stubGlobal("cancelIdleCallback", cic);
+    const l = loader();
+    const q = createPriorityQueue<number, string>({ load: l.load });
+    const stop = startPrefetch(q, keys(5), page(), { ready: () => false });
+    stop();
+    expect(cic).toHaveBeenCalledWith(9);
+    expect(l.calls).toHaveLength(0);
+  });
+
   test("on Save-Data or 2G nothing is planned at all", () => {
     for (const connection of [{ saveData: true }, { effectiveType: "2g" }, { effectiveType: "slow-2g" }]) {
       vi.stubGlobal("navigator", { connection });

@@ -341,25 +341,35 @@ export type PageLike = {
 
 /**
  * Plans `keys` (or what the function returns, worked out only when the browser is idle) in the background
- * once the browser is idle and the tab is visible, pausing while it is hidden. Does nothing on a constrained network. Returns a function that stops it (the plan is dropped,
+ * once the browser is idle and the tab is visible, pausing while it is hidden. Does nothing on a constrained network.
+ * With `ready`, it waits (up to `maxWait` ms, default 4000) until that says so: the page uses it to let the tables
+ * finish drawing their rows first, which competes for the same main thread. Returns a function that stops it (the plan is dropped,
  * loads under way finish).
  */
 export function startPrefetch<K>(
   queue: Pick<PriorityQueue<K, unknown>, "background" | "dropBackground" | "pause" | "resume">,
   keys: readonly K[] | (() => readonly K[]),
   page: PageLike | undefined = typeof document === "undefined" ? undefined : document,
-  opts: { timeout?: number; fallback?: number } = {},
+  opts: { timeout?: number; fallback?: number; ready?: () => boolean; maxWait?: number } = {},
 ): () => void {
   if (networkIsConstrained()) return () => {};
-  const when = { timeout: 2000, fallback: 200, ...opts };
+  const when = { timeout: opts.timeout ?? 2000, fallback: opts.fallback ?? 200 };
+  const since = typeof performance === "undefined" ? 0 : performance.now();
+  let cancelIdle = () => {};
   let off = () => {};
-  const cancelIdle = whenIdle(() => {
+  const begin = () => {
+    // not yet if something cheaper is still being drawn (`ready`), but never for longer than `maxWait`
+    if (opts.ready && !opts.ready() && performance.now() - since < (opts.maxWait ?? 4000)) {
+      cancelIdle = whenIdle(begin, when);
+      return;
+    }
     const sync = () => (page?.hidden ? queue.pause() : queue.resume());
     page?.addEventListener("visibilitychange", sync);
     off = () => page?.removeEventListener("visibilitychange", sync);
     if (page?.hidden) queue.pause(); // plan first, start when the tab comes back
     queue.background(typeof keys === "function" ? keys() : keys); // worked out only now: first paint pays nothing for it
-  }, when);
+  };
+  cancelIdle = whenIdle(begin, when);
   return () => {
     cancelIdle();
     off();
