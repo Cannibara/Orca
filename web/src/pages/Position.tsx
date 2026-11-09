@@ -80,48 +80,120 @@ async function loadPosition(fundId: number, stockId: number): Promise<PositionDa
 
 // ---- trades table -----------------------------------------------------------------
 
-const TRADE_COLUMNS: Column<Trade>[] = [
-  { header: "Quarter", align: "l", cell: (t) => qLabel(t.q) },
-  {
-    header: "Move",
-    align: "l",
-    cell: (t) => <span className={t.delta > 0 ? "pill buy" : "pill sell"}>{tradeMove(t)}</span>,
-  },
-  { header: "Shares", cell: (t) => <Signed v={t.delta}>{sgn(t.delta) + shareCount(Math.abs(t.delta))}</Signed> },
-  { header: "Est. price (VWAP)", cell: (t) => px(t.px) },
-  { header: "Quarter range", cell: (t) => (t.low == null || t.high == null ? DASH : `${px(t.low)}–${px(t.high)}`) },
-  { header: "$ value", cell: (t) => money(Math.abs(t.delta) * t.px) },
-  { header: "Shares after", cell: (t) => shareCount(t.sharesAfter) },
+/** The Move column's boxes, tinted like the fund page's "Last change" cells. */
+const MOVE: Record<Move, { word: string; tone: "add" | "trim" | "sold" }> = {
+  New: { word: "New", tone: "add" },
+  Add: { word: "Added", tone: "add" },
+  Trim: { word: "Trimmed", tone: "trim" },
+  Exit: { word: "Sold all", tone: "sold" },
+};
+
+/** Column widths in px: they add up to the table's minimum width, below which it scrolls inside its wrapper. */
+const TRADE_COLS = [
+  { head: "Quarter", w: 84, left: true },
+  { head: "Move", w: 112, left: true },
+  { head: "Shares", w: 120 },
+  { head: "Est. price (VWAP)", w: 124 },
+  { head: "Quarter range", w: 152 },
+  { head: "$ value", w: 92 },
+  { head: "Shares after", w: 116 },
 ];
+
+/** Whole millions like the fund page ("$2,968m"); under a million that would read "$0m", so plain dollars. */
+const tradeValue = (usd: number): string => (usd < 1e6 ? money(usd) : fMm(usd));
+
+function TradesTable({ trades }: { trades: Trade[] }) {
+  return (
+    <div className="twrap" tabIndex={0} role="region" aria-label="Trades by quarter, scrollable">
+      <table className="t" aria-label="Trades by quarter">
+        <colgroup>
+          {TRADE_COLS.map((c) => (
+            <col key={c.head} style={{ width: c.w + "px" }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            {TRADE_COLS.map((c) => (
+              <th key={c.head} scope="col" className={c.left ? "l" : undefined}>
+                {c.head}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {trades.length === 0 && (
+            <tr>
+              <td colSpan={TRADE_COLS.length} className="t-empty">
+                Nothing to show.
+              </td>
+            </tr>
+          )}
+          {trades.map((t, i) => {
+            const move = MOVE[tradeMove(t)];
+            return (
+              <tr key={i}>
+                <td title={qLabel(t.q)}>{qShort(t.q)}</td>
+                <td className="l">
+                  <span className={"lc " + move.tone}>
+                    <span className="lw">{move.word}</span>
+                  </span>
+                </td>
+                {/* The sign is always printed: the colour is never the only cue. */}
+                <td>
+                  <span className={signClass(t.delta) || undefined}>{sgn(t.delta) + shareCount(Math.abs(t.delta))}</span>
+                </td>
+                <td>{px(t.px)}</td>
+                <td>{t.low == null || t.high == null ? DASH : `${px(t.low)}–${px(t.high)}`}</td>
+                <td>{tradeValue(Math.abs(t.delta) * t.px)}</td>
+                <td>{shareCount(t.sharesAfter)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 // ---- page ------------------------------------------------------------------------------
 
 function Header({ data }: { data: PositionData }) {
   const { summary, position: p, security, price, priceDate } = data;
   return (
-    <div className="fhead">
-      <Link className="eyebrow back" to={`/fund/${summary.id}`}>
+    <header className="pos-head">
+      <Link className="crumb" to={`/fund/${summary.id}`}>
         {`← ${summary.name}`}
       </Link>
       <h1>
         <span className="mono">{security?.ticker ?? `#${p.stock_id}`}</span>
         {security && ` · ${security.name}`}
       </h1>
-      <div className="meta">
-        <span>
+      <div className="pos-meta">
+        <span className="pill">
           Sector <b>{security?.sector ?? DASH}</b>
         </span>
-        <span>
+        <span className="pill">
           Held{" "}
           <b>
             {qLabel(p.from_q)} – {p.to_q == null ? "now" : qLabel(p.to_q)}
           </b>
         </span>
-        <span>
+        <span className="pill">
           Latest price <b>{px(price ?? null)}</b>
           {priceDate !== undefined && ` · ${fmtDate(priceDate)}`}
         </span>
       </div>
+    </header>
+  );
+}
+
+/** One tile of the strip: label, the figure, and a one-line note. A signed figure takes the gain or loss colour. */
+function Kpi({ label, value, note, tone }: { label: string; value: string; note?: string; tone?: "up" | "down" | "" }) {
+  return (
+    <div className="kpi">
+      <div className="kpi-l">{label}</div>
+      <div className={tone && !printsZero(value) ? `kpi-v ${tone}` : "kpi-v"}>{value}</div>
+      {note && <div className="kpi-n">{note}</div>}
     </div>
   );
 }
@@ -134,20 +206,20 @@ function PositionTiles({ data }: { data: PositionData }) {
   const sharesSub = p.shares_now === 0 ? "fully sold" : price === undefined ? undefined : `worth ${money(p.shares_now * price)}`;
   const dividends = `incl. ${money(p.dividends)} dividends`;
   return (
-    <div className="sec">
-      <Tiles label="This position">
-        <Tile label="Shares now" value={shareCount(p.shares_now)} sub={sharesSub} />
-        <Tile label="Avg cost" value={px(p.avg_cost)} sub="avg of estimated buy prices" />
-        <Tile label="$ in" value={money(p.invested)} />
-        <Tile
+    <div className="pos-tiles">
+      <div className="kpis" role="group" aria-label="This position">
+        <Kpi label="Shares now" value={shareCount(p.shares_now)} note={sharesSub} />
+        <Kpi label="Avg cost" value={px(p.avg_cost)} note="avg of estimated buy prices" />
+        <Kpi label="$ in" value={money(p.invested)} />
+        <Kpi
           label="Total P&L"
           value={money(total, true)}
-          sub={ret === null ? dividends : `${pct(ret, 0)} on $ in · ${dividends}`}
+          note={ret === null ? dividends : `${pct(ret, 0)} on $ in · ${dividends}`}
           tone={signClass(total)}
         />
-        <Tile label="IRR" value={pct(x, 0)} sub="mid-quarter trade dates" tone={signClass(x)} />
-      </Tiles>
-      <p className="cap">
+        <Kpi label="IRR" value={pct(x, 0)} note="mid-quarter trade dates" tone={signClass(x)} />
+      </div>
+      <p className="kpi-cap">
         13F estimates, not actual fills: trades are inferred from quarter-end holdings and priced at each quarter's
         volume-weighted average. <Link to="/how-it-works">How it works</Link>
       </p>
@@ -155,35 +227,54 @@ function PositionTiles({ data }: { data: PositionData }) {
   );
 }
 
+/** A panel with the artifact's head: the title, a line under it, and the body. */
+function Panel({ id, title, sub, flush, children }: { id: string; title: string; sub: string; flush?: boolean; children: ReactNode }) {
+  return (
+    <section className="panel" aria-labelledby={id}>
+      <div className="ph">
+        <div className="ph-t">
+          <h2 className="pt" id={id}>
+            {title}
+          </h2>
+          <p className="ps">{sub}</p>
+        </div>
+      </div>
+      {flush ? children : <div className="pb">{children}</div>}
+    </section>
+  );
+}
+
 function PositionView({ data }: { data: PositionData }) {
-  const { summary, position: p, security, weekly } = data;
+  const { summary, position: p, security, weekly, price } = data;
   useTitle(`${security?.ticker ?? `#${p.stock_id}`} · ${summary.name} · Orca`);
   return (
-    <div className="view">
-      <Header data={data} />
-      <PositionTiles data={data} />
-      <Section
-        id="pos-price"
-        title="Price and estimated trades"
-        intro={<p>Dots sit at the quarter's volume-weighted price; the shaded bar is that quarter's low to high.</p>}
-      >
-        <div className="panel sec">
-          {weekly ? <PriceChart closes={weekly.close} start={weekly.start} trades={p.trades} /> : <p className="cap">No price history</p>}
-        </div>
-      </Section>
-      <Section id="pos-shares" title="Shares held" intro={<p>From each quarter's 13F, split-adjusted.</p>}>
-        <div className="panel">
+    <div className="pos-page">
+      <div className="pos-main">
+        <Header data={data} />
+        <PositionTiles data={data} />
+        <Panel
+          id="pos-price"
+          title="Price and estimated trades"
+          sub="Each triangle sits at the quarter's volume-weighted price: up for a buy, down for a sale. The shaded bar is that quarter's low to high."
+        >
+          {weekly ? (
+            <PriceChart closes={weekly.close} start={weekly.start} trades={p.trades} latest={price} />
+          ) : (
+            <p className="empty">No price history</p>
+          )}
+        </Panel>
+        <Panel id="pos-shares" title="Shares held" sub="From each quarter's 13F, split-adjusted.">
           {/* An open position's last level runs to the fund's latest filed quarter, a closed one's ends with its exit. */}
           <StepChart
             quarters={p.trades.map((t) => t.q)}
             shares={p.trades.map((t) => t.sharesAfter)}
             endQ={p.to_q ?? summary.period_q}
           />
-        </div>
-      </Section>
-      <Section id="pos-trades" title="Trades by quarter" intro={<p>Every dot on the price chart, with the numbers behind it.</p>}>
-        <DataTable label="Trades by quarter" columns={TRADE_COLUMNS} rows={p.trades} />
-      </Section>
+        </Panel>
+        <Panel id="pos-trades" title="Trades by quarter" sub="Every marker on the price chart, with the numbers behind it." flush>
+          <TradesTable trades={p.trades} />
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -193,18 +284,38 @@ function PositionLoader({ fundId, stockId }: { fundId: number; stockId: number }
   const state = useLoad(() => loadPosition(fundId, stockId), [fundId, stockId]);
   if (state.status === "loading") {
     return (
-      <p className="cap" role="status">
-        Loading…
-      </p>
+      <div className="pos-page">
+        <div className="pos-main" aria-busy="true">
+          <p className="status" role="status">
+            Loading…
+          </p>
+          {/* Placeholders in the shape of the page: the title, the tile strip and a panel. */}
+          <div className="skel" aria-hidden="true">
+            <span className="sk sk-h1" />
+            <span className="sk sk-kpis" />
+            <span className="sk sk-panel" />
+          </div>
+        </div>
+      </div>
     );
   }
   if (state.status === "error") {
     return isFundFileMissing(state.error, fundId) ? (
       <NotFound />
     ) : (
-      <p className="note" role="alert">
-        Couldn't load this position. Check your connection and reload the page.
-      </p>
+      <div className="pos-page">
+        <div className="pg-state err" role="alert">
+          <span className="ic">
+            <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 2.5 14 13H2L8 2.5z" />
+              <path d="M8 6.75v3M8 11.4v.01" />
+            </svg>
+          </span>
+          <p>
+            <b>Couldn't load this position.</b> Check your connection and reload the page.
+          </p>
+        </div>
+      </div>
     );
   }
   return state.data === null ? <NotFound /> : <PositionView data={state.data} />;

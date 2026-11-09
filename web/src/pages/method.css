@@ -1,0 +1,52 @@
+/* "How it works": prose in the language of the fund page. One reading column (about 72 characters at
+   15px/1.6), a heading block, then numbered sections separated by hairlines. The number is a counter
+   on the section, not part of the heading, so the headings' accessible names stay as written. The
+   formulas are quiet mono wells. No decoration. Everything under .method-page, tokens only. */
+
+.method-page{color:var(--ink);font:400 15px/1.6 var(--f-sans);-webkit-font-smoothing:antialiased;text-size-adjust:100%}
+.method-page *,.method-page *::before,.method-page *::after{box-sizing:border-box}
+.method-page :is(h1,h2,p,ul){margin:0}
+.method-page :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* the reading column: 72ch of text and, beside it, the gutter that holds the section numbers */
+.method-page .prose{--gutter:56px;max-width:calc(72ch + var(--gutter));display:flex;flex-direction:column;counter-reset:sec;min-width:0}
+
+/* heading block */
+.method-page .m-head{display:flex;flex-direction:column;gap:12px;padding-bottom:28px}
+.method-page .m-eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.method-page h1{font:600 clamp(28px,5vw,40px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance}
+.method-page .m-lede{font-size:16px;line-height:1.55;color:var(--ink2);max-width:66ch;text-wrap:pretty}
+
+/* a numbered section: the number sits in the gutter, level with the heading */
+.method-page .prose>section{
+  counter-increment:sec;
+  display:grid;grid-template-columns:var(--gutter) minmax(0,1fr);row-gap:12px;
+  padding:24px 0 28px;border-top:1px solid var(--line);
+}
+.method-page .prose>section>*{grid-column:2;min-width:0}
+.method-page .prose>section::before{
+  content:counter(sec,decimal-leading-zero);grid-column:1;grid-row:1;
+  font:500 12px/28px var(--f-mono);letter-spacing:.04em;color:var(--ink3);font-variant-numeric:tabular-nums;
+}
+.method-page h2{font:600 clamp(18px,2.4vw,22px)/1.25 var(--f-sans);letter-spacing:-.02em;text-wrap:balance}
+.method-page :is(p,li){color:var(--ink2);text-wrap:pretty}
+.method-page ul{list-style:disc;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.method-page li::marker{color:var(--ink3)}
+.method-page a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.method-page a:hover{text-decoration-color:currentColor}
+
+/* formula: a quiet mono well; it keeps its line breaks and scrolls sideways when the screen is narrower than the line */
+.method-page .formula{
+  font:400 12.5px/1.65 var(--f-mono);color:var(--ink);white-space:pre;overflow-x:auto;
+  background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-2);padding:12px 14px;
+  scrollbar-width:thin;scrollbar-color:var(--line2) transparent;
+}
+.method-page .formula:focus-visible{outline-offset:-2px}
+
+/* phone: no gutter; the number goes above its heading */
+@media (max-width:559px){
+  .method-page .prose{--gutter:0px}
+  .method-page .prose>section{grid-template-columns:minmax(0,1fr);row-gap:10px;padding:20px 0 24px}
+  .method-page .prose>section>*{grid-column:1}
+  .method-page .prose>section::before{grid-column:1;grid-row:auto;line-height:14px}
+}

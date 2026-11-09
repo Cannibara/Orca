@@ -7,9 +7,10 @@
 //               Year/Custom, or opened a row). Up to `demandLimit` run at once.
 //   BACKGROUND  the file is only wanted so a later step is instant. Up to `backgroundLimit` run at once,
 //               in the order they were handed in, and only while the queue is not paused.
-// Demand always starts first. A demand for a key that is waiting in the background moves it to the front
-// of the demand line; for a key already loading in the background it just waits for that load and the
-// load is counted as demand from then on (so it no longer holds one of the few background slots).
+// Demand always starts first, and no new background load starts while demand is waiting for a slot. A
+// demand for a key that is waiting in the background moves it to the front of the demand line; for a key
+// already loading in the background it just waits for that load and the load is counted as demand from
+// then on (so it no longer holds one of the few background slots).
 // Each key is loaded at most once: a settled key (a value, "no file" or a failure) stays settled.
 
 export type Priority = "demand" | "background";
@@ -77,6 +78,9 @@ class Line<K> {
   private head = 0;
   push(k: K): void {
     this.items.push(k);
+  }
+  peek(): K | undefined {
+    return this.head < this.items.length ? this.items[this.head] : undefined;
   }
   shift(): K | undefined {
     if (this.head >= this.items.length) return undefined;
@@ -165,13 +169,23 @@ export function createPriorityQueue<K, V>(opts: QueueOptions<K, V>): PriorityQue
     return undefined;
   };
 
+  /** Demand is waiting for a slot: background work must not take the connection from it meanwhile. */
+  const demandWaits = (): boolean => {
+    for (let k = demandLine.peek(); k !== undefined; k = demandLine.peek()) {
+      const e = entries.get(k);
+      if (e && e.state === "queued" && e.claims > 0) return true;
+      demandLine.shift(); // a stale place
+    }
+    return false;
+  };
+
   function pump(): void {
     while (running.demand < demandLimit) {
       const k = nextQueued(demandLine, true);
       if (k === undefined) break;
       start(k, entries.get(k)!, "demand");
     }
-    while (!paused && running.background < backgroundLimit) {
+    while (!paused && running.background < backgroundLimit && !demandWaits()) {
       const k = nextQueued(backgroundLine, false);
       if (k === undefined) break;
       start(k, entries.get(k)!, "background");

@@ -15,9 +15,17 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     if (!this.state.failed) return this.props.children;
     return (
       <div className="view">
-        <p className="note" role="alert">
-          Something went wrong showing this page. <a href="/">Go to the home page</a>.
-        </p>
+        <div className="state err" role="alert">
+          <span className="ic" aria-hidden="true">
+            <svg className="ico" viewBox="0 0 16 16">
+              <path d="M8 2.5 14 13H2L8 2.5z" />
+              <path d="M8 6.75v3M8 11.4v.01" />
+            </svg>
+          </span>
+          <p>
+            Something went wrong showing this page. <a href="/">Go to the home page</a>.
+          </p>
+        </div>
       </div>
     );
   }

@@ -1,0 +1,117 @@
+/* The single-stock position page (/fund/:id/stock/:stockId) in the language of the fund page: a
+   header with pills, a hairline-divided tile strip (the fund page's KPI strip), and panels with the
+   artifact's head and body. Everything sits under .pos-page and uses tokens only (tokens.css), so it
+   does not depend on the shared sheets. The charts' own rules are in ../charts/charts.css, the load
+   error's in state.css. The page root is a size container (`pos`): the padding and gaps follow its
+   width, like .fp does on the fund page. */
+
+.pos-page{
+  container:pos / inline-size;
+  color:var(--ink);font:400 14px/1.5 var(--f-sans);
+  -webkit-font-smoothing:antialiased;text-size-adjust:100%;
+}
+.pos-page *,.pos-page *::before,.pos-page *::after{box-sizing:border-box}
+.pos-page :is(h1,h2,p){margin:0}
+.pos-page :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.pos-main{--ppad:20px;--gap:16px;display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+@container pos (max-width:719px){.pos-main{--ppad:16px;--gap:12px}}
+@container pos (max-width:559px){.pos-main{--ppad:12px;--gap:12px}}
+
+/* ---------- header: breadcrumb back link, the title, three pills ---------- */
+.pos-head{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pos-head h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
+.pos-head h1 .mono{font-family:var(--f-mono);font-weight:600;letter-spacing:-.02em}
+.pos-head .crumb{align-self:flex-start;display:inline-flex;align-items:center;min-height:24px;border-radius:var(--r-1);font:500 12px/1.2 var(--f-sans);color:var(--ink3);text-decoration:none}
+.pos-head .crumb:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.pos-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.pos-meta .pill{height:24px;padding:0 10px;border-radius:var(--r-pill);border:1px solid var(--line2);background:var(--surface);font:500 12px/1 var(--f-sans);color:var(--ink2);display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pos-meta .pill b{color:var(--ink);font-weight:600}
+
+/* ---------- tiles: one box, hairlines between the cells (the fund page's KPI strip) ---------- */
+.pos-tiles{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pos-tiles .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
+.pos-tiles .kpi{background:var(--surface);padding:16px var(--ppad) 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pos-tiles .kpi-l{font:500 12px/16px var(--f-sans);color:var(--ink3)}
+.pos-tiles .kpi-v{font:600 28px/34px var(--f-sans);letter-spacing:-.025em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pos-tiles .kpi-v.up{color:var(--gain)}
+.pos-tiles .kpi-v.down{color:var(--loss)}
+.pos-tiles .kpi-n{font-size:12px;line-height:16px;color:var(--ink3);min-width:0;text-wrap:pretty}
+.pos-tiles .kpi-cap{padding:0 2px;font-size:12px;line-height:1.5;color:var(--ink3);max-width:80ch;text-wrap:pretty}
+.pos-tiles .kpi-cap a{color:var(--ink2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.pos-tiles .kpi-cap a:hover{color:var(--ink);text-decoration-color:currentColor}
+/* five tiles: three over two, then two columns with the last one across */
+@container pos (max-width:1079px){
+  .pos-tiles .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .pos-tiles .kpi:nth-child(-n+3){grid-column:span 2}
+  .pos-tiles .kpi:nth-child(n+4){grid-column:span 3}
+}
+@container pos (max-width:639px){
+  .pos-tiles .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pos-tiles .kpi:nth-child(n){grid-column:auto}
+  .pos-tiles .kpi:last-child:nth-child(odd){grid-column:1/-1}
+}
+@container pos (max-width:559px){
+  .pos-tiles .kpis{border-radius:0;border-left:0;border-right:0}
+  .pos-tiles .kpi-v{font-size:24px;line-height:30px}
+}
+
+/* ---------- panel: head (title, line under it) and body ---------- */
+.pos-page .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:0;min-width:0;display:flex;flex-direction:column}
+.pos-page .ph{padding:16px var(--ppad) 0}
+.pos-page .ph-t{min-width:0}
+.pos-page .pt{font:600 16px/22px var(--f-sans);letter-spacing:-.015em}
+.pos-page .ps{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;max-width:80ch;text-wrap:pretty}
+.pos-page .pb{padding:12px var(--ppad) 10px;min-width:0}
+.pos-page .empty{padding:24px 0;text-align:center;font-size:13px;color:var(--ink3)}
+@container pos (max-width:559px){
+  .pos-page .panel{border-radius:0;border-left:0;border-right:0}
+}
+
+/* ---------- trades table: sunken head, fixed 38px rows, tabular figures; scrolls inside its wrapper only ---------- */
+.pos-page .twrap{overflow-x:auto;margin-top:12px;border-top:1px solid var(--line);border-radius:0 0 var(--r-3) var(--r-3);position:relative}
+.pos-page .twrap:focus-visible{outline-offset:-2px}
+.pos-page table.t{border-collapse:separate;border-spacing:0;width:100%;min-width:800px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.pos-page .t>thead>tr>th{position:static;height:36px;padding:0 8px;background:var(--sunken);text-align:right;font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom:1px solid var(--line2);white-space:nowrap;vertical-align:middle}
+.pos-page .t>tbody>tr>td{height:var(--row);padding:0 8px;overflow:hidden;text-align:right;white-space:nowrap;vertical-align:middle;background:var(--surface);border-bottom:1px solid var(--line);color:var(--ink)}
+.pos-page .t>thead>tr>th.l,.pos-page .t>tbody>tr>td.l{text-align:left}
+.pos-page .t>thead>tr>th:first-child,.pos-page .t>tbody>tr>td:first-child{text-align:left;padding-left:var(--ppad);position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
+.pos-page .t>thead>tr>th:first-child{z-index:2}
+/* the edge of the sticky column only matters when the table scrolls, i.e. when the panel is narrower than the table */
+@container pos (min-width:801px){
+  .pos-page .t>thead>tr>th:first-child,.pos-page .t>tbody>tr>td:first-child{box-shadow:none}
+}
+.pos-page .t>thead>tr>th:last-child,.pos-page .t>tbody>tr>td:last-child{padding-right:var(--ppad)}
+.pos-page .t>tbody>tr:hover>td{background:var(--hover)}
+.pos-page .t>tbody>tr:last-child>td{border-bottom:0}
+.pos-page .t .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
+/* signed share counts: the sign is printed, the colour only backs it up (the AA-safe tones of styles.css where they exist) */
+.pos-page .t td .up{color:var(--up,var(--gain))}
+.pos-page .t td .down{color:var(--down,var(--loss))}
+/* Move: the tinted boxes of the fund page's "Last change" column */
+.pos-page .t .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
+.pos-page .t .lc .lw{font:500 12px/18px var(--f-sans);color:var(--ink)}
+.pos-page .t .lc.add{background:color-mix(in srgb,var(--gain) 11%,var(--surface))}
+.pos-page .t .lc.trim{background:color-mix(in srgb,var(--loss) 12%,var(--surface))}
+.pos-page .t .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+
+/* ---------- loading ---------- */
+.pos-page .status{font-size:12px;color:var(--ink3)}
+.pos-page .skel{display:flex;flex-direction:column;gap:var(--gap)}
+.pos-page .sk{position:relative;overflow:hidden;display:block;background:var(--sunken);border-radius:var(--r-2)}
+.pos-page .sk::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--shimmer),transparent);transform:translateX(-100%)}
+.pos-page .sk-h1{height:36px;width:min(360px,70%)}
+.pos-page .sk-kpis{height:92px}
+.pos-page .sk-panel{height:260px}
+
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .pos-page .sk::after{animation:pos-shimmer 1.4s linear infinite}
+  :root:not([data-motion="reduce"]) .pos-page .t>tbody>tr>td{transition:background-color var(--d-fast) var(--ease-out)}
+}
+@keyframes pos-shimmer{to{transform:translateX(100%)}}
+
+/* a finger needs a bigger target than a mouse */
+@media (pointer:coarse){
+  .pos-head .crumb{min-height:44px}
+  .pos-tiles .kpi-cap a{display:inline-block;padding-block:10px;margin-block:-10px}
+}

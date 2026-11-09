@@ -118,9 +118,9 @@ function titleOf(stockId: number): string {
 /** Wait until the page has loaded a position (its h1 holds the ticker). */
 const loaded = (name: string) => screen.findByRole("heading", { level: 1, name });
 
-const tile = (label: string) => screen.getByText(label).closest(".tile") as HTMLElement;
-const tileValue = (label: string) => tile(label).querySelector(".v")?.textContent;
-const tileSub = (label: string) => tile(label).querySelector(".d")?.textContent;
+const tile = (label: string) => screen.getByText(label).closest(".kpi") as HTMLElement;
+const tileValue = (label: string) => tile(label).querySelector(".kpi-v")?.textContent;
+const tileSub = (label: string) => tile(label).querySelector(".kpi-n")?.textContent;
 const chart = (label: string) => document.querySelector(`svg[aria-label="${label}"]`);
 const notFound = () => screen.findByRole("heading", { level: 1, name: "Page not found" });
 
@@ -157,13 +157,54 @@ describe("Position page", () => {
       "$ value",
       "Shares after",
     ]);
-    // Oldest first; a stock bought again after a full exit is "New" again.
+    // Oldest first; a stock bought again after a full exit is "New" again. The quarter is "Q2 ’25", the move
+    // a tinted word box and the value whole millions, like the fund page's positions table.
     expect(tradeRows()).toEqual([
-      ["Q1 2023", "New", "+12,916,044", "$111", "$97.59–$121", "$1.43B", "12,916,044"],
-      ["Q2 2023", "Exit", "−12,916,044", "$135", "$110–$153", "$1.74B", "0"],
-      ["Q4 2024", "New", "+12,543,441", "$283", "$223–$343", "$3.55B", "12,543,441"],
-      ["Q2 2025", "Add", "+5,200,998", "$219", "$174–$258", "$1.14B", "17,744,439"],
+      ["Q1 ’23", "New", "+12,916,044", "$111", "$97.59–$121", "$1,431m", "12,916,044"],
+      ["Q2 ’23", "Sold all", "−12,916,044", "$135", "$110–$153", "$1,744m", "0"],
+      ["Q4 ’24", "New", "+12,543,441", "$283", "$223–$343", "$3,554m", "12,543,441"],
+      ["Q2 ’25", "Added", "+5,200,998", "$219", "$174–$258", "$1,137m", "17,744,439"],
     ]);
+  });
+
+  it("shows each move in a tinted box and the shares signed, in the gain or loss colour", async () => {
+    stubData();
+    renderApp(positionPath(GOOGL));
+    await loaded("GOOGL · ALPHABET INC");
+    const table = screen.getByRole("table", { name: "Trades by quarter" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    // New and Added are tinted as gains, Sold all as neutral; Trimmed would be a loss.
+    expect(rows.map((r) => r.querySelector(".lc")?.className)).toEqual(["lc add", "lc sold", "lc add", "lc add"]);
+    expect(rows.map((r) => r.querySelectorAll("td")[2].querySelector("span")?.className)).toEqual(["up", "down", "up", "up"]);
+    // The head of the table names the columns of every row; none is left out at any width (the wrapper scrolls instead).
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(7);
+    expect(screen.getByRole("region", { name: "Trades by quarter, scrollable" })).toContainElement(table);
+  });
+
+  it("tints a trim as a loss", async () => {
+    stubData(
+      soloFund(
+        [
+          [0, 100, 10, 9, 11, 100],
+          [4, -40, 12, 11, 13.5, 60],
+        ],
+        20,
+      ),
+    );
+    renderApp(positionPath(SOLO));
+    await loaded("GOOGL · ALPHABET INC");
+    const rows = within(screen.getByRole("table", { name: "Trades by quarter" })).getAllByRole("row").slice(1);
+    expect(rows[1].querySelector(".lc")).toHaveClass("trim");
+    expect(rows[1].querySelectorAll("td")[2].querySelector("span")).toHaveClass("down");
+  });
+
+  it("puts the sector, the years held and the latest price in three pills under the title", async () => {
+    stubData();
+    renderApp(positionPath(GOOGL));
+    const h1 = await loaded("GOOGL · ALPHABET INC");
+    const pills = Array.from(h1.closest(".pos-head")!.querySelectorAll(".pos-meta .pill")).map((p) => p.textContent);
+    expect(pills).toEqual(["Sector Tech", "Held Q1 2023 – now", "Latest price $137 · 30 Oct 2026"]);
+    expect(screen.getByRole("group", { name: "This position" })).toBeInTheDocument();
   });
 
   it("shows a quarter range of dashes and a trim when a quarter has no prices", async () => {
@@ -179,8 +220,8 @@ describe("Position page", () => {
     renderApp(positionPath(SOLO));
     await loaded("GOOGL · ALPHABET INC");
     expect(tradeRows()).toEqual([
-      ["Q1 2013", "New", "+100", "$10.00", "—", "$1,000", "100"],
-      ["Q1 2014", "Trim", "−40", "$12.00", "$11.00–$13.50", "$480", "60"],
+      ["Q1 ’13", "New", "+100", "$10.00", "—", "$1,000", "100"], // under a million: plain dollars, not "$0m"
+      ["Q1 ’14", "Trimmed", "−40", "$12.00", "$11.00–$13.50", "$480", "60"],
     ]);
   });
 
@@ -192,7 +233,7 @@ describe("Position page", () => {
     const back = screen.getByRole("link", { name: "← Kelpwood Capital LP" });
     expect(back).toHaveAttribute("href", `/fund/${FUND}`);
     expect(h1.querySelector(".mono")).toHaveTextContent("GOOGL");
-    const meta = h1.closest(".fhead")!.querySelector(".meta") as HTMLElement;
+    const meta = h1.closest(".pos-head")!.querySelector(".pos-meta") as HTMLElement;
     expect(meta.textContent).toBe("Sector TechHeld Q1 2023 – nowLatest price $137 · 30 Oct 2026");
   });
 
@@ -200,7 +241,7 @@ describe("Position page", () => {
     stubData();
     renderApp(positionPath(PEABODY));
     const h1 = await loaded(titleOf(PEABODY));
-    const meta = h1.closest(".fhead")!.querySelector(".meta") as HTMLElement;
+    const meta = h1.closest(".pos-head")!.querySelector(".pos-meta") as HTMLElement;
     expect(meta.textContent).toMatch(/Held Q4 2017 – Q3 2019/);
     expect(meta.textContent).toMatch(/Latest price \$351 · 15 Aug 2019/);
     expect(tileValue("Shares now")).toBe("0");
@@ -219,7 +260,7 @@ describe("Position page", () => {
     expect(tileValue("$ in")).toBe("$6.12B");
     // realised + shares now x price - cost now + dividends = 312.7M + 2,431.8M - 4,690.6M + 50.9M
     expect(tileValue("Total P&L")).toBe("−$1.90B");
-    expect(tile("Total P&L").querySelector(".v")).toHaveClass("down");
+    expect(tile("Total P&L").querySelector(".kpi-v")).toHaveClass("down");
     expect(tileSub("Total P&L")).toBe("−31% on $ in · incl. $51M dividends");
     expect(tileValue("IRR")).toMatch(/^[+−]\d+%$/);
     expect(tileSub("IRR")).toBe("mid-quarter trade dates");
@@ -236,7 +277,7 @@ describe("Position page", () => {
     renderApp(positionPath(SOLO));
     await loaded("GOOGL · ALPHABET INC");
     expect(tileValue("IRR")).toBe(expected);
-    expect(tile("IRR").querySelector(".v")).toHaveClass(price > 10 ? "up" : "down");
+    expect(tile("IRR").querySelector(".kpi-v")).toHaveClass(price > 10 ? "up" : "down");
   });
 
   it("total P&L is realised + unrealised + dividends at the live price, with the return on dollars in", async () => {
@@ -248,7 +289,7 @@ describe("Position page", () => {
     expect(tileValue("Avg cost")).toBe("$10.00");
     expect(tileValue("$ in")).toBe("$1,000");
     expect(tileValue("Total P&L")).toBe("+$1,050"); // 0 realised + (100 x 20 - 1,000) + 50
-    expect(tile("Total P&L").querySelector(".v")).toHaveClass("up");
+    expect(tile("Total P&L").querySelector(".kpi-v")).toHaveClass("up");
     expect(tileSub("Total P&L")).toBe("+105% on $ in · incl. $50 dividends");
   });
 
@@ -276,7 +317,7 @@ describe("Position page", () => {
     stubData(soloFund([[0, 100, 10, 9, 11, 100]], null, { dividends: 50 }));
     renderApp(positionPath(SOLO));
     const h1 = await loaded("GOOGL · ALPHABET INC");
-    expect(h1.closest(".fhead")!.querySelector(".meta")!.textContent).toMatch(/Latest price —$/);
+    expect(h1.closest(".pos-head")!.querySelector(".pos-meta")!.textContent).toMatch(/Latest price —$/);
     expect(tileValue("Total P&L")).toBe("—");
     expect(tileSub("Total P&L")).toBe("incl. $50 dividends");
     expect(tileValue("IRR")).toBe("—");
@@ -295,7 +336,7 @@ describe("Position page", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Price and estimated trades" })).toBeInTheDocument();
     expect(chart("Weekly price with estimated trade prices")).not.toBeNull();
     expect(chart("Shares held by quarter")).not.toBeNull();
-    expect(document.querySelectorAll("circle.hit-dot")).toHaveLength(4); // one dot per trade
+    expect(document.querySelectorAll("path.mk")).toHaveLength(4); // one triangle per trade
 
     const props = vi.mocked(StepChart).mock.lastCall![0];
     expect(props.quarters).toEqual([40, 41, 47, 49]);
@@ -362,7 +403,7 @@ describe("Position page", () => {
     stubData({ "securities.json": without });
     renderApp(positionPath(GOOGL));
     const h1 = await loaded(`#${GOOGL}`);
-    expect(h1.closest(".fhead")!.querySelector(".meta")!.textContent).toMatch(/^Sector —Held/);
+    expect(h1.closest(".pos-head")!.querySelector(".pos-meta")!.textContent).toMatch(/^Sector —Held/);
   });
 });
 
@@ -463,6 +504,15 @@ describe("routes and the not-found page", () => {
     expect(within(main).getByRole("link", { name: /home/i })).toHaveAttribute("href", "/");
   });
 
+  it("the not-found page is the artifact's empty state: a card with an icon, the heading, a line and one action", async () => {
+    stubData();
+    renderApp("/no/such/page");
+    const h1 = await notFound();
+    const card = h1.closest(".pg-state") as HTMLElement;
+    expect(card.querySelector(".ic svg")).not.toBeNull();
+    expect(within(card).getAllByRole("link")).toHaveLength(1);
+  });
+
   it("/how-it-works renders the methodology page", async () => {
     const urls = stubData();
     renderApp("/how-it-works");
@@ -482,6 +532,23 @@ describe("routes and the not-found page", () => {
       "buy:  cost += shares bought × VWAP\nsell: realised += shares sold × (VWAP − avg cost)\nunrealised = shares held × latest price − cost\ntotal = realised + unrealised + dividends",
       "quarter return = (end value − start value − net buying + dividends)\n                 ÷ (start value + ½ × net buying)\nyear = the four quarters chained",
     ]);
+  });
+
+  it("the methodology page is a heading block and six sections; the formulas can be focused to scroll", () => {
+    stubData();
+    renderApp("/how-it-works");
+    const sections = Array.from(document.querySelectorAll(".method-page .prose > section"));
+    expect(sections.map((s) => s.querySelector("h2")?.textContent)).toEqual([
+      "What a 13F covers",
+      "Trade prices",
+      "P&L per stock",
+      "Fund returns",
+      "What if they'd kept it",
+      "Not investment advice",
+    ]);
+    // The section numbers are drawn by CSS, so they are not part of any heading's name.
+    sections.forEach((s) => expect(s.querySelector("h2")!.textContent).not.toMatch(/^\d/));
+    document.querySelectorAll(".formula").forEach((f) => expect(f).toHaveAttribute("tabindex", "0"));
   });
 
   it("method page ends with not-advice line", async () => {

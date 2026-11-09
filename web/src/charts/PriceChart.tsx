@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import type { Trade } from "../data/types";
 import { useGrowOnce } from "../fund/hooks";
 import { px, qLabel, sgn } from "../lib/format";
@@ -43,6 +43,7 @@ export function PriceChart({ closes, start, trades, latest, label = "Weekly pric
   const grow = useGrowOnce(ref, { durMs: 1400 });
   const tip = useTooltip();
   const svgRef = useRef<SVGSVGElement>(null);
+  const touched = useRef(false); // the last press on a trade marker was a finger
   const [hover, setHover] = useState<number | null>(null); // week index under the pointer
   const H = width < 480 ? 240 : 300;
   const iw = width - M.l - M.r;
@@ -209,6 +210,14 @@ export function PriceChart({ closes, start, trades, latest, label = "Weekly pric
                 },
                 { place: "cursor" },
               );
+              // A finger leaves as soon as it taps, so on touch the tooltip stays until focus moves on (a tap focuses the triangle).
+              const leave = (e: PointerEvent<Element>) => {
+                if (e.pointerType !== "touch") h.onPointerLeave();
+              };
+              // The browser's own focus move to the tapped (non-focusable) target comes after pointerup, so focus on click.
+              const focusOnTouch = (e: MouseEvent<SVGCircleElement>) => {
+                if (touched.current) (e.currentTarget.nextElementSibling as SVGElement | null)?.focus();
+              };
               return (
                 <g key={k}>
                   {/* A larger invisible target for the pointer; the triangle itself takes keyboard focus. */}
@@ -220,7 +229,11 @@ export function PriceChart({ closes, start, trades, latest, label = "Weekly pric
                     fill="transparent"
                     onPointerEnter={h.onPointerEnter}
                     onPointerMove={h.onPointerMove}
-                    onPointerLeave={h.onPointerLeave}
+                    onPointerLeave={leave}
+                    onPointerDown={(e) => {
+                      touched.current = e.pointerType === "touch";
+                    }}
+                    onClick={focusOnTouch}
                   />
                   <path
                     className={"mk " + (buy ? "buy" : "sell")}
@@ -228,6 +241,7 @@ export function PriceChart({ closes, start, trades, latest, label = "Weekly pric
                     tabIndex={0}
                     aria-label={kind + " " + qLabel(t.q) + " at about " + px(t.px)}
                     {...h}
+                    onPointerLeave={leave}
                   />
                 </g>
               );

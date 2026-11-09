@@ -9,7 +9,7 @@ import { positionRows } from "../src/lib/live";
 import { PeriodPicker } from "../src/fund/PeriodPicker";
 import { PositionsPanel } from "../src/fund/PositionsPanel";
 import { PositionsTable } from "../src/fund/PositionsTable";
-import { defaultPeriod, type PeriodState, type PosRow, type Timeline } from "../src/fund/positions";
+import { defaultPeriod, neededStocks, prefetchOrder, withSortedTrades, type PeriodState, type PosRow, type Timeline } from "../src/fund/positions";
 import { createWeeklyStore, useWeeklyPrices } from "../src/fund/usePositionData";
 
 vi.mock("../src/data/api", async (importOriginal) => {
@@ -40,7 +40,24 @@ beforeAll(() => {
   });
 });
 
+/** requestIdleCallback the tests drive by hand: nothing runs "when the browser is idle" until flushIdle says so. */
+const idle = { next: 1, pending: new Map<number, () => void>() };
+/** Runs the idle callbacks registered so far (those they register in turn wait for the next flush). */
+const flushIdle = () =>
+  act(async () => {
+    const run = [...idle.pending.values()];
+    idle.pending.clear();
+    run.forEach((cb) => cb());
+  });
+
 beforeEach(() => {
+  idle.pending.clear();
+  vi.stubGlobal("requestIdleCallback", (cb: () => void) => {
+    const id = idle.next++;
+    idle.pending.set(id, cb);
+    return id;
+  });
+  vi.stubGlobal("cancelIdleCallback", (id: number) => idle.pending.delete(id));
   // The segmented control places its thumb in an animation frame; run it at once, inside the render's act.
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     cb(0);
@@ -105,9 +122,11 @@ describe("PositionsPanel at the newest quarter", () => {
     expect(ge.querySelector(".lc.add b")?.textContent).toBe("+6.0%");
   });
 
-  test("the newest quarter needs no weekly file", () => {
+  test("the newest quarter needs no weekly file before the browser is idle; then the background prefetch begins", async () => {
     panel();
     expect(weeklyMock).not.toHaveBeenCalled();
+    await flushIdle();
+    expect(weeklyMock).toHaveBeenCalled();
   });
 
   test("clicking a heading sorts every row; clicking it again reverses; text starts ascending", () => {
@@ -361,6 +380,9 @@ describe("a fund with thousands of positions", () => {
     };
   };
   const rows = Array.from({ length: 400 }, (_, i) => mk(i + 1));
+  // jsdom draws rows far slower than a browser: give the pacing a fast clock, so chunks stay 150 unless a test says otherwise
+  beforeEach(() => void vi.spyOn(performance, "now").mockReturnValue(1000));
+  afterEach(() => void vi.restoreAllMocks());
 
   test("draws 150 rows, then more on request; sorting always covers all rows", () => {
     render(
@@ -381,6 +403,117 @@ describe("a fund with thousands of positions", () => {
     expect(screen.queryByRole("button", { name: /Show .* more/ })).toBeNull();
   });
 
+  const table = (r: PosRow[] = rows) => (
+    <MemoryRouter>
+      <PositionsTable fundId={1} rows={r} pending={false} failed={0} mode="quarter" latest={new Map()} />
+    </MemoryRouter>
+  );
+  const byWeight = rows.map((r) => r.ticker).reverse(); // Weight descending: T0400, T0399, ...
+  const quietLine = () => document.querySelector(".t-more")?.textContent;
+
+  test("nothing but the first page before the browser is idle: no extra rows, the button and its count", () => {
+    render(table());
+    expect(rowsOf()).toHaveLength(150);
+    expect(idle.pending.size).toBe(1); // the chunk is only waiting for idle
+    expect(screen.getByRole("button", { name: "Show 150 more" })).toBeInTheDocument();
+    expect(quietLine()).toMatch(/150 of 400 positions shown/);
+  });
+
+  test("once idle, the rest follows 150 at a time in the sorted order; the button gives way to a quiet 'Loading N more…' line", async () => {
+    render(table());
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(300);
+    expect(tickers()).toEqual(byWeight.slice(0, 300));
+    expect(screen.queryByRole("button", { name: /Show .* more/ })).toBeNull();
+    expect(quietLine()).toBe("Loading 100 more…");
+    expect(document.querySelector(".t-more .btn, .t-more svg, .t-more [role=progressbar]")).toBeNull(); // quiet: no spinner
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(400);
+    expect(tickers()).toEqual(byWeight);
+    expect(document.querySelector(".t-more")).toBeNull(); // everything is shown: no button, no line
+    expect(idle.pending.size).toBe(0); // and nothing more is scheduled
+  });
+
+  test("'Show more' before idle still works, and the fill carries on from there", async () => {
+    render(table());
+    fireEvent.click(screen.getByRole("button", { name: "Show 150 more" }));
+    expect(rowsOf()).toHaveLength(300);
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(400);
+    expect(tickers()).toEqual(byWeight);
+  });
+
+  test("a re-sort starts again from the first chunk, and the chunks keep the new order of every row", async () => {
+    render(table());
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(300);
+    fireEvent.click(screen.getByRole("button", { name: "Stock" }));
+    expect(rowsOf()).toHaveLength(150);
+    expect(quietLine()).toBe("Loading 250 more…"); // already filling: no flicker back to the button
+    expect(tickers()).toEqual([...byWeight].sort().slice(0, 150));
+    await flushIdle();
+    expect(tickers()).toEqual([...byWeight].sort().slice(0, 300));
+    fireEvent.click(screen.getByRole("button", { name: "Stock" })); // descending
+    expect(tickers()).toEqual([...byWeight].sort().reverse().slice(0, 150));
+    await flushIdle();
+    await flushIdle();
+    expect(tickers()).toEqual([...byWeight].sort().reverse());
+  });
+
+  test("a new period (new rows) starts again from the first chunk", async () => {
+    const { rerender } = render(table());
+    await flushIdle();
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(400);
+    rerender(table(rows.slice(0, 380)));
+    expect(rowsOf()).toHaveLength(150);
+    expect(quietLine()).toBe("Loading 230 more…");
+    await flushIdle();
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(380);
+  });
+
+  test("a row that is open stays open while chunks arrive, and the rows before it are not redrawn", async () => {
+    render(table());
+    const first = rowsOf()[0];
+    fireEvent.click(first);
+    expect(first).toHaveAttribute("aria-expanded", "true");
+    await flushIdle();
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(400);
+    expect(rowsOf()[0]).toBe(first); // the same element: React kept it
+    expect(first).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelectorAll(".xrow")).toHaveLength(1);
+  });
+
+  test("a chunk that takes long to draw makes the next one smaller (a slow device is never blocked for long)", async () => {
+    let t = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => (t += 100));
+    render(table(Array.from({ length: 700 }, (_, i) => mk(i + 1))));
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(300); // the first chunk is a full 150 ...
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(375); // ... it was slow, so the next is half
+    await flushIdle();
+    expect(rowsOf()).toHaveLength(375 + 37);
+  });
+
+  test("unmounting stops the fill: the idle callback is cancelled", () => {
+    const { unmount } = render(table());
+    expect(idle.pending.size).toBe(1);
+    unmount();
+    expect(idle.pending.size).toBe(0);
+  });
+
+  test("'Loading prices…' says how far the files are", () => {
+    render(
+      <MemoryRouter>
+        <PositionsTable fundId={1} rows={rows.slice(0, 5)} pending failed={0} progress={{ done: 120, total: 340 }} mode="quarter" latest={new Map()} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Loading prices… 120 of 340");
+  });
+
   test("an empty period says the fund held nothing", () => {
     render(
       <MemoryRouter>
@@ -388,5 +521,210 @@ describe("a fund with thousands of positions", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("The fund held nothing in this period.")).toBeInTheDocument();
+  });
+});
+
+describe("background prefetch of every position's weekly file", () => {
+  const sorted = withSortedTrades(positions);
+  const tl: Timeline = { qmin: summary.tracked_since_q, latest: summary.period_q, asof: latest.asof };
+  const plan = prefetchOrder(sorted, tl, prices);
+  const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+  /** Weekly loads that stay in flight until the test lets them go. */
+  function held() {
+    const open = new Map<number, () => void>();
+    weeklyMock.mockImplementation((id: number) => new Promise<Weekly>((ok) => open.set(id, () => ok(flat(id)))));
+    const release = async (n = Infinity) => {
+      for (const [id, go] of [...open].slice(0, n)) {
+        open.delete(id);
+        go();
+      }
+      await flush();
+    };
+    return { open, release };
+  }
+  const calledIds = () => weeklyMock.mock.calls.map((c) => c[0]);
+  const errors = () => vi.spyOn(console, "error").mockImplementation(() => {});
+
+  afterEach(() => {
+    delete (navigator as unknown as Record<string, unknown>).connection;
+    delete (document as unknown as Record<string, unknown>).hidden;
+    vi.restoreAllMocks();
+  });
+
+  test("starts when the browser is idle: held positions first, low fetch priority, three at a time, every position once", async () => {
+    const { open, release } = held();
+    panel();
+    expect(weeklyMock).not.toHaveBeenCalled();
+    await flushIdle();
+    expect(calledIds()).toEqual(plan.slice(0, 3));
+    expect(plan.slice(0, 9).every((id) => positions.find((p) => p.stock_id === id)!.shares_now > 0)).toBe(true); // the 9 held now come first
+    for (const c of weeklyMock.mock.calls) expect(c[1]).toEqual({ priority: "low" });
+    expect(open.size).toBe(3);
+    for (let i = 0; i < 30 && calledIds().length < plan.length; i++) {
+      await release();
+      expect(open.size).toBeLessThanOrEqual(3);
+    }
+    expect(calledIds()).toEqual(plan);
+  });
+
+  test("Save-Data and 2G: no background prefetch at all", async () => {
+    for (const connection of [{ saveData: true }, { effectiveType: "2g" }, { effectiveType: "slow-2g" }]) {
+      Object.defineProperty(navigator, "connection", { value: connection, configurable: true });
+      weeklyMock.mockClear();
+      const { unmount } = panel();
+      await flushIdle();
+      await flush();
+      expect(weeklyMock).not.toHaveBeenCalled();
+      unmount();
+    }
+  });
+
+  test("a hidden tab pauses it; it resumes when the tab is visible again", async () => {
+    let hidden = true;
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+    const { open, release } = held();
+    panel();
+    await flushIdle();
+    expect(weeklyMock).not.toHaveBeenCalled();
+    hidden = false;
+    await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+    expect(calledIds()).toEqual(plan.slice(0, 3));
+    hidden = true;
+    await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+    await release();
+    expect(calledIds()).toHaveLength(3); // nothing new while hidden
+    expect(open.size).toBe(0);
+    hidden = false;
+    await act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+    expect(calledIds()).toEqual(plan.slice(0, 6));
+  });
+
+  test("unmounting cancels it: nothing more is requested, nothing is set after, no warnings", async () => {
+    const err = errors();
+    const { open, release } = held();
+    const view = panel();
+    await flushIdle();
+    expect(calledIds()).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" })); // demand in flight as well
+    await flush();
+    const calls = calledIds().length;
+    expect(calls).toBeGreaterThan(3);
+    view.unmount();
+    expect(idle.pending.size).toBe(0);
+    await release();
+    await release();
+    await flush();
+    expect(calledIds()).toHaveLength(calls);
+    expect(open.size).toBe(0);
+    expect(err).not.toHaveBeenCalled();
+  });
+
+  test("unmounting before the idle moment leaves no callback behind and requests nothing", async () => {
+    const view = panel();
+    expect(idle.pending.size).toBeGreaterThan(0);
+    view.unmount();
+    expect(idle.pending.size).toBe(0);
+    await flushIdle();
+    expect(weeklyMock).not.toHaveBeenCalled();
+  });
+
+  test("a new fund (the panel is keyed by it) starts a plan of its own and drops the old one", async () => {
+    const { open } = held();
+    const props = { summary, positions, prices, stocks, asof: latest.asof };
+    const view = render(
+      <MemoryRouter>
+        <PositionsPanel fundId={9100002} {...props} />
+      </MemoryRouter>,
+    );
+    await flushIdle();
+    expect(calledIds()).toHaveLength(3);
+    view.rerender(
+      <MemoryRouter>
+        <PositionsPanel fundId={9100003} {...props} />
+      </MemoryRouter>,
+    );
+    await flushIdle();
+    // the old plan stopped (its three loads finish, nothing more of it starts); the new panel begins at the top again
+    expect(calledIds()).toEqual([...plan.slice(0, 3), ...plan.slice(0, 3)].filter((id, i) => i < 3 || !open.has(id) || true));
+    expect(weeklyMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("stepping back after the prefetch has finished makes no new requests and never shows 'Loading prices…'", async () => {
+    panel();
+    await flushIdle();
+    await waitFor(() => expect(weeklyMock).toHaveBeenCalledTimes(plan.length));
+    await flush();
+    const calls = weeklyMock.mock.calls.length;
+    for (const label of ["Q1 ’26", "Q4 ’25", "Q3 ’25", "Q2 ’25"]) {
+      fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
+      expect(selected()).toBe(label);
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.getByRole("region", { name: "Positions table, scrollable" })).toHaveAttribute("aria-busy", "false");
+      expect(rowsOf().length).toBeGreaterThan(0);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Year" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    expect(screen.queryByRole("status")).toBeNull();
+    await flush();
+    expect(weeklyMock).toHaveBeenCalledTimes(calls);
+  });
+
+  test("a missing file (404) is remembered as 'no price history': not retried, not reported", async () => {
+    weeklyMock.mockImplementation(() => Promise.reject(new NotFoundError("x/weekly.json")));
+    panel();
+    await flushIdle();
+    await waitFor(() => expect(weeklyMock).toHaveBeenCalledTimes(plan.length));
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
+    await flush();
+    expect(weeklyMock).toHaveBeenCalledTimes(plan.length);
+    expect(screen.queryByRole("status")).toBeNull(); // neither "Loading prices…" nor the could-not-be-loaded note
+    expect(rowsOf().length).toBeGreaterThan(0);
+  });
+
+  test("stepping back before it has finished: the loads under way are waited for, the rest jump the plan, the count moves", async () => {
+    const { open, release } = held();
+    panel();
+    await flushIdle();
+    const underWay = calledIds();
+    expect(underWay).toEqual(plan.slice(0, 3));
+    const before = tickers();
+    fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
+    const need = neededStocks(sorted, tl.latest - 1, tl.latest - 1, tl);
+    expect(need.length).toBeGreaterThan(8);
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(`Loading prices… 0 of ${need.length}`);
+    expect(tickers()).toEqual(before); // the previous rows stay
+    await flush();
+    // each file is requested once: the three under way are not asked for again, and demand is not held up
+    // by the background plan's three slots
+    const ids = calledIds();
+    expect(new Set(ids).size).toBe(ids.length);
+    const demandCalls = weeklyMock.mock.calls.filter((c) => c.length === 1).map((c) => c[0]);
+    expect(demandCalls.length).toBe(8);
+    expect(demandCalls.every((id) => need.includes(id))).toBe(true);
+    expect(weeklyMock.mock.calls.filter((c) => c.length === 2)).toHaveLength(3); // no new background load: the three slots are taken
+    // some arrive: the count follows (it updates a few times a second, and at once at the end)
+    await release(6);
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Loading prices… [1-9]\d* of /));
+    for (let i = 0; i < 40 && screen.queryByRole("status"); i++) await release();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(open.size).toBeLessThanOrEqual(3);
+    expect(rowsOf().length).toBeGreaterThan(0);
+  });
+
+  test("opening a row asks for its file ahead of the plan", async () => {
+    const { release } = held();
+    panel();
+    await flushIdle();
+    const last = rowsOf().at(-1)!;
+    const id = positions.find((p) => stocks.get(p.stock_id)?.ticker === last.getAttribute("data-t"))!.stock_id;
+    expect(calledIds()).not.toContain(id);
+    fireEvent.click(last);
+    await flush();
+    expect(weeklyMock).toHaveBeenLastCalledWith(id); // demand: no low priority
+    await release();
+    await screen.findByRole("img", { name: /share price/ });
   });
 });

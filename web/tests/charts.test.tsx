@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { PriceChart } from "../src/charts/PriceChart";
@@ -9,7 +9,13 @@ import type { Trade } from "../src/data/types";
 // jsdom has no PointerEvent, so fireEvent.pointer* would drop clientX/clientY.
 beforeAll(() => {
   if (!("PointerEvent" in window)) {
-    class PointerEventShim extends MouseEvent {}
+    class PointerEventShim extends MouseEvent {
+      pointerType: string;
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerType = init.pointerType ?? "mouse";
+      }
+    }
     Object.defineProperty(window, "PointerEvent", { value: PointerEventShim, configurable: true });
   }
 });
@@ -36,11 +42,10 @@ const trades: Trade[] = [
 ];
 
 describe("PriceChart", () => {
-  test("the weekly line is one path in --ink2 with a 2 px stroke", () => {
+  test("the weekly line is one unfilled path (its look is in charts.css)", () => {
     const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
     const line = container.querySelector("path.price-line") as SVGPathElement;
-    expect(line.style.stroke).toBe("var(--ink2)");
-    expect(line.getAttribute("stroke-width")).toBe("2");
+    expect(line.getAttribute("fill")).toBe("none");
     expect(line.getAttribute("d")!.match(/M/g)).toHaveLength(1);
   });
 
@@ -55,42 +60,52 @@ describe("PriceChart", () => {
     expect(points).toHaveLength(closes.length - 2); // one point per priced week, none for the gap
   });
 
-  test("buy and sell dots use --s1 and --s2 and carry their own class", () => {
+  test("buys are up triangles and sales down triangles, each focusable with its own name", () => {
     const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
-    const buys = Array.from(container.querySelectorAll("circle.hit-dot.buy")) as SVGElement[];
-    const sells = Array.from(container.querySelectorAll("circle.hit-dot.sell")) as SVGElement[];
+    const buys = Array.from(container.querySelectorAll("path.mk.buy")) as SVGElement[];
+    const sells = Array.from(container.querySelectorAll("path.mk.sell")) as SVGElement[];
     expect(buys).toHaveLength(2);
     expect(sells).toHaveLength(2);
-    buys.forEach((c) => expect(c.style.fill).toBe("var(--s1)"));
-    sells.forEach((c) => expect(c.style.fill).toBe("var(--s2)"));
-    [...buys, ...sells].forEach((c) => {
-      expect(c.getAttribute("tabindex")).toBe("0");
-      expect(c.getAttribute("r")).toBe("5");
-    });
+    // The tip of an up triangle is its first point and is above the base; a down triangle's is below.
+    const rise = (el: Element) => Number(/l[\d.]+,(-?[\d.]+)h/.exec(el.getAttribute("d")!)![1]);
+    buys.forEach((c) => expect(rise(c)).toBeGreaterThan(0)); // screen y grows downwards: the base is below the tip
+    sells.forEach((c) => expect(rise(c)).toBeLessThan(0));
+    [...buys, ...sells].forEach((c) => expect(c.getAttribute("tabindex")).toBe("0"));
     expect(buys[0].getAttribute("aria-label")).toBe("New Q1 2020 at about $11.00");
+    expect(sells[1].getAttribute("aria-label")).toBe("Exit Q4 2020 at about $14.00");
   });
 
   test("the quarter low-high band is drawn only for quarters that have a range", () => {
     const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
     const bands = container.querySelectorAll("rect.band");
     expect(bands).toHaveLength(3);
-    bands.forEach((b) => {
-      expect(num(b, "width")).toBe(8);
-      expect((b as SVGElement).style.fill).toBe("var(--range)");
-    });
+    bands.forEach((b) => expect(num(b, "width")).toBe(8));
   });
 
-  test("dots sit on their estimated price: a higher price is higher on screen", () => {
+  test("markers sit on their estimated price: a higher price is higher on screen", () => {
     const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
-    const dots = container.querySelectorAll("circle.hit-dot");
-    expect(num(dots[3], "cy")).toBeLessThan(num(dots[0], "cy")); // 14 above 11
-    expect(num(dots[3], "cx")).toBeGreaterThan(num(dots[0], "cx")); // later quarter further right
+    const hits = container.querySelectorAll("circle.mk-hit");
+    expect(hits).toHaveLength(4);
+    // The pointer targets are centred a few px off the price, towards their triangle; 14 is still above 11.
+    expect(num(hits[3], "cy")).toBeLessThan(num(hits[0], "cy"));
+    expect(num(hits[3], "cx")).toBeGreaterThan(num(hits[0], "cx")); // later quarter further right
   });
 
-  test("has a legend naming the line, both dots and the band", () => {
+  test("the line ends in a dot and a label at the latest price when one is given", () => {
+    const a = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
+    expect(a.container.querySelector("circle.pxdot")).toBeNull();
+    a.unmount();
+    const b = render(<PriceChart closes={closesFull} start={START} trades={trades} latest={12.5} />);
+    expect(b.container.querySelector("circle.pxdot")).not.toBeNull();
+    expect(b.container.querySelector("text.blab")!.textContent).toBe("$12.50");
+  });
+
+  test("has a legend naming the line, both triangles and the band", () => {
     const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
     const legend = container.querySelector(".legend")!;
     ["Weekly close", "Buy", "Sell", "Quarter low"].forEach((t) => expect(legend.textContent).toContain(t));
+    // One swatch per entry, in the shape of what it names; the colour is `currentColor` of the swatch.
+    expect(Array.from(legend.querySelectorAll("i")).map((i) => i.className)).toEqual(["lg-lk", "lg-up", "lg-dn", "lg-sw"]);
   });
 
   test("the svg is a group (its trade dots take focus) with a default or supplied label", () => {
@@ -136,9 +151,9 @@ describe("PriceChart", () => {
   test("a trade dot shows its tooltip on focus and on hover", async () => {
     const user = userEvent.setup();
     const { container } = withTip(<PriceChart closes={closesFull} start={START} trades={trades} />);
-    const dots = container.querySelectorAll("circle.hit-dot");
+    const dots = container.querySelectorAll("path.mk");
 
-    await user.tab(); // first tab stop is the first dot
+    await user.tab(); // first tab stop is the first marker
     expect(document.activeElement).toBe(dots[0]);
     expect(tipEl().querySelector(".t")!.textContent).toBe("New · Q1 2020");
     expect(Array.from(tipEl().querySelectorAll(".v")).map((r) => r.textContent)).toEqual([
@@ -160,6 +175,32 @@ describe("PriceChart", () => {
     expect(tipEl().querySelector(".t")!.textContent).toBe("Exit · Q4 2020");
     expect(tipEl().querySelector(".v")!.textContent).toContain("$14.00");
     expect(tipEl().textContent).toContain("shares−100");
+  });
+
+  test("a finger tap on a trade marker focuses it, and its tooltip stays until focus moves on", () => {
+    const { container } = withTip(<PriceChart closes={closesFull} start={START} trades={trades} />);
+    const hit = container.querySelectorAll("circle.mk-hit")[1];
+    const marker = container.querySelectorAll("path.mk")[1] as SVGElement;
+    fireEvent.pointerEnter(hit, { pointerType: "touch" });
+    fireEvent.pointerDown(hit, { pointerType: "touch" });
+    fireEvent.pointerLeave(hit, { pointerType: "touch" }); // the finger lifts
+    fireEvent.click(hit);
+    expect(document.activeElement).toBe(marker);
+    expect(tipEl().hidden).toBe(false);
+    expect(tipEl().querySelector(".t")!.textContent).toBe("Add · Q2 2020");
+    act(() => marker.blur());
+    expect(tipEl().hidden).toBe(true);
+  });
+
+  test("a mouse leaving a trade marker hides its tooltip, and a click does not move focus", () => {
+    const { container } = withTip(<PriceChart closes={closesFull} start={START} trades={trades} />);
+    const hit = container.querySelectorAll("circle.mk-hit")[0];
+    fireEvent.pointerEnter(hit, { clientX: 100, clientY: 100 });
+    expect(tipEl().hidden).toBe(false);
+    fireEvent.click(hit);
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.pointerLeave(hit);
+    expect(tipEl().hidden).toBe(true);
   });
 
   test("shows year labels on the x axis", () => {
@@ -192,8 +233,6 @@ describe("StepChart", () => {
     const line = container.querySelector("path.step-line")!.getAttribute("d")!;
     expect(line.match(/V/g)).toHaveLength(3);
     expect(line.match(/M/g)).toHaveLength(1);
-    expect(container.querySelector("path.step-line")!.getAttribute("stroke-width")).toBe("2");
-    expect((container.querySelector("path.step-line") as SVGElement).style.stroke).toBe("var(--s1)");
     expect(container.querySelector("path.step-area")).not.toBeNull();
   });
 
@@ -244,8 +283,74 @@ describe("StepChart", () => {
     expect(container.querySelector("line.crosshair")).toBeNull();
   });
 
+  test("a tick under the baseline marks each quarter, taller at a new year", () => {
+    // 18 (two quarters of lead-in) to 33 inclusive: 16 quarters, so 17 edges.
+    const { container } = render(<StepChart quarters={stepQuarters} shares={stepShares} endQ={33} />);
+    const ticks = container.querySelectorAll("line.qtick");
+    expect(ticks).toHaveLength(17);
+    expect(container.querySelectorAll("line.qtick.yr")).toHaveLength(4); // quarters 20, 24, 28 and 32 start a year
+  });
+
+  test("with no room for them the quarter ticks are left out", () => {
+    // 100 quarters in 574px of plot: under 5.74px each is fine, so use far more.
+    const { container } = render(<StepChart quarters={[0]} shares={[1]} endQ={400} />);
+    expect(container.querySelectorAll("line.qtick")).toHaveLength(0);
+  });
+
   test("renders with nothing to draw", () => {
     const { container } = render(<StepChart quarters={[]} shares={[]} />);
     expect(container.innerHTML).not.toContain("NaN");
+  });
+});
+
+// ------------------------------------------------------------------- grow-in
+
+// The chart draws in once, when it first comes into view, and only if motion is not reduced.
+describe("grow-in", () => {
+  type Callback = (entries: { isIntersecting: boolean }[]) => void;
+  let fire: Callback = () => {};
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: Callback) {
+          fire = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const classes = (c: HTMLElement) => c.querySelector("svg")!.getAttribute("class")!;
+
+  test("the price chart is hidden until it is in view, runs once, then settles and never replays", () => {
+    const { container, rerender } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
+    expect(classes(container)).toBe("pxsvg pre");
+    act(() => fire([{ isIntersecting: true }]));
+    expect(classes(container)).toBe("pxsvg run");
+    rerender(<PriceChart closes={closesFull} start={START} trades={trades} label="Again" />); // a re-render does not restart it
+    expect(classes(container)).toBe("pxsvg run");
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    expect(classes(container)).toBe("pxsvg");
+    rerender(<PriceChart closes={closesFull} start={START} trades={trades.slice(0, 2)} />); // new data: still drawn, not replayed
+    expect(classes(container)).toBe("pxsvg");
+  });
+
+  test("the shares chart does the same", () => {
+    const { container } = render(<StepChart quarters={stepQuarters} shares={stepShares} />);
+    expect(classes(container)).toBe("stsvg pre");
+    act(() => fire([{ isIntersecting: true }]));
+    expect(classes(container)).toBe("stsvg run");
+  });
+
+  test("with reduced motion the chart is drawn at once", () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {} }));
+    const { container } = render(<PriceChart closes={closesFull} start={START} trades={trades} />);
+    expect(classes(container)).toBe("pxsvg");
   });
 });

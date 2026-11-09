@@ -35,7 +35,8 @@
 .pxc .mk{stroke:var(--surface);stroke-width:1.5;stroke-linejoin:round;cursor:pointer;outline:none}
 .pxc .mk.buy{fill:var(--gain)}
 .pxc .mk.sell{fill:var(--loss)}
-.pxc .mk:focus-visible{stroke:var(--ink);stroke-width:2.5}
+/* keyboard focus: a heavier ink outline on the triangle itself (every browser) and the page's focus ring around it */
+.pxc .mk:focus-visible{stroke:var(--ink);stroke-width:2.5;outline:2px solid var(--focus);outline-offset:3px}
 .pxc .mk-hit{cursor:pointer}
 
 /* shares-held chart: the level in the gain colour */
@@ -62,6 +63,6 @@
    " pre" then " run" on the svg; with reduced motion, or without IntersectionObserver, neither is set) */
 @media (prefers-reduced-motion:no-preference){
   :root:not([data-motion="reduce"]) :is(.pxsvg,.stsvg).pre :is(.pxdraw,.stdraw){clip-path:inset(0 100% 0 0)}
-  :root:not([data-motion="reduce"]) :is(.pxsvg,.stsvg).run :is(.pxdraw,.stdraw){animation:chart-wipe 1000ms var(--ease-out) backwards}
+  :root:not([data-motion="reduce"]) :is(.pxsvg,.stsvg).run :is(.pxdraw,.stdraw){animation:chart-wipe 1100ms var(--ease-std) backwards}
 }
 @keyframes chart-wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}

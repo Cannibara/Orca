@@ -15,6 +15,7 @@ import type {
   TopRow,
 } from "../src/data/types";
 import Home from "../src/pages/Home";
+import { fBook } from "../src/pages/homeFmt";
 
 // ---- fixtures: the demo JSON under public/demo-data, served through a mocked fetch ----
 
@@ -104,6 +105,19 @@ beforeEach(() => clearDataCache());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Home", () => {
+  it("\"/\" jumps to the search, except while typing in a text field", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    const box = screen.getByRole("searchbox", { name: /search a fund/i });
+    expect(box).not.toHaveFocus();
+    await user.keyboard("/");
+    expect(box).toHaveFocus();
+    expect(box).toHaveValue(""); // the key opens the field, it is not typed into it
+    await user.keyboard("a/b");
+    expect(box).toHaveValue("a/b"); // inside the field a slash is just a character
+  });
+
   it("shows five tabs in order", async () => {
     stubData();
     renderHome();
@@ -372,7 +386,7 @@ describe("Home", () => {
       expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(headers);
       // no SPY benchmark column or rule anywhere on Home
       expect(screen.queryAllByRole("columnheader", { name: /spy|s&p/i })).toHaveLength(0);
-      expect(document.querySelector(".rule")?.textContent).not.toMatch(/spy|s&p/i);
+      expect(document.querySelector(".home .ps")?.textContent).not.toMatch(/spy|s&p/i);
     }
   });
 
@@ -406,19 +420,76 @@ describe("Home", () => {
     expect(within(table).queryByRole("columnheader", { name: /vs|score|quarter/i })).toBeNull();
     const [added, trimmed, exit] = within(table).getAllByRole("row").slice(1); // the file's order
     expect(within(exit).getByText("Exit")).toBeInTheDocument();
-    expect(within(exit).getByText("0.0%")).toBeInTheDocument();
+    expect(within(exit).getByText("0%")).toBeInTheDocument();
     expect(within(exit).getByText("−9.6 pts")).toBeInTheDocument();
-    expect(within(exit).getByText("−$45M")).toBeInTheDocument();
+    expect(within(exit).getByText("−$45m")).toBeInTheDocument();
     expect(within(exit).getByText("$100")).toBeInTheDocument();
     expect(within(exit).getByText("$80.00")).toBeInTheDocument(); // the price now
-    expect(within(exit).getByText("−20.0%")).toBeInTheDocument(); // 80 / 100 - 1
+    expect(within(exit).getByText("−20%")).toBeInTheDocument(); // 80 / 100 - 1
     expect(within(exit).getByRole("link", { name: /UNH/ })).toHaveAttribute("href", "/fund/9100003/stock/13");
     expect(within(added).getByText("New")).toBeInTheDocument();
-    expect(within(added).getByText("+$60M")).toBeInTheDocument();
-    expect(within(added).getByText("9.2%")).toBeInTheDocument();
+    expect(within(added).getByText("+$60m")).toBeInTheDocument();
+    expect(within(added).getByText("9%")).toBeInTheDocument();
     expect(within(added).getByText("+9.2 pts")).toBeInTheDocument();
     expect(within(added).getAllByText("—")).toHaveLength(2); // no price now, so no move since
-    expect(within(trimmed).getByText("Trim")).toHaveClass("sell");
+    expect(within(trimmed).getByText("Trim").closest(".lc")).toHaveClass("trim"); // a tinted box: orange for a cut
+  });
+
+  it("names each fund over its reported book on the lists that carry the fund's name as a link", async () => {
+    const funds = demo<FundsIndex>("funds.json");
+    const lantern = funds.book[funds.id.indexOf(9100003)];
+    const rows: ConvictionRow[] = [
+      { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q: 53, move: "new", usd: 60e6, weight_after: 0.06, change_pts: 6, est_price: 10, score: 3 },
+    ];
+    stubData({ "home/conviction_q.json": { latest_q: 53, rows } });
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
+    const row = (await screen.findAllByRole("row"))[1];
+    const link = within(row).getByRole("link", { name: "Lanternfish Capital Management" });
+    expect(link.parentElement).toHaveClass("stk");
+    expect(link.nextElementSibling).toHaveTextContent(fBook(lantern)); // the muted line, outside the link
+  });
+
+  it("shows no book line when the fund index could not be loaded, and the list still works", async () => {
+    stubData({}, ["funds.json"]);
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Best & worst calls" }));
+    const row = (await screen.findAllByRole("row"))[1];
+    expect(within(row).getAllByRole("link")).toHaveLength(2); // stock and fund
+    expect(row.querySelector(".sub")).toBeNull();
+  });
+
+  it("shows skeleton rows with a status while a list loads, and keeps the period control", async () => {
+    stubData();
+    renderHome();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+    expect(screen.getByRole("group", { name: "Period" })).toBeInTheDocument();
+    await screen.findByRole("table", { name: "Top funds" });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("an empty list is the dashed state card, not a table of headings", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("table", { name: "Top funds" });
+    await user.click(screen.getByRole("button", { name: "15 years" }));
+    const msg = await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.");
+    expect(msg.closest(".state")).not.toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("an error is the error state with the same words as before", async () => {
+    stubData({}, ["home/crowded.json"]);
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Crowded buys" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveClass("state", "err");
+    expect(alert).toHaveTextContent("Couldn't load this list.");
+    expect(alert).toHaveTextContent("Check your connection and reload the page.");
   });
 
   it("conviction shows the same page bar in both views, even on a single page", async () => {
@@ -458,12 +529,12 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     const table = await screen.findByRole("table", { name: "Conviction moves" });
-    const dollars = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getByText(/\$\d+M/).textContent);
-    expect(dollars()).toEqual(["+$40M", "−$80M", "+$60M"]); // the file's order
+    const dollars = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getByText(/\$\d+m/).textContent);
+    expect(dollars()).toEqual(["+$40m", "−$80m", "+$60m"]); // the file's order
     await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
-    expect(dollars()).toEqual(["+$60M", "+$40M", "−$80M"]);
+    expect(dollars()).toEqual(["+$60m", "+$40m", "−$80m"]);
     await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
-    expect(dollars()).toEqual(["−$80M", "+$40M", "+$60M"]);
+    expect(dollars()).toEqual(["−$80m", "+$40m", "+$60m"]);
     await user.click(within(table).getByRole("button", { name: "Buy/Sell" }));
     expect(within(within(table).getAllByRole("row")[3]).getByText("Exit")).toBeInTheDocument(); // buys first
   });
@@ -499,8 +570,8 @@ describe("Home", () => {
     const cells = within(first).getAllByRole("cell");
     expect(cells[0].textContent).toContain("AVGO");
     expect(cells[1].textContent).toBe("5");
-    expect(cells[2].textContent).toBe("$9.24B");
-    expect(cells[3].textContent).toBe("7.7%");
+    expect(cells[2].textContent).toBe("$9.2B");
+    expect(cells[3].textContent).toBe("8%");
   });
 
   it("calls computes since-buy from latest price", async () => {
@@ -512,13 +583,14 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Best & worst calls" }));
     const row = (await screen.findAllByRole("row"))[1];
-    expect(within(row).getByRole("link", { name: /VISA INC/ })).toHaveAttribute("href", "/fund/9100001/stock/16");
+    expect(within(row).getByRole("link", { name: /Visa/ })).toHaveAttribute("href", "/fund/9100001/stock/16"); // the name tidied, as on the fund page
     expect(within(row).getByRole("link", { name: "Kelpwood Capital LP" })).toHaveAttribute("href", "/fund/9100001");
     expect(within(row).getByText("Q2 2026")).toBeInTheDocument();
     expect(within(row).getByText("$10.00")).toBeInTheDocument(); // est. buy price
     expect(within(row).getByText("$12.00")).toBeInTheDocument(); // price now
-    expect(within(row).getByText("+20.0%")).toBeInTheDocument(); // 12 / 10 - 1
-    expect(within(row).getByText("+9.1%")).toBeInTheDocument(); // 12 / 11 - 1
+    expect(within(row).getByText("+20%")).toBeInTheDocument(); // 12 / 10 - 1
+    expect(within(row).getByText("+20%").closest(".lc")).toHaveClass("add"); // the fund's buy, in a blue-tinted box
+    expect(within(row).getByText("+9%")).toBeInTheDocument(); // 12 / 11 - 1
   });
 
   it("calls shows a dash where the latest price is missing", async () => {

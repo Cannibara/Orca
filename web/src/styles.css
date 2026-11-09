@@ -43,8 +43,8 @@ a{color:inherit}
 :is(p,li) a:hover{text-decoration-color:currentColor}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 h1,h2,h3{margin:0;text-wrap:balance}
-h1{font:600 clamp(26px,4vw,36px)/1.1 var(--f-sans);letter-spacing:-.03em}
-h2{font:600 clamp(18px,2.4vw,22px)/1.25 var(--f-sans);letter-spacing:-.02em}
+h1{font:600 clamp(28px,5vw,40px)/1.08 var(--f-sans);letter-spacing:-.03em}
+h2{font:600 clamp(17px,2vw,20px)/1.25 var(--f-sans);letter-spacing:-.02em}
 h3{font:600 15px/1.35 var(--f-sans);letter-spacing:-.01em}
 p{margin:0}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -52,6 +52,10 @@ p{margin:0}
 .num{font-variant-numeric:tabular-nums}
 .up{color:var(--up)} .down{color:var(--down)}
 .eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+/* kbd: a key cap, for hints such as the "/" that focuses the search */
+.kbd{font:500 11px/1 var(--f-mono);min-width:20px;height:20px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-bottom-width:2px;border-radius:var(--r-1);color:var(--ink3);background:var(--surface)}
+/* ico: the 16px line icons (inline svg, stroke follows the text colour) */
+.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
 .lede{font-size:16px;line-height:1.5;color:var(--ink2);max-width:66ch;text-wrap:pretty}
 .cap{font-size:12px;line-height:1.5;color:var(--ink3)}
 .hint{font-size:13px;color:var(--ink2)}
@@ -82,6 +86,12 @@ main{padding-block:32px 72px}
 .badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-pill);border:1px solid color-mix(in srgb,var(--warn) 60%,var(--line2));background:color-mix(in srgb,var(--warn) 18%,var(--surface));color:var(--ink);font:500 12px/1 var(--f-sans);white-space:nowrap}
 /* rule: the one-line statement of how a list is picked */
 .rule{font-size:12.5px;line-height:1.5;color:var(--ink2);border:1px dashed var(--line2);border-radius:var(--r-2);padding:9px 12px;text-wrap:pretty}
+/* state: an empty or failed list, the artifact's dashed card with a small icon (an error is crimson-marked) */
+.state{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:24px 20px;border:1px dashed var(--line2);border-radius:var(--r-3);background:var(--surface)}
+.state .ic{width:36px;height:36px;border-radius:var(--r-2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--ink2);background:var(--sunken)}
+.state h4{margin:0;font:600 14px/1.3 var(--f-sans);letter-spacing:-.01em}
+.state p{font-size:13px;color:var(--ink2);max-width:46ch;line-height:1.5}
+.state.err .ic{color:var(--crit)}
 details summary{cursor:pointer;color:var(--ink2);font-size:13px;font-weight:500;padding-block:4px}
 details summary:hover{color:var(--ink)}
 details[open] summary{margin-bottom:8px}
@@ -103,44 +113,33 @@ details[open] summary{margin-bottom:8px}
 .linkbtn:hover{background:var(--hover);color:var(--ink)}
 
 /* ---------- chips, tabs, pager ---------- */
+/* chip: a toggle for picking several things at once (one choice among a few is the .seg of fund/base.css) */
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{height:28px;padding:0 10px;border:1px solid var(--line2);border-radius:var(--r-pill);background:var(--surface);color:var(--ink2);font:500 12px/1 var(--f-sans);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .chip:hover:not(:disabled){background:var(--hover);color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--inv);border-color:var(--inv);color:var(--invfg)}
 .chip[aria-pressed="true"]:hover{background:var(--inv-hover);border-color:var(--inv-hover);color:var(--invfg)}
 .chip:disabled{opacity:.45;cursor:not-allowed}
-.chip-groups{display:flex;flex-wrap:wrap;gap:8px 24px}
 /* pager: "Showing 1–100 of 1,234 funds" with Previous / Next, above and below a long table */
 .pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;font-size:12px;color:var(--ink3)}
 .pager-btns{display:flex;align-items:center;gap:8px}
 .pager-at{font-variant-numeric:tabular-nums;white-space:nowrap}
 .pager-sum{font-variant-numeric:tabular-nums}
-/* tabs: the line is an inset shadow so the 2px ink bar of the open tab can sit on it inside the scroller */
-.tabs{display:flex;gap:2px;overflow-x:auto;box-shadow:inset 0 -1px 0 var(--line);scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
-.tab{position:relative;height:40px;padding:0 12px;border:0;background:none;color:var(--ink3);font:500 13px/1 var(--f-sans);white-space:nowrap;display:inline-flex;align-items:center;flex:none}
+/* tabs: a hairline under the strip and a 2px ink bar (.ind) that slides to the open tab; the line is an
+   inset shadow so the bar can sit on it inside the scroller */
+.tabs{position:relative;display:flex;gap:2px;overflow-x:auto;box-shadow:inset 0 -1px 0 var(--line);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;height:38px;padding:0 12px;border:0;background:none;color:var(--ink3);font:500 13px/1 var(--f-sans);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex:none}
 .tab:hover{color:var(--ink)}
 .tab[aria-selected="true"]{color:var(--ink)}
-.tab[aria-selected="true"]::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:2px;background:var(--ink)}
 .tab:focus-visible{outline-offset:-3px}
+.tabs .ind{position:absolute;left:0;bottom:0;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40));pointer-events:none}
 
-/* ---------- inputs and the home search ---------- */
-.input,.search input{height:36px;width:100%;padding:0 12px;border:1px solid var(--control);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans);min-width:0}
-.input::placeholder,.search input::placeholder{color:var(--ink3);opacity:1}
-.input:hover,.search input:hover{border-color:var(--ink3)}
-.input:focus,.search input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
-.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:end}
-.search{display:flex;gap:8px;flex-wrap:wrap}
-.search label{flex:1 1 100%;font:500 12px/1 var(--f-sans);color:var(--ink)}
-.search input{flex:1 1 220px;width:auto}
-.search .btn{--h:36px;padding:0 14px}
-.search-box{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0}
-.results{position:absolute;z-index:6;top:100%;left:0;right:0;margin-top:4px;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r-3);padding:6px;box-shadow:var(--shadow-1)}
-.results p{padding:8px 10px}
-.results ul{list-style:none;margin:0;padding:0}
-.results a{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-height:38px;padding:8px 10px;border-radius:var(--r-2);color:var(--ink);text-decoration:none;font-size:13.5px}
-.results a:hover,.results a:focus-visible{background:var(--band)}
-.results a:focus-visible{outline-offset:-2px}
-.results .cap{white-space:nowrap}
+/* ---------- inputs (the home search is in pages/home.css) ---------- */
+.input{height:36px;width:100%;padding:0 12px;border:1px solid var(--control);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans);min-width:0}
+.input::placeholder{color:var(--ink3);opacity:1}
+.input:hover{border-color:var(--ink3)}
+.input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 
 /* ---------- tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
@@ -157,37 +156,53 @@ details[open] summary{margin-bottom:8px}
 .back{align-self:flex-start;text-decoration:none;padding-block:4px}
 .back:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 
-/* ---------- tables: sunken head, hairline rows, hover tone ---------- */
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface)}
-/* A table wider than the page shows a soft edge on the side that has more: the local layers hide the shadows once scrolled to that edge. */
-@supports (background-attachment:local){
-  .tbl-wrap{background:
-    linear-gradient(to right,var(--surface) 24px,transparent) left center/40px 100% local no-repeat,
-    linear-gradient(to left,var(--surface) 24px,transparent) right center/40px 100% local no-repeat,
-    radial-gradient(farthest-side at 0 50%,color-mix(in srgb,var(--ink) 22%,transparent),transparent) left center/10px 100% scroll no-repeat,
-    radial-gradient(farthest-side at 100% 50%,color-mix(in srgb,var(--ink) 22%,transparent),transparent) right center/10px 100% scroll no-repeat,
-    var(--surface)}
-}
-table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
-th,td{height:38px;padding:0 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child,th.l,td.l{text-align:left}
-th:first-child,td:first-child{padding-left:16px}
-th:last-child,td:last-child{padding-right:16px}
-thead th{height:36px;padding-block:8px;font:500 12px/1.25 var(--f-sans);color:var(--ink3);background:var(--sunken);position:sticky;top:0;z-index:1;white-space:normal;vertical-align:bottom;border-bottom:1px solid var(--line2)}
-tbody tr:last-child td{border-bottom:0}
-tbody tr:hover td{background:var(--hover)}
-tr.click{cursor:pointer}
-tr.click:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+/* ---------- tables: the positions table's rules for every DataTable ----------
+   Fixed 38px rows, a sunken sticky head, the first column sticky, every column always there (the wrapper
+   scrolls sideways when they do not fit, the page never does), tabular figures, right-aligned numbers. */
+.tbl-wrap{--tpad:16px;position:relative;overflow:auto;max-height:min(70vh,620px);min-width:0;border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface)}
+.tbl-wrap:focus-visible{outline-offset:-2px}
+/* run edge to edge when the table is the body of a panel */
+.panel>.tbl-wrap,.fp .panel>.tbl-wrap{--tpad:var(--ppad);border-width:1px 0 0;border-radius:0}
+.panel>.tbl-wrap:last-child,.fp .panel>.tbl-wrap:last-child{border-radius:0 0 var(--r-3) var(--r-3)}
+.tbl-wrap table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.tbl-wrap :is(th,td){height:var(--row);padding:0 8px;text-align:right;white-space:nowrap;vertical-align:middle;border-bottom:1px solid var(--line)}
+.tbl-wrap :is(th,td).l,.tbl-wrap :is(th,td):first-child{text-align:left}
+.tbl-wrap :is(th,td):first-child{padding-left:var(--tpad)}
+.tbl-wrap :is(th,td):last-child{padding-right:var(--tpad)}
+.tbl-wrap thead th{position:sticky;top:0;z-index:2;height:36px;background:var(--sunken);font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom-color:var(--line2)}
+.tbl-wrap tbody td{background:var(--surface)}
+.tbl-wrap tbody tr:last-child td{border-bottom:0}
+.tbl-wrap tbody tr:hover>td{background:var(--hover)}
+/* the first column stays in view while the rest scrolls sideways */
+.tbl-wrap :is(thead th,tbody td):first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
+.tbl-wrap thead th:first-child{z-index:3}
+.tbl-wrap tr.click{cursor:pointer}
+.tbl-wrap tr.click:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.tbl-wrap td.empty{height:auto;padding-block:28px;white-space:normal;color:var(--ink3);font-size:13px}
 .tbl-wrap a{color:var(--ink);font-weight:500;text-decoration:none}
 .tbl-wrap a:hover{text-decoration:underline;text-underline-offset:3px}
-.tbl-wrap.virtual{max-height:min(70vh,640px);overflow:auto}
-.tbl-wrap.virtual tbody td{height:40px;padding-block:0;line-height:1.3}
-/* A collapsed border would scroll away from the sticky head of a scrolling table: draw its line as a shadow. */
-.tbl-wrap.virtual thead th{border-bottom:0;box-shadow:inset 0 -1px 0 var(--line2)}
-th button{font:inherit;color:inherit;background:none;border:0;padding:0;letter-spacing:inherit;text-align:inherit}
-th button:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
-th[aria-sort] button{color:var(--ink);font-weight:600}
-th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
+/* sort buttons: the chevron hangs to the left of a right-aligned heading (to the right of a left-aligned one), so it never shifts the label */
+.tbl-wrap th .sort{position:relative;display:inline-flex;align-items:center;gap:4px;height:100%;padding:6px 0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:normal;white-space:nowrap;text-align:inherit}
+.tbl-wrap th .sort .ico{position:absolute;right:calc(100% + 1px);width:12px;height:12px;stroke-width:2}
+.tbl-wrap th:is(.l,:first-child) .sort .ico{right:auto;left:calc(100% + 1px)}
+.tbl-wrap th .sort:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.tbl-wrap th[aria-sort] .sort{color:var(--ink);font-weight:600}
+/* stk: a name over a small muted line (ticker over company, fund over its size); text is cut with an ellipsis */
+.stk{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;max-width:14em}
+.stk>:is(.mono,.nm){font:600 13px/15px var(--f-mono);letter-spacing:-.01em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk>.nm{font-family:var(--f-sans);letter-spacing:-.005em}
+.stk>:is(.cap,.sub){color:var(--ink3);font-size:11.5px;line-height:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap a.nm{display:inline-block;vertical-align:bottom;max-width:15em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;letter-spacing:-.005em}
+a.stk{text-decoration:none}
+a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
+.tbl-wrap a.stk{font-weight:inherit}
+/* lc: a tinted box around a move (New, Trim) or a result (+20%), tone by direction: blue-tinted up, orange-tinted down, grey for a sale of everything */
+.tbl-wrap .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
+.tbl-wrap .lc b{font:600 13px/18px var(--f-sans);letter-spacing:-.01em;color:var(--ink)}
+.tbl-wrap .lc.add{background:color-mix(in srgb,var(--gain) 11%,var(--surface))}
+.tbl-wrap .lc.trim{background:color-mix(in srgb,var(--loss) 12%,var(--surface))}
+.tbl-wrap .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+@media (max-width:559px){.stk,.tbl-wrap a.nm{max-width:10em}}
 .tick{display:inline-flex;align-items:center;gap:8px}
 .tick .mono{font-weight:600}
 /* Long fund and company names are cut with an ellipsis (the full name shows on hover), so wide
@@ -196,8 +211,10 @@ th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
 .trunc{max-width:15em}
 .tick .cap{max-width:9em}
 .tick .mono{max-width:6.5em} /* a bond's "ticker" ("BABA 0-5 06-01-31") is cut too */
-/* A short two-part cell ("Q1 2016 → now", "−4% Q4 2025") may take two lines; a virtual table's
-   40px rows still fit them. */
+.tick.stk{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.tick.stk>.mono{display:block;max-width:100%}
+.tick.stk>.cap{display:block;max-width:100%}
+/* A short two-part cell ("Q1 2016 → now", "−4% Q4 2025") may take two lines; a 38px row still fits them. */
 .two-line{display:inline-block;white-space:normal;max-width:5.8em;line-height:1.25}
 /* pill: a small label; buy/sell carry a dot in the data colours, and always the word itself */
 .pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--r-pill);border:1px solid var(--line2);background:var(--surface);color:var(--ink2);font:500 12px/1 var(--f-sans);white-space:nowrap}
@@ -229,9 +246,6 @@ th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
 .prose li::marker{color:var(--ink3)}
 .formula{font:400 12.5px/1.6 var(--f-mono);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-2);padding:10px 14px;color:var(--ink);overflow-x:auto;white-space:pre}
 
-@media (max-width:760px){
-  .hero{grid-template-columns:1fr}
-}
 @media (min-width:720px){
   .wrap{padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
 }
@@ -248,9 +262,9 @@ th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
   .chip{height:36px;padding:0 14px}
   .tab{height:44px}
   .linkbtn{height:36px}
-  .search input,.input{height:44px}
-  .search .btn{--h:44px}
+  .input{height:44px}
 }
 @media (prefers-reduced-motion:no-preference){
-  .btn,.chip,.tab,.nav a,.linkbtn,tbody td{transition:background-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),border-color var(--d-fast) var(--ease-out)}
+  .btn,.chip,.tab,.nav a,.linkbtn,.tbl-wrap tbody td{transition:background-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),border-color var(--d-fast) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out)}
 }

@@ -1,4 +1,4 @@
-import { barPath, compact, linePath, niceTicks } from "../src/charts/scale";
+import { barPath, compact, linePath, markerPath, niceTicks } from "../src/charts/scale";
 
 describe("niceTicks", () => {
   test("mixed range uses the mockup's 2.5 step (ruling R2)", () => {
@@ -94,5 +94,16 @@ describe("compact", () => {
 
   test("negatives use the real minus sign", () => {
     expect(compact(-2_500)).toBe("−2.5K");
+  });
+});
+
+describe("markerPath", () => {
+  test("a buy points up from just above the price, a sale down from just below it", () => {
+    expect(markerPath(100, 50, true)).toBe("M100.0,42.5l5.5,9.3h-11z");
+    expect(markerPath(100, 50, false)).toBe("M100.0,57.5l5.5,-9.3h-11z");
+  });
+
+  test("its width follows `half`", () => {
+    expect(markerPath(0, 0, true, 4)).toBe("M0.0,-6.0l4,6.8h-8z");
   });
 });

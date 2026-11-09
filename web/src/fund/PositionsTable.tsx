@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { fMm, fP0, fPc1, fPx, fW0, qShort } from "./fmt";
 import { useWidth } from "./hooks";
 import { whenIdle } from "./prefetch";
@@ -30,6 +30,10 @@ const COLS: { key: SortKey; head: string; w: number }[] = [
  */
 const PAGE = 150;
 const CHUNK = 150;
+/** A chunk that takes longer than this to draw halves the next one (a slow device); one under FAST lets it grow back. */
+const SLOW_MS = 40;
+const FAST_MS = 15;
+const MIN_CHUNK = 30;
 
 const count = (n: number): string => n.toLocaleString("en-US");
 
@@ -184,16 +188,27 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, mode, 
   );
   // Set when the background fill has begun, and kept: later sorts show the quiet line at once, not the button.
   const [filling, setFilling] = useState(false);
+  // How big the next background chunk is: CHUNK, less on a device that drew the last one slowly.
+  const pace = useRef({ size: CHUNK, from: 0, rows: 0 });
   useEffect(() => {
     if (limit >= total) return;
     return whenIdle(
       () => {
         setFilling(true);
-        more(CHUNK);
+        pace.current.from = performance.now();
+        pace.current.rows = pace.current.size;
+        more(pace.current.size);
       },
       { timeout: 1000 },
     );
   }, [limit, total, more]);
+  useLayoutEffect(() => {
+    const p = pace.current;
+    if (p.from === 0) return;
+    const ms = performance.now() - p.from; // React's render and commit of the chunk
+    p.from = 0;
+    p.size = ms > SLOW_MS ? Math.max(MIN_CHUNK, Math.floor(p.rows / 2)) : ms < FAST_MS ? Math.min(CHUNK, p.rows * 2) : p.rows;
+  }, [limit]);
 
   const onSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "t" ? 1 : -1 }));
