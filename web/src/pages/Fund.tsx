@@ -106,6 +106,10 @@ function FundView({ data }: { data: FundData }) {
         <AumPanel series={series} win={win} />
         <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={names} asof={asof} />
         <WhatIf fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} />
+        <p className="fp-foot">
+          Source: SEC Form 13F-HR filings, quarterly. Every figure is an Orca estimate built from quarter-end holdings, so risk numbers
+          understate swings inside a quarter.
+        </p>
       </div>
     </div>
   );

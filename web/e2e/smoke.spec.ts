@@ -72,7 +72,7 @@ for (const width of widths) {
     test("fund page: every section is there, and clicking a year bar picks that year for What drove", async ({ page }) => {
       const errors = await open(page, `/fund/${fundId}`);
       await expect(page.locator("h1")).toHaveText(fundName);
-      for (const name of ["Annual returns", "Assets under management", "Positions", "More figures", "What if they'd kept it"]) {
+      for (const name of ["Annual returns", "Assets under management", "Positions", "What if they'd kept it"]) {
         await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
       }
       await expect(page.getByRole("heading", { name: /^What drove / })).toBeVisible();

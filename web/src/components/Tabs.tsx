@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 export type TabItem<T extends string> = { id: T; label: string };
 
@@ -16,7 +16,8 @@ export function tabPanelProps(idPrefix: string, value: string) {
 /**
  * Tab strip (WAI-ARIA tabs, automatic activation): arrow keys, Home and End move the
  * selection and focus, and only the selected tab is in the tab order. Render the panel
- * next to it with {...tabPanelProps(idPrefix, value)}.
+ * next to it with {...tabPanelProps(idPrefix, value)}. A 2px ink bar slides under the
+ * selected tab (the artifact's `.ind`); it only tweens after its first placement.
  */
 export function Tabs<T extends string>({
   tabs,
@@ -32,7 +33,39 @@ export function Tabs<T extends string>({
   label: string;
   idPrefix: string;
 }) {
+  const root = useRef<HTMLDivElement>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const [ready, setReady] = useState(false);
+
+  const place = useCallback(() => {
+    const el = root.current;
+    const b = el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    const ind = el?.querySelector<HTMLElement>(".ind");
+    if (!b || !ind) return;
+    ind.style.setProperty("--x", b.offsetLeft + "px");
+    ind.style.setProperty("--w", String(b.offsetWidth));
+  }, []);
+  useLayoutEffect(place, [place, value, tabs]);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  // Fonts loading or the strip resizing move the tabs; the bar follows them.
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(place);
+      ro.observe(el);
+    }
+    window.addEventListener("resize", place);
+    void document.fonts?.ready.then(place);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [place]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const i = tabs.findIndex((t) => t.id === value);
@@ -48,7 +81,7 @@ export function Tabs<T extends string>({
   };
 
   return (
-    <div className="tabs" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+    <div className={"tabs" + (ready ? " ready" : "")} role="tablist" aria-label={label} ref={root} onKeyDown={onKeyDown}>
       {tabs.map((t, i) => {
         const selected = t.id === value;
         return (
@@ -70,6 +103,7 @@ export function Tabs<T extends string>({
           </button>
         );
       })}
+      <span className="ind" aria-hidden="true" />
     </div>
   );
 }

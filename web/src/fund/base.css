@@ -201,3 +201,6 @@
 @keyframes growX{from{transform:scaleX(0)}}
 @keyframes fade{from{opacity:0}}
 @keyframes shimmer{to{transform:translateX(100%)}}
+
+/* the page's closing source line (the artifact's .app-foot) */
+.fp .fp-foot{font-size:12px;line-height:1.5;color:var(--ink3);padding:4px var(--pad) 8px;max-width:72ch}

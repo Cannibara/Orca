@@ -10,7 +10,7 @@ import { PeriodPicker } from "../src/fund/PeriodPicker";
 import { PositionsPanel } from "../src/fund/PositionsPanel";
 import { PositionsTable } from "../src/fund/PositionsTable";
 import { defaultPeriod, type PeriodState, type PosRow, type Timeline } from "../src/fund/positions";
-import { useWeeklyPrices } from "../src/fund/usePositionData";
+import { createWeeklyStore, useWeeklyPrices } from "../src/fund/usePositionData";
 
 vi.mock("../src/data/api", async (importOriginal) => {
   const real = await importOriginal<typeof import("../src/data/api")>();
@@ -298,7 +298,8 @@ describe("weekly price loading", () => {
       );
     });
     const ids = Array.from({ length: 30 }, (_, i) => i + 1);
-    const { result } = renderHook(() => useWeeklyPrices(ids));
+    const store = createWeeklyStore();
+    const { result } = renderHook(() => useWeeklyPrices(store, ids));
     expect(result.current.pending).toBe(true);
     await waitFor(() => expect(result.current.pending).toBe(false), { timeout: 3000 });
     expect(peak).toBeLessThanOrEqual(8);

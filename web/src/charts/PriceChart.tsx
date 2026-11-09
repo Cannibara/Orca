@@ -1,11 +1,13 @@
 import { useRef, useState, type PointerEvent } from "react";
 import type { Trade } from "../data/types";
+import { useGrowOnce } from "../fund/hooks";
 import { px, qLabel, sgn } from "../lib/format";
 import { tradeMove } from "../lib/live";
-import { Legend } from "./Legend";
-import { compact, linePath, niceTicks } from "./scale";
+import { Legend, type LegendItem } from "./Legend";
+import { compact, linePath, markerPath, niceTicks } from "./scale";
 import { tipHandlers, useTooltip, type TipRow } from "./Tooltip";
 import { useChartWidth } from "./useChartWidth";
+import "./charts.css";
 
 export type PriceChartProps = {
   /** Weekly closes: closes[i] is the close of the week ending `start` + 7 i days; null = no close that week (a gap). */
@@ -14,18 +16,19 @@ export type PriceChartProps = {
   start: string;
   /** The fund's trades in this stock, with estimated prices and each quarter's low-high. */
   trades: Trade[];
+  /** The latest price: the line ends in a dot at it, with its label. Omit to end the line at its last close. */
+  latest?: number;
   /** Accessible name of the chart. */
   label?: string;
 };
 
-const H = 300;
 const M = { t: 14, r: 14, b: 30, l: 52 };
 const WEEK = 7 * 864e5;
-const LEGEND = [
-  { label: "Weekly close", color: "var(--ink2)", kind: "lk" as const },
-  { label: "Buy (est. price)", color: "var(--s1)", kind: "dot" as const },
-  { label: "Sell (est. price)", color: "var(--s2)", kind: "dot" as const },
-  { label: "Quarter low–high", color: "var(--range)", kind: "sw" as const },
+const LEGEND: LegendItem[] = [
+  { label: "Weekly close", color: "var(--ink)", kind: "lk" },
+  { label: "Buy (est. price)", color: "var(--gain)", kind: "up" },
+  { label: "Sell (est. price)", color: "var(--loss)", kind: "dn" },
+  { label: "Quarter low–high", color: "var(--rng)", kind: "sw" },
 ];
 
 // Quarter q covers calendar quarter q % 4 of year 2013 + floor(q / 4).
@@ -34,11 +37,14 @@ const qMidMs = (q: number) => (qStartMs(q) + qStartMs(q + 1)) / 2;
 
 const dollars = (t: number) => "$" + +t.toFixed(2);
 
-export function PriceChart({ closes, start, trades, label = "Weekly price with estimated trade prices" }: PriceChartProps) {
+export function PriceChart({ closes, start, trades, latest, label = "Weekly price with estimated trade prices" }: PriceChartProps) {
   const [ref, width] = useChartWidth();
+  // The grow-in plays once, when the chart first scrolls into view; a resize or a hover never restarts it.
+  const grow = useGrowOnce(ref, { durMs: 1400 });
   const tip = useTooltip();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null); // week index under the pointer
+  const H = width < 480 ? 240 : 300;
   const iw = width - M.l - M.r;
   const ih = H - M.t - M.b;
 
@@ -63,17 +69,22 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
 
   let lo = Infinity;
   let hi = -Infinity;
-  const see = (v: number | null) => {
+  const see = (v: number | null | undefined) => {
     if (v == null) return;
     lo = Math.min(lo, v);
     hi = Math.max(hi, v);
   };
-  for (let i = iLo; i <= iHi; i++) see(closes[i]);
+  let iLast = -1; // last week with a close
+  for (let i = iLo; i <= iHi; i++) {
+    see(closes[i]);
+    if (closes[i] != null) iLast = i;
+  }
   trades.forEach((t) => {
     see(t.px);
     see(t.low);
     see(t.high);
   });
+  see(latest);
   if (!Number.isFinite(lo)) {
     lo = 0; // nothing priced and no trades: an empty 0-1 axis
     hi = 1;
@@ -107,18 +118,27 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
     const c = closes[i];
     setHover(i);
     tip.show(
-      { title: weekDate(i), rows: [{ color: "var(--ink2)", value: px(c), label: c == null ? "no close" : "weekly close" }] },
+      { title: weekDate(i), rows: [{ color: "var(--invfg)", value: px(c), label: c == null ? "no close" : "weekly close" }] },
       e.clientX,
       e.clientY,
+      { place: "cursor" },
     );
   };
   const hoverClose = hover != null && hover <= iHi ? closes[hover] : null;
 
   return (
-    <>
+    <div className="pxc">
       <Legend items={LEGEND} />
       <div className="chart" ref={ref}>
-        <svg ref={svgRef} viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
+        <svg
+          ref={svgRef}
+          className={"pxsvg" + grow.cls}
+          viewBox={`0 0 ${width} ${H}`}
+          width={width}
+          height={H}
+          role="group"
+          aria-label={label}
+        >
           {ticks.map((t) => (
             <g key={t}>
               <line x1={M.l} x2={width - M.r} y1={Y(t)} y2={Y(t)} className="grid" />
@@ -133,46 +153,7 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
             </text>
           ))}
           <line x1={M.l} x2={width - M.r} y1={M.t + ih} y2={M.t + ih} className="base" />
-          {trades.map(
-            (t, k) =>
-              t.low != null &&
-              t.high != null && (
-                <rect
-                  key={k}
-                  className="band"
-                  x={X(weekOf(qMidMs(t.q))) - 4}
-                  y={Y(t.high)}
-                  width={8}
-                  height={Math.max(2, Y(t.low) - Y(t.high))}
-                  rx={4}
-                  style={{ fill: "var(--range)" }}
-                />
-              ),
-          )}
-          <path
-            className="price-line"
-            d={line}
-            fill="none"
-            style={{ stroke: "var(--ink2)" }}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          {hover != null && hover <= iHi && (
-            <>
-              <line className="base crosshair" x1={X(hover)} x2={X(hover)} y1={M.t} y2={M.t + ih} />
-              {hoverClose != null && (
-                <circle
-                  className="crosshair-dot"
-                  cx={X(hover)}
-                  cy={Y(hoverClose)}
-                  r={4}
-                  strokeWidth={2}
-                  style={{ fill: "var(--ink2)", stroke: "var(--surface)" }}
-                />
-              )}
-            </>
-          )}
+          {/* Under the drawing, so the pointer reaches it everywhere but on a trade marker. */}
           <rect
             className="overlay"
             x={M.l}
@@ -187,46 +168,79 @@ export function PriceChart({ closes, start, trades, label = "Weekly price with e
               tip.hide();
             }}
           />
-          {trades.map((t, k) => {
-            const buy = t.delta > 0;
-            const kind = tradeMove(t);
-            const cx = X(weekOf(qMidMs(t.q)));
-            const cy = Y(t.px);
-            const color = buy ? "var(--s1)" : "var(--s2)";
-            const h = tipHandlers(tip, () => {
-              const rows: TipRow[] = [{ color, value: px(t.px), label: "est. price (VWAP)" }];
-              if (t.low != null && t.high != null) rows.push({ value: px(t.low) + " – " + px(t.high), label: "quarter range" });
-              rows.push({ value: sgn(t.delta) + compact(Math.abs(t.delta)), label: "shares" });
-              return { title: kind + " · " + qLabel(t.q), rows };
-            });
-            return (
-              <g key={k}>
-                {/* A larger invisible target for the pointer; the dot itself takes keyboard focus. */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={12}
-                  fill="transparent"
-                  onPointerEnter={h.onPointerEnter}
-                  onPointerMove={h.onPointerMove}
-                  onPointerLeave={h.onPointerLeave}
-                />
-                <circle
-                  className={"hit-dot " + (buy ? "buy" : "sell")}
-                  cx={cx}
-                  cy={cy}
-                  r={5}
-                  strokeWidth={2}
-                  tabIndex={0}
-                  style={{ fill: color, stroke: "var(--surface)", cursor: "pointer" }}
-                  aria-label={kind + " " + qLabel(t.q) + " at about " + px(t.px)}
-                  {...h}
-                />
-              </g>
-            );
-          })}
+          <g className="pxdraw">
+            {trades.map(
+              (t, k) =>
+                t.low != null &&
+                t.high != null && (
+                  <rect
+                    key={k}
+                    className="band"
+                    x={X(weekOf(qMidMs(t.q))) - 4}
+                    y={Y(t.high)}
+                    width={8}
+                    height={Math.max(2, Y(t.low) - Y(t.high))}
+                    rx={4}
+                  />
+                ),
+            )}
+            <path className="price-line" d={line} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+            {latest != null && iLast >= 0 && (
+              <>
+                <circle className="pxdot" cx={X(iLast)} cy={Y(latest)} r={3.5} />
+                <text className="blab" x={X(iLast) - 8} y={Y(latest) - 9} textAnchor="end">
+                  {"$" + latest.toFixed(2)}
+                </text>
+              </>
+            )}
+            {trades.map((t, k) => {
+              const buy = t.delta > 0;
+              const kind = tradeMove(t);
+              const cx = X(weekOf(qMidMs(t.q)));
+              const cy = Y(t.px);
+              const color = buy ? "var(--gain)" : "var(--loss)";
+              const h = tipHandlers(
+                tip,
+                () => {
+                  const rows: TipRow[] = [{ color, value: px(t.px), label: "est. price (VWAP)" }];
+                  if (t.low != null && t.high != null) rows.push({ value: px(t.low) + " – " + px(t.high), label: "quarter range" });
+                  rows.push({ value: sgn(t.delta) + compact(Math.abs(t.delta)), label: "shares" });
+                  return { title: kind + " · " + qLabel(t.q), rows };
+                },
+                { place: "cursor" },
+              );
+              return (
+                <g key={k}>
+                  {/* A larger invisible target for the pointer; the triangle itself takes keyboard focus. */}
+                  <circle
+                    className="mk-hit"
+                    cx={cx}
+                    cy={cy + (buy ? -3 : 3)}
+                    r={12}
+                    fill="transparent"
+                    onPointerEnter={h.onPointerEnter}
+                    onPointerMove={h.onPointerMove}
+                    onPointerLeave={h.onPointerLeave}
+                  />
+                  <path
+                    className={"mk " + (buy ? "buy" : "sell")}
+                    d={markerPath(cx, cy, buy)}
+                    tabIndex={0}
+                    aria-label={kind + " " + qLabel(t.q) + " at about " + px(t.px)}
+                    {...h}
+                  />
+                </g>
+              );
+            })}
+          </g>
+          {hover != null && hover <= iHi && (
+            <>
+              <line className="base crosshair" x1={X(hover)} x2={X(hover)} y1={M.t} y2={M.t + ih} />
+              {hoverClose != null && <circle className="crosshair-dot" cx={X(hover)} cy={Y(hoverClose)} r={4} />}
+            </>
+          )}
         </svg>
       </div>
-    </>
+    </div>
   );
 }

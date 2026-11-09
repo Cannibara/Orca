@@ -1,12 +1,9 @@
 // One fund's position in one stock: what it cost, what it is worth at the latest price, and every
 // trade behind it. Every figure that depends on the latest price is worked out here from latest_prices.json.
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PriceChart } from "../charts/PriceChart";
 import { StepChart } from "../charts/StepChart";
-import { DataTable, type Column } from "../components/DataTable";
-import { Section } from "../components/Section";
-import { Signed } from "../components/Signed";
-import { Tile, Tiles } from "../components/Tiles";
 import {
   NotFoundError,
   isFundFileMissing,
@@ -21,12 +18,15 @@ import {
   yearsSince2013,
 } from "../data/api";
 import type { PositionRow, Summary, Trade, Weekly } from "../data/types";
-import { DASH, fmtDate, money, pct, px, qLabel, sgn, shareCount, signClass } from "../lib/format";
-import { irr, positionFlows, positionRows, returnPct, totalPnl, tradeMove } from "../lib/live";
+import { fMm, qShort } from "../fund/fmt";
+import { DASH, fmtDate, money, pct, printsZero, px, qLabel, sgn, shareCount, signClass } from "../lib/format";
+import { irr, positionFlows, positionRows, returnPct, totalPnl, tradeMove, type Move } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
 import NotFound from "./NotFound";
+import "./position.css";
+import "./state.css";
 
 // ---- loading ----------------------------------------------------------------
 
