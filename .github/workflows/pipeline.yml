@@ -3,9 +3,10 @@ name: Pipeline
 # Monthly, on the 16th (the day after the latest 13F deadline of Feb 14, May 15, Aug 14 and Nov 14,
 # so each quarter's filings are in at once): restore the lake from the private R2 bucket, ingest
 # new filings and prices, recompute the funds they touch, upload the changed files to the public R2
-# bucket (manifest.json last), save the lake back. On the 1st: rebuild a sample of funds from the
-# lake's raw filings and compare them with what is published. A failed run leaves the site on the last good version; GitHub's default
-# notifications email the failure.
+# bucket (manifest.json last), clear the Cloudflare cache of the data site, save the lake back. On the
+# 1st: rebuild a sample of funds from the lake's raw filings and compare them with what is published.
+# A failed run leaves the site on the last good version; GitHub's default notifications email the
+# failure.
 #
 # Every run has a time budget (ORCA_TIME_BUDGET_MIN, 270 minutes by default): when it is spent the
 # pipeline stops its long stages cleanly, publishes the funds it computed (nothing, if it got no
@@ -24,6 +25,12 @@ name: Pipeline
 # third-party actions, the dependency install or the pipeline process. Both jobs run in the
 # `production` environment. In Settings > Environments, restrict it to the default branch (deployment
 # branches) and keep the R2 secrets there.
+#
+# The data site (data.orcaetf.com) sits behind Cloudflare's cache, which keeps a file for up to 30
+# days while the files are overwritten monthly under the same names. After the upload the pipeline
+# therefore clears that cache (the secret CF_PURGE_TOKEN, an API token that may only purge the cache,
+# and the variable CF_ZONE_ID, both in the `production` environment). Until both exist the step is
+# skipped with a notice. The Purge cache workflow does the same by hand.
 
 on:
   schedule:
@@ -162,6 +169,52 @@ jobs:
             --transfers 64 --checkers 64 --s3-no-head "${headers[@]}"
           # Last, so a reader never finds a manifest that names a file not yet uploaded.
           rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
+      - name: Clear the Cloudflare cache
+        # Only after the upload succeeded (a failed upload leaves the cache holding the old, consistent
+        # files). A failure here fails the run, but the next step runs whatever happens to this one.
+        env:
+          CF_PURGE_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
+          CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
+        run: |
+          # No `set -x` in this step: it handles the token.
+          # Values pasted with a trailing line break or space break the request: strip them.
+          token="${CF_PURGE_TOKEN//[[:space:]]/}"
+          zone="${CF_ZONE_ID//[[:space:]]/}"
+          missing=""
+          [ -n "$token" ] || missing="the secret CF_PURGE_TOKEN"
+          [ -n "$zone" ] || missing="${missing:+$missing and }the variable CF_ZONE_ID"
+          if [ -n "$missing" ]; then
+            echo "::notice::The Cloudflare cache was not cleared. Missing in the production environment: ${missing}. Until they are set, data.orcaetf.com can serve the previous files from its cache for up to 30 days (see docs/domain-and-data-hosting.md)."
+            exit 0
+          fi
+          if [[ ! "$zone" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::CF_ZONE_ID should be the zone ID of orcaetf.com: 32 characters, 0-9 and a-f (it is ${#zone} characters). The Cloudflare dashboard shows it on the right-hand side of the domain's Overview page."
+            exit 1
+          fi
+          if [[ ! "$token" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "::error::CF_PURGE_TOKEN has characters other than letters, digits, - and _ (it is ${#token} characters): it is not a Cloudflare API token. Create a new token and paste only the token."
+            exit 1
+          fi
+          response="$RUNNER_TEMP/cloudflare-purge.json"
+          rm -f "$response"
+          status="$(curl --silent --show-error --max-time 60 --retry 3 \
+            --request POST --header "Authorization: Bearer ${token}" --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}' --output "$response" --write-out '%{http_code}' \
+            "https://api.cloudflare.com/client/v4/zones/${zone}/purge_cache")" || status=000
+          if [[ "$status" =~ ^2[0-9][0-9]$ ]] && jq -e '.success == true' "$response" > /dev/null 2>&1; then
+            echo "The Cloudflare cache is cleared."
+            exit 0
+          fi
+          echo "::error::Cloudflare did not clear the cache (HTTP ${status})."
+          # Cloudflare's own reasons: {"success": false, "errors": [{"code": 10000, "message": "..."}]}
+          if ! jq -r '.errors[]? | "::error::Cloudflare error \(.code): \(.message | tostring | gsub("[\r\n]+"; " "))"' "$response" 2> /dev/null; then
+            echo "::error::Cloudflare's answer was not JSON, or there was no answer: $(head -c 300 "$response" 2> /dev/null | tr -d '\r\n')"
+          fi
+          if [ "$status" = 401 ] || [ "$status" = 403 ]; then
+            echo "::error::The token is wrong, expired, or lacks the permission Zone > Cache Purge > Purge for the zone orcaetf.com. Create a new token with only that permission and update the secret CF_PURGE_TOKEN."
+          fi
+          echo "::error::Once that is fixed, run Actions > Purge cache > Run workflow to clear the cache by hand."
+          exit 1
       - name: Save the lake
         # Also after a failed, cancelled or timed-out step: what the run stored is progress, and the
         # lake's state says what is still owed. If the upload did not complete, the lake's

@@ -1,0 +1,74 @@
+name: Purge cache
+
+# Clears Cloudflare's cache for the whole orcaetf.com zone by hand: the data site (data.orcaetf.com)
+# keeps its files in the cache for up to 30 days, so run this after fixing a data file by hand, and
+# once after adding the token to check that it works (the Pipeline workflow does the same after each
+# monthly upload). Run it from Actions > Purge cache > Run workflow.
+#
+# It needs, in the `production` environment (Settings > Environments > production):
+#   the secret    CF_PURGE_TOKEN  a Cloudflare API token with only the permission
+#                                 Zone > Cache Purge > Purge, for the zone orcaetf.com
+#   the variable  CF_ZONE_ID      the zone ID of orcaetf.com (the Overview page of the domain in the
+#                                 Cloudflare dashboard, right-hand side)
+# Unlike the Pipeline's step, which skips when they are missing, this workflow FAILS: you asked for
+# a purge, so a purge that did not happen must not look like a success.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  purge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: Clear the Cloudflare cache
+        env:
+          CF_PURGE_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
+          CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
+        run: |
+          # No `set -x` in this step: it handles the token.
+          # Values pasted with a trailing line break or space break the request: strip them.
+          token="${CF_PURGE_TOKEN//[[:space:]]/}"
+          zone="${CF_ZONE_ID//[[:space:]]/}"
+          missing=""
+          [ -n "$token" ] || missing="the secret CF_PURGE_TOKEN"
+          [ -n "$zone" ] || missing="${missing:+$missing and }the variable CF_ZONE_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing in the production environment (Settings > Environments > production): ${missing}. See docs/domain-and-data-hosting.md for how to create them."
+            exit 1
+          fi
+          if [[ ! "$zone" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::CF_ZONE_ID should be the zone ID of orcaetf.com: 32 characters, 0-9 and a-f (it is ${#zone} characters). The Cloudflare dashboard shows it on the right-hand side of the domain's Overview page."
+            exit 1
+          fi
+          if [[ ! "$token" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "::error::CF_PURGE_TOKEN has characters other than letters, digits, - and _ (it is ${#token} characters): it is not a Cloudflare API token. Create a new token and paste only the token."
+            exit 1
+          fi
+          response="$RUNNER_TEMP/cloudflare-purge.json"
+          rm -f "$response"
+          status="$(curl --silent --show-error --max-time 60 --retry 3 \
+            --request POST --header "Authorization: Bearer ${token}" --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}' --output "$response" --write-out '%{http_code}' \
+            "https://api.cloudflare.com/client/v4/zones/${zone}/purge_cache")" || status=000
+          if [[ "$status" =~ ^2[0-9][0-9]$ ]] && jq -e '.success == true' "$response" > /dev/null 2>&1; then
+            echo "The Cloudflare cache is cleared."
+            exit 0
+          fi
+          echo "::error::Cloudflare did not clear the cache (HTTP ${status})."
+          # Cloudflare's own reasons: {"success": false, "errors": [{"code": 10000, "message": "..."}]}
+          if ! jq -r '.errors[]? | "::error::Cloudflare error \(.code): \(.message | tostring | gsub("[\r\n]+"; " "))"' "$response" 2> /dev/null; then
+            echo "::error::Cloudflare's answer was not JSON, or there was no answer: $(head -c 300 "$response" 2> /dev/null | tr -d '\r\n')"
+          fi
+          if [ "$status" = 401 ] || [ "$status" = 403 ]; then
+            echo "::error::The token is wrong, expired, or lacks the permission Zone > Cache Purge > Purge for the zone orcaetf.com. Create a new token with only that permission and update the secret CF_PURGE_TOKEN."
+          fi
+          exit 1

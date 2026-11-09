@@ -4,6 +4,11 @@
 // The app mounts over it as usual. dist/index.html itself is left alone, and no 404.html is
 // written: Cloudflare Pages then serves index.html for every other path.
 //
+// It also writes dist/_headers, which Cloudflare Pages applies to every response: the security
+// headers (a Content-Security-Policy that names the data site's origin, so it is made here, from
+// VITE_DATA_URL, and is not a static file in public/) and the long cache for the content-hashed
+// files under /assets/. A VITE_DATA_URL that is malformed stops the build (scripts/dataOrigin.ts).
+//
 // Run by `npm run build` after `vite build`. Needs Node 22.18 or later (it imports money() from
 // src/lib/format.ts, which Node runs by stripping the types). Environment, read from the process
 // only (Vite's .env files are not consulted):
@@ -19,6 +24,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { money } from "../src/lib/format.ts";
+import { dataOrigin } from "./dataOrigin.ts";
 
 const DEFAULT_MAX = 15000;
 const WRITE_BATCH = 200;
@@ -27,6 +33,9 @@ const FETCH_TIMEOUT_MS = 60_000;
 const fail = (message) => {
   throw new Error(message);
 };
+
+// Cloudflare Pages reads at most 2,000 characters per line of _headers.
+const MAX_HEADER_LINE = 2000;
 
 const escapeHtml = (text) =>
   text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -103,9 +112,41 @@ function renderFund(template, fund) {
     .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
 }
 
+/**
+ * The text of dist/_headers. `origin` is the data site's origin when the app loads its data from
+ * another one (it is added to connect-src, the only directive that lets the page fetch from it),
+ * or null when the data comes from the site itself.
+ */
+function renderHeaders(origin) {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    `connect-src 'self'${origin === null ? "" : ` ${origin}`}`,
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+  ].join("; ");
+  const text = `/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: ${csp}
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+`;
+  const long = text.split("\n").find((line) => line.length > MAX_HEADER_LINE);
+  if (long !== undefined) fail(`_headers has a line of ${long.length} characters; Cloudflare Pages reads at most ${MAX_HEADER_LINE}`);
+  return text;
+}
+
 async function main() {
   const dist = path.resolve(process.env.PRERENDER_DIST || "dist");
   const max = parseMax(process.env.PRERENDER_MAX);
+  const origin = dataOrigin(process.env.VITE_DATA_URL);
   const funds = toFunds(await readFunds(dist));
 
   const indexFile = path.join(dist, "index.html");
@@ -118,6 +159,9 @@ async function main() {
   for (const [what, re] of [["<title>", TITLE], ["meta description", DESCRIPTION], ["<body>", BODY_OPEN]]) {
     if (!re.test(template)) fail(`${indexFile} has no ${what} to replace`);
   }
+
+  await writeFile(path.join(dist, "_headers"), renderHeaders(origin));
+  console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
 
   // Largest book first (a fund without a number sorts last); equal books by id so the choice is stable.
   const bookOf = (f) => (Number.isFinite(f.book) ? f.book : -Infinity);
