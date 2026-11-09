@@ -594,7 +594,10 @@ describe("Home", () => {
     const row = (await screen.findAllByRole("row"))[1];
     expect(within(row).getByRole("link", { name: /Visa/ })).toHaveAttribute("href", "/fund/9100001/stock/16"); // the name tidied, as on the fund page
     expect(within(row).getByRole("link", { name: "Kelpwood Capital LP" })).toHaveAttribute("href", "/fund/9100001");
-    expect(within(row).getByText("Q2 2026")).toBeInTheDocument();
+    // the quarter of the buy sits in a purchase box: the word "Bought" and "Q2 ’26"
+    const bought = within(row).getByRole("img", { name: "Bought in Q2 2026" });
+    expect(bought).toHaveClass("lc", "add");
+    expect(bought).toHaveTextContent("BoughtQ2 ’26");
     expect(within(row).getByText("$10.00")).toBeInTheDocument(); // est. buy price
     expect(within(row).getByText("$12.00")).toBeInTheDocument(); // price now
     expect(within(row).getByText("+20%")).toBeInTheDocument(); // 12 / 10 - 1

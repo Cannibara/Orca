@@ -18,6 +18,7 @@ import type {
   WinLossRow,
 } from "../data/types";
 import { count, DASH, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
+import { qShort } from "../fund/fmt";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
@@ -378,6 +379,16 @@ function MoveBox({ move, pts }: { move: ConvictionRow["move"]; pts: number }) {
   );
 }
 
+/** A call is a buy: "Bought" and the quarter, in the box tint of a purchase (the rows carry no weight change). */
+function BoughtBox({ q }: { q: number }) {
+  return (
+    <span className="lc add" role="img" aria-label={`Bought in ${qLabel(q)}`}>
+      <span className="lw">Bought</span>
+      <b>{qShort(q)}</b>
+    </span>
+  );
+}
+
 /** Sort value of a fund or stock name column. */
 const lower = (text: string | undefined) => (text ?? "").toLowerCase();
 
@@ -604,7 +615,7 @@ function Calls({
     () => [
       stockCol(lookup, (c) => c.row.fund_id, (c) => c.row.stock_id),
       fundCol(lookup, (c) => c.row.fund_id, (c) => c.row.name),
-      { header: "Bought", key: "q", by: (c) => c.row.q, cell: (c) => qLabel(c.row.q) },
+      { header: "Bought", key: "q", by: (c) => c.row.q, cell: (c) => <BoughtBox q={c.row.q} /> },
       { header: "Est. buy price", key: "est", by: (c) => c.row.est_price, cell: (c) => fPrice(c.row.est_price) },
       { header: "Price now", key: "now", by: (c) => c.price ?? null, cell: (c) => fPrice(c.price ?? null) },
       { header: "Since fund's buy", key: "since", by: (c) => c.sinceBuy, cell: (c) => <SinceBox v={c.sinceBuy} /> },
