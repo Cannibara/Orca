@@ -73,10 +73,12 @@ function writeFunds(index: Partial<FundsIndex> | unknown): string {
 
 type Result = { code: number; stdout: string; stderr: string };
 
-/** Run the script with only the variables given (the outer shell's PRERENDER_* / VITE_* are dropped). */
+/** Run the script with only the variables given (the outer shell's PRERENDER_* / VITE_* / SITE_URL are dropped). */
 function run(dist: string, env: Record<string, string>): Promise<Result> {
   const clean = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_")),
+    Object.entries(process.env).filter(
+      ([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_") && k !== "SITE_URL",
+    ),
   );
   return new Promise((resolve) => {
     execFile(
@@ -97,6 +99,7 @@ const tag = (html: string, re: RegExp) => re.exec(html)?.[1];
 const title = (html: string) => tag(html, /<title>([\s\S]*?)<\/title>/);
 const description = (html: string) => tag(html, /<meta name="description" content="([^"]*)"/);
 const noscript = (html: string) => tag(html, /<noscript>([\s\S]*?)<\/noscript>/);
+const canonical = (html: string) => tag(html, /<link rel="canonical" href="([^"]*)"/);
 const pageDirs = (dist: string) => (existsSync(join(dist, "fund")) ? readdirSync(join(dist, "fund")) : []);
 
 /** Answer `path` with `status` and `body` (anything else is a 404) on 127.0.0.1; resolves to the base URL and the paths requested. */
@@ -128,6 +131,7 @@ describe("prerender: fund pages from demo data", () => {
       );
       expect(noscript(html)).toContain(money(demo.book[i]));
       expect(noscript(html)).toContain(demo.name[i]);
+      expect(canonical(html)).toBe(`https://www.orcaetf.com/fund/${id}`);
     });
   });
 
@@ -138,6 +142,8 @@ describe("prerender: fund pages from demo data", () => {
     expect(html.match(/<title>/g)).toHaveLength(1);
     expect(html.match(/<meta name="description"/g)).toHaveLength(1);
     expect(html.match(/<noscript>/g)).toHaveLength(1);
+    expect(html.match(/rel="canonical"/g)).toHaveLength(1);
+    expect(html.indexOf('rel="canonical"')).toBeLessThan(html.indexOf("</head>"));
     expect(html).toContain('<script type="module" crossorigin src="/assets/index-abc123.js"></script>');
     expect(html).toContain('<div id="root"></div>');
   });
@@ -149,6 +155,29 @@ describe("prerender: fund pages from demo data", () => {
     expect(readdirSync(dist).sort()).toEqual(["fund", "index.html"]);
     expect(existsSync(join(dist, "404.html"))).toBe(false);
     expect(existsSync(join(dist, "_redirects"))).toBe(false);
+  });
+});
+
+describe("prerender: canonical address", () => {
+  it("SITE_URL sets the address, with or without a trailing slash", async () => {
+    for (const siteUrl of ["https://example.org", "https://example.org/"]) {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: siteUrl });
+      expect(r.code).toBe(0);
+      expect(canonical(read(page(dist, demo.id[0])))).toBe(`https://example.org/fund/${demo.id[0]}`);
+    }
+  });
+
+  it("an empty SITE_URL falls back to the default", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: "" });
+    expect(canonical(read(page(dist, demo.id[0])))).toBe(`https://www.orcaetf.com/fund/${demo.id[0]}`);
+  });
+
+  it("the home shell gets no canonical (it serves every other route too)", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    expect(read(join(dist, "index.html"))).not.toContain("canonical");
   });
 });
 
@@ -298,6 +327,16 @@ describe("prerender: fails loudly", () => {
       /PRERENDER_MAX must be a whole number/,
     ],
     [
+      "SITE_URL is not an address",
+      () => run(makeDist(), { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: "orcaetf.com" }),
+      /SITE_URL must be an address/,
+    ],
+    [
+      "SITE_URL has a path",
+      () => run(makeDist(), { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: "https://www.orcaetf.com/app" }),
+      /SITE_URL must be an http\(s\) address with no path/,
+    ],
+    [
       "dist has no index.html",
       () => {
         const dist = makeDist();
@@ -305,6 +344,15 @@ describe("prerender: fails loudly", () => {
         return run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
       },
       /cannot read .*index\.html/,
+    ],
+    [
+      "index.html has no </head> to put the canonical link before",
+      () => {
+        const dist = makeDist();
+        writeFileSync(join(dist, "index.html"), TEMPLATE.replace("</head>", ""));
+        return run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+      },
+      /index\.html has no <\/head> to replace/,
     ],
     [
       "index.html has no <title> to replace",

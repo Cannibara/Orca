@@ -15,6 +15,11 @@
 //   PRERENDER_MAX    how many funds to write, largest 13F book first (default 15000): Cloudflare
 //                    Pages allows 20,000 files per deployment and funds.json can list far more
 //                    funds than that. The rest still work as single-page-app routes.
+//   SITE_URL         the address search engines should list (default https://www.orcaetf.com):
+//                    each fund page gets <link rel="canonical" href="{SITE_URL}/fund/{id}">, so the
+//                    same page served from the pages.dev address is not counted as a copy. Only the
+//                    fund pages carry one: dist/index.html is the shell for every other route, and a
+//                    fixed canonical there would point all of them at one page.
 // Any problem (no funds.json, a malformed one, a missing index.html) stops the build.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -88,24 +93,45 @@ function parseMax(value) {
   return Number(value);
 }
 
+const DEFAULT_SITE_URL = "https://www.orcaetf.com";
+
 const TITLE = /<title>[\s\S]*?<\/title>/;
 const DESCRIPTION = /<meta\s+name=["']description["'][^>]*>/i;
+const HEAD_CLOSE = /<\/head>/i;
 const BODY_OPEN = /<body[^>]*>/i;
 
+/** SITE_URL without trailing slashes; it must be an http(s) address with no path, query or fragment. */
+function parseSiteUrl(value) {
+  const raw = value === undefined || value === "" ? DEFAULT_SITE_URL : value;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return fail(`SITE_URL must be an address like ${DEFAULT_SITE_URL}, not "${raw}"`);
+  }
+  if (!/^https?:$/.test(url.protocol) || url.pathname !== "/" || url.search !== "" || url.hash !== "") {
+    fail(`SITE_URL must be an http(s) address with no path, query or fragment, not "${raw}"`);
+  }
+  return url.origin;
+}
+
 /** The shell's page for one fund. Replacers are functions so a "$&" in a name is copied as typed. */
-function renderFund(template, fund) {
+function renderFund(template, fund, siteUrl) {
   const name = escapeHtml(fund.name);
   const description = `Estimated returns, P&amp;L and trades for ${name} from 13F filings.`;
   const noscript = `<noscript><p>${name}: 13F book ${money(fund.book)}. Turn on JavaScript to see estimated returns, P&amp;L and trades from 13F filings.</p></noscript>`;
+  const canonical = `<link rel="canonical" href="${siteUrl}/fund/${fund.id}" />`;
   return template
     .replace(TITLE, () => `<title>${name} · Orca</title>`)
     .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />`)
+    .replace(HEAD_CLOSE, (close) => `  ${canonical}\n  ${close}`)
     .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
 }
 
 async function main() {
   const dist = path.resolve(process.env.PRERENDER_DIST || "dist");
   const max = parseMax(process.env.PRERENDER_MAX);
+  const siteUrl = parseSiteUrl(process.env.SITE_URL);
   const funds = toFunds(await readFunds(dist));
 
   const indexFile = path.join(dist, "index.html");
@@ -115,7 +141,7 @@ async function main() {
   } catch (err) {
     return fail(`cannot read ${indexFile} (${err.code ?? err.message}): run vite build first`);
   }
-  for (const [what, re] of [["<title>", TITLE], ["meta description", DESCRIPTION], ["<body>", BODY_OPEN]]) {
+  for (const [what, re] of [["<title>", TITLE], ["meta description", DESCRIPTION], ["</head>", HEAD_CLOSE], ["<body>", BODY_OPEN]]) {
     if (!re.test(template)) fail(`${indexFile} has no ${what} to replace`);
   }
 
@@ -128,7 +154,7 @@ async function main() {
       chosen.slice(i, i + WRITE_BATCH).map(async (fund) => {
         const dir = path.join(dist, "fund", String(fund.id));
         await mkdir(dir, { recursive: true });
-        await writeFile(path.join(dir, "index.html"), renderFund(template, fund));
+        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, siteUrl));
       }),
     );
   }

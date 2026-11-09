@@ -1,0 +1,29 @@
+# Response headers for Cloudflare Pages (read from the build directory; vite copies public/ into dist/).
+# Cloudflare applies this file to its own responses only: `vite preview` and the Playwright smoke
+# tests never see it.
+#
+# The Content-Security-Policy is report-only for now: the browser logs what it would block in its
+# console and blocks nothing. Open the live site, click through the home, a fund and a stock page,
+# read the console, and when it shows no violations rename the header to Content-Security-Policy.
+#
+# Allowed on purpose:
+#   style-src 'unsafe-inline'   the charts and tables set inline style="" attributes
+#   fonts.googleapis.com / fonts.gstatic.com   the Google Fonts link in index.html; delete both
+#                               when the site switches to system or self-hosted fonts
+#   connect-src https://*.r2.dev   the public R2 data bucket (VITE_DATA_URL); add the new address
+#                               here if the data moves to a custom domain such as data.orcaetf.com
+#   img-src data:               the favicon is an inline SVG
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.r2.dev; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+
+# Keep the pages.dev copies of the site (production alias and preview deployments) out of search
+# results, so only the orcaetf.com address is listed.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
