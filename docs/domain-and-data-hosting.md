@@ -11,7 +11,7 @@ are listed here.
 | --- | --- |
 | https://www.orcaetf.com | The website. The main address. |
 | https://orcaetf.com | Only forwards (redirects) to www. |
-| https://orca-88p.pages.dev | The old address. Keeps working, nothing to do. |
+| https://orca-88p.pages.dev | The old address. Keeps working; search engines are told not to list it (see "What the build adds"). |
 | https://data.orcaetf.com | The data files (JSON) the website reads. A custom domain on the public R2 bucket, cached by Cloudflare. |
 
 The website is a Cloudflare Pages project called `orca`. The data bucket is the public R2 bucket named
@@ -22,6 +22,8 @@ in `R2_SITE_BUCKET`. The private bucket (`R2_LAKE_BUCKET`) is never public.
 | Name | Kind | Where | What it is |
 | --- | --- | --- | --- |
 | `VITE_DATA_URL` | variable | repository or `production` | Where the website reads its data: `https://data.orcaetf.com`. The security headers and the early connection hint are built from it. |
+| `SITE_URL` | variable (optional) | repository or `production` | The website's own address, used for the search-engine files (below). Empty means `https://www.orcaetf.com`, so you set nothing. Only `https://` plus the name: no path, no `/` at the end. |
+| `HSTS_MAX_AGE` | variable (optional) | repository or `production` | Seconds browsers remember "this site is https only". Empty means 15552000 (six months). `0` switches it off again (see "What the build adds"). |
 | `SITE_ORIGINS` | variable (optional) | repository | Websites allowed to read the data bucket (Site CORS), separated by spaces. Empty means the built-in list: www, the bare domain, the pages.dev address and localhost. Never put the data address here. |
 | `R2_SITE_BUCKET` | variable | repository | Name of the public data bucket. |
 | `CF_ZONE_ID` | variable | `production` | Zone ID of orcaetf.com (Cloudflare dashboard > orcaetf.com > Overview, right-hand side). |
@@ -37,7 +39,8 @@ Also there, from earlier setup: `R2_LAKE_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET
 
 - **Web**: on every change to `web/`, runs the tests and a test build. On the main branch it also builds
   the real site (reading `VITE_DATA_URL` and the list of funds from the data address) and deploys it to
-  Pages. Run it by hand (Run workflow, branch main) to redeploy.
+  Pages. The build also writes the security headers, `sitemap.xml` and `robots.txt`. Run it by hand
+  (Run workflow, branch main) to redeploy.
 - **Site CORS**: run by hand. Tells the data bucket which websites may read it. Run it when a website
   address is added or changed, then run **Purge cache**.
 - **Purge cache**: run by hand. Clears Cloudflare's cache for orcaetf.com. It fails, with a clear message,
@@ -47,6 +50,30 @@ Also there, from earlier setup: `R2_LAKE_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET
   private lake. Without `CF_PURGE_TOKEN` and `CF_ZONE_ID` that step only prints a notice and the data
   site may show old files for up to 30 days. If the step fails, the lake is still saved; fix the token
   and run **Purge cache** by hand.
+
+## What the build adds (security and search engines)
+
+All of it is written by every real build, nothing to switch on.
+
+- **HSTS** (`Strict-Transport-Security: max-age=15552000`, six months, without `includeSubDomains` or
+  `preload`): a browser that has visited the site uses only `https://` for it. Side effect to know: if
+  the site's certificate ever broke, those visitors could not click past the browser's warning.
+  **To undo it:** set the variable `HSTS_MAX_AGE` to `0` (Settings > Secrets and variables > Actions >
+  Variables) and run Web. The site then sends `max-age=0` and each browser forgets the rule the next time
+  it visits; until it does, it keeps using https (which the site needs anyway). Delete the variable later
+  to go back to six months. Nothing here puts the site on the browsers' built-in HSTS list (an entry there cannot be taken back).
+- **Old address not listed**: every `*.pages.dev` address of the site (the old `orca-88p.pages.dev` and
+  Pages' preview addresses) sends `X-Robots-Tag: noindex`, so search engines do not list it next to
+  www. The custom domain does not get it. `robots.txt` must therefore stay open (`Allow: /`): a search
+  engine has to be allowed to read the old address to see the "do not list" note.
+- **Fund pages name their own address** (a "canonical" link to `www.orcaetf.com/fund/<id>/`), and the
+  build writes `sitemap.xml` (home, How it works and every pre-rendered fund page, at most 15,000) and
+  `robots.txt` (everything may be crawled, plus the sitemap's address). They come from `SITE_URL`.
+  Other pages get no canonical link. The list in the sitemap changes only when the site is rebuilt, so
+  Web needs a run after a data refresh adds funds. Optional, in Google Search Console: add the property
+  `https://www.orcaetf.com` and submit `https://www.orcaetf.com/sitemap.xml`.
+- **No demo data in production**: with a `VITE_DATA_URL` that is a full address, the fictional demo files
+  are removed from the deployed site (they stay in tests and local builds).
 
 ## How to redeploy
 
@@ -106,6 +133,9 @@ custom domain, then the bare redirect (1, 2). 6. DNSSEC, HTTPS and e-mail record
   from the address the site was built with. Run Web again.
 - Funds do not load, the console talks about CORS: run **Site CORS**, then **Purge cache** (Cloudflare
   keeps copies without the CORS headers until the cache is cleared).
-- Old numbers after a monthly run: run **Purge cache**; the browser may keep a file up to 1 hour.
+- Old numbers after a monthly run: run **Purge cache**; a browser may keep a file up to 2 hours.
 - The build fails with `VITE_DATA_URL ... is not usable`: the variable has a space, a line break or is not
   an address like `https://data.orcaetf.com`. Fix it and run Web again.
+- The build fails with `SITE_URL ... is not usable` or `HSTS_MAX_AGE must be a whole number`: the variable
+  has a path, a `/` at the end, `http://`, a space, or (for HSTS) is not a number of seconds. Fix or delete
+  it (deleting it means the defaults) and run Web again.

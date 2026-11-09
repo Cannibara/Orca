@@ -56,7 +56,8 @@ Note: the four parked pipeline residuals (N1 failed upload left published.json c
 - R18 profitablePct = share of positions with totalPnl > 0 among positions whose totalPnl is computable (null excluded) — plan gives no denominator — cost if wrong: small % shift.
 - R19 T6 may modify Fund.tsx to mount <FundTables> below the charts — the plan's file list omits the mount point — cost if wrong: none.
 - R20 exits table joins positions.json by stock_id for avg cost, return, IRR actual, IRR if held, last change, last change $ — exits.json lacks them — cost if wrong: none.
-- R16 leave public/demo-data in the production dist (0.9 MB, ~80 files) — harmless and useful as a demo; excluding needs build config — cost if wrong: 0.9 MB of fictional data publicly reachable under /demo-data.
+- R16 leave public/demo-data in the production dist (0.9 MB, ~80 files) — harmless and useful as a demo; excluding needs build config — cost if wrong: 0.9 MB of fictional data publicly reachable under /demo-data
+  - Superseded (Nov 2026): a build with an absolute VITE_DATA_URL (production) now deletes dist/demo-data after the build (web/scripts/prerender.mjs); CI and e2e builds, which use the same-origin default, keep it..
 - R21 profitablePct returns number | null (null when no position has a computable total) instead of the plan's number — a fund whose every position lacks a price has no meaningful % — cost if wrong: none (tile shows "—").
 - R22 Task 2 adds positionRows(p: Positions): PositionRow[] (toRows + trade tuples → Trade objects) and tradeT(q) = q/4 + 0.125 in live.ts — every consumer needs both; the plan names Trade and PositionRow but no converter — cost if wrong: none.
 - R23 a fund's own SPY/ETF holding is shown like any stock; "no SPY" forbids SPY benchmark columns/rules only — spec §7.1 "No SPY column" is about the benchmark — cost if wrong: none (an ETF row reads as a holding).

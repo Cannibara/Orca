@@ -10,6 +10,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -73,10 +74,12 @@ function writeFunds(index: Partial<FundsIndex> | unknown): string {
 
 type Result = { code: number; stdout: string; stderr: string };
 
-/** Run the script with only the variables given (the outer shell's PRERENDER_* / VITE_* are dropped). */
+/** Run the script with only the variables given (the outer shell's PRERENDER_* / VITE_* / SITE_URL / HSTS_MAX_AGE are dropped). */
 function run(dist: string, env: Record<string, string>): Promise<Result> {
   const clean = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_")),
+    Object.entries(process.env).filter(
+      ([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_") && k !== "SITE_URL" && k !== "HSTS_MAX_AGE",
+    ),
   );
   return new Promise((resolve) => {
     execFile(
@@ -156,13 +159,18 @@ describe("prerender: fund pages from demo data", () => {
 const csp = (connect: string) =>
   `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`;
 
-const headersText = (connect: string) => `/*
+const headersText = (connect: string, hsts = 15552000) => `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=${hsts}
   Content-Security-Policy: ${csp(connect)}
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
 `;
 
 /** A _headers file as {path pattern: {header name: value}}, the way Cloudflare Pages reads it. */
@@ -233,15 +241,16 @@ describe("prerender: dist/_headers", () => {
     expect(r.stdout).toContain("prerender: wrote _headers (data origin: https://data.orcaetf.com)");
   });
 
-  it("parses as two rules: /* with four headers, /assets/* with the immutable cache and nothing else", async () => {
+  it("parses as four rules: /* with the five security headers, /assets/* with the immutable cache, two pages.dev hosts with noindex", async () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com" });
     const rules = parseHeaders(generated(dist));
-    expect(Object.keys(rules)).toEqual(["/*", "/assets/*"]);
+    expect(Object.keys(rules)).toEqual(["/*", "/assets/*", "https://:project.pages.dev/*", "https://:version.:project.pages.dev/*"]);
     expect(Object.keys(rules["/*"]).sort()).toEqual([
       "Content-Security-Policy",
       "Permissions-Policy",
       "Referrer-Policy",
+      "Strict-Transport-Security",
       "X-Content-Type-Options",
     ]);
     expect(rules["/*"]["X-Content-Type-Options"]).toBe("nosniff");
@@ -273,6 +282,322 @@ describe("prerender: dist/_headers", () => {
     expect(text.endsWith("\n")).toBe(true);
     expect(text).not.toContain("\r");
     for (const line of text.split("\n")) expect(line.length).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe("prerender: Strict-Transport-Security", () => {
+  it("is six months, with neither includeSubDomains nor preload", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    const value = parseHeaders(generated(dist))["/*"]["Strict-Transport-Security"];
+    expect(value).toBe("max-age=15552000");
+    expect(value).not.toMatch(/includeSubDomains|preload/i);
+  });
+
+  it("HSTS_MAX_AGE changes it, and 0 is the way to undo it", async () => {
+    for (const [value, expected] of [["0", 0], ["3600", 3600], ["63072000", 63072000], ["", 15552000]] as const) {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, HSTS_MAX_AGE: value });
+      expect(r.code, value).toBe(0);
+      expect(generated(dist), value).toBe(headersText("'self'", expected));
+    }
+  });
+
+  it.each(["abc", "-1", "1.5", "1; includeSubDomains", "15552000\npreload", " 60", "63072001", "99999999999", "0x10"])(
+    "stops the build for HSTS_MAX_AGE=%j and writes nothing",
+    async (value) => {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, HSTS_MAX_AGE: value });
+      expect(r.code).toBe(1);
+      expect(r.stderr).toMatch(/^prerender: HSTS_MAX_AGE must be a whole number of seconds from 0 to 63072000, not "/);
+      expect(r.stdout).toBe("");
+      expect(existsSync(join(dist, "_headers"))).toBe(false);
+    },
+  );
+});
+
+/** Does a _headers pattern match this URL? Placeholders (:name) stand for one label of a host, a splat (*) for anything. */
+function matches(pattern: string, url: string): boolean {
+  const parts = pattern.split(/(\*|:[A-Za-z]\w*)/).map((part) => {
+    if (part === "*") return ".*";
+    if (part.startsWith(":")) return "[^./]+";
+    return part.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  });
+  const re = new RegExp(`^${parts.join("")}$`);
+  return re.test(pattern.startsWith("https://") ? url : new URL(url).pathname);
+}
+
+/** The headers Pages would add to a request: those of every rule that matches, as the docs describe. */
+function headersFor(text: string, url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [pattern, headers] of Object.entries(parseHeaders(text))) {
+    if (matches(pattern, url)) Object.assign(out, headers);
+  }
+  return out;
+}
+
+describe("prerender: pages.dev addresses are not indexed, the custom domain is", () => {
+  const SECURITY = ["Content-Security-Policy", "Permissions-Policy", "Referrer-Policy", "Strict-Transport-Security", "X-Content-Type-Options"];
+
+  it("has the two Pages host rules with X-Robots-Tag: noindex, exactly as Cloudflare documents them", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    const text = generated(dist);
+    expect(text).toContain("\nhttps://:project.pages.dev/*\n  X-Robots-Tag: noindex\n");
+    expect(text).toContain("\nhttps://:version.:project.pages.dev/*\n  X-Robots-Tag: noindex\n");
+    // the rest is what it was: the /* block ends where the assets rule begins, and carries no robots header
+    const rules = parseHeaders(text);
+    expect(rules["/*"]["X-Robots-Tag"]).toBeUndefined();
+    expect(rules["/assets/*"]["X-Robots-Tag"]).toBeUndefined();
+    expect(rules["https://:project.pages.dev/*"]).toEqual({ "X-Robots-Tag": "noindex" });
+    expect(rules["https://:version.:project.pages.dev/*"]).toEqual({ "X-Robots-Tag": "noindex" });
+  });
+
+  it("noindex reaches the pages.dev address and its preview deployments, never the custom domain or the data host", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com", SITE_URL: "https://www.orcaetf.com" });
+    const text = generated(dist);
+    const robots = (url: string) => headersFor(text, url)["X-Robots-Tag"];
+    expect(robots("https://orca-88p.pages.dev/")).toBe("noindex");
+    expect(robots("https://orca-88p.pages.dev/fund/9100002/")).toBe("noindex");
+    expect(robots("https://orca.pages.dev/how-it-works")).toBe("noindex");
+    expect(robots("https://3f9a1c2b.orca-88p.pages.dev/")).toBe("noindex");
+    expect(robots("https://main.orca-88p.pages.dev/fund/1/")).toBe("noindex");
+    for (const url of [
+      "https://www.orcaetf.com/",
+      "https://www.orcaetf.com/fund/9100002/",
+      "https://orcaetf.com/",
+      "https://data.orcaetf.com/manifest.json",
+      "https://evil-pages.dev/",
+      "https://pages.dev/",
+    ]) {
+      expect(robots(url), url).toBeUndefined();
+    }
+  });
+
+  it("the /* rule still gives every host, pages.dev included, the security headers", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    const text = generated(dist);
+    for (const url of ["https://www.orcaetf.com/", "https://orca-88p.pages.dev/", "https://3f9a1c2b.orca-88p.pages.dev/fund/1/"]) {
+      const got = headersFor(text, url);
+      for (const name of SECURITY) expect(got[name], `${name} on ${url}`).toBeTruthy();
+    }
+    // and the long cache is for /assets/ only
+    expect(headersFor(text, "https://www.orcaetf.com/assets/index-abc.js")["Cache-Control"]).toBe("public, max-age=31536000, immutable");
+    expect(headersFor(text, "https://www.orcaetf.com/")["Cache-Control"]).toBeUndefined();
+    expect(headersFor(text, "https://www.orcaetf.com/sitemap.xml")["Cache-Control"]).toBeUndefined();
+  });
+});
+
+describe("prerender: demo data stays out of a production build", () => {
+  /** A dist with index.html and a demo-data folder, as `vite build` leaves it. */
+  function makeDistWithDemo(): string {
+    const dist = makeDist();
+    mkdirSync(join(dist, "demo-data", "fund", "1"), { recursive: true });
+    copyFileSync(DEMO_FUNDS, join(dist, "demo-data", "funds.json"));
+    writeFileSync(join(dist, "demo-data", "fund", "1", "summary.json"), "{}");
+    return dist;
+  }
+
+  it("is removed when VITE_DATA_URL is an absolute URL (the real data is elsewhere)", async () => {
+    const dist = makeDistWithDemo();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com" });
+    expect(r.code).toBe(0);
+    expect(existsSync(join(dist, "demo-data"))).toBe(false);
+    expect(r.stdout).toContain("prerender: removed demo-data from dist (the data comes from https://data.orcaetf.com)");
+    // nothing else is touched
+    expect(readdirSync(dist).sort()).toEqual(["_headers", "fund", "index.html"]);
+    expect(pageDirs(dist)).toHaveLength(demo.id.length);
+  });
+
+  it("is removed for an http data URL too, and a missing demo-data folder is no problem", async () => {
+    const withDemo = makeDistWithDemo();
+    expect((await run(withDemo, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "http://127.0.0.1:8788/site/" })).code).toBe(0);
+    expect(existsSync(join(withDemo, "demo-data"))).toBe(false);
+
+    const without = makeDist();
+    const r = await run(without, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com" });
+    expect(r.code).toBe(0);
+    expect(r.stdout).not.toContain("removed demo-data");
+  });
+
+  it("stays with the same-origin default, an explicit /demo-data and another path (CI and the e2e tests read it)", async () => {
+    const sameOrigin: Record<string, string>[] = [{}, { VITE_DATA_URL: "/demo-data" }, { VITE_DATA_URL: "/demo-data/" }, { VITE_DATA_URL: "/other" }];
+    for (const env of sameOrigin) {
+      const dist = makeDistWithDemo();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, ...env });
+      expect(r.code, JSON.stringify(env)).toBe(0);
+      expect(existsSync(join(dist, "demo-data", "funds.json")), JSON.stringify(env)).toBe(true);
+      expect(existsSync(join(dist, "demo-data", "fund", "1", "summary.json"))).toBe(true);
+    }
+  });
+
+  it("is not removed when the build stops on a bad VITE_DATA_URL", async () => {
+    const dist = makeDistWithDemo();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: "https://data.orcaetf.com; x" });
+    expect(r.code).toBe(1);
+    expect(existsSync(join(dist, "demo-data", "funds.json"))).toBe(true);
+  });
+});
+
+describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () => {
+  const SITE = "https://www.orcaetf.com";
+  const sitemapUrls = (dist: string) => [...read(join(dist, "sitemap.xml")).matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+  const canonicals = (html: string) => [...html.matchAll(/<link rel="canonical"[^>]*>/g)].map((m) => m[0]);
+
+  it("without SITE_URL none of them exists and the pages are the same as before", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS });
+    expect(r.code).toBe(0);
+    expect(existsSync(join(dist, "sitemap.xml"))).toBe(false);
+    expect(existsSync(join(dist, "robots.txt"))).toBe(false);
+    expect(readdirSync(dist).sort()).toEqual(["_headers", "fund", "index.html"]);
+    for (const id of demo.id) expect(read(page(dist, id))).not.toContain("canonical");
+    expect(r.stdout).not.toContain("sitemap");
+  });
+
+  it("an empty SITE_URL counts as not set", async () => {
+    const dist = makeDist();
+    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: "" })).code).toBe(0);
+    expect(existsSync(join(dist, "sitemap.xml"))).toBe(false);
+  });
+
+  it("puts a canonical link, and only one, in every fund page: the page's own address, with its trailing slash", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(r.code).toBe(0);
+    for (const id of demo.id) {
+      const html = read(page(dist, id));
+      expect(canonicals(html), String(id)).toEqual([`<link rel="canonical" href="${SITE}/fund/${id}/" />`]);
+      expect(html.indexOf('rel="canonical"')).toBeLessThan(html.indexOf("</head>"));
+      // the rest of the page is what it was
+      expect(html.match(/<title>/g)).toHaveLength(1);
+      expect(html.match(/<meta name="description"/g)).toHaveLength(1);
+    }
+  });
+
+  it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
+  });
+
+  it("writes sitemap.xml: the XML declaration, the sitemap namespace, the home page, the methodology and each fund page", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    const xml = read(join(dist, "sitemap.xml"));
+    expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')).toBe(true);
+    expect(xml.endsWith("</urlset>\n")).toBe(true);
+    const urls = sitemapUrls(dist);
+    expect(urls.slice(0, 2)).toEqual([`${SITE}/`, `${SITE}/how-it-works`]);
+    expect(urls.slice(2).sort()).toEqual(demo.id.map((id) => `${SITE}/fund/${id}/`).sort());
+    expect(new Set(urls).size).toBe(urls.length);
+    expect(xml.match(/<url>/g)).toHaveLength(urls.length);
+    expect(r.stdout).toContain(`prerender: wrote sitemap.xml (${demo.id.length + 2} URLs) and robots.txt for ${SITE}`);
+    // every URL is absolute https on the site, and every fund URL is a page that was written
+    for (const url of urls) expect(url.startsWith(`${SITE}/`)).toBe(true);
+    for (const id of demo.id) expect(existsSync(page(dist, id))).toBe(true);
+  });
+
+  it("the sitemap and the canonical links name the same funds: PRERENDER_MAX bounds both", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE, PRERENDER_MAX: "3" });
+    const urls = sitemapUrls(dist);
+    expect(urls).toHaveLength(5);
+    expect(urls.slice(2).map((u) => u.split("/")[4]).sort()).toEqual(pageDirs(dist).sort());
+  });
+
+  it("PRERENDER_MAX=0 still writes the sitemap with the home page and the methodology", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE, PRERENDER_MAX: "0" });
+    expect(sitemapUrls(dist)).toEqual([`${SITE}/`, `${SITE}/how-it-works`]);
+  });
+
+  it("writes robots.txt: everyone may crawl everything, and the sitemap is named", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(read(join(dist, "robots.txt"))).toBe(`User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
+  });
+
+  it("writes nothing that Pages would rewrite: real files with .xml / .txt names, and no _redirects or 404.html", async () => {
+    const dist = makeDist();
+    await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(readdirSync(dist).sort()).toEqual(["_headers", "fund", "index.html", "robots.txt", "sitemap.xml"]);
+    // no rule of _headers touches the type of these files, and none matches by file name
+    const rules = parseHeaders(generated(dist));
+    for (const headers of Object.values(rules)) {
+      expect(Object.keys(headers).map((h) => h.toLowerCase())).not.toContain("content-type");
+    }
+  });
+
+  it("accepts a port, and the home page of any https site", async () => {
+    for (const value of ["https://www.orcaetf.com", "https://example.com", "https://staging.example.com:8443", "https://xn--bcher-kva.example"]) {
+      const dist = makeDist();
+      const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: value });
+      expect(r.code, value).toBe(0);
+      expect(sitemapUrls(dist)[0]).toBe(`${value}/`);
+    }
+  });
+
+  it("stops the build at the sitemap limit of 50,000 URLs, before writing any page", { timeout: 60_000 }, async () => {
+    const count = 49_999; // plus the home page and the methodology: 50,001
+    const ids = Array.from({ length: count }, (_, i) => i + 1);
+    const funds = writeFunds({ v: 1, id: ids, name: ids.map((id) => `Fund ${id}`), book: ids, n: ids.map(() => 1) });
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: funds, SITE_URL: SITE, PRERENDER_MAX: "50000" });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^prerender: sitemap\.xml would list 50001 URLs and one file may list 50000: lower PRERENDER_MAX/);
+    expect(existsSync(join(dist, "sitemap.xml"))).toBe(false);
+    expect(existsSync(join(dist, "_headers"))).toBe(false);
+    expect(pageDirs(dist)).toEqual([]);
+  });
+
+  it("lists the 15,000 pages of a default run, and stays far below 50 MB", { timeout: 60_000 }, async () => {
+    const ids = Array.from({ length: 15_001 }, (_, i) => i + 1);
+    const funds = writeFunds({ v: 1, id: ids, name: ids.map((id) => `Fund ${id}`), book: ids, n: ids.map(() => 1) });
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: funds, SITE_URL: SITE });
+    expect(r.code).toBe(0);
+    expect(sitemapUrls(dist)).toHaveLength(15_002);
+    expect(statSync(join(dist, "sitemap.xml")).size).toBeLessThan(2 * 1024 * 1024);
+  });
+});
+
+describe("prerender: a malformed SITE_URL stops the build", () => {
+  const bad: [string, string][] = [
+    ["http, not https", "http://www.orcaetf.com"],
+    ["a trailing slash", "https://www.orcaetf.com/"],
+    ["a path", "https://www.orcaetf.com/app"],
+    ["a query", "https://www.orcaetf.com?x=1"],
+    ["a fragment", "https://www.orcaetf.com#top"],
+    ["an upper-case host", "https://WWW.orcaetf.com"],
+    ["the default port", "https://www.orcaetf.com:443"],
+    ["no scheme", "www.orcaetf.com"],
+    ["a protocol-relative address", "//www.orcaetf.com"],
+    ["a path only", "/fund"],
+    ["another scheme", "ftp://www.orcaetf.com"],
+    ["a script URL", "javascript:alert(1)"],
+    ["a space", "https://www.orcaetf.com https://evil.example"],
+    ["trailing white space", "https://www.orcaetf.com "],
+    ["a line break and more robots.txt", "https://www.orcaetf.com\nDisallow: /"],
+    ["a semicolon", "https://www.orcaetf.com;x"],
+    ["a comma", "https://a.example,https://b.example"],
+    ["quotes", 'https://www.orcaetf.com"x'],
+    ["angle brackets", "https://www.orcaetf.com<x>"],
+    ["a user name and password", "https://user:pw@www.orcaetf.com"],
+    ["an underscore in the host", "https://a_b.example"],
+    ["no host", "https://"],
+  ];
+
+  it.each(bad)("%s", async (_why, value) => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: value });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^prerender: SITE_URL ".*" is not usable: /s);
+    expect(r.stderr).toContain("https://www.orcaetf.com");
+    expect(r.stdout).toBe("");
+    expect(readdirSync(dist)).toEqual(["index.html"]);
   });
 });
 

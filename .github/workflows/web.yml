@@ -13,9 +13,15 @@ name: Web
 # which is how to redeploy after a data refresh adds funds: the pre-rendered pages and their
 # funds list only change when the site is built again.
 #
+# The build also writes the response headers (dist/_headers), and, from SITE_URL, the canonical links
+# of the fund pages, sitemap.xml and robots.txt. The optional variables SITE_URL (the website's
+# address, default https://www.orcaetf.com) and HSTS_MAX_AGE (seconds, default six months; 0 undoes
+# HSTS) override the defaults. With a VITE_DATA_URL that is an absolute address, the demo data is not
+# deployed. See docs/domain-and-data-hosting.md.
+#
 # The deploy job runs in the `production` environment. In Settings > Environments, restrict it to
 # the default branch (deployment branches) and keep CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
-# there; VITE_DATA_URL may be a repository or an environment variable.
+# there; VITE_DATA_URL, SITE_URL and HSTS_MAX_AGE may be repository or environment variables.
 
 on:
   workflow_dispatch:
@@ -107,6 +113,10 @@ jobs:
         env:
           VITE_DATA_URL: ${{ vars.VITE_DATA_URL }}
           PRERENDER_FUNDS: ${{ runner.temp }}/funds.json
+          # The website's own address: canonical links, sitemap.xml and robots.txt are made from it.
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.orcaetf.com' }}
+          # Seconds of the Strict-Transport-Security header; unset means six months. 0 undoes it.
+          HSTS_MAX_AGE: ${{ vars.HSTS_MAX_AGE }}
         run: npm run build
       - name: Deploy to Cloudflare Pages
         env:

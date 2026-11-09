@@ -1,6 +1,7 @@
 // The preconnect hint to the data site: `vite build` (vite.config.ts) adds
 // <link rel="preconnect" href="<origin>" crossorigin> to dist/index.html when VITE_DATA_URL is an
 // absolute http(s) URL, and the fund pages that scripts/prerender.mjs copies from it carry it too.
+// The same builds show that the demo data is dropped from a build with real data elsewhere.
 // Real builds into temporary directories, as `npm run build` runs them; no network.
 import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -19,7 +20,9 @@ type Result = { code: number; stdout: string; stderr: string };
 
 function node(args: string[], env: Record<string, string>): Promise<Result> {
   const clean = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_")),
+    Object.entries(process.env).filter(
+      ([k]) => !k.startsWith("PRERENDER_") && !k.startsWith("VITE_") && k !== "SITE_URL" && k !== "HSTS_MAX_AGE",
+    ),
   );
   return new Promise((resolve) => {
     execFile(process.execPath, args, { cwd: ROOT, env: { ...clean, ...env }, encoding: "utf8" }, (err, stdout, stderr) => {
@@ -73,6 +76,12 @@ describe("preconnect to the data site", () => {
       const html = readFileSync(join(dirs.remote, "fund", String(id), "index.html"), "utf8");
       expect(preconnects(html)).toEqual(['<link rel="preconnect" href="https://data.orcaetf.com" crossorigin>']);
     }
+  });
+
+  it("the demo data is copied by Vite into a plain build, and removed from one with an absolute data URL", () => {
+    expect(existsSync(join(dirs.plain, "demo-data", "funds.json"))).toBe(true);
+    expect(existsSync(join(dirs.remote, "demo-data"))).toBe(false);
+    expect(existsSync(join(dirs.remote, "_headers"))).toBe(true);
   });
 
   it("a malformed VITE_DATA_URL stops the build with the reason and writes no page", () => {

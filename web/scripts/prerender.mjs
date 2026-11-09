@@ -6,8 +6,18 @@
 //
 // It also writes dist/_headers, which Cloudflare Pages applies to every response: the security
 // headers (a Content-Security-Policy that names the data site's origin, so it is made here, from
-// VITE_DATA_URL, and is not a static file in public/) and the long cache for the content-hashed
-// files under /assets/. A VITE_DATA_URL that is malformed stops the build (scripts/dataOrigin.ts).
+// VITE_DATA_URL, and is not a static file in public/; and HSTS), the long cache for the
+// content-hashed files under /assets/, and "noindex" for the pages.dev addresses (the website
+// lives at its own domain; the old address must not compete with it in search results). A
+// VITE_DATA_URL that is malformed stops the build (scripts/dataOrigin.ts).
+//
+// When VITE_DATA_URL is an absolute URL the real data lives elsewhere, so the fictional demo files
+// that Vite copies from public/demo-data are removed from dist: they must not ship to production.
+//
+// When SITE_URL (the website's own address) is set it also writes the search-engine files:
+// <link rel="canonical"> in every pre-rendered fund page (and only there: the other routes are one
+// shared index.html, which cannot know its own address), dist/sitemap.xml and dist/robots.txt.
+// Without it none of those exist, and the demo build used by CI and the e2e tests is unchanged.
 //
 // Run by `npm run build` after `vite build`. Needs Node 22.18 or later (it imports money() from
 // src/lib/format.ts, which Node runs by stripping the types). Environment, read from the process
@@ -20,11 +30,16 @@
 //   PRERENDER_MAX    how many funds to write, largest 13F book first (default 15000): Cloudflare
 //                    Pages allows 20,000 files per deployment and funds.json can list far more
 //                    funds than that. The rest still work as single-page-app routes.
+//   SITE_URL         the website's own address, https://www.orcaetf.com (https, no path, no
+//                    trailing slash); unset means no canonical links, sitemap.xml or robots.txt
+//   HSTS_MAX_AGE     seconds of the Strict-Transport-Security header (default 15552000, six
+//                    months; 0 makes browsers forget it: the way to undo it)
 // Any problem (no funds.json, a malformed one, a missing index.html) stops the build.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { money } from "../src/lib/format.ts";
 import { dataOrigin } from "./dataOrigin.ts";
+import { siteUrl } from "./siteUrl.ts";
 
 const DEFAULT_MAX = 15000;
 const WRITE_BATCH = 200;
@@ -36,6 +51,13 @@ const fail = (message) => {
 
 // Cloudflare Pages reads at most 2,000 characters per line of _headers.
 const MAX_HEADER_LINE = 2000;
+// Six months. No includeSubDomains (the other hosts of the domain are not this site's to decide)
+// and no preload (a preload-list entry cannot be taken back).
+const DEFAULT_HSTS_MAX_AGE = 15_552_000;
+const MAX_HSTS_MAX_AGE = 63_072_000; // two years
+// The sitemap protocol allows 50,000 URLs and 50 MB (uncompressed) per file.
+const MAX_SITEMAP_URLS = 50_000;
+const MAX_SITEMAP_BYTES = 50 * 1024 * 1024;
 
 const escapeHtml = (text) =>
   text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -97,27 +119,49 @@ function parseMax(value) {
   return Number(value);
 }
 
+function parseHstsMaxAge(value) {
+  if (value === undefined || value === "") return DEFAULT_HSTS_MAX_AGE;
+  if (!/^\d{1,10}$/.test(value) || Number(value) > MAX_HSTS_MAX_AGE) {
+    const shown = JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}...` : value);
+    fail(`HSTS_MAX_AGE must be a whole number of seconds from 0 to ${MAX_HSTS_MAX_AGE}, not ${shown}`);
+  }
+  return Number(value);
+}
+
+const fundPath = (id) => `/fund/${id}/`;
+
 const TITLE = /<title>[\s\S]*?<\/title>/;
 const DESCRIPTION = /<meta\s+name=["']description["'][^>]*>/i;
 const BODY_OPEN = /<body[^>]*>/i;
 
-/** The shell's page for one fund. Replacers are functions so a "$&" in a name is copied as typed. */
-function renderFund(template, fund) {
+/**
+ * The shell's page for one fund. Replacers are functions so a "$&" in a name is copied as typed.
+ * `site` is the website's address, or null: the canonical link names this very page (the one with
+ * the trailing slash, which is where Pages serves dist/fund/{id}/index.html).
+ */
+function renderFund(template, fund, site) {
   const name = escapeHtml(fund.name);
+  const canonical = site === null ? "" : `\n    <link rel="canonical" href="${escapeHtml(`${site}${fundPath(fund.id)}`)}" />`;
   const description = `Estimated returns, P&amp;L and trades for ${name} from 13F filings.`;
   const noscript = `<noscript><p>${name}: 13F book ${money(fund.book)}. Turn on JavaScript to see estimated returns, P&amp;L and trades from 13F filings.</p></noscript>`;
   return template
     .replace(TITLE, () => `<title>${name} · Orca</title>`)
-    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />`)
+    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}`)
     .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
 }
 
 /**
  * The text of dist/_headers. `origin` is the data site's origin when the app loads its data from
  * another one (it is added to connect-src, the only directive that lets the page fetch from it),
- * or null when the data comes from the site itself.
+ * or null when the data comes from the site itself. `hsts` is the max-age of Strict-Transport-Security.
+ *
+ * Cloudflare Pages gives a request the headers of every rule it matches. The last two rules match
+ * hosts, not paths: ":project" is a placeholder that stands for one label of the host (no dots), so
+ * https://:project.pages.dev/* is the Pages address of this site (orca-88p.pages.dev) and
+ * https://:version.:project.pages.dev/* its preview deployments (abc123.orca-88p.pages.dev). Neither
+ * can match the custom domain.
  */
-function renderHeaders(origin) {
+function renderHeaders(origin, hsts) {
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -134,19 +178,49 @@ function renderHeaders(origin) {
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=${hsts}
   Content-Security-Policy: ${csp}
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
 `;
   const long = text.split("\n").find((line) => line.length > MAX_HEADER_LINE);
   if (long !== undefined) fail(`_headers has a line of ${long.length} characters; Cloudflare Pages reads at most ${MAX_HEADER_LINE}`);
   return text;
 }
 
+/** dist/sitemap.xml: the home page, the methodology and the pre-rendered fund pages (sitemaps.org protocol). */
+function renderSitemap(site, funds) {
+  const urls = [`${site}/`, `${site}/how-it-works`, ...funds.map((f) => `${site}${fundPath(f.id)}`)];
+  if (urls.length > MAX_SITEMAP_URLS) {
+    fail(`sitemap.xml would list ${urls.length} URLs and one file may list ${MAX_SITEMAP_URLS}: lower PRERENDER_MAX`);
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((url) => `  <url><loc>${escapeHtml(url)}</loc></url>`).join("\n")}
+</urlset>
+`;
+  const bytes = Buffer.byteLength(xml);
+  if (bytes > MAX_SITEMAP_BYTES) fail(`sitemap.xml would be ${bytes} bytes and one file may hold ${MAX_SITEMAP_BYTES}: lower PRERENDER_MAX`);
+  return { xml, count: urls.length };
+}
+
+/** dist/robots.txt: everything may be crawled, and where the sitemap is. */
+const renderRobots = (site) => `User-agent: *
+Allow: /
+
+Sitemap: ${site}/sitemap.xml
+`;
+
 async function main() {
   const dist = path.resolve(process.env.PRERENDER_DIST || "dist");
   const max = parseMax(process.env.PRERENDER_MAX);
   const origin = dataOrigin(process.env.VITE_DATA_URL);
+  const site = siteUrl(process.env.SITE_URL);
+  const hsts = parseHstsMaxAge(process.env.HSTS_MAX_AGE);
   const funds = toFunds(await readFunds(dist));
 
   const indexFile = path.join(dist, "index.html");
@@ -160,19 +234,31 @@ async function main() {
     if (!re.test(template)) fail(`${indexFile} has no ${what} to replace`);
   }
 
-  await writeFile(path.join(dist, "_headers"), renderHeaders(origin));
-  console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
-
   // Largest book first (a fund without a number sorts last); equal books by id so the choice is stable.
   const bookOf = (f) => (Number.isFinite(f.book) ? f.book : -Infinity);
   const chosen = [...funds].sort((a, b) => bookOf(b) - bookOf(a) || a.id - b.id).slice(0, max);
+  // Made before anything is written, so a sitemap over the limit stops the build early.
+  const sitemap = site === null ? null : renderSitemap(site, chosen);
+
+  await writeFile(path.join(dist, "_headers"), renderHeaders(origin, hsts));
+  console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
+  if (origin !== null && (await stat(path.join(dist, "demo-data")).then(() => true, () => false))) {
+    // The data is elsewhere: the fictional demo files Vite copied from public/ must not ship.
+    await rm(path.join(dist, "demo-data"), { recursive: true, force: true });
+    console.log(`prerender: removed demo-data from ${path.basename(dist)} (the data comes from ${origin})`);
+  }
+  if (sitemap !== null) {
+    await writeFile(path.join(dist, "sitemap.xml"), sitemap.xml);
+    await writeFile(path.join(dist, "robots.txt"), renderRobots(site));
+    console.log(`prerender: wrote sitemap.xml (${sitemap.count} URLs) and robots.txt for ${site}`);
+  }
 
   for (let i = 0; i < chosen.length; i += WRITE_BATCH) {
     await Promise.all(
       chosen.slice(i, i + WRITE_BATCH).map(async (fund) => {
         const dir = path.join(dist, "fund", String(fund.id));
         await mkdir(dir, { recursive: true });
-        await writeFile(path.join(dir, "index.html"), renderFund(template, fund));
+        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, site));
       }),
     );
   }

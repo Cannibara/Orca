@@ -26,7 +26,7 @@ export default defineConfig({
     // Always the demo-data build (public/demo-data, fetched from the same origin), whatever the
     // caller's environment says, then the production bundle served by `vite preview`.
     command: `npm run build && npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
-    env: { VITE_DATA_URL: "/demo-data", PRERENDER_FUNDS: "", PRERENDER_MAX: "", PRERENDER_DIST: "dist" },
+    env: { VITE_DATA_URL: "/demo-data", PRERENDER_FUNDS: "", PRERENDER_MAX: "", PRERENDER_DIST: "dist", SITE_URL: "", HSTS_MAX_AGE: "" },
     url: `http://127.0.0.1:${PORT}`,
     timeout: 180_000,
     reuseExistingServer: false,
