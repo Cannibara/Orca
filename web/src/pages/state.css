@@ -1,0 +1,34 @@
+/* The artifact's empty / error state (.state): a dashed box with an icon, a heading, a line of text and
+   one action. Used by the not-found page and the position page's load error. Class names are prefixed
+   (pg-) so nothing here can meet another sheet's rules; tokens only. */
+
+.pg-state{
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+  max-width:640px;padding:24px 20px;
+  border:1px dashed var(--line2);border-radius:var(--r-3);background:var(--surface);color:var(--ink);
+  font:400 14px/1.5 var(--f-sans);
+}
+.pg-state .ic{width:36px;height:36px;border-radius:var(--r-2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--ink2);background:var(--sunken)}
+.pg-state.err .ic{color:var(--crit)}
+.pg-state .ico{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.pg-state h1{margin:0;font:600 clamp(20px,3vw,24px)/1.2 var(--f-sans);letter-spacing:-.02em;text-wrap:balance}
+.pg-state p{margin:0;font-size:13px;line-height:1.5;color:var(--ink2);max-width:46ch;text-wrap:pretty}
+.pg-state p b{color:var(--ink);font-weight:600}
+.pg-state .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+
+/* the action: an ink button (a link that looks like one) */
+.pg-btn{
+  --h:32px;height:var(--h);padding:0 12px;border-radius:var(--r-2);border:1px solid transparent;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;
+  font:500 13px/1 var(--f-sans);text-decoration:none;user-select:none;
+  background:var(--inv);color:var(--invfg);
+}
+.pg-btn:hover{background:var(--inv-hover)}
+.pg-btn:active{background:var(--inv-press)}
+.pg-btn:focus-visible,.pg-state a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (pointer:coarse){
+  .pg-btn{--h:44px}
+}
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .pg-btn{transition:background-color var(--d-fast) var(--ease-out)}
+}

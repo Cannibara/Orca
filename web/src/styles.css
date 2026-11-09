@@ -1,182 +1,271 @@
-/* Layout: one centred column, sticky app bar, sections stacked summary → detail. Deep-water neutrals, chart blue/orange carry the data. */
+/* Orca's shared styles in the language of the approved "Orca Modern UI": warm paper neutrals, ink
+   buttons and selection, ocean blue = up, orange = down, hairlines or tone (never both) between
+   things. The palette, type, spacing and motion tokens live in tokens.css; the fund page's own rules
+   are scoped under .fp in src/fund/*.css and are not repeated here. */
+@import "./tokens.css";
+
+/* Old token names, kept as aliases of the new ones so markup and charts written before the
+   redesign keep working. Only what has no counterpart in tokens.css is defined here. */
 :root{
-  --bg:#f2f6f6; --surface:#fcfdfd; --ink:#0c1a20; --ink2:#46555b; --muted:#5d6c72;
-  --line:#dbe3e4; --line2:#c3cfd1; --chip:#e6eef0; --accent:#1c5cab; --accent-ink:#ffffff;
-  --s1:#2a78d6; --s2:#eb6834; --pos:#2a78d6; --neg:#e34948; --band:rgba(42,120,214,.16);
-  --up:#006300; --down:#b3261e; --note-bg:#fff3d1; --note-ink:#523c00;
-  --tip-bg:#0c1a20; --tip-ink:#f2f6f6; --tip-muted:#b7c4c7;
-  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
-  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:var(--page);
+  --muted:var(--ink3);
+  --chip:var(--hover);
+  --accent:var(--inv);
+  --accent-ink:var(--invfg);
+  --s1:var(--gain); --s2:var(--loss);
+  --pos:var(--gain); --neg:var(--loss);
+  --note-bg:var(--sunken); --note-ink:var(--ink2);
+  --tip-bg:var(--inv); --tip-ink:var(--invfg); --tip-muted:var(--inv2);
+  --f-display:var(--f-sans); --f-body:var(--f-sans);
+  /* Signed figures. Blue for a gain; for a loss the orange is deepened in the light theme so small
+     orange text on paper keeps 4.5:1 (and the dark blue is lifted a touch for the hover tone). The
+     sign is always printed too: colour is never the only cue. */
+  --up:var(--gain);
+  --down:color-mix(in srgb,var(--loss) 78%,var(--ink));
+  /* The quarter low-high bars on the price chart: a neutral wash that shows on both surfaces. */
+  --range:color-mix(in srgb,var(--ink) 15%,transparent);
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0a1215; --surface:#101b1f; --ink:#e7eef0; --ink2:#b2c0c3; --muted:#93a2a6;
-    --line:#1f2e33; --line2:#2e4046; --chip:#18272c; --accent:#6da7ec; --accent-ink:#06121a;
-    --s1:#3987e5; --s2:#d95926; --pos:#3987e5; --neg:#e66767; --band:rgba(57,135,229,.2);
-    --up:#3cc23c; --down:#f08a84; --note-bg:#33290b; --note-ink:#f3dc9a;
-    --tip-bg:#e7eef0; --tip-ink:#0c1a20; --tip-muted:#46555b; color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0a1215; --surface:#101b1f; --ink:#e7eef0; --ink2:#b2c0c3; --muted:#93a2a6;
-  --line:#1f2e33; --line2:#2e4046; --chip:#18272c; --accent:#6da7ec; --accent-ink:#06121a;
-  --s1:#3987e5; --s2:#d95926; --pos:#3987e5; --neg:#e66767; --band:rgba(57,135,229,.2);
-  --up:#3cc23c; --down:#f08a84; --note-bg:#33290b; --note-ink:#f3dc9a;
-  --tip-bg:#e7eef0; --tip-ink:#0c1a20; --tip-muted:#46555b; color-scheme:dark;
-}
-*{box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}}
+:root[data-theme="dark"]{--up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}
+
+/* ---------- base ---------- */
+*,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--f-body)}
+body{margin:0;background:var(--page);color:var(--ink);font:400 14px/1.5 var(--f-sans);-webkit-font-smoothing:antialiased;text-size-adjust:100%}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
-.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-h1,h2,h3{font-family:var(--f-display);font-stretch:85%;text-wrap:balance;margin:0;letter-spacing:-.01em}
-h1{font-size:clamp(28px,4vw,40px);font-weight:750;line-height:1.1}
-h2{font-size:22px;font-weight:700;line-height:1.2}
-h3{font-size:16px;font-weight:650}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+code,kbd{font-family:var(--f-mono)}
+a{color:inherit}
+/* A link inside running text keeps a quiet underline; links in tables, menus and bars style themselves. */
+:is(p,li) a{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+:is(p,li) a:hover{text-decoration-color:currentColor}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font:600 clamp(28px,5vw,40px)/1.08 var(--f-sans);letter-spacing:-.03em}
+h2{font:600 clamp(17px,2vw,20px)/1.25 var(--f-sans);letter-spacing:-.02em}
+h3{font:600 15px/1.35 var(--f-sans);letter-spacing:-.01em}
 p{margin:0}
-.mono{font-family:var(--f-mono);font-weight:500;letter-spacing:.01em}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono);font-weight:500;letter-spacing:-.01em}
 .num{font-variant-numeric:tabular-nums}
 .up{color:var(--up)} .down{color:var(--down)}
-.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-.lede{color:var(--ink2);max-width:62ch}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+/* kbd: a key cap, for hints such as the "/" that focuses the search */
+.kbd{font:500 11px/1 var(--f-mono);min-width:20px;height:20px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-bottom-width:2px;border-radius:var(--r-1);color:var(--ink3);background:var(--surface)}
+/* ico: the 16px line icons (inline svg, stroke follows the text colour) */
+.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.lede{font-size:16px;line-height:1.5;color:var(--ink2);max-width:66ch;text-wrap:pretty}
+.cap{font-size:12px;line-height:1.5;color:var(--ink3)}
+.hint{font-size:13px;color:var(--ink2)}
+.hint b{color:var(--ink);font-weight:600}
 
-/* app bar */
+/* ---------- top bar: logo, two nav links, a hairline under it ---------- */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
-.topbar{display:flex;align-items:center;gap:20px;min-height:56px;flex-wrap:wrap;padding-block:6px}
-.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:8px}
-.brand svg{width:26px;height:26px}
-.nav{display:flex;gap:4px;flex-wrap:wrap}
-.nav a{padding:8px 12px;border-radius:8px;color:var(--ink2);text-decoration:none;font-weight:500;font-size:14px}
-.nav a[aria-current="page"]{background:var(--chip);color:var(--ink)}
+.topbar{display:flex;align-items:stretch;gap:20px;min-height:56px}
+.brand{display:flex;align-items:center;gap:9px;flex:none;font:600 16px/1 var(--f-sans);letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+.brand svg{width:22px;height:22px;flex:none;display:block}
+.nav{display:flex;align-items:stretch;gap:2px;min-width:0}
+.nav a{position:relative;display:flex;align-items:center;padding:0 10px;font:500 13px/1 var(--f-sans);color:var(--ink3);text-decoration:none}
+.nav a:hover,.nav a[aria-current="page"]{color:var(--ink)}
+.nav a[aria-current="page"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--ink)}
+.nav a:focus-visible{outline-offset:-3px}
 
-main{padding-block:24px 64px}
-.view{display:flex;flex-direction:column;gap:36px}
-.sec{display:flex;flex-direction:column;gap:14px}
-.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.sec-head p{color:var(--ink2);font-size:14px;max-width:70ch}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+/* ---------- page frame ---------- */
+main{padding-block:32px 72px}
+.view{display:flex;flex-direction:column;gap:32px;min-width:0}
+.sec{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:6px 16px;flex-wrap:wrap}
+.sec-head>p{font-size:13px;line-height:1.5;color:var(--ink3);max-width:70ch;text-wrap:pretty}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:16px var(--ppad);min-width:0}
 
-/* note: a callout in the amber note tokens */
-.note{background:var(--note-bg);color:var(--note-ink);border-radius:8px;padding:8px 12px;font-size:13px}
-/* badge: a short warning in the same amber tokens */
-.badge{display:inline-block;background:var(--note-bg);color:var(--note-ink);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:600}
-/* linkbtn: a button that reads as a link, e.g. "Show the numbers" */
-.linkbtn{font:500 13px var(--f-body);color:var(--accent);background:none;border:0;padding:8px 0;min-height:36px;cursor:pointer;align-self:flex-start}
+/* note: a callout (an error or a notice); badge: a short warning, both on the warn tone */
+.note{background:var(--surface);border:1px solid var(--line2);border-left:3px solid var(--warn);border-radius:var(--r-2);padding:10px 12px;font-size:13px;line-height:1.5;color:var(--ink);text-wrap:pretty}
+.note[role="alert"]{border-left-color:var(--crit)}
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-pill);border:1px solid color-mix(in srgb,var(--warn) 60%,var(--line2));background:color-mix(in srgb,var(--warn) 18%,var(--surface));color:var(--ink);font:500 12px/1 var(--f-sans);white-space:nowrap}
+/* rule: the one-line statement of how a list is picked */
+.rule{font-size:12.5px;line-height:1.5;color:var(--ink2);border:1px dashed var(--line2);border-radius:var(--r-2);padding:9px 12px;text-wrap:pretty}
+/* state: an empty or failed list, the artifact's dashed card with a small icon (an error is crimson-marked) */
+.state{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:24px 20px;border:1px dashed var(--line2);border-radius:var(--r-3);background:var(--surface)}
+.state .ic{width:36px;height:36px;border-radius:var(--r-2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--ink2);background:var(--sunken)}
+.state h4{margin:0;font:600 14px/1.3 var(--f-sans);letter-spacing:-.01em}
+.state p{font-size:13px;color:var(--ink2);max-width:46ch;line-height:1.5}
+.state.err .ic{color:var(--crit)}
+details summary{cursor:pointer;color:var(--ink2);font-size:13px;font-weight:500;padding-block:4px}
+details summary:hover{color:var(--ink)}
+details[open] summary{margin-bottom:8px}
 
-/* chips / tabs */
+/* ---------- buttons: primary = ink fill (the default .btn), secondary = surface + line2 border ---------- */
+.btn{--h:32px;height:var(--h);padding:0 12px;border-radius:var(--r-2);font:500 13px/1 var(--f-sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;white-space:nowrap;text-decoration:none;user-select:none;background:var(--inv);color:var(--invfg)}
+.btn:hover:not(:disabled){background:var(--inv-hover)}
+.btn:active:not(:disabled){background:var(--inv-press)}
+.btn.sm{--h:28px;padding:0 10px;font-size:12px}
+.btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line2)}
+.btn-secondary:hover:not(:disabled){background:var(--hover);border-color:var(--control)}
+.btn-secondary:active:not(:disabled){background:var(--band)}
+.btn-ghost{background:transparent;color:var(--ink2)}
+.btn-ghost:hover:not(:disabled){background:var(--hover);color:var(--ink)}
+.btn-ghost:active:not(:disabled){background:var(--band);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* linkbtn: a quiet button for a secondary action, e.g. "Show the numbers" */
+.linkbtn{height:28px;padding:0 8px;border:0;border-radius:var(--r-2);background:none;color:var(--ink2);font:500 12px/1 var(--f-sans);align-self:flex-start;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.linkbtn:hover{background:var(--hover);color:var(--ink)}
+
+/* ---------- chips, tabs, pager ---------- */
+/* chip: a toggle for picking several things at once (one choice among a few is the .seg of fund/base.css) */
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{font:500 13px/1 var(--f-body);padding:9px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);cursor:pointer;min-height:36px}
-.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-.chip:disabled{opacity:.45;cursor:default}
+.chip{height:28px;padding:0 10px;border:1px solid var(--line2);border-radius:var(--r-pill);background:var(--surface);color:var(--ink2);font:500 12px/1 var(--f-sans);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip:hover:not(:disabled){background:var(--hover);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--inv);border-color:var(--inv);color:var(--invfg)}
+.chip[aria-pressed="true"]:hover{background:var(--inv-hover);border-color:var(--inv-hover);color:var(--invfg)}
+.chip:disabled{opacity:.45;cursor:not-allowed}
 /* pager: "Showing 1–100 of 1,234 funds" with Previous / Next, above and below a long table */
-.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;font-size:13px;color:var(--muted)}
+.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;font-size:12px;color:var(--ink3)}
 .pager-btns{display:flex;align-items:center;gap:8px}
 .pager-at{font-variant-numeric:tabular-nums;white-space:nowrap}
 .pager-sum{font-variant-numeric:tabular-nums}
-.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
-.tab{font:600 14px/1 var(--f-body);padding:12px 14px;border:0;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;min-height:44px}
-.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+/* tabs: a hairline under the strip and a 2px ink bar (.ind) that slides to the open tab; the line is an
+   inset shadow so the bar can sit on it inside the scroller */
+.tabs{position:relative;display:flex;gap:2px;overflow-x:auto;box-shadow:inset 0 -1px 0 var(--line);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;height:38px;padding:0 12px;border:0;background:none;color:var(--ink3);font:500 13px/1 var(--f-sans);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex:none}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink)}
+.tab:focus-visible{outline-offset:-3px}
+.tabs .ind{position:absolute;left:0;bottom:0;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40));pointer-events:none}
 
-/* tiles */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
-.tile .k{font-size:12.5px;color:var(--muted)}
-.tile .v{font-size:22px;font-weight:600;line-height:1.25}
-.tile .d{font-size:12.5px;color:var(--ink2)}
+/* ---------- inputs (the home search is in pages/home.css) ---------- */
+.input{height:36px;width:100%;padding:0 12px;border:1px solid var(--control);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans);min-width:0}
+.input::placeholder{color:var(--ink3);opacity:1}
+.input:hover{border-color:var(--ink3)}
+.input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 
-/* fund header */
-.fhead{display:flex;flex-direction:column;gap:10px}
-.meta{display:flex;gap:8px 18px;flex-wrap:wrap;color:var(--ink2);font-size:14px}
+/* ---------- tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:14px 16px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile .k{font:500 12px/16px var(--f-sans);color:var(--ink3)}
+.tile .v{font:600 24px/30px var(--f-sans);letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.tile .d{font-size:12px;line-height:16px;color:var(--ink3)}
+
+/* ---------- headers ---------- */
+.fhead{display:flex;flex-direction:column;gap:10px;min-width:0}
+.fhead h1 .mono{font-weight:600;letter-spacing:-.02em}
+.meta{display:flex;gap:6px 20px;flex-wrap:wrap;color:var(--ink2);font-size:13px}
 .meta b{color:var(--ink);font-weight:600}
 .back{align-self:flex-start;text-decoration:none;padding-block:4px}
-.back:hover{text-decoration:underline}
+.back:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 
-/* tables */
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:9px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child,th.l,td.l{text-align:left}
-thead th{font-size:12px;font-weight:600;color:var(--muted);background:var(--surface);position:sticky;top:0;letter-spacing:.02em;white-space:normal;vertical-align:bottom;line-height:1.3}
-tbody tr:last-child td{border-bottom:0}
-tbody td:not(.l){font-variant-numeric:tabular-nums}
-tr.click{cursor:pointer} tr.click:hover td{background:var(--chip)}
-.tbl-wrap.virtual{max-height:min(70vh,640px);overflow:auto}
-.tbl-wrap.virtual tbody td{height:40px;padding-block:0;line-height:1.3}
-th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;letter-spacing:inherit}
-th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
+/* ---------- tables: the positions table's rules for every DataTable ----------
+   Fixed 38px rows, a sunken sticky head, the first column sticky, every column always there (the wrapper
+   scrolls sideways when they do not fit, the page never does), tabular figures, right-aligned numbers. */
+.tbl-wrap{--tpad:16px;position:relative;overflow:auto;max-height:min(70vh,620px);min-width:0;border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface)}
+.tbl-wrap:focus-visible{outline-offset:-2px}
+/* run edge to edge when the table is the body of a panel */
+.panel>.tbl-wrap,.fp .panel>.tbl-wrap{--tpad:var(--ppad);border-width:1px 0 0;border-radius:0}
+.panel>.tbl-wrap:last-child,.fp .panel>.tbl-wrap:last-child{border-radius:0 0 var(--r-3) var(--r-3)}
+.tbl-wrap table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.tbl-wrap :is(th,td){height:var(--row);padding:0 8px;text-align:right;white-space:nowrap;vertical-align:middle;border-bottom:1px solid var(--line)}
+.tbl-wrap :is(th,td).l,.tbl-wrap :is(th,td):first-child{text-align:left}
+.tbl-wrap :is(th,td):first-child{padding-left:var(--tpad)}
+.tbl-wrap :is(th,td):last-child{padding-right:var(--tpad)}
+.tbl-wrap thead th{position:sticky;top:0;z-index:2;height:36px;background:var(--sunken);font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom-color:var(--line2)}
+.tbl-wrap tbody td{background:var(--surface)}
+.tbl-wrap tbody tr:last-child td{border-bottom:0}
+.tbl-wrap tbody tr:hover>td{background:var(--hover)}
+/* the first column stays in view while the rest scrolls sideways */
+.tbl-wrap :is(thead th,tbody td):first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
+.tbl-wrap thead th:first-child{z-index:3}
+.tbl-wrap tr.click{cursor:pointer}
+.tbl-wrap tr.click:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.tbl-wrap td.empty{height:auto;padding-block:28px;white-space:normal;color:var(--ink3);font-size:13px}
+.tbl-wrap a{color:var(--ink);font-weight:500;text-decoration:none}
+.tbl-wrap a:hover{text-decoration:underline;text-underline-offset:3px}
+/* sort buttons: the chevron hangs to the left of a right-aligned heading (to the right of a left-aligned one), so it never shifts the label */
+.tbl-wrap th .sort{position:relative;display:inline-flex;align-items:center;gap:4px;height:100%;padding:6px 0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:normal;white-space:nowrap;text-align:inherit}
+.tbl-wrap th .sort .ico{position:absolute;right:calc(100% + 1px);width:12px;height:12px;stroke-width:2}
+.tbl-wrap th:is(.l,:first-child) .sort .ico{right:auto;left:calc(100% + 1px)}
+.tbl-wrap th .sort:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.tbl-wrap th[aria-sort] .sort{color:var(--ink);font-weight:600}
+/* stk: a name over a small muted line (ticker over company, fund over its size); text is cut with an ellipsis */
+.stk{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;max-width:14em}
+.stk>:is(.mono,.nm){font:600 13px/15px var(--f-mono);letter-spacing:-.01em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk>.nm{font-family:var(--f-sans);letter-spacing:-.005em}
+.stk>:is(.cap,.sub){color:var(--ink3);font-size:11.5px;line-height:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-wrap a.nm{display:inline-block;vertical-align:bottom;max-width:15em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;letter-spacing:-.005em}
+a.stk{text-decoration:none}
+a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
+.tbl-wrap a.stk{font-weight:inherit}
+/* lc: the holdings table's tinted "Last change" box: a word (Added) and a signed figure, or just a figure (+20%); blue-tinted up, orange-tinted down, grey for a sale of everything */
+.tbl-wrap .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
+.tbl-wrap .lc .lw{font-size:11.5px;color:var(--ink2)}
+.tbl-wrap .lc b{font:600 14px/18px var(--f-sans);letter-spacing:-.01em;color:var(--ink)}
+.tbl-wrap .lc.add{background:color-mix(in srgb,var(--gain) 11%,var(--surface))}
+.tbl-wrap .lc.trim{background:color-mix(in srgb,var(--loss) 12%,var(--surface))}
+.tbl-wrap .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+@media (max-width:559px){.stk,.tbl-wrap a.nm{max-width:10em}}
 .tick{display:inline-flex;align-items:center;gap:8px}
+.tick .mono{font-weight:600}
 /* Long fund and company names are cut with an ellipsis (the full name shows on hover), so wide
    tables fit the page without scrolling sideways. */
 .trunc,.tick .cap,.tick .mono{display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
 .trunc{max-width:15em}
 .tick .cap{max-width:9em}
 .tick .mono{max-width:6.5em} /* a bond's "ticker" ("BABA 0-5 06-01-31") is cut too */
-/* A short two-part cell ("Q1 2016 → now", "−4% Q4 2025") may take two lines; a virtual table's
-   40px rows still fit them. */
+.tick.stk{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.tick.stk>.mono{display:block;max-width:100%}
+.tick.stk>.cap{display:block;max-width:100%}
+/* A short two-part cell ("Q1 2016 → now", "−4% Q4 2025") may take two lines; a 38px row still fits them. */
 .two-line{display:inline-block;white-space:normal;max-width:5.8em;line-height:1.25}
-.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--ink2)}
-.pill.buy{background:color-mix(in srgb,var(--s1) 16%,transparent);color:var(--ink)}
-.pill.sell{background:color-mix(in srgb,var(--s2) 18%,transparent);color:var(--ink)}
-.cap{font-size:12.5px;color:var(--muted)}
-details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500;padding-block:4px}
-details[open] summary{margin-bottom:8px}
+/* pill: a small label; buy/sell carry a dot in the data colours, and always the word itself */
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--r-pill);border:1px solid var(--line2);background:var(--surface);color:var(--ink2);font:500 12px/1 var(--f-sans);white-space:nowrap}
+.pill.buy,.pill.sell{color:var(--ink)}
+.pill.buy::before,.pill.sell::before{content:"";width:6px;height:6px;border-radius:50%;flex:none}
+.pill.buy{background:color-mix(in srgb,var(--gain) 12%,var(--surface));border-color:color-mix(in srgb,var(--gain) 45%,var(--line2))}
+.pill.buy::before{background:var(--gain)}
+.pill.sell{background:color-mix(in srgb,var(--loss) 12%,var(--surface));border-color:color-mix(in srgb,var(--loss) 45%,var(--line2))}
+.pill.sell::before{background:var(--loss)}
 
-/* charts */
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
-.lk{width:16px;height:2px;border-radius:2px;display:inline-block}
-.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-.chart{width:100%;min-width:0}
-.chart svg{display:block;max-width:100%}
-.ax{fill:var(--muted);font:400 11px var(--f-body);font-variant-numeric:tabular-nums}
-.lab{fill:var(--ink2);font:500 12px var(--f-body)}
-.lab.sel{fill:var(--ink);font-weight:700}
-.val{fill:var(--ink);font:600 11.5px var(--f-body);font-variant-numeric:tabular-nums}
+/* ---------- charts on the position page (price line, step chart) ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.lk{width:16px;height:3px;border-radius:2px;display:inline-block;flex:none}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.chart{position:relative;width:100%;min-width:0}
+.chart svg{display:block;max-width:100%;font-family:var(--f-sans);-webkit-user-select:none;user-select:none}
+.ax{fill:var(--ink3);font:400 11px var(--f-sans);font-variant-numeric:tabular-nums}
 .grid{stroke:var(--line);stroke-width:1}
 .base{stroke:var(--line2);stroke-width:1}
-.hit{fill:transparent;cursor:pointer;outline:none}
-.hit:focus-visible{stroke:var(--accent);stroke-width:2}
-.selbg{fill:var(--chip)}
-.mark{transition:opacity .12s}
-g.cat:hover .mark,g.cat:focus-within .mark{opacity:.82}
-@media (prefers-reduced-motion:reduce){.mark{transition:none}}
-.hint{font-size:13px;color:var(--ink2)}
-.hint b{color:var(--ink)}
+.base.crosshair{stroke:var(--ink3);stroke-dasharray:1 3;stroke-linecap:round;pointer-events:none}
 
-#tip{position:fixed;z-index:20;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.4;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
-#tip .t{color:var(--tip-muted);font-size:11.5px;margin-bottom:2px}
-#tip .r{display:flex;align-items:center;gap:8px}
-#tip .r b{font-variant-numeric:tabular-nums}
-
-/* home */
-.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:end}
-.search{display:flex;gap:8px;flex-wrap:wrap}
-.search label{flex:1 1 100%;font-size:13px;color:var(--muted)}
-.search input{flex:1 1 220px;min-width:0;font:400 15px var(--f-body);padding:12px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);min-height:46px}
-.btn{font:600 14px var(--f-body);padding:12px 16px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;min-height:46px}
-.search-box{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0}
-.results{position:absolute;z-index:6;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
-.results p{padding:8px 10px}
-.results ul{list-style:none;margin:0;padding:0}
-.results a{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:500}
-.results a:hover,.results a:focus-visible{background:var(--chip)}
-.results .cap{white-space:nowrap}
-.chip-groups{display:flex;flex-wrap:wrap;gap:8px 24px}
-.btn:disabled{opacity:.5;cursor:default}
-.rule{font-size:13px;color:var(--ink2);background:var(--surface);border:1px dashed var(--line2);border-radius:10px;padding:10px 12px}
-
-/* methodology */
-.prose{max-width:72ch;display:flex;flex-direction:column;gap:22px}
-.prose section{display:flex;flex-direction:column;gap:8px}
-.prose p,.prose li{color:var(--ink2)}
+/* ---------- how it works ---------- */
+.prose{max-width:72ch;display:flex;flex-direction:column;gap:28px}
+.prose section{display:flex;flex-direction:column;gap:10px}
+.prose p,.prose li{color:var(--ink2);line-height:1.55;text-wrap:pretty}
 .prose ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
-.formula{font-family:var(--f-mono);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink);overflow-x:auto;white-space:pre}
+.prose li::marker{color:var(--ink3)}
+.formula{font:400 12.5px/1.6 var(--f-mono);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-2);padding:10px 14px;color:var(--ink);overflow-x:auto;white-space:pre}
 
-@media (max-width:760px){
-  .hero{grid-template-columns:1fr}
-  .tile .v{font-size:19px}
+@media (min-width:720px){
+  .wrap{padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+}
+@media (max-width:559px){
+  :root{--ppad:16px}
+  .tile .v{font-size:22px;line-height:28px}
+  /* two tiles to a row: an odd last one takes the whole row */
+  .tile:last-child:nth-child(odd){grid-column:1/-1}
+}
+/* Fingers need bigger targets than a mouse does. */
+@media (pointer:coarse){
+  .btn{--h:40px}
+  .btn.sm{--h:36px}
+  .chip{height:36px;padding:0 14px}
+  .tab{height:44px}
+  .linkbtn{height:36px}
+  .input{height:44px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .btn,.chip,.tab,.nav a,.linkbtn,.tbl-wrap tbody td{transition:background-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),border-color var(--d-fast) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out)}
 }

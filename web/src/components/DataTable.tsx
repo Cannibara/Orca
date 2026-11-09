@@ -29,10 +29,19 @@ type Props<T> = {
   label?: string;
 };
 
-/** Fixed row height of a virtual table (see `.tbl-wrap.virtual td` in styles.css). */
-const ROW_H = 40;
+/** Fixed row height of every table (the `--row` of `.tbl-wrap table` in styles.css). */
+const ROW_H = 38;
 /** Viewport assumed when the scroll container reports no height (no layout: tests, a hidden tab). */
 const FALLBACK_VIEW_H = 640;
+
+/** The chevron on the sorted column's heading, as on the fund page's positions table. */
+function SortIcon({ desc }: { desc: boolean }) {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+      <path d={desc ? "M4 6.25 8 10.25l4-4" : "M4 9.75l4-4 4 4"} />
+    </svg>
+  );
+}
 
 const interactive = (target: EventTarget) => target instanceof Element && target.closest("a, button, input, select, textarea");
 
@@ -97,10 +106,12 @@ export function DataTable<T>({
         {onSort && c.key !== undefined ? (
           <button
             type="button"
+            className="sort"
             data-dir={dir === 0 ? undefined : dir > 0 ? "↑" : "↓"}
             onClick={() => onSort(c.key as string)}
           >
             {c.header}
+            {dir !== 0 && <SortIcon desc={dir < 0} />}
           </button>
         ) : (
           c.header
@@ -150,7 +161,14 @@ export function DataTable<T>({
     ) : null;
 
   return (
-    <div ref={scroller} className={virtual ? "tbl-wrap virtual" : "tbl-wrap"}>
+    // Focusable so the keyboard can scroll it sideways when the columns do not fit (a table without links has no other stop).
+    <div
+      ref={scroller}
+      className={virtual ? "tbl-wrap virtual" : "tbl-wrap"}
+      tabIndex={0}
+      role="region"
+      aria-label={label ? `${label}, scrollable` : undefined}
+    >
       <table aria-label={label} aria-rowcount={virtual ? rows.length + 1 : undefined}>
         <thead>
           <tr>{columns.map(header)}</tr>
@@ -158,7 +176,7 @@ export function DataTable<T>({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="l cap">
+              <td colSpan={columns.length} className="l empty">
                 {empty}
               </td>
             </tr>

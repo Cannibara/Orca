@@ -1,0 +1,80 @@
+/* "What if they'd kept it" panel: a row of tiles and the sold-or-trimmed table, in the look of the
+   Positions table (fixed 38px rows, sticky head and first column). Every selector sits under `.fp`;
+   tokens and the shared pieces (.panel, .ph, .pt, .ps, .pf) come from base.css, and the opened row
+   reuses the Positions panel's .xpanel / .xhead / .xleg / .viz.px / .xtbl (positions.css, imported by
+   StockPanel). The table sets every property it cares about itself, so the generic table rules of
+   styles.css never leak into it. */
+
+/* the panel draws its own padding (header, tiles, table, note); the generic .panel padding of styles.css is not wanted */
+.fp #whatIfPanel.panel{padding:0}
+
+/* ---------- tiles: the KPI strip's look, as one row inside the panel ---------- */
+.fp .wi-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:14px}
+.fp .wi-tile{padding:14px var(--ppad) 12px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--surface)}
+.fp .wi-l{font:500 12px/16px var(--f-sans);color:var(--ink3)}
+.fp .wi-v{font:600 28px/34px var(--f-sans);letter-spacing:-.025em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fp .wi-v.gain{color:var(--gain)}
+.fp .wi-v.loss{color:var(--loss)}
+.fp .wi-n{font-size:12px;line-height:16px;color:var(--ink3);min-width:0}
+
+/* ---------- the table ---------- */
+/* 14 columns in the page's 1190px: the cells are padded 6px a side (the Positions table's 8px has 13 columns and room to spare) */
+.fp .wi-wrap{overflow:auto;max-height:620px;position:relative}
+.fp .wi-wrap:focus-visible{outline-offset:-2px}
+.fp table.wi{border-collapse:separate;border-spacing:0;width:100%;min-width:1173px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.fp .wi>thead>tr>th{position:sticky;top:0;z-index:2;background:var(--sunken);height:36px;padding:0 6px;text-align:right;font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom:1px solid var(--line2);white-space:nowrap;vertical-align:middle}
+.fp .wi>thead>tr>th.l,.fp .wi>tbody>tr>td.l{text-align:left}
+.fp .wi>thead>tr>th:first-child,.fp .wi>tbody>tr>td:first-child{text-align:left;padding-left:var(--ppad)}
+.fp .wi>thead>tr>th:last-child,.fp .wi>tbody>tr>td:last-child{padding-right:var(--ppad)}
+.fp .wi .sort{position:relative;display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;padding:6px 0;height:100%;color:inherit;font:inherit;white-space:nowrap;text-decoration:none;letter-spacing:normal}
+.fp .wi .sort .ico{position:absolute;right:calc(100% + 1px);width:12px;height:12px;stroke-width:2}
+.fp .wi>thead>tr>th:first-child .sort .ico,.fp .wi>thead>tr>th.l .sort .ico,.fp .wi>thead>tr>th:last-child .sort .ico{right:auto;left:calc(100% + 1px)}
+.fp .wi .sort:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.fp .wi>thead>tr>th[aria-sort="ascending"] .sort,.fp .wi>thead>tr>th[aria-sort="descending"] .sort{color:var(--ink);font-weight:600}
+.fp .wi>tbody>tr>td{height:var(--row);padding:0 6px;overflow:hidden;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface);vertical-align:middle}
+.fp .wi>tbody>tr:hover>td{background:var(--hover)}
+.fp .wi>tbody>tr.is-sel>td{background:var(--band)}
+.fp .wi>tbody>tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.fp .wi>tbody>tr:last-child>td{border-bottom:0}
+/* the Stock column stays in view while the rest scrolls sideways */
+.fp .wi>thead>tr>th:first-child,.fp .wi>tbody>tr>td:first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
+.fp .wi>thead>tr>th:first-child{z-index:3}
+.fp .wi>tbody>tr[data-t]{cursor:pointer}
+.fp .wi .stk{display:flex;flex-direction:column;align-items:stretch;gap:1px;min-width:0;width:100%}
+.fp .wi .stk b{font:600 13px/15px var(--f-mono);letter-spacing:-.01em;display:inline-block}
+.fp .wi .stk span{color:var(--ink3);font-size:11.5px;line-height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%}
+
+/* status and last change: a box tinted by what the fund did, as the Positions table's Last change */
+.fp .wi .lc,.fp .wi .st{display:inline-flex;align-items:baseline;gap:5px;padding:3px 7px;border-radius:var(--r-2);background:var(--sunken)}
+.fp .wi .st{font:600 12.5px/18px var(--f-sans);color:var(--ink)}
+.fp .wi .lc .lw{font-size:11.5px;color:var(--ink2)}
+.fp .wi .lc b{font:600 14px/18px var(--f-sans);letter-spacing:-.01em;color:var(--ink)}
+.fp .wi :is(.lc,.st).add{background:color-mix(in srgb,var(--gain) 11%,var(--surface))}
+.fp .wi :is(.lc,.st).trim{background:color-mix(in srgb,var(--loss) 12%,var(--surface))}
+.fp .wi :is(.lc,.st).sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+.fp .wi .lcw{display:inline-flex;align-items:center;gap:5px}
+.fp .wi .lq{font-size:11.5px;color:var(--ink3)}
+.fp .wi .lc-none{color:var(--ink3)}
+/* $ missed / dodged: plus = gains missed = loss colour, minus = a drop avoided = gain colour (darkened a little so the small figure reads on the page) */
+.fp .wi .mv.loss{color:color-mix(in srgb,var(--loss) 82%,var(--ink));font-weight:600}
+.fp .wi .mv.gain{color:color-mix(in srgb,var(--gain) 86%,var(--ink));font-weight:600}
+
+.fp .wi .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
+.fp .wi-more{padding:10px var(--ppad);border-top:1px solid var(--line);font-size:12px;line-height:18px;color:var(--ink3)}
+.fp .pf.wi-foot{padding-top:10px;border-top:1px solid var(--line);max-width:none}
+.fp .wi-more+.pf.wi-foot{border-top:0;padding-top:0}
+
+/* ---------- the opened row ---------- */
+.fp .wi>tbody>tr.xrow>td{padding:0;height:auto;text-align:left;background:var(--sunken);border-bottom:1px solid var(--line2);overflow:visible}
+.fp .wi>tbody>tr.xrow>td:first-child{position:static;box-shadow:none}
+
+@container app (max-width:899px){
+  .fp .wi-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container app (max-width:559px){
+  .fp .wi-v{font-size:24px;line-height:30px}
+  .fp .wi .stk span{font-size:11.5px;max-width:112px}
+}
+@container app (max-width:359px){
+  .fp .wi-tiles{grid-template-columns:minmax(0,1fr)}
+}

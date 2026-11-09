@@ -60,6 +60,18 @@ export function linePath(points: ReadonlyArray<readonly [number, number] | null>
   return d;
 }
 
+/**
+ * A trade marker's triangle (the fund page's price chart draws the same): a buy points up and
+ * sits just above the price (x, y), a sale points down and sits just below it, so the marker
+ * never covers the line it marks. `half` is half the base width.
+ */
+export function markerPath(x: number, y: number, up: boolean, half = 5.5): string {
+  const tip = y + (up ? -1 : 1) * (half + 2);
+  const run = half;
+  const rise = (up ? 1 : -1) * half * 1.7;
+  return `M${x.toFixed(1)},${tip.toFixed(1)}l${run},${rise.toFixed(1)}h${-2 * half}z`;
+}
+
 /** Short count for axis labels and tooltips: 12345678 → "12.35M", 850000 → "850K". */
 export function compact(v: number): string {
   const a = Math.abs(v);

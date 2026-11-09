@@ -1,0 +1,84 @@
+/* Home page: the hero with its search, the tab strip and the list panels. Every selector sits under
+   `.home`, which is rendered inside the fund page's `.fp` frame (<div class="fp"><div class="home fp-main">),
+   so the shared pieces come from fund/base.css (.panel .ph .pt .ps .ph-c .pb .pf .seg .btn .sk .state)
+   and styles.css (tabs, the DataTable look: .tbl-wrap .stk .lc, .pager). Tokens come from tokens.css. */
+
+/* ---------- hero: eyebrow and heading on the left, the search on the right ---------- */
+.home .hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px 24px;align-items:end;padding:8px 0}
+.home .hero-t{display:flex;flex-direction:column;gap:14px;min-width:0}
+.home .hero h1{overflow-wrap:anywhere}
+@container app (max-width:719px){
+  .home .hero{grid-template-columns:minmax(0,1fr);padding-top:0}
+}
+
+/* ---------- search: the artifact's command field (surface, hairline, 36px, icon, "/" hint) ---------- */
+.home .search-box{position:relative;display:flex;flex-direction:column;min-width:0;justify-self:end;width:min(100%,520px)}
+.home .search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center}
+.home .search label{grid-column:1/-1;font:500 12px/1 var(--f-sans);color:var(--ink)}
+.home .in-wrap{position:relative;display:flex;align-items:center;min-width:0}
+.home .in-wrap>.ico{position:absolute;left:11px;color:var(--ink3);pointer-events:none}
+.home .in-wrap>.kbd{position:absolute;right:8px;pointer-events:none}
+.home .in-wrap>input{appearance:none;-webkit-appearance:none;height:36px;width:100%;min-width:0;padding:0 36px 0 34px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans)}
+.home .in-wrap>input::placeholder{color:var(--ink3);opacity:1}
+.home .in-wrap>input:hover{border-color:var(--control)}
+.home .in-wrap>input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+/* the "/" hint goes while typing or focused, and on touch screens and phones where there is no keyboard to use it */
+.home .in-wrap>input:focus~.kbd,.home .in-wrap>input:not(:placeholder-shown)~.kbd{display:none}
+@media (hover:none),(pointer:coarse){.home .in-wrap>.kbd{display:none}}
+@container app (max-width:719px){.home .in-wrap>.kbd{display:none}}
+.home .in-wrap>input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin:0 0 0 6px;cursor:pointer;background:var(--ink3);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.home .in-wrap>input::-webkit-search-cancel-button:hover{background:var(--ink)}
+.home .search .btn{--h:36px;padding:0 14px}
+
+/* ---------- the results menu: the artifact's palette rows (name left, muted detail right, active row in tone) ---------- */
+.home .results{position:absolute;z-index:6;top:100%;left:0;right:0;margin-top:4px;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r-3);padding:6px;box-shadow:var(--shadow-1)}
+.home .results ul{display:flex;flex-direction:column;gap:1px}
+.home .results a{display:flex;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:var(--r-2);color:var(--ink);text-decoration:none;font-size:13.5px}
+.home .results a:hover,.home .results a:focus-visible{background:var(--band)}
+.home .results a:focus-visible{outline-offset:-2px}
+.home .results a .ico{color:var(--ink3)}
+.home .results a:is(:hover,:focus-visible) .ico{color:var(--ink)}
+.home .results .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home .results .rt{font:500 12px/1 var(--f-mono);color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.home .results p{padding:10px 10px;font-size:13px;color:var(--ink3)}
+.home .search-note{margin-top:6px;font-size:12px;color:var(--ink3)}
+
+/* ---------- the list panels ---------- */
+.home .home-body{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+.home .panel{overflow-wrap:normal}
+/* the period / window toggles: six options do not fit a phone, so the control scrolls inside itself */
+.home .ph-c{min-width:0;max-width:100%}
+.home .seg{overflow-x:auto;scrollbar-width:none}
+.home .seg::-webkit-scrollbar{display:none}
+.home .ph{padding-bottom:12px}
+.home .pager{padding:10px var(--ppad)}
+.home .ph+.pager{padding-top:0}
+.home .tbl-wrap+.pager{border-top:1px solid var(--line)}
+.home .pb{padding-bottom:var(--ppad)}
+.home .pf{border-top:1px solid var(--line);padding-top:10px}
+.home .pager+.pf{border-top:0;padding-top:0}
+/* two lists side by side (wins and losses) when the panel is wide enough, stacked otherwise */
+.home .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px var(--gap);align-items:start}
+.home .duo>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.home .duo h3{font:600 13px/18px var(--f-sans);letter-spacing:-.005em}
+/* on a phone the two lists run edge to edge like the panel does, so their columns get every pixel */
+@container app (max-width:559px){
+  .home .duo{padding-inline:0}
+  .home .duo h3{padding-inline:var(--ppad)}
+  .home .duo .tbl-wrap{--tpad:var(--ppad);border-inline:0;border-radius:0}
+  .home .duo .stk{max-width:9em}
+}
+.home .foot{padding:0 2px}
+
+/* ---------- loading: skeleton rows (the artifact's shimmer) ---------- */
+.home .skl{padding:4px var(--ppad) 12px}
+.home .skr{display:flex;align-items:center;gap:16px;height:38px;border-bottom:1px solid var(--line)}
+.home .skr:last-child{border-bottom:0}
+.home .skr .sk{height:10px;flex:none}
+.home .skr .sk:first-child{flex:1 1 0;max-width:220px}
+
+@media (pointer:coarse){
+  .home .seg button{height:34px}
+  .home .in-wrap>input{height:44px;font-size:16px}
+  .home .search .btn{--h:44px}
+}

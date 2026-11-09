@@ -23,13 +23,13 @@ export function Pager({ page, pageSize, total, onPage, noun }: Props) {
         Showing {count(first)}–{count(last)} of {count(total)} {noun}
       </span>
       <span className="pager-btns">
-        <button type="button" className="chip" onClick={() => onPage(page - 1)} disabled={page === 0}>
+        <button type="button" className="btn btn-secondary sm" onClick={() => onPage(page - 1)} disabled={page === 0}>
           Previous
         </button>
         <span className="pager-at">
           Page {page + 1} of {pages}
         </span>
-        <button type="button" className="chip" onClick={() => onPage(page + 1)} disabled={page >= pages - 1}>
+        <button type="button" className="btn btn-secondary sm" onClick={() => onPage(page + 1)} disabled={page >= pages - 1}>
           Next
         </button>
       </span>

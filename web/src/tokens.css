@@ -1,0 +1,100 @@
+/* Design tokens of the approved "Orca Modern UI" (warm paper neutrals, ocean blue = up, orange = down).
+   Generated from the artifact's palette; edit values here, not at the use sites. Both themes follow
+   prefers-color-scheme unless <html data-theme="light|dark"> says otherwise. */
+:root{
+  --page:#FAF3EA;
+  --ground:#FAF3EA;
+  --surface:#FFFCF8;
+  --sunken:#F0E6D8;
+  --hover:#F0E6D9;
+  --band:#F0E6D8;
+  --line:#E6DCCF;
+  --line2:#CDBFAE;
+  --control:#8E8272;
+  --ink:#1B1916;
+  --ink2:#4B463F;
+  --ink3:#6A635A;
+  --inv:#1B1916;
+  --invfg:#FFFCF8;
+  --focus:#0E658C;
+  --gain:#0E658C;
+  --loss:#D4561F;
+  --inv2:#BDB4A8;
+  --inv-hover:#4B463F;
+  --inv-press:#6A635A;
+  --raised:#FFFCF8;
+  --good:#0CA30C;
+  --warn:#FAB219;
+  --serious:#EC835A;
+  --crit:#D03B3B;
+  --shadow-1:0 1px 2px rgba(27,25,22,.08),0 8px 24px rgba(27,25,22,.14);
+  --scrim:rgba(27,25,22,.38);
+  --shimmer:rgba(255,252,248,.7);
+  --f-sans:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--sp-8:64px;
+  --r-1:3px;--r-2:6px;--r-3:10px;--r-pill:999px;
+  --ease-out:cubic-bezier(.2,.7,.2,1);--ease-std:cubic-bezier(.4,0,.2,1);
+  --d-instant:0ms;--d-fast:120ms;--d-base:200ms;--d-grow:600ms;--d-label:300ms;--d-ambient:1400ms;
+  --ppad:20px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#14110E;
+  --ground:#14110E;
+  --surface:#1C1814;
+  --sunken:#14110E;
+  --hover:#26211C;
+  --band:#26211C;
+  --line:#2D2721;
+  --line2:#433B33;
+  --control:#857B6E;
+  --ink:#F3ECE3;
+  --ink2:#BDB4A8;
+  --ink3:#9A9186;
+  --inv:#F3ECE3;
+  --invfg:#14110E;
+  --focus:#6BB6E0;
+  --gain:#3A8FC2;
+  --loss:#F48D60;
+  --inv2:#6A635A;
+  --inv-hover:#FFFCF8;
+  --inv-press:#BDB4A8;
+  --raised:#26211C;
+  --good:#0CA30C;
+  --warn:#FAB219;
+  --serious:#EC835A;
+  --crit:#D03B3B;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
+  --scrim:rgba(0,0,0,.62);
+  --shimmer:rgba(243,236,227,.06);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#14110E;
+  --ground:#14110E;
+  --surface:#1C1814;
+  --sunken:#14110E;
+  --hover:#26211C;
+  --band:#26211C;
+  --line:#2D2721;
+  --line2:#433B33;
+  --control:#857B6E;
+  --ink:#F3ECE3;
+  --ink2:#BDB4A8;
+  --ink3:#9A9186;
+  --inv:#F3ECE3;
+  --invfg:#14110E;
+  --focus:#6BB6E0;
+  --gain:#3A8FC2;
+  --loss:#F48D60;
+  --inv2:#6A635A;
+  --inv-hover:#FFFCF8;
+  --inv-press:#BDB4A8;
+  --raised:#26211C;
+  --good:#0CA30C;
+  --warn:#FAB219;
+  --serious:#EC835A;
+  --crit:#D03B3B;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
+  --scrim:rgba(0,0,0,.62);
+  --shimmer:rgba(243,236,227,.06);
+  color-scheme:dark}

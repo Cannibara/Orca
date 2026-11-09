@@ -1,6 +1,7 @@
 // "How it works": what a 13F covers and the formulas behind every estimate. Static text, no data.
 // The wording and formulas are the approved mockup's; the page ends with the not-advice line.
 import { useTitle } from "../lib/useTitle";
+import "./method.css";
 
 // The formulas keep their line breaks and alignment (the .formula box is white-space: pre).
 const TRADE_PRICE = `typical price = (high + low + close) ÷ 3
@@ -18,16 +19,16 @@ year = the four quarters chained`;
 export default function Method() {
   useTitle("How it works · Orca");
   return (
-    <div className="view">
+    <div className="method-page">
       <div className="prose">
-        <div className="sec">
-          <p className="eyebrow">Methodology</p>
+        <header className="m-head">
+          <p className="m-eyebrow">Methodology</p>
           <h1>How Orca estimates fund results</h1>
-          <p className="lede">
+          <p className="m-lede">
             Everything comes from public 13F filings plus daily stock prices. 13Fs only show what a fund held on the last
             day of each quarter, so trade prices, P&amp;L and returns are estimates.
           </p>
-        </div>
+        </header>
         <section>
           <h2>What a 13F covers</h2>
           <ul>
@@ -43,16 +44,16 @@ export default function Method() {
             We can't see trade dates, only the change in shares between quarter ends. All of a quarter's buying or selling
             is assumed to happen at that quarter's volume-weighted average price:
           </p>
-          <div className="formula">{TRADE_PRICE}</div>
+          <div className="formula" tabIndex={0}>{TRADE_PRICE}</div>
           <p>The quarter's low and high are shown next to every estimate.</p>
         </section>
         <section>
           <h2>P&amp;L per stock</h2>
-          <div className="formula">{PNL}</div>
+          <div className="formula" tabIndex={0}>{PNL}</div>
         </section>
         <section>
           <h2>Fund returns</h2>
-          <div className="formula">{RETURNS}</div>
+          <div className="formula" tabIndex={0}>{RETURNS}</div>
         </section>
         <section>
           <h2>What if they'd kept it</h2>

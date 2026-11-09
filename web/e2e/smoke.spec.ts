@@ -1,7 +1,8 @@
 // Smoke tests against `vite preview` of the demo-data build (see playwright.config.ts): the home
 // page, a fund page, that fund's first position page, the methodology and a not-found page, at
 // desktop and phone width, light and dark (the two projects). Each page must show its heading, log
-// no console or page errors, and not scroll sideways.
+// no console or page errors, and not scroll sideways. The fund page also gets its sections and one
+// click on a year bar checked in a real layout.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -65,6 +66,27 @@ for (const width of widths) {
         expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
       });
     }
+
+    // jsdom cannot measure, so the unit tests draw every chart at a fixed fallback width: this is the
+    // one place the panels are laid out for real, at a desktop and a phone width.
+    test("fund page: every section is there, and clicking a year bar picks that year for What drove", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}`);
+      await expect(page.locator("h1")).toHaveText(fundName);
+      for (const name of ["Annual returns", "Assets under management", "Positions", "What if they'd kept it"]) {
+        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      }
+      await expect(page.getByRole("heading", { name: /^What drove / })).toBeVisible();
+      await expect(page.locator("#retPanel rect.hit").first()).toBeAttached();
+
+      // a bar in the middle: the first and last carry the bracket's handles
+      const hits = page.locator("#retPanel rect.hit");
+      const aria = await hits.nth(Math.floor((await hits.count()) / 2)).getAttribute("aria-label");
+      const label = (aria as string).split(":")[0];
+      await page.getByRole("button", { name: new RegExp(`^${label}: `) }).click();
+      await expect(page.getByRole("heading", { name: `What drove ${label}`, exact: true })).toBeVisible();
+      await expect(page.locator("#retPanel rect.hit[aria-pressed='true']")).toHaveCount(1);
+      expect(errors).toEqual([]);
+    });
   });
 }
 

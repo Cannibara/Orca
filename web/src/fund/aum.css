@@ -1,0 +1,42 @@
+/* Assets under management panel. Ported from the approved artifact's style.css
+   (.stats/.stat, the legend swatches, the AUM bar variants and the hatch pattern).
+   Everything sits under `.fp .aum`; shared panel, legend, chart and table rules are in base.css. */
+
+/* the legacy global .panel (styles.css) pads the section; the sections inside carry the page padding themselves */
+.fp .panel.aum{padding:0}
+
+/* three figures above the chart */
+.fp .aum .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:12px var(--ppad) 0;border:1px solid var(--line);border-radius:var(--r-2);overflow:hidden}
+.fp .aum .stat{padding:8px 12px;border-left:1px solid var(--line);min-width:0}
+.fp .aum .stat:first-child{border-left:0}
+.fp .aum .stat span{display:block;font-size:11.5px;line-height:15px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp .aum .stat b{display:block;font:600 15px/22px var(--f-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap}
+@container app (max-width:559px){
+  .fp .aum .stat b{font-size:14px}
+}
+@container app (max-width:419px){
+  .fp .aum .stat span{white-space:normal}
+}
+
+/* legend swatches: what the bar parts look like */
+.fp .aum .lg i.flow{background:repeating-linear-gradient(135deg,var(--gain) 0 1.6px,transparent 1.6px 3.6px);border:1.5px solid var(--gain)}
+.fp .aum .lg i.out{background:transparent;border:1.5px dashed var(--loss)}
+.fp .aum .lg i.rml{background:color-mix(in srgb,var(--loss) 16%,transparent);border:1.5px dashed var(--loss)}
+
+/* bars: the book carried over, net inflows (hatched; the pattern fill is set on the path), gains, and the dotted boxes for what left */
+.fp .aum .viz .bar.corp{fill:color-mix(in srgb,var(--gain) 34%,var(--surface));stroke:var(--gain);stroke-width:1}
+.fp .aum .viz .bar.fin{stroke:var(--gain);stroke-width:1.25}
+.fp .aum .viz .bar.rm-loss{fill:color-mix(in srgb,var(--loss) 16%,transparent);stroke:var(--loss);stroke-width:1.25;stroke-dasharray:3 3}
+.fp .aum .viz .bar.rm-out{fill:none;stroke:var(--loss);stroke-width:1.25;stroke-dasharray:3 3}
+.fp .aum .viz .hf-bg{fill:transparent}
+.fp .aum .viz .hf-ln{fill:var(--gain)}
+
+/* the chart is static: columns only show the tooltip */
+.fp .aum .viz.c2 .hit{cursor:default}
+
+/* the numbers table: styles.css still has global th/td rules (38px rows, a hover tint, no rule under the last row) that the
+   artifact's table does not have; undo them here so the rows are as tall as the artifact's */
+.fp .aum .tbl-mini :is(th,td){height:auto;vertical-align:middle}
+.fp .aum .tbl-mini td{line-height:normal}
+.fp .aum .tbl-mini tbody tr:hover td{background:transparent}
+.fp .aum .tbl-mini tbody tr:last-child :is(th,td){border-bottom:1px solid var(--line)}

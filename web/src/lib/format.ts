@@ -99,3 +99,22 @@ export function signClass(x: number | null): "up" | "down" | "" {
   if (missing(x)) return "";
   return x > 0 ? "up" : x < 0 ? "down" : "";
 }
+
+const NAME_SUFFIX = /(?:\s+(?:&\s+)?(?:INC|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|PLC|LLC|LP|NEW|TR|COM))+\.?$/;
+// Acronyms that stay in capitals when a name is title-cased.
+const NAME_KEEP = new Set(["ETF", "ETN", "SPDR", "S&P", "US", "USA", "UK", "ADR", "REIT", "AI", "II", "III", "IV", "ISHARES"]);
+
+/**
+ * A security's name as the fund page prints it. SEC filings give names in capitals with legal suffixes
+ * ("ALPHABET INC", "COSTCO WHSL CORP NEW"): those become "Alphabet", "Costco Whsl". A name that already
+ * has lower-case letters is left as it is.
+ */
+export function tidyName(name: string): string {
+  if (name === "" || /[a-z]/.test(name)) return name;
+  const trimmed = name.replace(NAME_SUFFIX, "").trim();
+  const base = trimmed === "" ? name : trimmed;
+  return base
+    .split(/\s+/)
+    .map((w) => (NAME_KEEP.has(w) ? (w === "ISHARES" ? "iShares" : w) : w.toLowerCase().replace(/(^|[-'/.])([a-z])/g, (_, b: string, c: string) => b + c.toUpperCase())))
+    .join(" ");
+}

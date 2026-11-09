@@ -1,8 +1,10 @@
 import { useRef, useState, type PointerEvent } from "react";
+import { useGrowOnce } from "../fund/hooks";
 import { qLabel } from "../lib/format";
 import { compact, niceTicks } from "./scale";
 import { useTooltip } from "./Tooltip";
 import { useChartWidth } from "./useChartWidth";
+import "./charts.css";
 
 export type StepChartProps = {
   /** Quarters (Q1 2013 = 0) in which the holding changed, ascending. */
@@ -17,9 +19,11 @@ export type StepChartProps = {
 
 const H = 170;
 const M = { t: 12, r: 14, b: 30, l: 52 };
+const MIN_TICK_GAP = 5; // quarter ticks closer than this (px) are left out
 
 export function StepChart({ quarters, shares, endQ, label = "Shares held by quarter" }: StepChartProps) {
   const [ref, width] = useChartWidth();
+  const grow = useGrowOnce(ref, { durMs: 1400 });
   const tip = useTooltip();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null); // quarter under the pointer
@@ -54,63 +58,78 @@ export function StepChart({ quarters, shares, endQ, label = "Shares held by quar
   const years: number[] = [];
   for (let y = firstYear; y <= lastYear; y += yearStep) years.push(y);
 
+  // One small tick per quarter edge under the baseline (taller at a new year), if there is room for them.
+  const quarterTicks: number[] = [];
+  if (iw / slots >= MIN_TICK_GAP) for (let q = qa; q <= qb + 1; q++) quarterTicks.push(q);
+
   const onOverlay = (e: PointerEvent<SVGRectElement>) => {
     const b = svgRef.current!.getBoundingClientRect();
     const sx = (e.clientX - b.left) * (b.width > 0 ? width / b.width : 1); // client px → svg units
     const q = Math.max(qa, Math.min(qb, Math.floor(qa + ((sx - M.l) / iw) * slots)));
     setHover(q);
     tip.show(
-      { title: qLabel(q), rows: [{ color: "var(--s1)", value: levelAt(q).toLocaleString("en-US"), label: "shares held" }] },
+      { title: qLabel(q), rows: [{ color: "var(--gain)", value: levelAt(q).toLocaleString("en-US"), label: "shares held" }] },
       e.clientX,
       e.clientY,
+      { place: "cursor" },
     );
   };
 
+  const hoverX = hover != null && hover <= qb ? (X(hover) + X(hover + 1)) / 2 : null;
+
   return (
-    <div className="chart" ref={ref}>
-      <svg ref={svgRef} viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={M.l} x2={width - M.r} y1={Y(t)} y2={Y(t)} className={t === 0 ? "base" : "grid"} />
-            <text x={M.l - 8} y={Y(t) + 4} textAnchor="end" className="ax">
-              {compact(t)}
+    <div className="stc">
+      <div className="chart" ref={ref}>
+        <svg ref={svgRef} className={"stsvg" + grow.cls} viewBox={`0 0 ${width} ${H}`} width={width} height={H} role="group" aria-label={label}>
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={M.l} x2={width - M.r} y1={Y(t)} y2={Y(t)} className={t === 0 ? "base" : "grid"} />
+              <text x={M.l - 8} y={Y(t) + 4} textAnchor="end" className="ax">
+                {compact(t)}
+              </text>
+            </g>
+          ))}
+          {quarterTicks.map((q) => (
+            <line
+              key={q}
+              className={"qtick" + (q % 4 === 0 ? " yr" : "")}
+              x1={X(q)}
+              x2={X(q)}
+              y1={M.t + ih}
+              y2={M.t + ih + (q % 4 === 0 ? 6 : 3)}
+            />
+          ))}
+          {years.map((y) => (
+            <text key={y} x={X(y * 4)} y={H - 8} textAnchor="middle" className="ax">
+              {2013 + y}
             </text>
-          </g>
-        ))}
-        {area && <path className="step-area" d={area} style={{ fill: "var(--s1)", fillOpacity: 0.1 }} />}
-        {d && (
-          <path
-            className="step-line"
-            d={d}
-            fill="none"
-            style={{ stroke: "var(--s1)" }}
-            strokeWidth={2}
-            strokeLinejoin="round"
+          ))}
+          <rect
+            className="overlay"
+            x={M.l}
+            y={M.t}
+            width={iw}
+            height={ih}
+            fill="transparent"
+            onPointerEnter={onOverlay}
+            onPointerMove={onOverlay}
+            onPointerLeave={() => {
+              setHover(null);
+              tip.hide();
+            }}
           />
-        )}
-        {years.map((y) => (
-          <text key={y} x={X(y * 4)} y={H - 10} textAnchor="middle" className="ax">
-            {2013 + y}
-          </text>
-        ))}
-        {hover != null && hover <= qb && (
-          <line className="base crosshair" x1={(X(hover) + X(hover + 1)) / 2} x2={(X(hover) + X(hover + 1)) / 2} y1={M.t} y2={M.t + ih} />
-        )}
-        <rect
-          className="overlay"
-          x={M.l}
-          y={M.t}
-          width={iw}
-          height={ih}
-          fill="transparent"
-          onPointerEnter={onOverlay}
-          onPointerMove={onOverlay}
-          onPointerLeave={() => {
-            setHover(null);
-            tip.hide();
-          }}
-        />
-      </svg>
+          <g className="stdraw">
+            {area && <path className="step-area" d={area} />}
+            {d && <path className="step-line" d={d} fill="none" strokeLinejoin="round" />}
+          </g>
+          {hoverX != null && hover != null && (
+            <>
+              <line className="base crosshair" x1={hoverX} x2={hoverX} y1={M.t} y2={M.t + ih} />
+              <circle className="crosshair-dot" cx={hoverX} cy={Y(levelAt(hover))} r={4} />
+            </>
+          )}
+        </svg>
+      </div>
     </div>
   );
 }

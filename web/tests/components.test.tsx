@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { Chips } from "../src/components/Chips";
+import { Choice } from "../src/components/Choice";
 import { DataTable, type Column } from "../src/components/DataTable";
+import { Pager } from "../src/components/Pager";
+import { Panel } from "../src/components/Panel";
 import { Signed } from "../src/components/Signed";
+import { State } from "../src/components/State";
 import { Tile } from "../src/components/Tiles";
 import { money, pct, pp } from "../src/lib/format";
 import { Tabs, tabPanelProps } from "../src/components/Tabs";
@@ -100,6 +103,24 @@ describe("DataTable", () => {
     expect(row).not.toHaveClass("click");
   });
 
+  it("draws a chevron on the sorted heading only", () => {
+    const { rerender } = render(<DataTable columns={columns} rows={rows} sort={{ key: "n", dir: -1 }} onSort={vi.fn()} />);
+    const chevron = (name: string) => screen.getByRole("button", { name }).querySelector("svg.ico");
+    expect(chevron("Count")).not.toBeNull();
+    expect(chevron("Name")).toBeNull();
+    expect(chevron("Count")!.querySelector("path")).toHaveAttribute("d", "M4 6.25 8 10.25l4-4"); // down: largest first
+    rerender(<DataTable columns={columns} rows={rows} sort={{ key: "n", dir: 1 }} onSort={vi.fn()} />);
+    expect(chevron("Count")!.querySelector("path")).toHaveAttribute("d", "M4 9.75l4-4 4 4"); // up: smallest first
+    expect(chevron("Count")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("is a focusable, named region so the keyboard can scroll it sideways", () => {
+    render(<DataTable columns={columns} rows={rows} label="Demo rows" />);
+    const region = screen.getByRole("region", { name: "Demo rows, scrollable" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(within(region).getByRole("table", { name: "Demo rows" })).toBeInTheDocument();
+  });
+
   describe("virtual", () => {
     const many: Row[] = Array.from({ length: 2000 }, (_, i) => ({ name: `row ${i}`, n: i }));
 
@@ -118,7 +139,7 @@ describe("DataTable", () => {
       const { container, unmount } = render(<DataTable columns={columns} rows={many} virtual />);
       const scroller = container.firstElementChild as HTMLElement;
       expect(scroller).toHaveClass("virtual");
-      fireEvent.scroll(scroller, { target: { scrollTop: 40 * 1000 } });
+      fireEvent.scroll(scroller, { target: { scrollTop: 38 * 1000 } });
       expect(screen.getByText("row 1000")).toBeInTheDocument();
       expect(screen.queryByText("row 0")).not.toBeInTheDocument();
       unmount(); // before the virtualizer's scroll-idle timer fires
@@ -128,7 +149,7 @@ describe("DataTable", () => {
       render(<DataTable columns={columns} rows={many} virtual />);
       const spacers = screen.getAllByRole("row", { hidden: true }).filter((r) => r.getAttribute("aria-hidden") === "true");
       expect(spacers).toHaveLength(1); // at the top there is only a bottom spacer
-      expect(parseInt(spacers[0].style.height, 10)).toBeGreaterThan(40 * 1900);
+      expect(parseInt(spacers[0].style.height, 10)).toBeGreaterThan(38 * 1900);
     });
 
     it("falls back to the plain table when virtual is off", () => {
@@ -162,7 +183,7 @@ describe("DataTable", () => {
       const { container, unmount } = render(<DataTable columns={columns} rows={rows} virtual />);
       expect(pinned()).toEqual(["40px", "50px", "40px"]);
       const scroller = container.firstElementChild as HTMLElement;
-      fireEvent.scroll(scroller, { target: { scrollTop: 40 * 1500 } });
+      fireEvent.scroll(scroller, { target: { scrollTop: 38 * 1500 } });
       expect(pinned()).toEqual(["110px", "50px", "40px"]);
       fireEvent.scroll(scroller, { target: { scrollTop: 0 } });
       expect(screen.getAllByText("s", { selector: "td" }).length).toBeGreaterThan(0); // back among the short names
@@ -185,7 +206,7 @@ describe("DataTable", () => {
     it("starts again from what is measured when the rows change", () => {
       const { container, rerender, unmount } = render(<DataTable columns={columns} rows={names("a long name")} virtual />);
       const scroller = container.firstElementChild as HTMLElement;
-      fireEvent.scroll(scroller, { target: { scrollTop: 40 * 1500 } });
+      fireEvent.scroll(scroller, { target: { scrollTop: 38 * 1500 } });
       fireEvent.scroll(scroller, { target: { scrollTop: 0 } });
       expect(pinned()[0]).toBe("110px"); // same rows: the pin stays
       // a new row set (a filter or a sort): the widest cell is no longer among them
@@ -285,6 +306,14 @@ describe("Tabs", () => {
     expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Beta");
   });
 
+  it("keeps a sliding bar under the strip that is not itself a tab", () => {
+    const { container } = render(<Harness />);
+    const bar = container.querySelector(".tabs .ind");
+    expect(bar).not.toBeNull();
+    expect(bar).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+  });
+
   it("moves with the arrow keys, Home and End, wrapping around", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -305,12 +334,12 @@ describe("Tabs", () => {
   });
 });
 
-describe("Chips", () => {
-  it("shows which chip is pressed and reports a change", async () => {
+describe("Choice", () => {
+  it("shows which option is pressed and reports a change", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(
-      <Chips
+      <Choice
         label="Period"
         options={[
           { id: "1y", label: "1 year" },
@@ -325,5 +354,61 @@ describe("Chips", () => {
     expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute("aria-pressed", "false");
     await user.click(screen.getByRole("button", { name: "1 year" }));
     expect(onChange).toHaveBeenCalledWith("1y");
+  });
+});
+
+describe("Panel", () => {
+  it("is a region named by its title, with the subtitle and controls in its head", () => {
+    render(
+      <Panel title="Top funds" subtitle="Best first." controls={<button type="button">Go</button>}>
+        <p>body</p>
+      </Panel>,
+    );
+    const panel = screen.getByRole("region", { name: "Top funds" });
+    expect(within(panel).getByRole("heading", { level: 2, name: "Top funds" })).toHaveClass("pt");
+    expect(within(panel).getByText("Best first.")).toHaveClass("ps");
+    expect(within(panel).getByRole("button", { name: "Go" }).closest(".ph-c")).not.toBeNull();
+    expect(within(panel).getByText("body")).toBeInTheDocument();
+  });
+
+  it("leaves out the subtitle and the controls when there are none", () => {
+    const { container } = render(<Panel title="Plain">x</Panel>);
+    expect(container.querySelector(".ps")).toBeNull();
+    expect(container.querySelector(".ph-c")).toBeNull();
+  });
+});
+
+describe("State", () => {
+  it("is plain for an empty list and an alert for an error", () => {
+    const { rerender } = render(<State>Nothing here.</State>);
+    expect(screen.getByText("Nothing here.").closest(".state")).not.toHaveClass("err");
+    expect(screen.queryByRole("alert")).toBeNull();
+    rerender(
+      <State kind="error" title="Couldn't load">
+        Try again.
+      </State>,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("state", "err");
+    expect(alert).toHaveTextContent("Couldn't load");
+    expect(alert).toHaveTextContent("Try again.");
+  });
+});
+
+describe("Pager", () => {
+  it("says which rows are shown, pages with Previous and Next, and is absent for an empty list", async () => {
+    const onPage = vi.fn();
+    const user = userEvent.setup();
+    const { rerender, container } = render(<Pager page={1} pageSize={100} total={250} onPage={onPage} noun="funds" />);
+    expect(screen.getByRole("navigation", { name: "Pages of funds" })).toHaveTextContent("Showing 101–200 of 250 funds");
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(onPage).toHaveBeenLastCalledWith(2);
+    await user.click(screen.getByRole("button", { name: "Previous" }));
+    expect(onPage).toHaveBeenLastCalledWith(0);
+    rerender(<Pager page={2} pageSize={100} total={250} onPage={onPage} noun="funds" />);
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    rerender(<Pager page={0} pageSize={100} total={0} onPage={onPage} noun="funds" />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
