@@ -1,0 +1,148 @@
+# Architecture
+
+Last verified: 2026-11-09 (pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+
+## Overview
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    SEC[SEC EDGAR<br/>13F data-set ZIPs, daily index,<br/>submissions, company_tickers, companyconcept]
+    FIGI[OpenFIGI mapping API]
+    TI[Tiingo daily prices<br/>+ supported_tickers.zip]
+    FRED[FRED DTB3]
+  end
+  subgraph GHA[GitHub Actions: pipeline.yml]
+    RUN[python -m orca.run weekly<br/>ingest → securities → prices → compute → publish]
+  end
+  LAKE[(R2 private lake<br/>R2_LAKE_BUCKET<br/>Parquet + state JSON, has CUSIPs)]
+  SITE[(R2 public bucket orca-site<br/>brotli JSON per pipeline/contract.md)]
+  CDN[Cloudflare cache<br/>data.orcaetf.com]
+  PAGES[Cloudflare Pages project orca<br/>www.orcaetf.com]
+  UI[Browser: React app<br/>computes live values]
+  SEC --> RUN
+  FIGI --> RUN
+  TI --> RUN
+  FRED --> RUN
+  LAKE <-->|rclone restore / save| RUN
+  RUN -->|rclone upload, manifest.json last| SITE
+  RUN -->|purge_everything| CDN
+  SITE --> CDN --> UI
+  PAGES -->|HTML, JS, CSS, fonts, _headers| UI
+```
+
+There is no API server. The "API" is the set of static JSON files defined in `pipeline/contract.md`. The browser fetches them through `web/src/data/api.ts` (one cached promise per URL) and computes value, unrealised P&L, IRR and as-of figures (`web/src/lib/live.ts`, `web/src/fund/positions.ts`).
+
+## Pipeline (`pipeline/orca`)
+
+| Module | Purpose |
+|---|---|
+| `config.py` | thresholds (top lists, conviction, calls), `PERIODS`, `VALUE_DOLLARS_FROM`, lake/out dirs |
+| `http.py` | `Client` (rate limit, retries), `FetchError`, `sec_client`, `figi_client`, `tiingo_client`, `fred_client` |
+| `sec/bulk.py` | list and parse SEC 13F data-set ZIPs (`list_bulk_zips`, `parse_bulk_zip`, `raw_holdings`, `value_to_usd`) |
+| `sec/live.py` | EDGAR daily index + submission `.txt` parsing (`fetch_new_filings`, `parse_daily_index`) |
+| `holdings.py` | `select_reports`, `build_holdings`, `fill_gaps` |
+| `securities.py` | CUSIP → FIGI/ticker (`map_cusips`), stock ids, SIC → sector, SEC lookups |
+| `vendor.py` | Tiingo ticker universe (`load_universe`, `resolve`, `candidates`) |
+| `prices.py` | `TiingoSource`, incremental price store, compaction, split adjustment |
+| `quarter_px.py` | quarter VWAP/low/high/close/dividends (`quarter_px`, `last_close_before`) |
+| `rf.py` | FRED DTB3 yearly average (`fetch_tbill`) |
+| `storage.py` | `Lake` (zstd Parquet, atomic writes), `Manifest` |
+| `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
+| `home.py` | home lists (`top_funds`, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
+| `publish.py` | JSON + brotli writers, manifest, health |
+| `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
+| `demo.py` | synthetic offline dataset for `web/public/demo-data` |
+
+CLI: `python -m orca.run {weekly | rebuild | home | check-keys | verify [--sample N --seed S] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
+
+Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIINGO_RATE_PER_SEC`, `FRED_KEY`, `ORCA_TIME_BUDGET_MIN`, `ORCA_LAKE_DIR` (default `data/lake`), `ORCA_OUT_DIR` (default `data/out`), `ORCA_NETWORK` (tests).
+
+### Ingestion
+| Item | Fact |
+|---|---|
+| Schedule | `pipeline.yml`: `23 6 16 * *` (the job is named `weekly` but runs monthly), `41 7 1 * *` runs `verify`; both need `vars.ORCA_SCHEDULE_ENABLED == 'true'`; manual inputs `full`, `home_only`; concurrency group `pipeline` |
+| Timeouts | job 330 min, step 300 min; budget `ORCA_TIME_BUDGET_MIN` (default 270, `run/budget.py`); the price stage stops with `min(90, budget/3)` min left (`run/market.py` `PRICES_RESERVE_MIN`) |
+| SEC | `SEC_RATE_PER_SEC = 8.0` (`http.py`); User-Agent `Orca research {ORCA_CONTACT}`, `RuntimeError` if unset |
+| Others | OpenFIGI keyed 25 req/6 s × 100 jobs (anonymous 25/60 s × 10); Tiingo 2.5/s default; FRED 2/s; timeout 30 s |
+| Retries | up to 4, sleeping 2/4/8/16 s, on transport errors, 429 and 5xx; other 4xx and all 3xx raise (no redirects) (`Client._request`) |
+| Breakers | prices stop on 401/403/429 or 25 consecutive failures (`prices.py`); live ingest stops after 3 refused days/downloads or a 429 (`live.py`) |
+| Idempotency | `ingested.json` (ZIP name → sha256; the skip check is by name only); per-quarter parts replaced by (accession, source); `state.json` pending sets are cleared only after a successful publish; `_reconcile_published` compares `published.json` with the site manifest; only changed files upload; `manifest.json` last |
+| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` abort before the manifest; the lake is saved after any run |
+| verify | rebuilds 50 random published funds from raw parts and compares sha256 with `published.json`; no API calls |
+
+### 13F quirks handled
+| Quirk | Handling (file, function) |
+|---|---|
+| Amendments | base = latest 13F-HR, or the latest RESTATEMENT; NEW HOLDINGS amendments filed after it are added and summed; unknown types ignored; bulk beats live for the same accession (`holdings.select_reports`, `_bulk_first_unique`) |
+| Value units | VALUE × 1000 for filings before 2023-01-03, dollars from then (`config.VALUE_DOLLARS_FROM`, `bulk._unit_multiplier`); valuation uses shares × our price, VALUE only as a fallback price |
+| CUSIP mapping | OpenFIGI (prefer `exchCode == "US"`, composite FIGI), else exact name match to one SEC ticker; ETF when `securityType == "ETP"`; retried/remapped every 28 days (≤ 2000 per run); vendor tickers resolved from Tiingo's list (`securities.map_cusips`, `vendor.candidates`) |
+| Options, bonds | PUT/CALL and PRN rows are stored but only `kind == "SH"` enters P&L and pricing (`run/compute.py`); their value still counts in `priced_pct` |
+| Filing lag | latest quarter = quarter whose 45-day deadline has passed (`weekly.deadline_quarter`, `DEADLINE_DAYS = 45`) |
+| Missed quarters | one missed quarter is carried (`carried=True`); a gap of 2+ starts a new segment and only the last segment is computed; `inactive` when the last filing is older than `last_q − 1` (`holdings.fill_gaps`, `compute_fund`) |
+| Splits | prices split-adjusted, share counts adjusted by quarter factors; suspicious 2/3/4/5/10× changes flagged (`prices.split_adjust_prices`, `compute.split_suspects`) |
+| Unpriced | a held unpriced stock enters the book at its first priced close; fallback chain last close → implied price; > 10× mismatch flagged (`engine/position.compute_position`) |
+| Duplicates | SUBMISSION/COVERPAGE de-duplicated by accession; share classes summed per `stock_id` |
+| Confidential treatment | UNKNOWN / not handled in code |
+
+### Engine formulas
+| Figure | Formula (function) |
+|---|---|
+| Quarter return | `(end − start − net_buying + dividends) / (start + net_buying/2)`; None for a segment's first quarter or a non-positive start/denominator (`fund.aggregate_fund`) |
+| Bridge | `end = start + market_move + net_buying + trade_gains`, tolerance 1e-6 × max(1, \|end\|, \|start\|, buys+sells) (`check_bridge`) |
+| Year | `∏(1+r) − 1`; `approx_ret = (gains + dividends) / (start + inflows/2)` (`fund_years`) |
+| Metrics | ann = growth^(4/n) − 1; vol = stdev × 2; Sharpe = mean(excess)×4 / (stdev(excess)×2); Sortino = mean(excess)×4 / (sqrt(mean(min(0,x)²))×2); Calmar = ann/\|max_dd\|; rf per quarter = year's DTB3 mean / 4; needs ≥ 4 returns (`metrics.performance`) |
+| Turnover, hold | mean over full years of min(buys, sells) / mean book; hold = quarters held / 4 (`metrics.turnover`, `hold_lengths`) |
+| Trade price | first report: close; else quarter VWAP of (H+L+C)/3; else last close; else implied (`position._trade_price`, `quarter_px.quarter_px`) |
+| Avg cost, realised | buy adds delta×px; sell realises −delta×(px − cost/shares) (`compute_position`) |
+| Contribution | pnl / (year start + inflows/2) × 100 (`fund.contributions`) |
+| Conviction | score = size / max(usual, 0.01) (`home.conviction_moves`) |
+| Exits | one_y = close(q+4)/last sale px − 1; spy_one_y = SPY close(q+4)/SPY VWAP(q) − 1 (`whatif.exit_rows`) |
+
+## Lake schema (zstd Parquet, `storage.Lake.write`)
+| Table | Columns (units) |
+|---|---|
+| `filings/qNNN`, `reports/qNNN` | accession, cik i64, period i16 (quarter index), filed date, form, amendment_type, manager_name, source (bulk/live) |
+| `raw_holdings/qNNN` | accession, cusip, issuer, title, shares f64, sh_type, put_call, value_usd f64 (dollars), source |
+| `holdings/qNNN` | cik, q i16, cusip, kind (SH/PRN/PUT/CALL), shares, value_usd, filed |
+| `securities` | stock_id i32, figi, ticker, name, is_etf, cik, sic i32, sector, shares_out |
+| `cusip_map` | cusip, stock_id, method, tried (internal only, never published) |
+| `prices_daily/{y<year>, z<run>-NNNN}` | raw unadjusted OHLC f32, volume f64, split_factor f32, dividend f32 |
+| `vendor_tickers` | stock_id, ticker, end |
+| `rf` | year i32, rate f64 (decimal) |
+| `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
+| JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`), `published.json` |
+
+Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.publish_fund`); `funds.json`, `securities.json`, `latest_prices.json`, `home/*.json` (`publish.publish_shared`); `stock/{id}/weekly.json` (`publish.publish_weekly`); `health.json`, `manifest.json`. They are minified with sorted keys and brotli quality 9, uploaded with `Content-Encoding: br` and `Cache-Control: public, max-age=300`, which the Cloudflare cache rule overrides. CUSIP guard: `_json_ready` refuses a `cusip` key and `publish_step.cusip_leaks` scans the staged files. Field meanings and units: `pipeline/contract.md`.
+
+## Web (`web/`)
+- Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `/how-it-works`, `*`.
+- Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files. `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
+- Row budget for big tables: `web/src/fund/loading.ts` (50 / 200 / 25 / 100).
+- Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3) it also writes `sitemap.xml`, `robots.txt` and canonical links. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.
+
+## Cloudflare setup
+| Service | Setting |
+|---|---|
+| Pages project `orca` | deployed by `wrangler pages deploy dist --project-name ${CF_PAGES_PROJECT:-orca} --branch main` (`.github/workflows/web.yml`); default address `orca-88p.pages.dev`; custom domains `www.orcaetf.com`, `orcaetf.com`; no Functions/Workers, no bindings |
+| Redirect rule | `orcaetf.com/*` → `https://www.orcaetf.com/${1}` 301 (dashboard) |
+| R2 `orca-site` | public; custom domain `data.orcaetf.com`; CORS GET/HEAD for www, bare, pages.dev, localhost:5173 (set in dashboard); `r2.dev` address still enabled |
+| Cache rule | host `data.orcaetf.com`: eligible, edge TTL 1 month, browser TTL 2 hours (dashboard) |
+| DNS | DNSSEC on; SPF `v=spf1 -all`; DMARC `p=reject` (verified via DoH) |
+| R2 lake bucket | private (`R2_LAKE_BUCKET`) |
+
+GitHub secrets (names): `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `FRED_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CF_PURGE_TOKEN`. Variables: `R2_LAKE_BUCKET`, `R2_SITE_BUCKET`, `ORCA_SCHEDULE_ENABLED`, `ORCA_TIME_BUDGET_MIN`, `TIINGO_RATE_PER_SEC`, `VITE_DATA_URL`, `SITE_ORIGINS`, `CF_ZONE_ID`, `CF_PAGES_PROJECT`, `SITE_URL`, `HSTS_MAX_AGE`. The deploy and pipeline jobs run in the `production` environment.
+
+Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest, demo build, Playwright) runs first. Then the deploy job fetches `funds.json` from `VITE_DATA_URL`, builds with `PRERENDER_FUNDS`, `SITE_URL` and `HSTS_MAX_AGE`, and runs wrangler. PRs run tests only.
+
+## Tech debt and risks
+- `pipeline/contract.md` is stale. It says prices refresh "every week" and exits are refreshed for 8 quarters; the code runs monthly with `EXIT_REFRESH_QUARTERS = 6` (code).
+- Confidential-treatment 13F filings are not handled (code).
+- Only the latest tracking segment is computed, so history before a gap of 2+ quarters is dropped (code).
+- The bulk ZIP skip ignores the checksum; there is no `is_finite` check on VALUE (code).
+- Golden snapshots were never committed (`pipeline/tests/golden/` holds only `.gitkeep`) (code).
+- Deferred review items: the weights ≈ 100% invariant is unchecked; a crash window between `write_manifest` and the `fund_state` writes; a `pending_all` run doesn't republish every weekly file (rulings doc).
+- The Site CORS workflow lacks an R2 Admin token; the purge clears the whole zone (chat).
+- A big fund fetches ~2,000+ `weekly.json` files when stepping back a quarter before the prefetch is done (about 7 s measured). A per-fund quarter-end price file would fix that (chat).
+- A plain `<table>` with all rows: layout cost grows with rows; capped by `loading.ts`, not virtualised (chat).
+- No server-side gating is possible while all data is public (chat).
