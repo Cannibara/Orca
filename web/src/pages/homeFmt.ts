@@ -33,3 +33,10 @@ export function fWeight(w: number | null | undefined): string {
   if (missing(w)) return DASH;
   return w > 0 && w < 0.005 ? "<1%" : Math.round(w * 100) + "%";
 }
+
+/** A change in a holding's weight, in percent of the fund's AUM with one decimal: 20.46 → "+20.5%", −9.3 → "−9.3%". A value that prints as 0.0 has no sign. */
+export function fAum(pts: number | null | undefined): string {
+  if (missing(pts)) return DASH;
+  const digits = Math.abs(pts).toFixed(1);
+  return (Number(digits) === 0 ? "" : pts < 0 ? MINUS : "+") + digits + "%";
+}

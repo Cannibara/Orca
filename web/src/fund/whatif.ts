@@ -9,9 +9,6 @@ import type { Exits, ExitsRows, ExitStatus, PositionRow, Summary } from "../data
 import { heldFlows, irr, missed, sinceSale, tradeMove, type Move } from "../lib/live";
 import { buildRows, sharesAt, withSortedTrades, type PosRow, type PriceSource, type Tag, type Timeline } from "./positions";
 
-/** Rows drawn at first paint, and appended per idle chunk after it. */
-export const CHUNK = 150;
-
 /** Runs `f` the first time it is asked and keeps the answer: an IRR is dear and most rows are never looked at. */
 function once<T>(f: () => T): () => T {
   let done = false;

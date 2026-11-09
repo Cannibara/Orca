@@ -17,11 +17,11 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { count, DASH, pct, pp, printsZero, qLabel, ratio, tidyName } from "../lib/format";
+import { count, DASH, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
-import { fBook, fPrice, fWeight } from "./homeFmt";
+import { fAum, fBook, fPrice, fWeight } from "./homeFmt";
 import "./home.css";
 
 // ---- loading ----------------------------------------------------------------
@@ -103,7 +103,7 @@ function StockLink({ lookup, fundId, stockId }: { lookup: Lookup; fundId: number
 }
 
 /** A price move since a buy, in a box tinted by direction (nothing but the dash when there is no price). */
-function MoveBox({ v }: { v: number | null }) {
+function SinceBox({ v }: { v: number | null }) {
   if (v === null) return <>{DASH}</>;
   const text = pct(v, 0);
   return (
@@ -362,11 +362,21 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
   );
 }
 
-const MOVE_LABEL: Record<ConvictionRow["move"], string> = { new: "New", add: "Add", trim: "Trim", exit: "Exit" };
+/** The words of the holdings table's "Last change" box. */
+const MOVE_WORD: Record<ConvictionRow["move"], string> = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" };
 /** The tint of a move's box: blue for buying, orange for trimming, grey for selling all of it. */
 const MOVE_TONE: Record<ConvictionRow["move"], string> = { new: "add", add: "add", trim: "trim", exit: "sold" };
-/** Buys before sells when the Buy/Sell column is sorted. */
-const MOVE_ORDER: Record<ConvictionRow["move"], number> = { new: 0, add: 1, trim: 2, exit: 3 };
+
+/** A move as the holdings table shows its last change: the word, then the weight change in % of the fund's AUM, in a tinted box. */
+function MoveBox({ move, pts }: { move: ConvictionRow["move"]; pts: number }) {
+  const change = fAum(pts);
+  return (
+    <span className={`lc ${MOVE_TONE[move]}`} role="img" aria-label={`${MOVE_WORD[move]}, ${change} of the fund's AUM`}>
+      <span className="lw">{MOVE_WORD[move]}</span>
+      <b>{change}</b>
+    </span>
+  );
+}
 
 /** Sort value of a fund or stock name column. */
 const lower = (text: string | undefined) => (text ?? "").toLowerCase();
@@ -407,24 +417,14 @@ function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; o
       fundCol(lookup, (r) => r.fund_id, (r) => r.name),
       stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
       ...quarter,
-      {
-        header: "Buy/Sell",
-        key: "move",
-        align: "l",
-        by: (r) => MOVE_ORDER[r.move],
-        cell: (r) => (
-          <span className={`lc ${MOVE_TONE[r.move]}`}>
-            <b>{MOVE_LABEL[r.move]}</b>
-          </span>
-        ),
-      },
+      // Sorts by the signed change in the fund's AUM, so buys lead and sales trail (or the reverse).
+      { header: "Move", key: "move", by: (r) => r.change_pts, cell: (r) => <MoveBox move={r.move} pts={r.change_pts} /> },
       {
         header: win === "q" ? "Weight now" : "Weight after",
         key: "weight",
         by: (r) => r.weight_after,
         cell: (r) => fWeight(r.weight_after),
       },
-      { header: "Change", key: "change", by: (r) => r.change_pts, cell: (r) => <Signed v={r.change_pts}>{pp(r.change_pts)}</Signed> },
       { header: "$ bought / sold", key: "usd", by: (r) => r.usd, cell: (r) => <Signed v={r.usd}>{fBook(r.usd, true)}</Signed> },
       { header: "Est. price", key: "est", by: (r) => r.est_price, cell: (r) => fPrice(r.est_price) },
       { header: "Price now", key: "now", by: now, cell: (r) => fPrice(now(r)) },
@@ -607,7 +607,7 @@ function Calls({
       { header: "Bought", key: "q", by: (c) => c.row.q, cell: (c) => qLabel(c.row.q) },
       { header: "Est. buy price", key: "est", by: (c) => c.row.est_price, cell: (c) => fPrice(c.row.est_price) },
       { header: "Price now", key: "now", by: (c) => c.price ?? null, cell: (c) => fPrice(c.price ?? null) },
-      { header: "Since fund's buy", key: "since", by: (c) => c.sinceBuy, cell: (c) => <MoveBox v={c.sinceBuy} /> },
+      { header: "Since fund's buy", key: "since", by: (c) => c.sinceBuy, cell: (c) => <SinceBox v={c.sinceBuy} /> },
       {
         header: "Since 13F went public",
         key: "filed",

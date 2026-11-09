@@ -1,4 +1,4 @@
-import { fBook, fPrice, fWeight } from "../src/pages/homeFmt";
+import { fAum, fBook, fPrice, fWeight } from "../src/pages/homeFmt";
 
 describe("fBook", () => {
   it("prints billions to one decimal and millions whole with a small m", () => {
@@ -54,5 +54,22 @@ describe("fWeight", () => {
     expect(fWeight(0.003)).toBe("<1%");
     expect(fWeight(0)).toBe("0%");
     expect(fWeight(null)).toBe("—");
+  });
+});
+
+describe("fAum", () => {
+  it("is the weight change in percent of AUM: one decimal, a plus for a buy and a true minus for a sale", () => {
+    expect(fAum(20.46)).toBe("+20.5%");
+    expect(fAum(9.24)).toBe("+9.2%");
+    expect(fAum(6)).toBe("+6.0%");
+    expect(fAum(-9.3)).toBe("−9.3%");
+    expect(fAum(-9.6)).toBe("−9.6%");
+  });
+
+  it("gives a change that prints as 0.0 no sign, and a dash for a missing one", () => {
+    expect(fAum(0)).toBe("0.0%");
+    expect(fAum(0.04)).toBe("0.0%");
+    expect(fAum(-0.04)).toBe("0.0%");
+    expect(fAum(null)).toBe("—");
   });
 });

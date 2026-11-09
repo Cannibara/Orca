@@ -1,7 +1,7 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { fMm, fP0, fPc1, fPx, fW0, qShort } from "./fmt";
 import { useWidth } from "./hooks";
-import { whenIdle } from "./prefetch";
+import { moreLabel, useRowBudget } from "./loading";
 import { sortRows, type Mode, type PosRow, type SortKey } from "./positions";
 import { StockPanel } from "./StockPanel";
 import "./positions.css";
@@ -23,17 +23,6 @@ const COLS: { key: SortKey; head: string; w: number }[] = [
   { key: "unreal", head: "Unrealised", w: 84 },
   { key: "total", head: "Total P&L", w: 96 },
 ];
-
-/**
- * Rows drawn at first: a fund can have thousands of positions. The rest follow once the page is idle,
- * CHUNK rows at a time (the "Show more" button asks for PAGE at once before that).
- */
-const PAGE = 150;
-const CHUNK = 150;
-/** A chunk that takes longer than this to draw halves the next one (a slow device); one under FAST lets it grow back. */
-const SLOW_MS = 40;
-const FAST_MS = 15;
-const MIN_CHUNK = 30;
 
 const count = (n: number): string => n.toLocaleString("en-US");
 
@@ -162,9 +151,10 @@ const Row = memo(function Row({ r, maxW, isOpen, tw, fundId, latest, onToggle, o
 
 /**
  * The positions table: sortable columns, rows that open into a price chart and the trades behind
- * the position. Sorting always covers every row. Only the first PAGE of them are drawn at first (the
- * page lands fast); once the browser is idle the rest are added CHUNK at a time, in the sorted order, and a
- * new sort or period starts again from the first chunk. Until then "Show more" can ask for more at once.
+ * the position. Sorting always covers every row. Only the first INITIAL_ROWS of them are drawn at first (the
+ * page lands fast with the biggest holdings); once the browser is idle more are added CHUNK at a time up to
+ * AUTO_FILL_MAX, in the sorted order, and "Show more" adds the rest MORE_STEP at a time (see ./loading). A new
+ * sort or period starts again from the first rows.
  */
 export function PositionsTable({ fundId, rows, pending, failed, progress, mode, latest }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "w", dir: -1 });
@@ -176,39 +166,8 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, mode, 
   const sorted = useMemo(() => sortRows(all, sort.key, sort.dir), [all, sort]);
   const maxW = useMemo(() => Math.max(1, ...all.map((r) => r.w)), [all]);
 
-  // How many rows are drawn. The count belongs to one ordering: a new sort or period (a new `sorted`)
-  // falls back to the first page without a render in between.
-  const total = sorted.length;
-  const [grow, setGrow] = useState<{ of: PosRow[]; n: number }>({ of: sorted, n: PAGE });
-  const limit = Math.min(total, grow.of === sorted ? grow.n : PAGE);
+  const { limit, filling, left, more } = useRowBudget(sorted.length, sorted);
   const shown = sorted.slice(0, limit);
-  const more = useCallback(
-    (by: number) => setGrow((g) => ({ of: sorted, n: Math.min(sorted.length, (g.of === sorted ? g.n : PAGE) + by) })),
-    [sorted],
-  );
-  // Set when the background fill has begun, and kept: later sorts show the quiet line at once, not the button.
-  const [filling, setFilling] = useState(false);
-  // How big the next background chunk is: CHUNK, less on a device that drew the last one slowly.
-  const pace = useRef({ size: CHUNK, from: 0, rows: 0 });
-  useEffect(() => {
-    if (limit >= total) return;
-    return whenIdle(
-      () => {
-        setFilling(true);
-        pace.current.from = performance.now();
-        pace.current.rows = pace.current.size;
-        more(pace.current.size);
-      },
-      { timeout: 1000 },
-    );
-  }, [limit, total, more]);
-  useLayoutEffect(() => {
-    const p = pace.current;
-    if (p.from === 0) return;
-    const ms = performance.now() - p.from; // React's render and commit of the chunk
-    p.from = 0;
-    p.size = ms > SLOW_MS ? Math.max(MIN_CHUNK, Math.floor(p.rows / 2)) : ms < FAST_MS ? Math.min(CHUNK, p.rows * 2) : p.rows;
-  }, [limit]);
 
   const onSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "t" ? 1 : -1 }));
@@ -308,19 +267,18 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, mode, 
           </tbody>
         </table>
       </div>
-      {total > shown.length &&
-        (filling ? (
-          <div className="t-more">
-            <span>{`Loading ${count(total - shown.length)} more…`}</span>
-          </div>
-        ) : (
-          <div className="t-more">
-            <button type="button" className="btn btn-secondary sm" onClick={() => more(PAGE)}>
-              {`Show ${count(Math.min(PAGE, total - shown.length))} more`}
-            </button>
-            <span>{`${count(shown.length)} of ${count(total)} positions shown`}</span>
-          </div>
-        ))}
+      {filling > 0 && (
+        <div className="t-more">
+          <span>{`Loading ${count(filling)} more…`}</span>
+        </div>
+      )}
+      {filling === 0 && left > 0 && (
+        <div className="t-more">
+          <button type="button" className="btn btn-secondary sm" onClick={more}>
+            {moreLabel(left)}
+          </button>
+        </div>
+      )}
       {failed > 0 && (
         <p className="t-note" role="status">
           Price history could not be loaded for some stocks; their earlier prices are the fund's own trade prices.

@@ -372,7 +372,7 @@ describe("Home", () => {
       [
         "Conviction moves",
         /Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before/,
-        ["Fund", "Stock", "Buy/Sell", "Weight now", "Change", "$ bought / sold", "Est. price", "Price now", "Since"],
+        ["Fund", "Stock", "Move", "Weight now", "$ bought / sold", "Est. price", "Price now", "Since"],
       ],
       ["Big wins & losses", /Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds\./, ["Fund", "Stock", "Quarter P&L"]],
       ["Crowded buys", /Stocks bought by several concentrated active funds in the same quarter \(Q2 2026\)\./, ["Stock", "Funds buying", "Total bought", "Avg weight after"]],
@@ -419,20 +419,25 @@ describe("Home", () => {
     const table = screen.getByRole("table", { name: "Conviction moves" });
     expect(within(table).queryByRole("columnheader", { name: /vs|score|quarter/i })).toBeNull();
     const [added, trimmed, exit] = within(table).getAllByRole("row").slice(1); // the file's order
-    expect(within(exit).getByText("Exit")).toBeInTheDocument();
+    expect(within(exit).getByText("Sold all")).toBeInTheDocument();
+    expect(within(exit).getByText("Sold all").closest(".lc")).toHaveClass("sold"); // the grey tint
+    expect(within(exit).getByRole("img", { name: "Sold all, −9.6% of the fund's AUM" })).toHaveClass("lc");
     expect(within(exit).getByText("0%")).toBeInTheDocument();
-    expect(within(exit).getByText("−9.6 pts")).toBeInTheDocument();
+    expect(within(exit).getByText("−9.6%")).toBeInTheDocument(); // the weight change, in the move box
     expect(within(exit).getByText("−$45m")).toBeInTheDocument();
     expect(within(exit).getByText("$100")).toBeInTheDocument();
     expect(within(exit).getByText("$80.00")).toBeInTheDocument(); // the price now
     expect(within(exit).getByText("−20%")).toBeInTheDocument(); // 80 / 100 - 1
     expect(within(exit).getByRole("link", { name: /UNH/ })).toHaveAttribute("href", "/fund/9100003/stock/13");
     expect(within(added).getByText("New")).toBeInTheDocument();
+    expect(within(added).getByText("New").closest(".lc")).toHaveClass("add"); // the blue tint
+    expect(within(added).getByRole("img", { name: "New, +9.2% of the fund's AUM" })).toBeInTheDocument();
     expect(within(added).getByText("+$60m")).toBeInTheDocument();
     expect(within(added).getByText("9%")).toBeInTheDocument();
-    expect(within(added).getByText("+9.2 pts")).toBeInTheDocument();
+    expect(within(added).getByText("+9.2%")).toBeInTheDocument();
     expect(within(added).getAllByText("—")).toHaveLength(2); // no price now, so no move since
-    expect(within(trimmed).getByText("Trim").closest(".lc")).toHaveClass("trim"); // a tinted box: orange for a cut
+    expect(within(trimmed).getByText("Trimmed").closest(".lc")).toHaveClass("trim"); // a tinted box: orange for a cut
+    expect(within(trimmed).getByText("−5.0%")).toBeInTheDocument();
   });
 
   it("names each fund over its reported book on the lists that carry the fund's name as a link", async () => {
@@ -521,7 +526,7 @@ describe("Home", () => {
   it("conviction sorts by any column", async () => {
     const row = (stock_id: number, usd: number, score: number): ConvictionRow => ({
       fund_id: 9100003, name: "Lanternfish Capital Management", stock_id, q: 53, move: usd < 0 ? "exit" : "new",
-      usd, weight_after: 0.05, change_pts: 5, est_price: 10, score,
+      usd, weight_after: 0.05, change_pts: usd < 0 ? -8 : usd / 1e7, est_price: 10, score,
     });
     const file: RowsFile<ConvictionRow> = { latest_q: 53, rows: [row(13, 40e6, 9), row(5, -80e6, 7), row(7, 60e6, 8)] };
     stubData({ "home/conviction_q.json": file });
@@ -535,8 +540,12 @@ describe("Home", () => {
     expect(dollars()).toEqual(["+$60m", "+$40m", "−$80m"]);
     await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
     expect(dollars()).toEqual(["−$80m", "+$40m", "+$60m"]);
-    await user.click(within(table).getByRole("button", { name: "Buy/Sell" }));
-    expect(within(within(table).getAllByRole("row")[3]).getByText("Exit")).toBeInTheDocument(); // buys first
+    // the Move column sorts by the signed change in the fund's AUM: the biggest buy first, a sale last, and back again
+    const moves = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getByRole("img").textContent);
+    await user.click(within(table).getByRole("button", { name: "Move" }));
+    expect(moves()).toEqual(["New+6.0%", "New+4.0%", "Sold all−8.0%"]);
+    await user.click(within(table).getByRole("button", { name: "Move" }));
+    expect(moves()).toEqual(["Sold all−8.0%", "New+4.0%", "New+6.0%"]);
   });
 
   it("conviction's last 4 quarters view loads its own file and shows each move's quarter", async () => {

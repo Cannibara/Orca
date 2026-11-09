@@ -1,12 +1,12 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Stock } from "../data/api";
 import type { Exits, PositionRow, Summary } from "../data/types";
 import { count, pct, pp, signClass } from "../lib/format";
 import { fMm, fMoneySigned, fP0, fPc1, fPx, qShort } from "./fmt";
 import { useWidth } from "./hooks";
+import { moreLabel, useRowBudget } from "./loading";
 import { StockPanel } from "./StockPanel";
 import {
-  CHUNK,
   buildSaleRows,
   sortSales,
   statusWord,
@@ -48,40 +48,6 @@ const WORD = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" } as 
 const TONE = { new: "add", add: "add", trim: "trim", exit: "sold" } as const;
 
 const n0 = (v: number): string => Math.round(v).toLocaleString("en-US");
-
-// ---- progressive rows -------------------------------------------------------------------------
-
-type IdleHandle = { cancel: () => void };
-
-/** Runs `f` when the browser is idle (a timer where there is no idle callback). */
-function whenIdle(f: () => void): IdleHandle {
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(f, { timeout: 400 });
-    return { cancel: () => window.cancelIdleCallback(id) };
-  }
-  const id = window.setTimeout(f, 16);
-  return { cancel: () => window.clearTimeout(id) };
-}
-
-/**
- * How many rows to draw: `chunk` at first paint, then another chunk each time the browser is idle until
- * all `total` are in. Restarts from the first chunk when `restartKey` changes (a new sort order or new
- * data), so the top of the list is always the first to be drawn.
- */
-export function useProgressive(total: number, restartKey: unknown, chunk = CHUNK): number {
-  const [state, setState] = useState({ key: restartKey, limit: chunk });
-  // restart during render, not in an effect: no frame draws the old limit over the new order
-  if (state.key !== restartKey) setState({ key: restartKey, limit: chunk });
-  const limit = state.key === restartKey ? state.limit : chunk;
-
-  useEffect(() => {
-    if (limit >= total) return;
-    const h = whenIdle(() => setState((s) => (s.key === restartKey ? { key: s.key, limit: s.limit + chunk } : s)));
-    return () => h.cancel();
-  }, [limit, total, restartKey, chunk]);
-
-  return Math.min(limit, total);
-}
 
 // ---- cells ------------------------------------------------------------------------------------
 
@@ -249,8 +215,8 @@ export type WhatIfPanelProps = {
 
 /**
  * Every sale of the fund, most missed first: the Positions table's figures for the stock, and how the
- * stock did since the fund sold it. Sorting covers every row; the first CHUNK of them are drawn at once
- * and the rest follow in idle time.
+ * stock did since the fund sold it. Sorting covers every row. Only the first INITIAL_ROWS are drawn at once;
+ * more follow in idle time up to AUTO_FILL_MAX and "Show more" adds the rest (see ./loading).
  */
 export function WhatIfPanel(props: WhatIfPanelProps) {
   // A new fund starts again from the top.
@@ -277,7 +243,7 @@ function Panel({ fundId, positions, exits, prices, stocks, asof, summary }: What
   );
   const sorted = useMemo(() => sortSales(rows, sort.key, sort.dir), [rows, sort]);
   const figures = useMemo(() => tileFigures(rows), [rows]);
-  const limit = useProgressive(sorted.length, sorted);
+  const { limit, filling, left, more } = useRowBudget(sorted.length, sorted);
   const shown = sorted.length > limit ? sorted.slice(0, limit) : sorted;
 
   const onSort = (key: SaleKey) =>
@@ -304,7 +270,6 @@ function Panel({ fundId, positions, exits, prices, stocks, asof, summary }: What
     [onToggle],
   );
 
-  const more = sorted.length - shown.length;
   return (
     <section className="panel" id="whatIfPanel" aria-labelledby="whatIfTitle">
       <div className="ph">
@@ -316,7 +281,7 @@ function Panel({ fundId, positions, exits, prices, stocks, asof, summary }: What
         </div>
       </div>
       <Tiles f={figures} summary={exits.summary} />
-      <div className="wi-wrap" ref={wrap} tabIndex={0} role="region" aria-label="Sold or trimmed stocks, scrollable" aria-busy={more > 0}>
+      <div className="wi-wrap" ref={wrap} tabIndex={0} role="region" aria-label="Sold or trimmed stocks, scrollable" aria-busy={filling > 0}>
         <table className="wi" aria-label="Sold or trimmed stocks">
           <colgroup>
             {COLS.map((c) => (
@@ -357,7 +322,14 @@ function Panel({ fundId, positions, exits, prices, stocks, asof, summary }: What
           </tbody>
         </table>
       </div>
-      {more > 0 && <p className="wi-more">{`Loading ${n0(more)} more…`}</p>}
+      {filling > 0 && <p className="wi-more">{`Loading ${n0(filling)} more…`}</p>}
+      {filling === 0 && left > 0 && (
+        <div className="wi-more t-more">
+          <button type="button" className="btn btn-secondary sm" onClick={more}>
+            {moreLabel(left)}
+          </button>
+        </div>
+      )}
       <p className="pf wi-foot">
         IRR uses mid-quarter trade dates and today's price for anything still held; "IRR if held" assumes no share was ever sold.
         "1y after" compares the stock with SPY over the 12 months after the sale. "$ missed / dodged": plus means the shares sold
