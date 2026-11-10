@@ -113,14 +113,6 @@ def test_round_trip(built):
         assert from_json(to_json(fi)) == fi
 
 
-def test_too_many_positions_is_refused(demo_run):
-    ctx, batch = demo_batch(demo_run, CIKS[:1])
-    (p, r), = batch
-    n = len(r.output.positions)
-    with pytest.raises(ValueError, match=str(p.cik)):
-        build_inputs(ctx, p, r, {}, read_table(ctx.lake, "securities", SECURITIES_SCHEMA), n - 1)
-
-
 def test_validate_rejects_non_finite_and_cusip(built):
     *_, inputs = built
     fi = inputs[0]

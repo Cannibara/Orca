@@ -9,7 +9,6 @@ import json
 import math
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import date
-from typing import TYPE_CHECKING
 
 import brotli
 import polars as pl
@@ -18,9 +17,7 @@ from orca.publish import BROTLI_QUALITY, _json_ready, _last_change
 from orca.quarter_px import last_close_before
 from orca.quarters import BASE_YEAR
 from orca.run.compute import Context, FundResult, Prepared
-
-if TYPE_CHECKING:
-    from orca.workbook.cut import OtherInputs
+from orca.workbook.cut import OtherInputs, other_inputs, split_top
 
 _QUARTER_FIELDS = ("start", "end", "market_move", "net_buying", "trade_gains", "dividends", "ret")
 _YEAR_FIELDS = ("ret", "start", "end", "gains", "inflows", "dividends", "approx_ret")
@@ -107,7 +104,7 @@ class FundInputs:
     stocks: list[StockInputs]
     orca_stocks: list[OrcaStock]
     orca: OrcaFund
-    other: "OtherInputs | None" = None
+    other: OtherInputs | None = None
 
 
 def build_inputs(
@@ -118,21 +115,20 @@ def build_inputs(
     securities: pl.DataFrame,
     max_positions: int = 500,
 ) -> FundInputs:
-    """The inputs of one fund from its `Prepared` and `FundResult`. Raises ValueError when the
-    fund has more than `max_positions` positions (the cut that handles it comes later)."""
+    """The inputs of one fund from its `Prepared` and `FundResult`. A fund with more than
+    `max_positions` positions keeps the top ones as stock rows and the rest as `other`; a stock
+    without a position (never priced) stays a zero row and is never cut."""
     out = r.output
     fund_id = out.meta.fund_id
-    if len(out.positions) > max_positions:
-        raise ValueError(
-            f"fund {fund_id}: {len(out.positions)} positions, more than max_positions "
-            f"{max_positions}"
-        )
-    quarters = list(range(p.start, p.bound + 1))
-    by_stock = {pos.stock_id: pos for pos in out.positions}
+    top, rest = split_top(out.positions, max_positions)
+    cut = {pos.stock_id for pos in rest}
     peak = {
-        sid: max((pq.value for pq in pos.quarters), default=0.0) for sid, pos in by_stock.items()
+        pos.stock_id: max((pq.value for pq in pos.quarters), default=0.0) for pos in top
     }
-    order = sorted(p.adjusted, key=lambda sid: (-peak.get(sid, 0.0), sid))
+    order = sorted(
+        (sid for sid in p.adjusted if sid not in cut), key=lambda sid: (-peak.get(sid, 0.0), sid)
+    )
+    quarters = list(range(p.start, p.bound + 1))
 
     names = {
         row["stock_id"]: (row["ticker"] or "", row["name"] or "")
@@ -186,7 +182,7 @@ def build_inputs(
         stocks=stocks,
         orca_stocks=_orca_stocks(r, order),
         orca=_orca_fund(r, quarters),
-        other=None,
+        other=other_inputs(rest, p, latest, out.meta.period_q) if rest else None,
     )
 
 
@@ -260,7 +256,7 @@ def _orca_fund(r: FundResult, quarters: list[int]) -> OrcaFund:
 
 def validate(fi: FundInputs) -> None:
     """Raise ValueError (naming the fund and the field) for a non-finite number, a CUSIP key, a
-    list that does not match its columns, or a position count the cut would have to handle."""
+    list that does not match its columns (the cut's `other` lists included)."""
 
     def fail(field: str, why: str) -> None:
         raise ValueError(f"fund {fi.fund_id}: {field}: {why}")
@@ -298,6 +294,11 @@ def validate(fi: FundInputs) -> None:
     for st, o in zip(fi.stocks, fi.orca_stocks, strict=False):
         if st.stock_id != o.stock_id:
             fail("orca_stocks", f"is not aligned to stocks at stock {st.stock_id}")
+    if fi.other is not None:
+        for f in fields(fi.other):
+            values = getattr(fi.other, f.name)
+            if isinstance(values, list):
+                length(f"other.{f.name}", values, n)
     for name, values in fi.orca.quarters.items():
         length(f"orca.quarters.{name}", values, n)
     for name, values in fi.orca.years.items():
@@ -342,5 +343,5 @@ def from_json(data: bytes) -> FundInputs:
     ]
     d["orca"] = OrcaFund(**d["orca"])
     if d.get("other") is not None:
-        raise ValueError(f"fund {d['fund_id']}: other positions are not supported yet")
+        d["other"] = OtherInputs(**d["other"])
     return FundInputs(**d)
