@@ -81,7 +81,8 @@ def other_inputs(
             gain[i] += pq.trade_gain
             divs[i] += pq.dividends
 
-    held_now = value_now = before_value_now = 0.0
+    held_now = 0
+    value_now = before_value_now = 0.0
     profitable = computable = 0
     hold_all = hold_sold = 0.0
     n_sold = 0
@@ -91,7 +92,7 @@ def other_inputs(
     for pos in rest:
         price = latest[pos.stock_id][1] if pos.stock_id in latest else None
         held = pos.shares_now > 0
-        held_now += held
+        held_now += int(held)
         before = next((pq.shares for pq in pos.quarters if pq.q == period_q - 1), 0.0)
         if price is not None:
             value_now += pos.shares_now * price
@@ -143,7 +144,7 @@ def other_inputs(
         trade_gain=gain,
         dividends=divs,
         count=len(rest),
-        held_now=int(held_now),
+        held_now=held_now,
         in_book_count=sum(1 for pos in rest if pos.quarters),
         value_now=value_now,
         before_value_now=before_value_now,
