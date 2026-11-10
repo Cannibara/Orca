@@ -186,7 +186,6 @@ GitHub secrets (names): `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT
 Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest, demo build, Playwright) runs first. Then the deploy job fetches `funds.json` from `VITE_DATA_URL`, builds with `PRERENDER_FUNDS`, `SITE_URL` and `HSTS_MAX_AGE`, and runs wrangler. PRs run tests only.
 
 ## Tech debt and risks
-- `pipeline/contract.md` is stale. It says prices refresh "every week" and exits are refreshed for 8 quarters; the code runs monthly with `EXIT_REFRESH_QUARTERS = 6` (code).
 - Confidential-treatment 13F filings are not handled (code).
 - Only the latest tracking segment is computed, so history before a gap of 2+ quarters is dropped (code).
 - The bulk ZIP skip ignores the checksum; there is no `is_finite` check on VALUE (code).
@@ -194,7 +193,7 @@ Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest,
 - Deferred review items: the weights ≈ 100% invariant is unchecked; a crash window between `write_manifest` and the `fund_state` writes; a `pending_all` run doesn't republish every weekly file (rulings doc).
 - The Site CORS workflow lacks an R2 Admin token; the purge clears the whole zone (chat).
 - A big fund fetches ~2,000+ `weekly.json` files when stepping back a quarter before the prefetch is done (about 7 s measured). A per-fund quarter-end price file would fix that (chat).
-- A plain `<table>` with all rows: layout cost grows with rows; capped by `loading.ts`, not virtualised (chat).
+- The fund Positions and What-if tables, and every Home table, are plain `<table>`s with all loaded rows: layout cost grows with rows; capped by `loading.ts` (fund tables) and not virtualised. `DataTable` has a `virtual` mode (`@tanstack/react-virtual`), but no caller turns it on (code).
 - No server-side gating is possible while all data is public (chat).
 - Fund compute runs on one core (~48 min); parallel compute was estimated at 17–20 min, not built (chat)(code).
 - `home/just_filed.json` is built and published with no reader since 2026-11-06 (code).

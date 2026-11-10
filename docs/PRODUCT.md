@@ -34,6 +34,11 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Backlog | Per-fund quarter-end price file (fewer requests) | (chat) |
 | Phase 1 built (owner-only) | Paid per-fund workbook (phase 1: owner-only): an Excel file per fund with the raw quarterly data and formulas for every fund-page metric, reconciled to Orca's figures; built by hand with Actions > Workbook into the private bucket; not for sale until the Tiingo licence is settled; login, payment and on-demand build are phase 2 | `pipeline/orca/workbook/`, `docs/superpowers/specs/2026-11-10-fund-workbook-design.md` (code)(chat) |
 | Backlog | Gated paid tier, login | (spec)(chat) |
+| Backlog (F1) | Paid per-fund workbook, the phase 2 of the row above | `docs/ROADMAP.md` (proposal until the owner approves) |
+| Backlog (F2) | Column choices and saved views (may need accounts) | `docs/ROADMAP.md` (proposal) |
+| Backlog (F3) | Weekly popularity list | `docs/ROADMAP.md` (proposal) |
+| Backlog (F4) | Sector momentum and volume | `docs/ROADMAP.md` (proposal) |
+| Backlog (F5) | Manager rankings, with benchmarks | `docs/ROADMAP.md` (proposal) |
 | Backlog | Spec 2 skill scores, spec 3 sector rotation, stock pages "who holds X", alerts, pre-2013 history | (spec) |
 
 ## Home list rules
