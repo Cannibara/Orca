@@ -5,6 +5,10 @@ Last verified: 2026-11-10
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-10 — Workbook opened in real Excel (owner)
+
+The owner ran Actions > Workbook for fund 1067983 (Berkshire Hathaway) and opened the file in Excel: it works (owner, chat). This closes the "never opened in real Excel" gap noted in the workbook entries below; the figures were not compared cell by cell against EDGAR (the hand-check against the filing is still open). Settings done by the owner the same day: Issues on, `ORCA_SCHEDULE_ENABLED=true`, secret scanning and push protection, the other dashboard items from the roadmap list (owner, chat).
+
 ## 2026-11-10 — Roadmap safety net: health gates, failure alert, lake backup
 
 | What changed | Why | Files |
