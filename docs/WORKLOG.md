@@ -13,6 +13,15 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 
 - Open: the `alert` job and the backup step have only been linted (actionlint, shellcheck, a stubbed-rclone run of the backup script); neither has run on GitHub. Do the restore drill once on a scratch bucket. The freshness monitor (rest of E2) is not built.
 
+## 2026-11-10 — Roadmap batch: safety net and quick wins (PR after #4)
+
+| What changed | Why | Files |
+|---|---|---|
+| Health gates abort a run before the manifest when no stock is mapped, coverage_median < 0.90 or every tried fund came out empty (`run/gates.py`); failure issue for scheduled pipeline/verify runs; monthly lake-state backup to `backups/<date>/` (keep 3, schedule only, excluded from the restore and save syncs) (ROADMAP D2, E2, E3) | Bad data was never published only by luck (go-live run 5 published 0 tickers); failures were silent; the lake had one copy | `pipeline/orca/run/gates.py`, `weekly.py`, `.github/workflows/pipeline.yml`, `.github/actions/restore-r2/action.yml`, `docs/ARCHITECTURE.md`, `docs/domain-and-data-hosting.md` |
+| Dependabot (monthly, grouped, uv/npm/github-actions) and non-blocking `npm audit` / `pip-audit`; site-wide estimate footer; `types.ts` vs `contract.md` test; stale-doc fixes (contract, virtualisation, Tiingo licence, F1–F5 backlog) (ROADMAP X3, U3, D3, H1–H3) | Quick wins from the audit | `.github/dependabot.yml`, `ci.yml`, `web.yml`, `web/src/App.tsx`, `web/tests/contract-types.test.ts`, docs |
+
+Not done: ROADMAP U1 (URL state) waits for the saved-views work it is groundwork for; L1 (Tiingo licence), E1 (`ORCA_SCHEDULE_ENABLED`), P1 (data-host cache key, `r2.dev`), X4 (old `orca-eiq` token), secret scanning and push protection are owner or dashboard actions. The alert and backup steps and the rclone filters have only been checked offline (stubbed rclone, actionlint, shellcheck); Issues must be enabled on the repo.
+
 ## 2026-11-10 — Per-fund Excel workbook, phase 1 built (owner-only)
 
 | What changed | Why | Files |
