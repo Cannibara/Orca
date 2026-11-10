@@ -63,7 +63,8 @@ class Sheet(Worksheet):
     asks); the tests check this gives xlsxwriter's own text for every registry formula."""
 
     def _prepare_formula(self, formula, expand_future_functions=False):
-        if expand_future_functions:  # conditional formats and the like: xlsxwriter's own
+        # conditional formats and the like, and array formulas ("{=...}"): xlsxwriter's own
+        if expand_future_functions or formula.startswith("{"):
             return super()._prepare_formula(formula, expand_future_functions)
         formula = formula.removeprefix("=")
         if self.use_future_functions and "_xlfn." not in formula:
@@ -124,15 +125,10 @@ class ModelMap:
         return f"{col_letter(self.column(column))}{self.row(block_id, stock_id)}"
 
 
-_last_map: tuple[FundInputs, ModelMap] | None = None
-
-
 def model_map(fi: FundInputs) -> ModelMap:
-    """The Model layout of `fi` (the last one is kept, so repeated lookups are cheap)."""
-    global _last_map
-    if _last_map is None or _last_map[0] is not fi:
-        _last_map = (fi, _plan(fi))
-    return _last_map[1]
+    """The Model layout of `fi`, planned afresh (nothing is cached between calls): a caller
+    that looks up many cells keeps the map."""
+    return _plan(fi)
 
 
 def cell_of(

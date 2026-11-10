@@ -307,4 +307,7 @@ def test_sheet_prepares_formulas_as_xlsxwriter_does(tmp_path):
     for formula in formulas:
         assert fast._prepare_formula(formula) == slow._prepare_formula(formula), formula
     assert "_xlfn.STDEV.S(J5:J9)" in fast._prepare_formula(formulas[-2])
+    # an array formula ("{=...}") goes to xlsxwriter's own path (ruling R20)
+    for formula in ("{=SUM(A1:A2*B1:B2)}", "{=STDEV.S(A1:A9)}"):
+        assert fast._prepare_formula(formula) == slow._prepare_formula(formula), formula
     book.close()

@@ -10,6 +10,7 @@ prices and points within 1e-9 x MAX(1, |engine|); counts and quarters exactly. A
 
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 from collections.abc import Iterable
@@ -42,30 +43,42 @@ def recalc(path: Path, out_dir: Path) -> Path:
 
 def recalc_all(paths: Iterable[Path], out_dir: Path) -> list[Path]:
     """`recalc` for several files in one soffice run (its start-up costs seconds). Each run has
-    a fresh profile, so no user setting or a running LibreOffice interferes."""
+    a fresh profile, so no user setting or a running LibreOffice interferes. soffice runs in a
+    session of its own: on a timeout the whole group (soffice.bin included) is killed, and a
+    failure says what soffice printed."""
     paths = [Path(p) for p in paths]
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="orca-lo-") as profile:
-        subprocess.run(
-            [
-                "soffice",
-                f"-env:UserInstallation=file://{profile}",
-                "--headless",
-                "--calc",
-                "--convert-to",
-                "xlsx",
-                "--outdir",
-                str(out_dir),
-                *map(str, paths),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=TIMEOUT,
+        command = [
+            "soffice",
+            f"-env:UserInstallation=file://{profile}",
+            "--headless",
+            "--calc",
+            "--convert-to",
+            "xlsx",
+            "--outdir",
+            str(out_dir),
+            *map(str, paths),
+        ]
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
         )
+        try:
+            stdout, stderr = proc.communicate(timeout=TIMEOUT)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            _, stderr = proc.communicate()
+            raise RuntimeError(f"soffice timed out after {TIMEOUT} s: {stderr.strip()}") from None
+    if proc.returncode != 0:
+        raise RuntimeError(f"soffice exited {proc.returncode}: {stderr.strip()}")
     out = [out_dir / p.name for p in paths]
     missing = [str(p) for p in out if not p.exists()]
     if missing:
-        raise RuntimeError(f"LibreOffice wrote no {missing}")
+        raise RuntimeError(f"LibreOffice wrote no {missing}: {stderr.strip()} {stdout.strip()}")
     return out
 
 
