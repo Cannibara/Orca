@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -15,6 +15,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | Anything in the pipeline, data, hosting, Cloudflare | `docs/ARCHITECTURE.md` |
 | Changing a published JSON file or its reader | `pipeline/contract.md` (source of truth; change it first) |
 | UI, metrics, what a view shows | `docs/PRODUCT.md` |
+| The Excel workbook (`pipeline/orca/workbook/`) | `docs/superpowers/specs/2026-11-10-fund-workbook-design.md`, `docs/ARCHITECTURE.md` (Workbook) |
 | "Why is it like this?" | `docs/DECISIONS.md`, then `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md` (rulings R1–R33) |
 | Domain, DNS, cache, CORS, secrets/variables, rollback | `docs/domain-and-data-hosting.md` (owner runbook) |
 | What happened recently, open issues | `docs/WORKLOG.md` |
@@ -30,6 +31,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ## Repo map
 ```
 pipeline/            Python package `orca` (ingest → lake → engine → publish), tests/, contract.md
+pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
 web/src/pages/       Home, Fund (assembles the fund page), Position, Method, NotFound (+ page css)
 web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css
@@ -54,6 +56,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Web e2e | `cd web && npx playwright test` (cloud sessions: prefix `PW_CHROMIUM=/opt/pw-browsers/chromium`) |
 | Pipeline install / tests | `cd pipeline && uv sync --locked && uv run pytest -m "not network"` |
 | Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`); locally `uv run python -m orca.run {weekly\|rebuild\|home\|check-keys\|verify}` (needs the API key env vars) |
+| Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |
 | Clear data cache | Actions > Purge cache |

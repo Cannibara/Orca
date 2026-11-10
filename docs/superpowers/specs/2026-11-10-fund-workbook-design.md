@@ -60,7 +60,7 @@ Year cells are always formulas over the same row's quarter cells, following the 
 
 **Year columns** cover the calendar years of the tracked quarters (segment start to `end_q`).
 
-**Stock rows** cover every mapped stock (`kind == "SH"`, with a `stock_id`) that the fund filed in its tracked segment, priced or not. A stock that was never priced has rows of zeros, but its filed value still counts toward % priced, as in `metrics.priced_pct`.
+**Stock rows** cover every mapped stock (`kind == "SH"`, with a `stock_id`) that the fund filed in its tracked segment, priced or not. A stock that was never priced has rows of zeros. Its filed value counts toward % priced only when it is 0: the engine prices any positive filed value through the reported-value fallback, so a never-priced stock with a positive value cannot occur.
 
 **Stock order** is identical in every block and on every tab: descending by peak quarter-end value (the same ranking the 500 cut uses), with ties broken by `stock_id`. When the fund has been cut, the "All other positions" row comes last.
 
@@ -76,7 +76,7 @@ Year cells are always formulas over the same row's quarter cells, following the 
 
 **Blank or zero.** A formula shows blank (`""`) wherever the site shows "—": an undefined return, an average exit price when nothing was sold, a ratio whose denominator is zero, an IRR or XIRR with no answer (`#NUM!`). It shows 0 only where 0 is the true value, for example the shares of a stock not held, or the dividends of a quarter with none. Guards are explicit, such as `IF(B=0,"",A/B)`. `IFERROR` is used only around XIRR, so that other errors still show.
 
-**Functions allowed** (portable to Excel 2016+, LibreOffice and Google Sheets): `IF`, `AND`, `OR`, `SUM`, `SUMIF(S)`, `COUNTIF(S)`, `AVERAGE`, `AVERAGEIFS`, `SUMPRODUCT`, `INDEX`, `MATCH`, `MAX`, `MIN`, `ABS`, `EXP`, `LN`, `SQRT`, `STDEV.S`, `COUNT`, `XIRR`, `IFERROR`. Functions only in Excel 365 (`LET`, `LAMBDA`, `XLOOKUP`, `FILTER`, dynamic arrays) are not used. The first quarter of something (for example the first in book) comes from `MATCH(1,row,0)`. The last quarter of something (for example the last trade) comes from `SUMPRODUCT(MAX((condition)×(Quarter row+1)))−1`, which gives −1 for "none" and is shown blank.
+**Functions allowed** (portable to Excel 2016+, LibreOffice and Google Sheets): `IF`, `AND`, `OR`, `SUM`, `SUMIF(S)`, `COUNTIF(S)`, `AVERAGE`, `AVERAGEIFS`, `SUMPRODUCT`, `INDEX`, `MATCH`, `MAX`, `MIN`, `ABS`, `EXP`, `SQRT`, `STDEV.S`, `COUNT`, `XIRR`, `IFERROR`. Functions only in Excel 365 (`LET`, `LAMBDA`, `XLOOKUP`, `FILTER`, dynamic arrays) are not used. The first quarter of something (for example the first in book) comes from `MATCH(1,row,0)`. The last quarter of something (for example the last trade) comes from `SUMPRODUCT(MAX((condition)×(Quarter row+1)))−1`, which gives −1 for "none" and is shown blank.
 
 **Recalculation.** The workbook sets `fullCalcOnLoad`. It stores **no cached values**; Excel, LibreOffice, Google Sheets and Numbers compute everything on open. See section 11 for why this changes the earlier plan.
 
@@ -84,7 +84,7 @@ Year cells are always formulas over the same row's quarter cells, following the 
 
 ### 3.2 Model tab
 
-The tab runs from top to bottom. At the top are a short notes block and a block index with links to each block. Then come the header rows, the fund inputs, the stock input blocks, the stock calculation blocks, the fund rows, and finally the Orca's-figures section that the checks use. Each block starts with a header row naming the block, followed by one row per stock.
+The tab runs from top to bottom. At the top is a short notes block, then the frozen header rows, and just below them (not above: an index above the freeze would fill a laptop screen with frozen rows) a block index with links to each block. Then come the fund inputs, the stock input blocks, the stock calculation blocks, the fund rows, and finally the Orca's-figures section that the checks use. Each block starts with a header row naming the block, followed by one row per stock.
 
 **Notes (top):**
 - fund name, fund id and CIK;
@@ -104,7 +104,7 @@ The tab runs from top to bottom. At the top are a short notes block and a block 
 | Quarter end | date |
 | Mid-quarter | quarter start + ⌊(quarter end − quarter start) / 2⌋ days. This is the trade date for XIRR. The Latest column holds the latest price date. |
 | First tracked quarter | 1 in the segment's first quarter, else 0 |
-| Held through | 1 up to the fund's last held quarter (`end_q`), 0 after it. Calculation blocks are blank where 0. |
+| Held through | 1 up to the fund's last held quarter (`end_q`), 0 after it. Informational: calculation cells after `end_q` are simply not written. |
 
 The year columns carry the year number in the Year row.
 
@@ -156,7 +156,7 @@ When the fund has been cut, the cut adds these inputs (section 6): Other positio
 | C19 | 1-year-after return | `IF(C7=0,"",IF(+4 I4<>"",+4 I4/C8−1,""))`: the stock's close four quarters later over the trade price. It feeds "buys vs sells next 12 months". | blank |
 | C20 | Points | year columns only: `IF(year C6=0,"",IF(year Start+year Net buying/2>0, year C13/(year Start+year Net buying/2)×100,""))`. This is "What drove". | (year-only) |
 
-Calculation cells after `end_q` (Held through = 0) are blank. The Close row runs to `bound`, because the what-if figures read closes four quarters after a sale.
+Calculation cells after `end_q` are not written, so they are blank by construction ("Held through" stays as an informational row), with one exception: the two cash-flow rows (C17, C18) hold the number 0 there up to Latest, because those flows are truly 0 and Excel's behaviour with empty cells inside an XIRR range is unverified. The Close row runs to `bound`, because the what-if figures read closes four quarters after a sale.
 
 **Fund rows** (quarter columns, bottom of Model):
 
@@ -172,7 +172,7 @@ Calculation cells after `end_q` (Held through = 0) are blank. The Close row runs
 | Dividends | `SUM` of C12 | sum |
 | Bridge gap | End − (Start + Market move + Net buying + Trade gains) | sum |
 | Bridge OK | `ABS(gap) <= 1e-6×MAX(1,ABS(End),ABS(Start),Buys+Sells)` (1/0) | min |
-| Return | `IF(AND(First tracked quarter=0,Start>0,Start+Net buying/2>0),(End−Start−Net buying+Dividends)/(Start+Net buying/2),"")` | chained: `IF(year count=0,"",EXP(SUMPRODUCT((Year=y)×LN(Growth)))−1)` |
+| Return | `IF(AND(First tracked quarter=0,Start>0,Start+Net buying/2>0),(End−Start−Net buying+Dividends)/(Start+Net buying/2),"")` | chained: `IF(year count=0,"",Year-to-date growth at the year's last quarter−1)` |
 | Growth | `IF(Return="",1,1+Return)` | product |
 | Has return | `IF(Return="",0,1)` | sum (quarters with a return) |
 | Risk-free used | `IF(T-bill<>"",T-bill,prev Risk-free used)`; 0 when no earlier rate exists (`metrics._quarterly_rf`) | year-end |
@@ -210,11 +210,11 @@ The cut also adds an "All other positions" row with input values (End, Market mo
 
 | Rule | Year cell |
 |---|---|
-| sum | `SUMIF(Year row, y, this row's quarter cells)` |
-| year-end | the row's value in the year's last tracked quarter (`INDEX`/`MATCH` on the Year row) |
-| first quarter's Start | the row's value in the year's first tracked quarter |
-| chained / product | as given in the row's formula |
-| min | `MIN` over the year's quarters, via a helper (no array-only functions) |
+| sum | `SUM` over the year's contiguous quarter cells, referenced directly |
+| year-end | the row's cell in the year's last tracked quarter, referenced directly |
+| first quarter's Start | the row's cell in the year's first tracked quarter, referenced directly |
+| chained / product | the year's running-growth cell (the "Year-to-date growth" fund row, a running product of Growth reset at each year's first tracked quarter) at the year's last quarter, minus 1; no `LN` anywhere, because `LN` gives `#NUM!` for a quarterly return of −100% or less where the engine still returns a number |
+| min | `MIN` over the year's contiguous quarter cells |
 | blank | empty |
 
 ### 3.4 Outputs tab
@@ -239,7 +239,7 @@ The cut also adds an "All other positions" row with input values (End, Market mo
 | Unrealised | `IF(Shares now=0,0,IF(Value now="","",Value now−Cost now))` |
 | Total P&L | `IF(Unrealised="","",Realised+Unrealised+Dividends)` |
 | Return | `IF(AND(Invested>0,Total P&L<>""),Total P&L/Invested,"")` |
-| IRR | `IF(AND(Shares now>0,Latest price=""),"",IFERROR(XIRR(C17 row incl. Latest, Mid-quarter row incl. Latest),""))`, blank outside −99%…1,000% (the site's search range) |
+| IRR | `IF(AND(Shares now>0,Latest price=""),"",IFERROR(XIRR(C17 row from the position's first trade quarter to Latest, Mid-quarter row over the same columns),""))`, blank outside −99%…1,000% (the site's search range). The range starts at the first trade, not at the first quarter column: after years of leading zero flows LibreOffice's XIRR stopped at a spurious root (14,220% against the site's −28%), and the IRR does not depend on where the dates start |
 | Weight | Value now ÷ total Value now (including Other positions held now) |
 | Last change | the site's newest quarter is `period_q` (the latest filed quarter; `end_q` may be the carried copy after it). Shares at `period_q` (a) against `period_q − 1` (b), both at latest prices: A = a×price, B = b×price, vb = Σ B (+ Other). dw = (A/(vb−B+A) − B/vb)×100 when the denominators are positive. Tag New/Add/Trim/Exit as in `positions.buildRows`. |
 | Last trade: quarter, type, %, $ | the position's last nonzero C7, as `publish._last_change` (% = delta ÷ shares before, for an add or trim only) |
@@ -251,7 +251,7 @@ The cut also adds an "All other positions" row with input values (End, Market mo
 | Beat SPY | 1/0 when both exist |
 | Since sale | `IF(AND(Avg exit>0,Latest price<>""),Latest price/Avg exit−1,"")` |
 | Missed | `IF(Latest price="","",Shares sold×Latest price−$ sold)` (plus = sold too early) |
-| IRR if held | `IF(Latest price="","",IFERROR(XIRR(C18 row incl. Latest, Mid-quarter row incl. Latest),""))`, for sold stocks, blank outside −99%…1,000% |
+| IRR if held | `IF(Latest price="","",IFERROR(XIRR(C18 row from the first trade quarter to Latest, Mid-quarter row over the same columns),""))`, for sold stocks, blank outside −99%…1,000% |
 | Hold length (years) | ((To quarter or `end_q`) − From quarter + 1) ÷ 4 |
 
 **Orca's columns** follow, as inputs, from `positions.json` and `exits.json` (engine values, unrounded): avg_cost, avg_exit, invested, realised, dividends, shares_now, cost_now, from_q, to_q, last_q, last_type, last_pct, last_usd, sold_shares, sold_usd, last_sale_q, one_y, spy_one_y.
@@ -259,7 +259,7 @@ The cut also adds an "All other positions" row with input values (End, Market mo
 **Difference cells.** Each Orca value, on Model (rows) and on Outputs (columns), has a difference cell beside it:
 - 0 when both are blank;
 - 1E+300 when only one of them is blank;
-- otherwise, for dollars and shares, `ABS(Excel−Orca)/MAX(1,ABS(Orca))`; for returns and ratios, `ABS(Excel−Orca)`; for quarters, counts and text, `IF(Excel=Orca,0,1)`.
+- otherwise, for dollars and shares, `ABS(Excel−Orca)/MAX(1,ABS(Orca),scale)`; for returns and ratios, `ABS(Excel−Orca)/MAX(1,ABS(Orca))`; for quarters, counts and text, `IF(Excel=Orca,0,1)`. The scale is computed in Excel on the same tab: a fund quarter's `MAX(ABS(Start),ABS(End),Buys+Sells)`, a fund year's maximum of that over its quarters, a stock's `MAX` of its |Value|, |Cost| and Invested. Reason: sums of large cancelling terms differ by about 1E−16 × terms between LibreOffice (compensated summation) and the engine (plain addition). The Summary book uses `MAX(1,ABS(Orca))`.
 
 **Checks table** (one row per measure):
 
@@ -268,7 +268,7 @@ The cut also adds an "All other positions" row with input values (End, Market mo
 | Measure | name |
 | Compared | count of cells compared |
 | Max difference | `MAX` of the measure's difference cells |
-| Tolerance | 1e-9 (relative for dollars and shares, absolute for returns and ratios); 0 for quarters, counts and text |
+| Tolerance | 1e-9 for dollars, shares, returns and ratios (each difference is already scaled as above); 0 for quarters, counts and text |
 | Result | PASS/FAIL |
 
 What is compared:
@@ -313,7 +313,7 @@ The cut applies when the fund has more than 500 positions in its tracked segment
 - Positions are ranked by peak value: the maximum of `PositionQuarter.value` over the segment, ties broken by `stock_id`.
 - The top 500 get full stock rows.
 - The rest become **one "All other positions" row** in each summed block (End/Value, Market move, Trade gains, Dividends, P&L, Value filed), plus fund input rows for their buys and sells per quarter. All of these come from Orca's own sums over those positions and are labelled as Orca inputs.
-- The Outputs tab gets an "All other positions" row with Orca's counts and sums: positions, held now, value now at latest prices (for weight), shares before × latest price (for last change), profitable count and computable count, hold-length sum and count (all and sold), buys and sells 1-year-after return sums and counts, beat-SPY pairs, missed (too early and dodged).
+- The Outputs tab gets an "All other positions" block (a labelled input block below the Total row, not a row of the stock table, because the counts and sums do not fit the stock columns) with Orca's counts and sums: positions, held now, value now at latest prices (for weight), shares before × latest price (for last change), profitable count and computable count, hold-length sum and count (all and sold), buys and sells 1-year-after return sums and counts, beat-SPY pairs, missed (too early and dodged).
 - So fund-level figures stay exact. Only the stock-by-stock rebuild stops at 500.
 - Measured: Vanguard's top 500 cover 81.5% of value in 22,438 stock-quarter rows.
 

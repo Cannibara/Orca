@@ -1,9 +1,22 @@
 # Worklog
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-10 — Per-fund Excel workbook, phase 1 built (owner-only)
+
+| What changed | Why | Files |
+|---|---|---|
+| Builder for a per-fund workbook (Model, Outputs, Summary tabs; every fund-page metric as formulas, 57 in-file checks against Orca's figures); `orca.run workbook` CLI that validates, round-trips and writes inputs plus the file; manual Workbook Action to the private lake bucket; CI installs LibreOffice and requires it; the site's IRR now uses Excel's XIRR convention (mid-quarter dates, days ÷ 365); docs and spec brought in line with the build (code)(git) | Owner decision: paid per-fund workbook, phase 1 for the owner only (chat) | `pipeline/orca/workbook/`, `pipeline/orca/run/workbook.py`, `pipeline/orca/run/cli.py`, `pipeline/orca/run/compute.py`, `.github/workflows/workbook.yml`, `.github/workflows/ci.yml`, `web/src/lib/live.ts`, `docs/*`, `CLAUDE.md` |
+
+- The public pipeline contract is unchanged (no public file changed).
+- Open:
+  - Excel has never opened these files; only LibreOffice 24.2 recalculated them. Open one in Excel and check Summary's "Checks failing" before anyone relies on it.
+  - Tiingo's redistribution licence is a blocker before selling or sharing a workbook.
+  - Phase 2 (login, payment, Worker, Container, per-fund private input files for every fund) needs its own spec.
+  - The Workbook Action and the CI change have not run on GitHub; `actionlint` and `shellcheck` were not installed here.
 
 ## 2026-11-10 — Per-fund Excel workbook design: sections 1–2 approved
 

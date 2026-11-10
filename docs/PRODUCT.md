@@ -1,6 +1,6 @@
 # Product
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Tags: (chat) session conversation, (code) checked in code, (git) commit history, (spec) `docs/superpowers/specs/2026-10-30-orca-fund-pnl-design.md`.
 
@@ -32,7 +32,8 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Proposed, unanswered | Conviction: drop funds with ≥ 30% of book in ETFs; common stock only (no convertibles/preferreds); name filters for wealth managers and charities; match the two views' Quarter / Weight columns | (chat) |
 | Proposed, declined | Best & worst calls from every qualifying buy, re-cut live (owner kept the 50 + 50 file) | (chat) |
 | Backlog | Per-fund quarter-end price file (fewer requests) | (chat) |
-| Backlog | Gated paid tier, login, Excel export | (spec)(chat) |
+| Phase 1 built (owner-only) | Paid per-fund workbook (phase 1: owner-only): an Excel file per fund with the raw quarterly data and formulas for every fund-page metric, reconciled to Orca's figures; built by hand with Actions > Workbook into the private bucket; not for sale until the Tiingo licence is settled; login, payment and on-demand build are phase 2 | `pipeline/orca/workbook/`, `docs/superpowers/specs/2026-11-10-fund-workbook-design.md` (code)(chat) |
+| Backlog | Gated paid tier, login | (spec)(chat) |
 | Backlog | Spec 2 skill scores, spec 3 sector rotation, stock pages "who holds X", alerts, pre-2013 history | (spec) |
 
 ## Home list rules
@@ -73,7 +74,7 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 | Positions profitable | share of positions with total P&L > 0 among those computable | `web/src/lib/live.ts` `profitablePct` (code) |
 | Avg cost, realised | average cost (cost of the shares sold leaves at the running average) | `web/src/fund/positions.ts` `asOf` (code) |
 | Return (position) | total P&L ÷ dollars invested | `asOf` (code) |
-| IRR | trade flows at mid-quarter (`tradeT = q/4 + 0.125`), terminal value at the period end, dividends excluded | `web/src/lib/live.ts` (code) |
+| IRR | Excel's XIRR convention: trades dated mid-quarter (quarter start + half its days), days ÷ 365; terminal value at the period end; dividends excluded. Changed 2026-11-10 from the old quarter-step clock (`q/4 + 0.125`); median gap 0.011 pp on Berkshire | `web/src/lib/live.ts` (code) |
 | Weight | position value ÷ priced book at the period end | `positions.ts` (code) |
 | Last change (box) | weight change in % of AUM from the stock's own trade: A/(vb−B+A) − B/vb at period-end prices | `positions.ts` (code) |
 | Contribution points | stock P&L ÷ (year start + ½ inflows) × 100 | `pipeline/contract.md` |

@@ -10,7 +10,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -25,5 +25,9 @@ jobs:
           python-version: "3.13"
       - name: Install dependencies
         run: uv sync --locked
+      - name: Install LibreOffice (the workbook tests recalculate the files with it)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-calc
       - name: Run the tests that need no network
+        env:
+          ORCA_REQUIRE_LIBREOFFICE: "1"
         run: uv run pytest -m "not network"
