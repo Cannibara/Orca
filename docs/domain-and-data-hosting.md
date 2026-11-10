@@ -89,6 +89,30 @@ one > Rollback.
    variable by themselves.
 3. The old address must still serve the files and allow the website (Site CORS covers the bucket).
 
+## Restore from backup
+
+After each successful Pipeline run (not `home_only`), the state of the private lake is copied to
+`backups/<UTC date>/` in the lake bucket (`R2_LAKE_BUCKET`); the 3 newest dates are kept. It holds
+the state JSON files, `fund_state`, `cusip_map`, `vendor_tickers`, `securities` and `rf`, not the
+prices or the filings (those are fetched or rebuilt by the next runs).
+
+Use it when a run saved a bad lake (wrong mappings, a damaged state file) and the next run cannot
+repair it by itself.
+
+1. Stop the schedule first: unset the repository variable `ORCA_SCHEDULE_ENABLED`, and cancel any
+   Pipeline run in progress. A run restoring or saving while you copy would overwrite your work.
+2. On a computer with rclone and the R2 credentials (a remote named `r2`), pick the date:
+   `rclone lsf --dirs-only r2:<lake bucket>/backups`
+3. Copy it back over the live lake (`copy` only adds and overwrites; never use `sync` here, it would
+   delete the prices):
+   `rclone copy r2:<lake bucket>/backups/<YYYY-MM-DD> r2:<lake bucket> --exclude "workbooks/**" --exclude "backups/**"`
+4. Run Actions > Pipeline > Run workflow by hand. It restores that lake, finds the site ahead of or
+   behind it (the lake's `published.json` against the site's manifest) and republishes what differs. If
+   the data itself was wrong, run it with `full` ticked. Then set `ORCA_SCHEDULE_ENABLED` to `true`.
+
+Nothing in the lake bucket's `backups/` folder is ever public. Practise this once on a copy before
+you need it: restore a date into a scratch bucket, not the live one.
+
 ## Cloudflare settings that are not in the repository
 
 Write down any change you make to these here.

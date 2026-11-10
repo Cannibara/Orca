@@ -75,11 +75,14 @@ runs:
         done
         # A sync that has not finished in 15 minutes (it takes under a minute) is stopped and run
         # again, which picks up where it stopped: at most three tries.
-        # workbooks/** (built workbooks, written by the Workbook workflow only) is not restored:
-        # no run reads it, and the pipeline's save skips it too, so it is never deleted there.
+        # workbooks/** (built workbooks, written by the Workbook workflow only) and backups/**
+        # (dated copies of the lake's state, written by the pipeline's backup step) are not
+        # restored: no run reads them, and the pipeline's save skips them too, so they are never
+        # deleted there.
         restored=""
         for attempt in 1 2 3; do
-          if timeout 15m rclone sync "r2:${R2_LAKE_BUCKET}" data/lake --exclude "workbooks/**"; then
+          if timeout 15m rclone sync "r2:${R2_LAKE_BUCKET}" data/lake \
+            --exclude "workbooks/**" --exclude "backups/**"; then
             restored=1
             break
           fi
