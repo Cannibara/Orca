@@ -5,8 +5,8 @@ name: Pipeline
 # new filings and prices, recompute the funds they touch, upload the changed files to the public R2
 # bucket (manifest.json last), clear the Cloudflare cache of the data site, save the lake back. On the
 # 1st: rebuild a sample of funds from the lake's raw filings and compare them with what is published.
-# A failed run leaves the site on the last good version; GitHub's default notifications email the
-# failure.
+# A failed run leaves the site on the last good version. A failed scheduled run (the run or the
+# monthly check) also opens a GitHub issue (the `alert` job at the end).
 #
 # Every run has a time budget (ORCA_TIME_BUDGET_MIN, 270 minutes by default): when it is spent the
 # pipeline stops its long stages cleanly, publishes the funds it computed (nothing, if it got no
@@ -276,3 +276,40 @@ jobs:
           endpoint: ${{ secrets.R2_ENDPOINT }}
       - name: Rebuild a sample of funds and compare
         run: uv run --locked --no-dev python -m orca.run verify --sample 50
+
+  alert:
+    # A failed scheduled run (the monthly run or the 1st's check) opens an issue, so the failure is
+    # seen without anyone watching Actions. It also keeps the schedule from going unnoticed:
+    # public-repo schedules switch off after 60 days without activity. Holds no secrets and
+    # checks nothing out; the issue says only where to look.
+    needs: [weekly, verify]
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      (needs.weekly.result == 'failure' || needs.verify.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          REF: ${{ github.ref }}
+        run: |
+          title="Pipeline failed: ${RUN_ID}"
+          body="$(printf 'Run: %s\nWorkflow: %s\nRef: %s\nDate: %s\n' "$RUN_URL" "$WORKFLOW" "$REF" "$(date -u +%F)")"
+          # A re-run of the same run (same id) comments on the issue it already has.
+          number="$(gh issue list --state open --search "\"${title}\" in:title" --json number,title \
+            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
