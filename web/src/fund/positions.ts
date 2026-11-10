@@ -1,6 +1,6 @@
 // The Positions panel's model, pure: every figure of every position as it stood at the end of a
 // chosen period (a quarter, a year or a custom run of quarters). Ported from the approved
-// artifact (app.js: tradeT/irrOf/sharesAt/priceQ/tEnd/dividendsAsOf/asOf/periodRows and the sort),
+// artifact (app.js: tradeYears/irrOf/sharesAt/priceQ/tEnd/dividendsAsOf/asOf/periodRows and the sort),
 // with the live data behind it: trades come from positions.json, prices from latest_prices.json
 // (the newest quarter) or the weekly series (earlier quarter ends).
 //
@@ -38,7 +38,7 @@ export const endDate = (tl: Timeline, qe: number): string => (qe >= tl.latest ? 
 
 /** End of the period in years after 2013-01-01 (the IRR clock). */
 export const tEnd = (tl: Timeline, qe: number): number =>
-  qe >= tl.latest ? yearsSince2013(tl.asof) : (qEndMs(qe) - D2013) / (365.25 * DAY);
+  qe >= tl.latest ? yearsSince2013(tl.asof) : (qEndMs(qe) - D2013) / (365 * DAY);
 
 // ---- periods ----------------------------------------------------------------------------
 

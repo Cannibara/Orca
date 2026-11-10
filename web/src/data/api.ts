@@ -136,7 +136,7 @@ export function priceDates(lp: LatestPrices): Map<number, string> {
   return m;
 }
 
-/** Years from 2013-01-01 to an ISO date (365.25-day years): the IRR clock. */
+/** Years from 2013-01-01 to an ISO date (365-day years, as Excel XIRR): the IRR clock. */
 export function yearsSince2013(isoDate: string): number {
-  return (Date.parse(isoDate) - Date.UTC(2013, 0, 1)) / (365.25 * 86_400_000);
+  return (Date.parse(isoDate) - Date.UTC(2013, 0, 1)) / (365 * 86_400_000);
 }

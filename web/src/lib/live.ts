@@ -6,8 +6,22 @@ import type { Holdings, PositionRow, Positions, Trade, TradeTuple } from "../dat
 
 type Flow = [t: number, amount: number];
 
-/** Trade time in years after 2013-01-01: the middle of quarter q (R10). */
-export const tradeT = (q: number): number => q / 4 + 0.125;
+const DAY_MS = 86_400_000;
+
+/**
+ * UTC ms of the date a quarter's trades are assumed to happen (R10): quarter start plus half the days
+ * from its first to its last day, rounded down. The fund workbook uses the same rule.
+ */
+export const midQuarterMs = (q: number): number => {
+  const y = 2013 + Math.floor(q / 4);
+  const m = (q % 4) * 3;
+  const start = Date.UTC(y, m, 1);
+  const end = Date.UTC(y, m + 3, 0);
+  return start + Math.floor((end - start) / DAY_MS / 2) * DAY_MS;
+};
+
+/** Trade time in years of 365 days after 2013-01-01, so IRR matches Excel's XIRR (days / 365). */
+export const tradeYears = (q: number): number => (midQuarterMs(q) - Date.UTC(2013, 0, 1)) / (365 * DAY_MS);
 
 /** What a trade did to the holding. */
 export type Move = "New" | "Add" | "Trim" | "Exit";
@@ -73,7 +87,7 @@ export function irr(flows: Flow[]): number | null {
  */
 export function positionFlows(trades: Trade[], sharesNow: number, price: number | undefined, nowT: number): Flow[] {
   if (sharesNow > 0 && price === undefined) return [];
-  const flows: Flow[] = trades.map((t) => [tradeT(t.q), -t.delta * t.px]);
+  const flows: Flow[] = trades.map((t) => [tradeYears(t.q), -t.delta * t.px]);
   if (sharesNow > 0 && price !== undefined) flows.push([nowT, sharesNow * price]);
   return flows;
 }
@@ -85,7 +99,7 @@ export function positionFlows(trades: Trade[], sharesNow: number, price: number 
 export function heldFlows(trades: Trade[], price: number | undefined, nowT: number): Flow[] {
   if (price === undefined) return [];
   const buys = trades.filter((t) => t.delta > 0);
-  const flows: Flow[] = buys.map((t) => [tradeT(t.q), -t.delta * t.px]);
+  const flows: Flow[] = buys.map((t) => [tradeYears(t.q), -t.delta * t.px]);
   flows.push([nowT, buys.reduce((a, t) => a + t.delta, 0) * price]);
   return flows;
 }

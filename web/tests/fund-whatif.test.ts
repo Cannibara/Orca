@@ -91,7 +91,7 @@ describe("position figures come from the as-of model at the newest quarter", () 
     expect(r.ret).toBeCloseTo(returnPct(p, 40) as number, 12);
     expect(r.ret).toBeCloseTo(1, 12); // 1,000 made on 1,000 in
     expect(r.irr()).toBeCloseTo(irr(positionFlows(p.trades, p.shares_now, 40, yearsSince2013(ASOF))) as number, 12);
-    expect(r.irr()).toBeCloseTo(Math.pow(2, 1 / (49 / 4 + 0.125 - (10 / 4 + 0.125))) - 1, 6); // 1,000 -> 2,000 over q 10..49
+    expect(r.irr()).toBeCloseTo(Math.pow(2, 365 / 3562) - 1, 6); // 1,000 -> 2,000 over q 10..49: 2015-08-15 to 2025-05-16 is 3,562 days
     expect(r.irrHeld()).toBeCloseTo(irr(heldFlows(p.trades, 40, yearsSince2013(ASOF))) as number, 12);
     expect(r.irrHeld()).toBeCloseTo(0.1, 1);
   });
@@ -102,7 +102,7 @@ describe("position figures come from the as-of model at the newest quarter", () 
     expect(noPrice.since).toBeNull();
     expect(noPrice.missed).toBeNull();
     expect(noPrice.irrHeld()).toBeNull();
-    expect(noPrice.irr()).toBeCloseTo(0.0737, 3); // nothing is held, so the price is not needed
+    expect(noPrice.irr()).toBeCloseTo(0.0736, 3); // nothing is held, so the price is not needed
     expect(noPrice.ret).toBeCloseTo(1, 12); // the model reads the trades: 1,000 made on 1,000 in
 
     const none = build({ exits: exitsOf([{ stock_id: 2, sold_shares: 100, sold_usd: 2000 }]), prices: pricesOf({ 2: 5 }) })[0];

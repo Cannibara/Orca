@@ -267,10 +267,10 @@ describe("Position page", () => {
     expect(tileSub("IRR")).toBe("mid-quarter trade dates");
   });
 
-  // One buy of 100 shares at $10 in Q1 2013 (t = 0.125 years) held to 2014-01-01 (365 / 365.25 years):
-  // a price of P turns $1,000 into 100 P over 0.874316 years, so IRR = (P / 10)^(1 / 0.874316) - 1.
+  // One buy of 100 shares at $10 on 2013-02-14 (mid Q1 2013) held to 2014-01-01 (321 days = 321 / 365 years):
+  // a price of P turns $1,000 into 100 P over 0.879452 years, so IRR = (P / 10)^(1 / 0.879452) - 1.
   it.each([
-    [20, "+121%"],
+    [20, "+120%"],
     [15, "+59%"],
     [5, "−55%"],
   ])("irr tile uses live price (%s)", async (price, expected) => {
@@ -295,7 +295,7 @@ describe("Position page", () => {
   });
 
   it("a closed position needs no price: IRR from its trades alone", async () => {
-    // Bought 100 at $10 in Q1 2013 (t = 0.125), sold all at $20 in Q1 2014 (t = 1.125): exactly one year, doubled.
+    // Bought 100 at $10 in Q1 2013 (2013-02-14), sold all at $20 in Q1 2014 (2014-02-14): exactly 365 days, doubled.
     stubData(
       soloFund(
         [

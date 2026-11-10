@@ -60,6 +60,7 @@ export default function Method() {
           <p>
             For every sale we track the stock's return from the estimated sale price to today and over the next 12 months,
             against SPY. "IRR if held" keeps the same buys but values every share bought at today's price.
+            IRR dates trades mid-quarter and counts years of 365 days, as Excel's XIRR does.
           </p>
         </section>
         <section>
