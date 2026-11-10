@@ -21,9 +21,12 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import cache
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from orca.quarters import BASE_YEAR, q_end, q_start
+
+if TYPE_CHECKING:
+    from orca.workbook.inputs import FundInputs
 
 Kind = Literal["header", "input", "calc", "fund", "fund_input", "year_only"]
 YearRule = Literal["sum", "year_end", "first_start", "chained", "product", "min", "blank", "none"]
@@ -40,7 +43,8 @@ LABEL_COLUMNS = ("Name", "Ticker", "Company", "Stock id", "Units")  # columns A-
 
 # Number formats (spec 3.1).
 USD = "#,##0"
-WHOLE = "0"  # shares, quarter indices, years, 1/0 flags and counts
+SHARES = "#,##0"  # whole shares, with thousands separators like dollars
+WHOLE = "0"  # quarter indices, years, 1/0 flags and counts
 PRICE = "0.0000"
 PCT = "0.00%"
 RATIO = "0.00"
@@ -74,7 +78,7 @@ class Columns:
     """The Model tab's columns: A-E labels, the `years`, a gap, Before, the `quarters`
     (start..bound) and Latest. Properties give column letters; `*_index` the 0-based index.
     `end_q` (the fund's last held quarter, default the last column) ends the tracked quarters
-    that the year columns roll up."""
+    that the year columns roll up; the builder uses `for_inputs`, which always passes it."""
 
     def __init__(self, years: list[int], quarters: list[int], end_q: int | None = None) -> None:
         if not quarters or quarters != list(range(quarters[0], quarters[-1] + 1)):
@@ -93,6 +97,15 @@ class Columns:
         self._quarter = {q: self.before_index + 1 + i for i, q in enumerate(quarters)}
         self.latest_index = self.before_index + 1 + len(quarters)
         self._at_year = {i: y for y, i in self._year.items()}
+        spans: dict[int, list[int]] = {}
+        for q in range(quarters[0], self.end_q + 1):
+            spans.setdefault(_year_of(q), []).append(q)
+        self._span = {y: (self.quarter(qs[0]), self.quarter(qs[-1])) for y, qs in spans.items()}
+
+    @classmethod
+    def for_inputs(cls, fi: "FundInputs") -> "Columns":
+        """The columns of fund `fi`: its years, its quarters start..bound, tracked to end_q."""
+        return cls(fi.years, fi.quarters, end_q=fi.end_q)
 
     def year_index(self, y: int) -> int:
         return self._year[y]
@@ -131,10 +144,9 @@ class Columns:
     def year_span(self, y: int) -> tuple[str, str]:
         """The first and last quarter column of year `y` among the tracked quarters
         (start..end_q): a year's quarter columns are contiguous."""
-        qs = [q for q in range(self.quarters[0], self.end_q + 1) if _year_of(q) == y]
-        if not qs:
+        if y not in self._span:
             raise ValueError(f"year {y} has no tracked quarter")
-        return self.quarter(qs[0]), self.quarter(qs[-1])
+        return self._span[y]
 
     def year_at(self, index: int) -> int | None:
         """The year of the year column at `index`, None for any other column."""
@@ -144,12 +156,17 @@ class Columns:
 @dataclass(frozen=True)
 class Rows:
     """Where the builder put each row id: `first[id]` is the 1-based sheet row of a single row,
-    or of a stock block's first stock. A stock block has `stocks` rows, plus a last "All other
-    positions" row for the ids in `other` (when the fund is cut)."""
+    or of a stock block's first stock. A stock block has `stocks` rows; when the fund is `cut`,
+    the blocks in OTHER_ROWS end with an "All other positions" row."""
 
     first: Mapping[str, int]
     stocks: int
-    other: frozenset[str] = frozenset()
+    cut: bool = False
+
+    @property
+    def other(self) -> frozenset[str]:
+        """The blocks with an "All other positions" row on this sheet."""
+        return OTHER_ROWS if self.cut else frozenset()
 
     def row(self, row_id: str, stock: int = 0) -> int:
         if row_id not in self.first:
@@ -171,16 +188,19 @@ class Rows:
 
 
 class Ref:
-    """A template's view of the one cell being written: column `col` (0-based), stock `stock`
-    (for stock blocks), and whether the fund is `cut` (has an "All other positions" line).
-    Every method takes a row id of the registry and returns an A1 reference or range."""
+    """A template's view of the one cell being written: column `col` (0-based) and stock `stock`
+    (for stock blocks) on the sheet laid out as `rows`. Every method takes a row id of the
+    registry and returns an A1 reference or range."""
 
-    __slots__ = ("cols", "rows", "col", "stock", "cut")
+    __slots__ = ("cols", "rows", "col", "stock")
 
-    def __init__(
-        self, cols: Columns, rows: Rows, col: int, stock: int = 0, cut: bool = False
-    ) -> None:
-        self.cols, self.rows, self.col, self.stock, self.cut = cols, rows, col, stock, cut
+    def __init__(self, cols: Columns, rows: Rows, col: int, stock: int = 0) -> None:
+        self.cols, self.rows, self.col, self.stock = cols, rows, col, stock
+
+    @property
+    def cut(self) -> bool:
+        """Whether the fund is cut (has an "All other positions" line): the Rows' own flag."""
+        return self.rows.cut
 
     def _at(self, row_id: str, col: int) -> str:
         return f"{col_letter(col)}{self.rows.row(row_id, self.stock)}"
@@ -268,7 +288,9 @@ class Block:
     input row is written from: a StockInputs field for stock blocks, a FundInputs field (or
     "other.<field>") for single rows. `other` fills the block's "All other positions" row when
     the fund is cut: the name of an OtherInputs list (an input row), or a template rendered with
-    that row as the stock (a formula row). `cut_only` rows exist only when the fund is cut."""
+    that row as the stock (a formula row). Like the block's stock rows, it covers the quarters
+    start..bound in an input block (I2) and start..end_q in a calculation block, plus its year
+    cells. `cut_only` rows exist only when the fund is cut."""
 
     id: str
     name: str
@@ -723,7 +745,7 @@ FUND_INPUTS: tuple[Block, ...] = (
 )  # fmt: skip
 
 _STOCK_INPUTS: tuple[Block, ...] = (
-    Block("I1", "Shares filed", "input", "shares", "year_end", WHOLE, None, source="shares_filed"),
+    Block("I1", "Shares filed", "input", "shares", "year_end", SHARES, None, source="shares_filed"),
     Block(
         "I2", "Value filed ($)", "input", "$", "year_end", USD, None,
         source="value_filed", other="value_filed",
@@ -738,13 +760,13 @@ _STOCK_INPUTS: tuple[Block, ...] = (
 )  # fmt: skip
 
 _STOCK_CALCS: tuple[Block, ...] = (
-    Block("C1", "Adjusted shares", "calc", "shares", "year_end", WHOLE, _c1, before=0.0),
+    Block("C1", "Adjusted shares", "calc", "shares", "year_end", SHARES, _c1, before=0.0),
     Block("C2", "Last close", "calc", "$/share", "year_end", PRICE, _c2, before=_c2_before),
     Block("C3", "Implied price", "calc", "$/share", "blank", PRICE, _c3),
     Block("C4", "Valuation price", "calc", "$/share", "year_end", PRICE, _c4),
-    Block("C5", "Shares held", "calc", "shares", "year_end", WHOLE, _c5, before=0.0),
+    Block("C5", "Shares held", "calc", "shares", "year_end", SHARES, _c5, before=0.0),
     Block("C6", "In book", "calc", "1/0", "sum", WHOLE, _c6),
-    Block("C7", "Shares traded", "calc", "shares", "sum", WHOLE, _c7),
+    Block("C7", "Shares traded", "calc", "shares", "sum", SHARES, _c7),
     Block("C8", "Trade price", "calc", "$/share", "blank", PRICE, _c8),
     Block("C9", "Trade $", "calc", "$", "sum", USD, _c9),
     Block("C10", "Market move", "calc", "$", "sum", USD, _c10, other="market_move"),
@@ -820,3 +842,7 @@ BLOCKS: tuple[Block, ...] = _STOCK_INPUTS + _STOCK_CALCS + _FUND_ROWS + _YEAR_RO
 MODEL_ROWS: tuple[Block, ...] = HEADER_ROWS + FUND_INPUTS + BLOCKS  # in the tab's order
 
 BY_ID: dict[str, Block] = {b.id: b for b in MODEL_ROWS}
+
+# The blocks a cut fund ends with an "All other positions" row (spec section 4): the one list
+# Rows, the templates and the builder read.
+OTHER_ROWS: frozenset[str] = frozenset(b.id for b in MODEL_ROWS if b.other is not None)

@@ -2,11 +2,19 @@
 renders to A1 references, and uses only the portable functions."""
 
 import ast
+import functools
 import math
+import random
 import re
 from datetime import date
+from types import SimpleNamespace
+
+import pytest
 
 from orca.engine.fund import FundQuarter, fund_years
+from orca.engine.position import compute_position
+from orca.engine.whatif import _return_after
+from orca.quarter_px import QuarterPx, last_close_before
 from orca.workbook.layout import (
     ALLOWED_FUNCTIONS,
     BLOCKS,
@@ -14,6 +22,8 @@ from orca.workbook.layout import (
     FUND_INPUTS,
     HEADER_ROWS,
     MODEL_ROWS,
+    OTHER_ROWS,
+    SHARES,
     Columns,
     Ref,
     Rows,
@@ -60,12 +70,17 @@ class _LazyIf(ast.NodeTransformer):
         return node
 
 
+@functools.cache
+def _compiled(formula: str):
+    text = re.sub(r"(?<![<>!=])=", "==", formula[1:].replace("<>", "!="))
+    tree = ast.fix_missing_locations(_LazyIf().visit(ast.parse(text, mode="eval")))
+    return compile(tree, "<formula>", "eval")
+
+
 def evaluate(formula: str, cells: dict) -> object:
     """The value of a Stub-rendered formula of IF, comparisons and arithmetic, with `cells`
     naming the Stub's cells. IF is lazy, as in Excel, so an untaken branch is not computed."""
-    text = re.sub(r"(?<![<>!=])=", "==", formula[1:].replace("<>", "!="))
-    tree = ast.fix_missing_locations(_LazyIf().visit(ast.parse(text, mode="eval")))
-    return eval(compile(tree, "<formula>", "eval"), {}, dict(cells))
+    return eval(_compiled(formula), {}, dict(cells))
 
 
 # Names in the spec's formula text -> the Stub's names, longest first.
@@ -168,14 +183,13 @@ SPEC_FUND = {
 
 def sheet(n_stocks: int = 3, cut: bool = False) -> Rows:
     """Every registry row stacked from row 2, each block after a title line."""
-    other = frozenset(b.id for b in MODEL_ROWS if b.other) if cut else frozenset()
     first, row = {}, 2
     for b in MODEL_ROWS:
         if b.cut_only and not cut:
             continue
         first[b.id] = row + 1
-        row += 1 + (n_stocks + (b.id in other) if b.per_stock else 1)
-    return Rows(first, n_stocks, other)
+        row += 1 + (n_stocks + (cut and b.id in OTHER_ROWS) if b.per_stock else 1)
+    return Rows(first, n_stocks, cut)
 
 
 # Two years, end_q = Q4 2015, bound two quarters later (an inactive fund).
@@ -187,7 +201,7 @@ def rendered(cut: bool) -> list[str]:
     rows = sheet(cut=cut)
 
     def at(col: int) -> Ref:
-        return Ref(COLS, rows, col, stock=1, cut=cut)
+        return Ref(COLS, rows, col, stock=1)
 
     out = []
     for b in MODEL_ROWS:
@@ -206,7 +220,7 @@ def rendered(cut: bool) -> list[str]:
             cols = [COLS.year_index(y) for y in COLS.years] if b.kind == "year_only" else [
                 COLS.quarter_index(q) for q in range(4, 12)
             ]
-            out += [b.other(Ref(COLS, rows, col, stock=rows.stocks, cut=True)) for col in cols]
+            out += [b.other(Ref(COLS, rows, col, stock=rows.stocks)) for col in cols]
     return out
 
 
@@ -318,7 +332,8 @@ def test_c19_one_year_after_return():
 
 def test_ref_renders_a1():
     rows = sheet(n_stocks=3, cut=True)
-    r = Ref(COLS, rows, COLS.quarter_index(4), stock=2, cut=True)
+    r = Ref(COLS, rows, COLS.quarter_index(4), stock=2)
+    assert r.cut and not Ref(COLS, sheet(), 0).cut  # the cut is the Rows' own
     c5 = rows.row("C5", 2)
     assert c5 == rows.first["C5"] + 2
     assert BY_ID["C7"].formula(r) == f"=J{c5}-I{c5}"  # the first quarter's prev is Before
@@ -408,13 +423,204 @@ def test_other_rows():
         "C16": "value",
     }
     assert [b.id for b in MODEL_ROWS if callable(b.other)] == ["C13", "C20"]
+    assert OTHER_ROWS == {"I2", "C10", "C11", "C12", "C13", "C16", "C20"}
     rows = sheet(n_stocks=3, cut=True)
 
     def other(row_id):
         return rows.row(row_id, 3)
 
-    q = Ref(COLS, rows, COLS.quarter_index(5), stock=3, cut=True)
+    q = Ref(COLS, rows, COLS.quarter_index(5), stock=3)
     assert BY_ID["C13"].other(q) == f"=K{other('C10')}+K{other('C11')}+K{other('C12')}"
-    y = Ref(COLS, rows, COLS.year_index(2015), stock=3, cut=True)
+    y = Ref(COLS, rows, COLS.year_index(2015), stock=3)
     den = f"G{rows.row('start')}+G{rows.row('net_buying')}/2"
     assert BY_ID["C20"].other(y) == f'=IF({den}>0,G{other("C13")}/({den})*100,"")'
+
+
+def test_rows_carry_the_cut():
+    # one source of truth: the Rows say whether the fund is cut, and a Ref reads it from there
+    cut, whole = sheet(cut=True), sheet()
+    assert cut.other == OTHER_ROWS and whole.other == frozenset()
+    assert Ref(COLS, cut, COLS.quarter_index(4)).cut and not Ref(COLS, whole, 0).cut
+    top = cut.first["C10"]
+    assert cut.down("C10") == (top, top + 3) and whole.down("C10")[1] == whole.first["C10"] + 2
+    assert cut.down("C9") == (cut.first["C9"], cut.first["C9"] + 2)  # no Other row in C9
+    with pytest.raises(KeyError):
+        whole.row("other_buys")  # the cut-only rows exist only on a cut sheet
+
+
+def test_columns_for_inputs():
+    # the builder's constructor always passes end_q (an inactive fund: bound after end_q)
+    fi = SimpleNamespace(years=[2014, 2015], quarters=list(range(4, 14)), end_q=11)
+    cols = Columns.for_inputs(fi)
+    assert cols.end_q == 11 and cols.last_q == COLS.last_q
+    assert cols.year_span(2015) == ("N", "Q")  # stops at end_q, not at bound
+    with pytest.raises(ValueError):
+        Columns.for_inputs(SimpleNamespace(years=[2014, 2015, 2016], quarters=fi.quarters,
+                                           end_q=11))
+
+
+def test_number_formats():
+    assert SHARES == "#,##0"
+    shares = {b.id: b.number_format for b in MODEL_ROWS if b.units == "shares"}
+    assert shares == dict.fromkeys(("I1", "C1", "C5", "C7"), SHARES)
+
+
+# --- the stock blocks against the engine, cell by cell (a seeded fuzz) -------------------------
+
+
+class _Empty:
+    """An empty input cell, as Excel reads it: 0 in arithmetic and comparisons, and equal to
+    "" as well as to 0."""
+
+    __hash__ = None
+
+    def __eq__(self, other):
+        return other == "" or other == 0
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __lt__(self, other):
+        return 0 < other
+
+    def __gt__(self, other):
+        return 0 > other
+
+    def __neg__(self):
+        return 0
+
+    def __add__(self, other):
+        return 0 + other
+
+    __radd__ = __add__
+
+    def __sub__(self, other):
+        return 0 - other
+
+    def __rsub__(self, other):
+        return other
+
+    def __mul__(self, other):
+        return 0 * other
+
+    __rmul__ = __mul__
+
+    def __truediv__(self, other):
+        return 0 / other
+
+    def __rtruediv__(self, other):
+        return other / 0  # #DIV/0!
+
+
+class _Text(str):
+    """A formula's "" (text), as Excel reads it: above every number in a comparison (so
+    `"">0` is TRUE) and #VALUE! in arithmetic."""
+
+    __hash__ = str.__hash__
+
+    def __eq__(self, other):
+        return isinstance(other, str) and str(self) == other
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __gt__(self, other):
+        return not isinstance(other, str)
+
+    def __lt__(self, other):
+        return False
+
+    def _value_error(self, *_):
+        raise ValueError("#VALUE!: arithmetic on a formula's blank")
+
+    __add__ = __radd__ = __sub__ = __rsub__ = __mul__ = __rmul__ = _value_error
+    __truediv__ = __rtruediv__ = __neg__ = _value_error
+
+
+_EMPTY = _Empty()
+
+
+def _excel(formula: str, cells: dict) -> object:
+    """`evaluate` with Excel's AND and OR; a text result is a formula's blank."""
+    value = evaluate(formula, {**cells, "AND": lambda *x: all(x), "OR": lambda *x: any(x)})
+    return _Text(value) if isinstance(value, str) else value
+
+
+class _NearBound(Stub):
+    def ahead(self, row_id, k):
+        return None  # four quarters on is past bound: no column there
+
+
+def _fuzz_position(rng: random.Random) -> int:
+    """One random position through C1-C19 quarter by quarter, checked against
+    `compute_position` (and C19 against `whatif._return_after`); the quarters held."""
+    start, end_q = 4, rng.randint(6, 18)
+    bound = end_q + rng.choice([0, 0, 3, 6])
+    shares, value, factor, level = {}, {}, {}, rng.choice([100.0, 1000.0])
+    for q in range(start, end_q + 1):
+        factor[q] = rng.choice([1.0, 1.0, 2.0, 0.5, 3.0])
+        if rng.random() < 0.7:
+            level = rng.choice([0.0, level, level * 1.5, level * 0.6, rng.uniform(50, 5000)])
+            shares[q] = level
+            value[q] = rng.choice([0.0, rng.uniform(1e3, 1e5), rng.uniform(1e3, 1e5)])
+    px = {}
+    for q in range(start - 3, bound + 1):  # prices before the segment and up to bound
+        if rng.random() < 0.65:
+            close = None if rng.random() < 0.15 else rng.uniform(5, 200)
+            vwap = None if rng.random() < 0.2 else rng.uniform(5, 200)
+            px[q] = QuarterPx(vwap, None, None, close, rng.choice([0.0, 0.0, 0.5]), (None,) * 3)
+    adjusted = {q: shares[q] * factor[q] for q in shares}
+    implied = {q: value[q] / adjusted[q] for q in adjusted if adjusted[q] > 0 and value[q] > 0}
+    result = compute_position(1, adjusted, px, start, end_q, implied)
+    engine = {pq.q: pq for pq in (result.quarters if result else [])}
+    trades = {t.q: t for t in (result.trades if result else [])}
+
+    def price(q, field):
+        got = getattr(px[q], field) if q in px else None
+        return _EMPTY if got is None else got
+
+    before = last_close_before(px, start)
+    prev = {"C1": 0.0, "C5": 0.0, "C14": 0.0, "C4": _EMPTY}  # Before; C4 has no Before cell
+    prev["C2"] = _excel(BY_ID["C2"].before(Stub()), {"I4": _EMPTY if before is None else before})
+    for q in range(start, end_q + 1):
+        cells = {
+            "I1": shares.get(q, _EMPTY), "I2": value.get(q, _EMPTY), "I3": factor[q],
+            "I4": price(q, "close"), "I5": price(q, "vwap"), "I6": px[q].div_ps if q in px else 0.0,
+            "first_tracked": int(q == start), "I4_plus4": price(q + 4, "close"),
+            **{f"prev_{k}": v for k, v in prev.items()},
+        }  # fmt: skip
+        stub = Stub() if q + 4 <= bound else _NearBound()
+        for i in range(1, 20):
+            cells[f"C{i}"] = _excel(BY_ID[f"C{i}"].formula(stub), cells)
+        if q in engine:
+            pq = engine[q]
+            want = {
+                "C5": pq.shares, "C6": 1, "C7": pq.delta, "C9": pq.net_buying,
+                "C8": "" if pq.trade_px is None else pq.trade_px, "C10": pq.market_move,
+                "C11": pq.trade_gain, "C12": pq.dividends, "C14": pq.cost, "C15": pq.realised,
+                "C16": pq.value,
+            }  # fmt: skip
+        else:  # not held before or now: the engine skips the quarter
+            want = dict.fromkeys(("C5", "C6", "C7", "C9", "C10", "C11", "C12", "C15", "C16"), 0)
+            want["C8"] = ""
+        if q in trades and q + 4 <= bound:
+            after = _return_after(px, q, trades[q].px)
+            want["C19"] = "" if after is None else after
+        elif q not in trades:
+            want["C19"] = ""
+        for key, expected in want.items():
+            got = cells[key]
+            if isinstance(expected, str) or isinstance(got, str):
+                assert got == "" and expected == "", (q, key, got, expected)
+            else:
+                assert math.isclose(got, expected, rel_tol=1e-12, abs_tol=1e-9), (q, key)
+        prev = {k: cells[k] for k in ("C1", "C2", "C4", "C5", "C14")}
+    return len(engine)
+
+
+def test_stock_blocks_agree_with_engine():
+    # random filings, gaps, zero shares, splits, values, missing closes and VWAPs, dividends,
+    # prices before the segment, bound after end_q; seeded, so a failure reproduces
+    rng = random.Random(20261110)
+    held = sum(_fuzz_position(rng) for _ in range(300))
+    assert held > 1000  # the positions are held most of the time: the check has teeth
