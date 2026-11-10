@@ -13,8 +13,10 @@ mirror `engine.fund` and `engine.metrics`, and the AUM rows the site's `aumParts
 Columns (spec 3.1): A-E labels, one per calendar year, a gap, Before, one per quarter
 start..bound, Latest. Input rows run to bound; calculation and fund cells are written for the
 quarters start..end_q only, so they are blank after end_q by construction (no "Held through"
-wrapper). Year cells follow the row's year rule (`year_formula`) over the year's contiguous
-quarter columns, which stop at end_q.
+wrapper). The one exception is the cash-flow blocks C17 and C18 (`Block.after_end`): the builder
+writes the number 0 from end_q + 1 to bound, so no XIRR range holds an empty cell. Year cells
+follow the row's year rule (`year_formula`) over the year's contiguous quarter columns, which
+stop at end_q.
 
 The checks (spec 3.4): Model ends with Orca's figures (inputs) and a difference row or block
 beside each (ORCA_ROWS); OUTPUT_COLUMNS is the Outputs tab's stock table, its Orca columns and
@@ -304,7 +306,11 @@ class Block:
     row), or a template rendered with that row as the stock (a formula row). Like the block's
     stock rows, it covers the quarters start..bound in an input block (I2) and start..end_q in a
     calculation block, plus its year cells. `cut_only` rows exist only when the fund is cut.
-    `year_cell` is the year-cell template of a row whose year rule is "own" (the differences)."""
+    `year_cell` is the year-cell template of a row whose year rule is "own" (the differences).
+    `after_end` is the number the builder writes in a stock calculation block's quarter columns
+    after end_q, up to bound, where every other calculation cell is left unwritten: the cash
+    flows (C17, C18) are truly 0 there (no filing, no trade), and Excel's XIRR is not known to
+    accept an empty cell inside its range."""
 
     id: str
     name: str
@@ -319,6 +325,7 @@ class Block:
     other: str | Template | None = None
     cut_only: bool = False
     year_cell: Template | None = None
+    after_end: float | None = None
 
     @property
     def per_stock(self) -> bool:
@@ -796,8 +803,11 @@ _STOCK_CALCS: tuple[Block, ...] = (
     Block("C14", "Cost", "calc", "$", "year_end", USD, _c14, before=0.0),
     Block("C15", "Realised", "calc", "$", "sum", USD, _c15),
     Block("C16", "Value", "calc", "$", "year_end", USD, _c16, other="value"),
-    Block("C17", "Cash flow", "calc", "$", "sum", USD, _c17, latest=_c17_latest),
-    Block("C18", "Cash flow if held", "calc", "$", "sum", USD, _c18, latest=_c18_latest),
+    # after end_q there is no trade: a written 0, so the XIRR ranges have no empty cell
+    Block("C17", "Cash flow", "calc", "$", "sum", USD, _c17, latest=_c17_latest, after_end=0.0),
+    Block(
+        "C18", "Cash flow if held", "calc", "$", "sum", USD, _c18, latest=_c18_latest, after_end=0.0
+    ),
     Block("C19", "1-year-after return", "calc", "%", "blank", PCT, _c19),
     Block("C20", "Points", "year_only", "points", "none", RATIO, _c20, other=_c20_other),
 )

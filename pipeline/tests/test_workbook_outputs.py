@@ -32,7 +32,7 @@ from orca.workbook.sheet import Formats, TabWriter
 CIKS = list(range(9100001, 9100013))
 CUT_CIK, CUT_KEEP = 9100009, 3  # Seastack cut to 3 stock rows
 CARRIED = 9100005  # Saltglass: end_q = period_q + 1 (Review Focus 2)
-INACTIVE = 9100010  # Cobblereef: bound after end_q, so the flows end in empty cells
+INACTIVE = 9100010  # Cobblereef: bound after end_q, so the flows cross quarters with no filing
 RANGE_CIK, RANGE = 9100001, (2016, 2019)
 SHEETS = {"Model": 1, "Outputs": 2, "Summary": 3}  # xl/worksheets/sheet<n>.xml
 BLUE, BLACK, GREEN = "FF0000FF", "FF000000", "FF008000"
@@ -423,23 +423,41 @@ def test_outputs_follow_the_site_rules(cases, computed):
 
 
 @pytest.mark.libreoffice
-def test_irr_through_empty_cells_after_end_q(cases, computed):
-    # the inactive fund's flows run to Latest across quarter cells never written (R8):
-    # LibreOffice's XIRR takes them as no flow and gives the site's answer
+def test_irr_flows_are_0_after_end_q(cases, computed):
+    # the inactive fund's flows run to Latest across the quarters after its last filing. The
+    # builder writes the number 0 there (ruling R23: no filing, no trade), so no XIRR range
+    # holds an empty cell, whatever Excel makes of one; the IRRs are still the site's
     case, read = cases[str(INACTIVE)], Read(cases[str(INACTIVE)], computed[str(INACTIVE)])
     fi = case.fi
     model = workbook_map(fi).model
     assert fi.bound > fi.end_q
-    raw = openpyxl.load_workbook(case.path)["Model"]
-    for q in range(fi.end_q + 1, fi.bound + 1):
-        assert raw[model.cell("C17", fi.stocks[0].stock_id, q)].value is None
-    numeric = 0
+    raw = openpyxl.load_workbook(case.path)["Model"]  # the built file, before recalculation
+    for st in fi.stocks:
+        for block in ("C17", "C18"):
+            where = (block, st.stock_id)
+            for q in range(fi.end_q + 1, fi.bound + 1):
+                cell = raw[model.cell(block, st.stock_id, q)]
+                assert cell.value == 0 and cell.data_type == "n", (where, q)
+            # the rest of the row an XIRR range can cover is formulas: to end_q, and Latest
+            for column in (*range(fi.start, fi.end_q + 1), "latest"):
+                assert raw[model.cell(block, st.stock_id, column)].data_type == "f", (where, column)
+    for column in (*fi.quarters, "latest"):  # and every date of the flows is there
+        assert raw[model.cell("mid_quarter", None, column)].value is not None, column
+    held = if_held = 0
     for pos in case.r.output.positions:
-        price = next(st.close_latest for st in fi.stocks if st.stock_id == pos.stock_id)
-        want, got = position_irr(pos, fi, price), read.out("irr", pos.stock_id)
-        assert (got is None) == (want is None) and (want is None or abs(got - want) <= IRR_TOL)
-        numeric += want is not None and pos.shares_now > 0
-    assert numeric >= 3  # held positions: the last flow sits in Latest, after the empty cells
+        sid = pos.stock_id
+        price = next(st.close_latest for st in fi.stocks if st.stock_id == sid)
+        want, got = position_irr(pos, fi, price), read.out("irr", sid)
+        assert (got is None) == (want is None), (sid, got, want)
+        assert want is None or abs(got - want) <= IRR_TOL, (sid, got, want)
+        held += want is not None and pos.shares_now > 0
+        if pos.sold_shares > 0:  # every share bought, valued in Latest after the 0s
+            want, got = held_irr(pos, fi, price), read.out("irr_held", sid)
+            assert (got is None) == (want is None), (sid, got, want)
+            assert want is None or abs(got - want) <= IRR_TOL, (sid, got, want)
+            if_held += want is not None
+    assert held >= 3  # held positions: the last flow sits in Latest, after the 0s
+    assert if_held >= 3
 
 
 @pytest.mark.libreoffice

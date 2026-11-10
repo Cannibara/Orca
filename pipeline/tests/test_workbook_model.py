@@ -37,6 +37,7 @@ from orca.workbook.layout import BLOCKS, MODEL_ROWS
 CIKS = list(range(9100001, 9100013))
 CUT_CIK, CUT_KEEP = 9100009, 3  # Seastack (18-24 positions) cut to 3 stock rows
 INACTIVE = 9100010  # Cobblereef: last filed Q4 2023, so bound is after end_q
+ZERO_AFTER_END = {"C17", "C18"}  # the cash flows: the only blocks with a value after end_q
 
 # engine.position.PositionQuarter field of each stock block (spec 3.2)
 STOCK_FIELDS = {
@@ -183,7 +184,8 @@ def test_model_year_columns(cases, computed):
 
 @pytest.mark.libreoffice
 def test_inactive_fund_blank_after_end_q(cases, computed):
-    # Review Focus 1: calculation and fund cells after end_q are not written; the years stop
+    # Review Focus 1: calculation and fund cells after end_q are not written, the cash flows
+    # aside (ruling R23: the number 0 there, so no XIRR range has an empty cell); the years stop
     # at end_q's year; the Close block runs to bound, so the what-if one-year figures exist
     case = cases[str(INACTIVE)]
     fi, values, model = case.fi, computed[str(INACTIVE)], model_map(case.fi)
@@ -191,7 +193,7 @@ def test_inactive_fund_blank_after_end_q(cases, computed):
     assert fi.bound > fi.end_q
     after = range(fi.end_q + 1, fi.bound + 1)
     raw = openpyxl.load_workbook(case.path)["Model"]
-    cells = 0
+    cells = zeros = 0
     for block in BLOCKS:
         if block.kind not in ("calc", "fund"):
             continue
@@ -199,9 +201,19 @@ def test_inactive_fund_blank_after_end_q(cases, computed):
         for sid in stocks:
             for q in after:
                 ref = model.cell(block.id, sid, q)
+                if block.id in ZERO_AFTER_END:
+                    # a number the builder wrote, not a formula: blue like its other constants
+                    # (the Before column's starting values), in the block's number format
+                    cell = raw[ref]
+                    assert cell.value == 0 and cell.data_type == "n", (block.id, ref)
+                    assert cell.font.color.rgb == BLUE, (block.id, ref)
+                    assert cell.number_format == block.number_format, (block.id, ref)
+                    assert values[("Model", ref)] == 0, (block.id, ref)
+                    zeros += 1
+                    continue
                 assert raw[ref].value is None and ("Model", ref) not in values, (block.id, ref)
                 cells += 1
-    assert cells > 1000
+    assert cells > 1000 and zeros == len(ZERO_AFTER_END) * len(fi.stocks) * len(after)
     for q in fi.quarters:
         lo.assert_exact(get("held_through", None, q), int(q <= fi.end_q), f"held q {q}")
     assert fi.years[-1] == BASE_YEAR + fi.end_q // 4 and model.cols.years == fi.years

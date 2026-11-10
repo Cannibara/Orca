@@ -390,6 +390,17 @@ def test_before_and_latest_cells():
     assert BY_ID["C18"].latest(latest) == f'=IF(T{i4}="","",SUMIF(J{c7}:Q{c7},">0")*T{i4})'
 
 
+def test_cash_flows_are_0_after_end_q():
+    # ruling R23, the one exception to "nothing is written after end_q": the cash-flow blocks
+    # hold the number 0 from end_q + 1 to bound (no filing, no trade: a true 0), so no XIRR
+    # range has an empty cell. Every other block has no value there
+    flagged = {b.id: b.after_end for b in MODEL_ROWS if b.after_end is not None}
+    assert flagged == {"C17": 0.0, "C18": 0.0}
+    for block_id in flagged:  # stock rows only: neither has an "All other positions" row
+        b = BY_ID[block_id]
+        assert b.kind == "calc" and b.per_stock and block_id not in OTHER_ROWS, block_id
+
+
 def test_year_chaining_without_ln():
     # quarters of -100% and -120%: LN of their growth would be #NUM!; the engine chains them
     for cut in (False, True):

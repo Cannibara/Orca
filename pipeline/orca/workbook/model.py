@@ -200,6 +200,7 @@ class ModelWriter(TabWriter):
         tracked = [q for q in fi.quarters if q <= fi.end_q]
         self.tracked = [(q, self.cols.quarter_index(q)) for q in tracked]
         self.all_q = [(q, self.cols.quarter_index(q)) for q in fi.quarters]
+        self.after = [col for q, col in self.all_q if q > fi.end_q]  # end_q + 1 .. bound
         self.year_cols = [self.cols.year_index(y) for y in self.cols.years]
 
     def labels(self, row: int, name: str, units: str, stock: int | None = None) -> None:
@@ -318,6 +319,9 @@ class ModelWriter(TabWriter):
                 for _, col in self.tracked:
                     ref = Ref(self.cols, self.rows, col, stock)
                     self.formula(row, col, b.formula(ref), b.number_format)
+            if b.after_end is not None:  # the cash flows after the last filing: a written 0
+                for col in self.after:
+                    self.number(row, col, b.after_end, b.number_format)
             if callable(b.latest):
                 ref = Ref(self.cols, self.rows, self.cols.latest_index, stock)
                 self.formula(row, self.cols.latest_index, b.latest(ref), b.number_format)
