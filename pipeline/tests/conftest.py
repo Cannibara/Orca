@@ -67,3 +67,10 @@ def demo_batch(
         )
     ctx = Context.build(demo_run.lake, state.last_q)
     return ctx, list(prepare_batch(ctx, pl.concat(holdings), pl.concat(reports)))
+
+
+@pytest.fixture
+def no_health_gates(monkeypatch):
+    """For tests of deliberately odd one-fund datasets (nothing priced, nothing mapped): the gates
+    are about the real run's health, tested in test_gates.py and on the demo data."""
+    monkeypatch.setattr("orca.run.weekly.check_health", lambda **_: None)

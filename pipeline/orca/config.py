@@ -56,6 +56,7 @@ CALLS_MIN_PRICE = 1.0  # dollars
 # Data quality
 PRICE_MISMATCH = 10.0  # reported value / shares more than this far from our price -> flag
 COVERAGE_WARN = 0.80  # warn below this share of book priced
+COVERAGE_MIN = 0.90  # a run whose median fund prices less than this share of its book aborts
 
 # 13F VALUE is in thousands before this filing date, dollars from it
 VALUE_DOLLARS_FROM = date(2023, 1, 3)

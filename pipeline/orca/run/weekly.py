@@ -27,6 +27,7 @@ from orca.publish import (
 from orca.quarters import q_end, q_of_date
 from orca.run.budget import Budget
 from orca.run.compute import Context, compute_batch
+from orca.run.gates import check_health
 from orca.run.ingest import Counts, ingest_bulk, ingest_live
 from orca.run.market import (
     map_new_cusips,
@@ -264,9 +265,10 @@ def run_weekly(
     budget: Budget | None = None,
 ) -> RunStats:
     """One pipeline run as of `today`; `full` recomputes and republishes everything (after a
-    formula change). Returns what it did. Raises InvariantError or CusipLeakError, before the
-    manifest is written, when a recomputed fund breaks an invariant or a staged file would publish
-    a CUSIP; the site then stays on the last good version and the next run retries.
+    formula change). Returns what it did. Raises InvariantError, CusipLeakError or
+    HealthGateError (run/gates.py), before the manifest is written, when a recomputed fund breaks
+    an invariant, a staged file would publish a CUSIP or the run's health is bad; the site then
+    stays on the last good version and the next run retries.
 
     `budget` (default: ORCA_TIME_BUDGET_MIN, 270 minutes) bounds the run. When it is spent a long
     stage stops cleanly between two units of work (a ZIP, a ticker, a lookup, a batch of funds)
@@ -391,6 +393,14 @@ def run_weekly(
     leaks = cusip_leaks(staging, guarded, compress)
     if leaks:
         raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
+    check_health(
+        cusips=cusip_map.height,
+        mapped=int(cusip_map["stock_id"].is_not_null().sum()),
+        coverage_median=statistics.median(priced) if priced else None,
+        funds_recomputed=len(computed),
+        funds_owed=len(recompute),
+        budget_cut=budget.spent() or bool(budget.flag()),
+    )
 
     _log_stage("publish", started, {"files": len(files), "changed": len(changed)})
     dropped = funds.attempted - computed

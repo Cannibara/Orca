@@ -8,6 +8,7 @@ import random
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from unittest import mock
 
 import polars as pl
 from conftest import DemoRun, demo_batch
@@ -149,7 +150,9 @@ def run_fund(root: Path, fx: Fixtures, today: date = TODAY, max_positions: int =
     """Run the weekly pipeline on `fx` as of `today` in `root`, then the engine's inputs and
     results of the fund and its FundInputs (cut to `max_positions`)."""
     lake = Lake(root / "lake")
-    stats = run_weekly(lake, root / "out", fixture_sources(fx), today)
+    # Hand-built funds are small and partly unpriced on purpose: the health gates do not apply.
+    with mock.patch("orca.run.weekly.check_health"):
+        stats = run_weekly(lake, root / "out", fixture_sources(fx), today)
     ctx, batch = demo_batch(DemoRun(root, lake, stats.last_q), [FUND])
     ((p, r),) = batch
     securities = read_table(lake, "securities", SECURITIES_SCHEMA)

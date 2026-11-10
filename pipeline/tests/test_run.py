@@ -34,6 +34,7 @@ from orca.quarter_px import QuarterPx, close_on
 from orca.quarters import q_end, q_index
 from orca.run import (
     CusipLeakError,
+    HealthGateError,
     InvariantError,
     affected_funds,
     compute,
@@ -253,6 +254,18 @@ def test_bridge_failure_aborts_before_manifest(fixtures, base_runs, tmp_path, mo
     )
 
 
+def test_a_failed_gate_aborts_before_the_manifest(fixtures, base_runs, tmp_path, monkeypatch):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    manifest_bytes = (inc / "out" / "manifest.json").read_bytes()
+    monkeypatch.setattr("orca.run.gates.COVERAGE_MIN", 1.01)
+
+    with pytest.raises(HealthGateError, match="median fund prices"):
+        run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK3, full=True)
+
+    assert (inc / "out" / "manifest.json").read_bytes() == manifest_bytes
+    assert json.loads((inc / "lake" / "state.json").read_text())["pending_all"] is True
+
+
 def test_failed_zip_download_keeps_last_good(fixtures, base_runs, tmp_path):
     inc = from_base(base_runs, WEEK2, tmp_path)
     before = manifest(inc)
@@ -453,7 +466,7 @@ def test_cusip_in_a_published_file_aborts_before_manifest(tmp_path):
     assert not (tmp_path / "out" / "manifest.json").exists()
 
 
-def test_junk_cusip_does_not_abort_the_run(tmp_path):
+def test_junk_cusip_does_not_abort_the_run(tmp_path, no_health_gates):
     # A 13F "CUSIP" without a valid check digit is no security's identifier: free text that
     # happens to contain it is published.
     junk = "999999999"
@@ -740,7 +753,7 @@ def test_stored_fund_state_round_trips_every_field():
     assert decode(old) == trade
 
 
-def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path):
+def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path, no_health_gates):
     widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
     small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
     down = FigiClient(
@@ -761,7 +774,7 @@ def test_failed_cusip_mapping_is_flagged_and_retried(tmp_path):
     assert positions["stock_id"] == [1]
 
 
-def test_unreadable_zip_is_flagged_by_its_name(tmp_path):
+def test_unreadable_zip_is_flagged_by_its_name(tmp_path, no_health_gates):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as z:
         z.writestr("SUBMISSION.tsv", "ACCESSION_NUMBER\n")  # no COVERPAGE / INFOTABLE
@@ -818,7 +831,7 @@ def test_non_ascii_text_is_never_a_cusip(lead):
     assert not is_cusip(text + cusip_check_digit("32345678"))  # ... or "3..."
 
 
-def test_non_ascii_cusip_does_not_crash_the_leak_scan(tmp_path):
+def test_non_ascii_cusip_does_not_crash_the_leak_scan(tmp_path, no_health_gates):
     odd = "ÉBCDEFGH5"
     rows = [Holding("WIDGET CORP", WIDGET, 400.0, 10), Holding("ODD", odd, 400.0, 10)]
     small = small_fixtures({Q1_24: rows, Q2_24: rows})
@@ -1372,7 +1385,7 @@ def gadget_fixtures(known: bool) -> Fixtures:
     )
 
 
-def test_an_unmapped_cusip_is_asked_again_after_four_weeks(tmp_path):
+def test_an_unmapped_cusip_is_asked_again_after_four_weeks(tmp_path, no_health_gates):
     run(tmp_path, fixture_sources(gadget_fixtures(known=False)), SMALL_TODAY)
     cusip_map = Lake(tmp_path / "lake").read("cusip_map")
     assert cusip_map.filter(cusip=GADGET)["method"].to_list() == ["unmapped"]
@@ -1391,7 +1404,7 @@ def test_an_unmapped_cusip_is_asked_again_after_four_weeks(tmp_path):
     assert cusip_map["cusip"].is_unique().all()
 
 
-def test_an_openfigi_job_error_is_asked_again_next_run(tmp_path):
+def test_an_openfigi_job_error_is_asked_again_next_run(tmp_path, no_health_gates):
     widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
     small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
 

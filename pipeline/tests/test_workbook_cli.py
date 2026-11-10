@@ -42,7 +42,7 @@ def test_cli_unknown_fund_exits_1(demo_lake, tmp_path, capsys):
     assert not list(tmp_path.glob("*.xlsx"))
 
 
-def test_cli_skips_fund_without_priced_positions(tmp_path, monkeypatch, capsys):
+def test_cli_skips_fund_without_priced_positions(tmp_path, monkeypatch, capsys, no_health_gates):
     # CHAR is filed with shares but no value and has no prices: the engine has no position.
     rows = {q: [held("CHAR", 500, 0)] for q in (43, 44, 45)}
     fx = multi_stock_fixtures({"CHAR": None}, rows)
