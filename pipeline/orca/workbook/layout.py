@@ -266,8 +266,9 @@ class Block:
     `before` and `latest` fill the Before and Latest columns: a number (a starting value), a
     template, or the name of the input field that holds the value. `source` names the field an
     input row is written from: a StockInputs field for stock blocks, a FundInputs field (or
-    "other.<field>") for single rows. `other` names the OtherInputs list that fills the block's
-    "All other positions" row when the fund is cut; `cut_only` rows exist only then."""
+    "other.<field>") for single rows. `other` fills the block's "All other positions" row when
+    the fund is cut: the name of an OtherInputs list (an input row), or a template rendered with
+    that row as the stock (a formula row). `cut_only` rows exist only when the fund is cut."""
 
     id: str
     name: str
@@ -279,7 +280,7 @@ class Block:
     before: float | str | Template | None = None
     latest: str | Template | None = None
     source: str | None = None
-    other: str | None = None
+    other: str | Template | None = None
     cut_only: bool = False
 
     @property
@@ -290,10 +291,12 @@ class Block:
 
 def year_formula(block: Block, r: Ref) -> str | None:
     """The year cell of `block` in the year column of `r`, by its year rule (spec 3.3). The
-    year's quarter columns are contiguous, so each rule reads that range directly: SUM, MIN, the
-    last or first quarter's cell, or a product as EXP(SUMPRODUCT(LN(...))). "chained" is the
-    Return row: the year's Growth cells chained, blank without a quarterly return. None for
-    "blank" (no year cell) and "none" (a year-only block, whose formula is the year cell)."""
+    year's quarter columns are contiguous, so each rule reads that range directly: SUM, MIN, or
+    the last or first quarter's cell. "product" (the Growth row) and "chained" (the Return row)
+    read the Year-to-date growth row at the year's last quarter: a running product, so a quarter
+    of -100% or worse still gives the engine's `math.prod` (LN of it would be #NUM!). The year's
+    Return is blank without a quarterly return. None for "blank" (no year cell) and "none" (a
+    year-only block, whose formula is the year cell)."""
     rule = block.year_rule
     if rule == "sum":
         return f"=SUM({r.year_span(block.id)})"
@@ -305,10 +308,9 @@ def year_formula(block: Block, r: Ref) -> str | None:
     if rule == "first_start":
         return f"={r.year_first(block.id)}"
     if rule == "product":
-        return f"=EXP(SUMPRODUCT(LN({r.year_span(block.id)})))"
+        return f"={r.year_last('ytd_growth')}"
     if rule == "chained":
-        growth = r.year_span("growth")
-        return f'=IF({r.fund("has_return")}=0,"",EXP(SUMPRODUCT(LN({growth})))-1)'
+        return f'=IF({r.fund("has_return")}=0,"",{r.year_last("ytd_growth")}-1)'
     return None
 
 
@@ -454,6 +456,13 @@ def _c20(r: Ref) -> str:
     return f'=IF({r.this("C6")}=0,"",IF({den}>0,{r.this("C13")}/({den})*100,""))'
 
 
+def _c20_other(r: Ref) -> str:
+    """Points of the "All other positions" row: its P&L as for any stock. That row has no In
+    book row, so a year in which none of those positions was held shows 0, their empty sum."""
+    den = f"{r.fund('start')}+{r.fund('net_buying')}/2"
+    return f'=IF({den}>0,{r.this("C13")}/({den})*100,"")'
+
+
 # --- fund rows (engine.fund.aggregate_fund, engine.metrics) ------------------------------------
 
 
@@ -519,6 +528,13 @@ def _ret(r: Ref) -> str:
 def _growth(r: Ref) -> str:
     ret = r.fund("ret")
     return f'=IF({ret}="",1,1+{ret})'
+
+
+def _ytd_growth(r: Ref) -> str:
+    """The running product of Growth within the calendar year, restarting at the year's first
+    tracked quarter (Before is 1): its last quarter is the year's growth, `math.prod` exactly."""
+    restart = f"{r.col_header('year')}<>{r.prev('year')}"
+    return f"=IF({restart},1,{r.prev('ytd_growth')})*{r.fund('growth')}"
 
 
 def _has_return(r: Ref) -> str:
@@ -734,14 +750,15 @@ _STOCK_CALCS: tuple[Block, ...] = (
     Block("C10", "Market move", "calc", "$", "sum", USD, _c10, other="market_move"),
     Block("C11", "Trade gain", "calc", "$", "sum", USD, _c11, other="trade_gain"),
     Block("C12", "Dividends $", "calc", "$", "sum", USD, _c12, other="dividends"),
-    Block("C13", "P&L", "calc", "$", "sum", USD, _c13),
+    # the "All other positions" P&L is that row's market move + trade gain + dividends
+    Block("C13", "P&L", "calc", "$", "sum", USD, _c13, other=_c13),
     Block("C14", "Cost", "calc", "$", "year_end", USD, _c14, before=0.0),
     Block("C15", "Realised", "calc", "$", "sum", USD, _c15),
     Block("C16", "Value", "calc", "$", "year_end", USD, _c16, other="value"),
     Block("C17", "Cash flow", "calc", "$", "sum", USD, _c17, latest=_c17_latest),
     Block("C18", "Cash flow if held", "calc", "$", "sum", USD, _c18, latest=_c18_latest),
     Block("C19", "1-year-after return", "calc", "%", "blank", PCT, _c19),
-    Block("C20", "Points", "year_only", "points", "none", RATIO, _c20),
+    Block("C20", "Points", "year_only", "points", "none", RATIO, _c20, other=_c20_other),
 )
 
 _FUND_ROWS: tuple[Block, ...] = (
@@ -757,6 +774,9 @@ _FUND_ROWS: tuple[Block, ...] = (
     Block("bridge_ok", "Bridge OK", "fund", "1/0", "min", WHOLE, _bridge_ok),
     Block("ret", "Return", "fund", "%", "chained", PCT, _ret),
     Block("growth", "Growth", "fund", "×", "product", FACTOR, _growth),
+    Block(
+        "ytd_growth", "Year-to-date growth", "fund", "×", "blank", FACTOR, _ytd_growth, before=1.0
+    ),
     Block("has_return", "Has return", "fund", "1/0", "sum", WHOLE, _has_return),
     Block("rf_used", "Risk-free used", "fund", "%", "year_end", PCT, _rf_used, before=0.0),
     Block("excess", "Excess return", "fund", "%", "blank", PCT, _excess),

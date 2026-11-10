@@ -1,9 +1,12 @@
 """The workbook's block registry and column map: every formula is the spec's (section 3.2),
 renders to A1 references, and uses only the portable functions."""
 
+import ast
+import math
 import re
 from datetime import date
 
+from orca.engine.fund import FundQuarter, fund_years
 from orca.workbook.layout import (
     ALLOWED_FUNCTIONS,
     BLOCKS,
@@ -44,6 +47,25 @@ class Stub:
 
     def fund(self, row_id):
         return row_id
+
+    def year_last(self, row_id):
+        return f"last_{row_id}"
+
+
+class _LazyIf(ast.NodeTransformer):
+    def visit_Call(self, node):
+        self.generic_visit(node)
+        if isinstance(node.func, ast.Name) and node.func.id == "IF":
+            return ast.IfExp(test=node.args[0], body=node.args[1], orelse=node.args[2])
+        return node
+
+
+def evaluate(formula: str, cells: dict) -> object:
+    """The value of a Stub-rendered formula of IF, comparisons and arithmetic, with `cells`
+    naming the Stub's cells. IF is lazy, as in Excel, so an untaken branch is not computed."""
+    text = re.sub(r"(?<![<>!=])=", "==", formula[1:].replace("<>", "!="))
+    tree = ast.fix_missing_locations(_LazyIf().visit(ast.parse(text, mode="eval")))
+    return eval(compile(tree, "<formula>", "eval"), {}, dict(cells))
 
 
 # Names in the spec's formula text -> the Stub's names, longest first.
@@ -180,6 +202,11 @@ def rendered(cut: bool) -> list[str]:
             out.append(b.before(at(COLS.before_index)))
         if callable(b.latest):
             out.append(b.latest(at(COLS.latest_index)))
+        if cut and callable(b.other):  # the "All other positions" row's own formula
+            cols = [COLS.year_index(y) for y in COLS.years] if b.kind == "year_only" else [
+                COLS.quarter_index(q) for q in range(4, 12)
+            ]
+            out += [b.other(Ref(COLS, rows, col, stock=rows.stocks, cut=True)) for col in cols]
     return out
 
 
@@ -320,12 +347,10 @@ def test_year_formula_rules():
     assert year_formula(BY_ID["I4"], y15) == f'=IF(Q{row("I4")}="","",Q{row("I4")})'
     assert year_formula(BY_ID["start"], y15) == f"=N{row('start')}"
     assert year_formula(BY_ID["drawdown"], y15) == f"=MIN(N{row('drawdown')}:Q{row('drawdown')})"
-    assert year_formula(BY_ID["growth"], y15) == (
-        f"=EXP(SUMPRODUCT(LN(N{row('growth')}:Q{row('growth')})))"
-    )
+    # the year's growth and return read the running product at the year's last quarter
+    assert year_formula(BY_ID["growth"], y15) == f"=Q{row('ytd_growth')}"
     assert year_formula(BY_ID["ret"], y15) == (
-        f'=IF(G{row("has_return")}=0,"",'
-        f"EXP(SUMPRODUCT(LN(N{row('growth')}:Q{row('growth')})))-1)"
+        f'=IF(G{row("has_return")}=0,"",Q{row("ytd_growth")}-1)'
     )
     assert year_formula(BY_ID["year"], y15) == f"=MIN(N{row('year')}:Q{row('year')})"
     for blank in ("C8", "I5", "excess", "in_range", "C20", "full_year"):
@@ -335,7 +360,7 @@ def test_year_formula_rules():
 def test_before_and_latest_cells():
     assert {b.id: b.before for b in MODEL_ROWS if isinstance(b.before, float)} == {
         "C1": 0.0, "C5": 0.0, "C14": 0.0, "end": 0.0, "rf_used": 0.0,
-        "index": 1.0, "peak": 1.0, "range_index": 1.0, "range_peak": 1.0,
+        "index": 1.0, "peak": 1.0, "range_index": 1.0, "range_peak": 1.0, "ytd_growth": 1.0,
     }
     assert (BY_ID["I4"].before, BY_ID["I4"].latest) == ("close_before", "close_latest")
     assert BY_ID["mid_quarter"].latest == "latest_date"
@@ -348,3 +373,48 @@ def test_before_and_latest_cells():
     # Latest = shares at end_q (Q4 2015, column Q) at the latest close; quarters to end_q only
     assert BY_ID["C17"].latest(latest) == f'=IF(Q{c5}=0,0,IF(T{i4}="","",Q{c5}*T{i4}))'
     assert BY_ID["C18"].latest(latest) == f'=IF(T{i4}="","",SUMIF(J{c7}:Q{c7},">0")*T{i4})'
+
+
+def test_year_chaining_without_ln():
+    # quarters of -100% and -120%: LN of their growth would be #NUM!; the engine chains them
+    for cut in (False, True):
+        assert not [f for f in rendered(cut) if "LN(" in f]
+    for rets in (
+        [0.1, -1.0, -1.2, 0.05],
+        [0.1, None, -1.2, 0.05],
+        [None, -1.2, None, 0.3],
+        [None, None],
+    ):
+        prev = {"prev_year": 2014, "prev_ytd_growth": 7.0}  # last year's product: restarts
+        for ret in rets:
+            cells = {"ret": "" if ret is None else ret, "year": 2015, **prev}
+            cells["growth"] = evaluate(BY_ID["growth"].formula(Stub()), cells)
+            ytd = evaluate(BY_ID["ytd_growth"].formula(Stub()), cells)
+            prev = {"prev_year": 2015, "prev_ytd_growth": ytd}
+        quarters = [FundQuarter(8 + i, 0, 0, 0, 0, 0, 0, 0, 0, r) for i, r in enumerate(rets)]
+        (engine,) = fund_years(quarters)
+        year = {"has_return": sum(r is not None for r in rets), "last_ytd_growth": ytd}
+        expected = "" if engine.ret is None else engine.ret  # math.prod, bit for bit
+        assert evaluate(year_formula(BY_ID["ret"], Stub()), year) == expected, rets
+        growth = evaluate(year_formula(BY_ID["growth"], Stub()), year)
+        assert growth == math.prod(1 + r for r in rets if r is not None), rets
+
+
+def test_other_rows():
+    # the "All other positions" rows of a cut fund: Orca's sums as inputs, P&L and points
+    # as formulas over them (spec section 4)
+    assert {b.id: b.other for b in MODEL_ROWS if isinstance(b.other, str)} == {
+        "I2": "value_filed", "C10": "market_move", "C11": "trade_gain", "C12": "dividends",
+        "C16": "value",
+    }
+    assert [b.id for b in MODEL_ROWS if callable(b.other)] == ["C13", "C20"]
+    rows = sheet(n_stocks=3, cut=True)
+
+    def other(row_id):
+        return rows.row(row_id, 3)
+
+    q = Ref(COLS, rows, COLS.quarter_index(5), stock=3, cut=True)
+    assert BY_ID["C13"].other(q) == f"=K{other('C10')}+K{other('C11')}+K{other('C12')}"
+    y = Ref(COLS, rows, COLS.year_index(2015), stock=3, cut=True)
+    den = f"G{rows.row('start')}+G{rows.row('net_buying')}/2"
+    assert BY_ID["C20"].other(y) == f'=IF({den}>0,G{other("C13")}/({den})*100,"")'
