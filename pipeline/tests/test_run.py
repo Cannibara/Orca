@@ -254,16 +254,37 @@ def test_bridge_failure_aborts_before_manifest(fixtures, base_runs, tmp_path, mo
     )
 
 
-def test_a_failed_gate_aborts_before_the_manifest(fixtures, base_runs, tmp_path, monkeypatch):
-    inc = from_base(base_runs, WEEK2, tmp_path)
+def _gate_abort_leaves_the_published_state(inc, today, fixtures, match):
+    lake_dir = inc / "lake"
     manifest_bytes = (inc / "out" / "manifest.json").read_bytes()
-    monkeypatch.setattr("orca.run.gates.COVERAGE_MIN", 1.01)
+    published = (lake_dir / "published.json").read_bytes()
+    before = json.loads((lake_dir / "state.json").read_text())
 
-    with pytest.raises(HealthGateError, match="median fund prices"):
-        run_weekly(Lake(inc / "lake"), inc / "out", fixture_sources(fixtures), WEEK3, full=True)
+    with pytest.raises(HealthGateError, match=match):
+        run_weekly(Lake(lake_dir), inc / "out", fixture_sources(fixtures), today, full=True)
 
     assert (inc / "out" / "manifest.json").read_bytes() == manifest_bytes
-    assert json.loads((inc / "lake" / "state.json").read_text())["pending_all"] is True
+    assert (lake_dir / "published.json").read_bytes() == published
+    after = json.loads((lake_dir / "state.json").read_text())
+    assert after["pending_all"] is True  # the rebuild is still owed
+    assert after["pending_funds"] == before["pending_funds"]
+    assert after["last_q"] == before["last_q"]
+
+
+def test_a_failed_coverage_gate_aborts_before_the_manifest(
+    fixtures, base_runs, tmp_path, monkeypatch
+):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    monkeypatch.setattr("orca.run.gates.COVERAGE_MIN", 1.01)
+    _gate_abort_leaves_the_published_state(inc, WEEK3, fixtures, "median fund prices")
+
+
+def test_funds_tried_but_none_computed_aborts_before_the_manifest(
+    fixtures, base_runs, tmp_path, monkeypatch
+):
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    monkeypatch.setattr("orca.run.weekly.compute_batch", lambda *args: [])
+    _gate_abort_leaves_the_published_state(inc, WEEK3, fixtures, "none was computed")
 
 
 def test_failed_zip_download_keeps_last_good(fixtures, base_runs, tmp_path):

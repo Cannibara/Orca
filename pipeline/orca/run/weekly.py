@@ -194,6 +194,7 @@ class _Funds:
     snaps: dict[int, FundSnapshot] = field(default_factory=dict)
     flags: list = field(default_factory=list)
     attempted: set[int] = field(default_factory=set)
+    with_reports: set[int] = field(default_factory=set)  # attempted funds that have a report
 
 
 def _publish_funds(
@@ -219,6 +220,7 @@ def _publish_funds(
         holdings = scan(lake, "holdings", HOLDINGS_SCHEMA, where)
         reports = scan(lake, "reports", REPORTS_SCHEMA, where)
         if reports.height:
+            done.with_reports |= set(reports["cik"].to_list())
             rows = _publish_batch(ctx, holdings, reports, staging, compress, done)
             lake.write(FUND_STATE_RUN, rows, part=f"b{number:05d}")
     return done
@@ -398,7 +400,7 @@ def run_weekly(
         mapped=int(cusip_map["stock_id"].is_not_null().sum()),
         coverage_median=statistics.median(priced) if priced else None,
         funds_recomputed=len(computed),
-        funds_owed=len(recompute),
+        funds_tried=len(funds.with_reports),
         budget_cut=budget.spent() or bool(budget.flag()),
     )
 

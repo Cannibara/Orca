@@ -12,7 +12,8 @@ next run carries on from the state.
 
 Modules: `state` (lake tables, state.json, stored fund state), `sources` (what a run fetches),
 `budget` (the time budget), `ingest` (bulk and live filings), `market` (securities, prices,
-T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `gates` (health gates), `weekly` (the
+T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `gates` (health gates),
+`weekly` (the
 run and `verify`), `cli`.
 
 Lake layout (all under `lake.root`):

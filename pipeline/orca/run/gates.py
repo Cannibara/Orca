@@ -15,15 +15,16 @@ def check_health(
     mapped: int,
     coverage_median: float | None,
     funds_recomputed: int,
-    funds_owed: int,
+    funds_tried: int,
     budget_cut: bool = False,
 ) -> None:
     """Raise HealthGateError when
     - the lake has CUSIPs but none maps to a stock (run 5 of the first go-live published no
       tickers and said nothing),
     - the median fund prices less than COVERAGE_MIN of its book (None, no funds, passes), or
-    - funds were owed a recompute and none was computed. A run cut short by its time budget may
-      legitimately get through none, so `budget_cut` skips this one."""
+    - funds with reports were tried (`funds_tried`) and none was computed. Funds without a report
+      are not counted: they legitimately produce nothing. A run cut short by its time budget may
+      get through none, so `budget_cut` skips this one."""
     problems = []
     if cusips > 0 and mapped == 0:
         problems.append(f"none of {cusips} CUSIPs is mapped to a stock")
@@ -31,7 +32,7 @@ def check_health(
         problems.append(
             f"median fund prices {coverage_median:.1%} of its book (minimum {COVERAGE_MIN:.0%})"
         )
-    if funds_owed > 0 and funds_recomputed == 0 and not budget_cut:
-        problems.append(f"{funds_owed} funds were owed a recompute and none was computed")
+    if funds_tried > 0 and funds_recomputed == 0 and not budget_cut:
+        problems.append(f"{funds_tried} funds with reports were tried and none was computed")
     if problems:
         raise HealthGateError("health gate: " + "; ".join(problems))

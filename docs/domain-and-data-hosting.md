@@ -35,6 +35,12 @@ Also there, from earlier setup: `R2_LAKE_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET
 `R2_ENDPOINT` and the data-provider keys the pipeline uses; `CF_PAGES_PROJECT` (optional, default
 `orca`). Paste values without spaces or line breaks.
 
+GitHub Issues must be enabled on the repository (Settings > General > Features > Issues): when a
+scheduled Pipeline run or the monthly check fails, the `alert` job opens an issue titled
+"Pipeline failed: <run id>" there, and cannot if Issues are off. A bootstrap run that finishes
+within its time budget but prices under 90% of the funds' books fails the health gate and
+publishes nothing (see the header of `pipeline.yml`); run it again.
+
 ## What each workflow does (GitHub > Actions)
 
 - **Web**: on every change to `web/`, runs the tests and a test build. On the main branch it also builds
@@ -91,7 +97,7 @@ one > Rollback.
 
 ## Restore from backup
 
-After each successful Pipeline run (not `home_only`), the state of the private lake is copied to
+After each successful scheduled Pipeline run (not a manual one), the state of the private lake is copied to
 `backups/<UTC date>/` in the lake bucket (`R2_LAKE_BUCKET`); the 3 newest dates are kept. It holds
 the state JSON files, `fund_state`, `cusip_map`, `vendor_tickers`, `securities` and `rf`, not the
 prices or the filings (those are fetched or rebuilt by the next runs).
@@ -103,8 +109,11 @@ repair it by itself.
    Pipeline run in progress. A run restoring or saving while you copy would overwrite your work.
 2. On a computer with rclone and the R2 credentials (a remote named `r2`), pick the date:
    `rclone lsf --dirs-only r2:<lake bucket>/backups`
-3. Copy it back over the live lake (`copy` only adds and overwrites; never use `sync` here, it would
-   delete the prices):
+3. Delete the live copy of each table you are restoring first, both the file and the part folder
+   (for example `cusip_map.parquet` and `cusip_map/`): the lake reads `t.parquet` and every
+   `t/<part>.parquet` and concatenates them, so a restored file next to a newer part would mix the two.
+   Then copy the backup back over the live lake (`copy` only adds and overwrites; never use `sync`
+   here, it would delete the prices):
    `rclone copy r2:<lake bucket>/backups/<YYYY-MM-DD> r2:<lake bucket> --exclude "workbooks/**" --exclude "backups/**"`
 4. Run Actions > Pipeline > Run workflow by hand. It restores that lake, finds the site ahead of or
    behind it (the lake's `published.json` against the site's manifest) and republishes what differs. If
