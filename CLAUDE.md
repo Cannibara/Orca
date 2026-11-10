@@ -18,6 +18,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | "Why is it like this?" | `docs/DECISIONS.md`, then `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md` (rulings R1–R33) |
 | Domain, DNS, cache, CORS, secrets/variables, rollback | `docs/domain-and-data-hosting.md` (owner runbook) |
 | What happened recently, open issues | `docs/WORKLOG.md` |
+| Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
 ## Stack and hosting
