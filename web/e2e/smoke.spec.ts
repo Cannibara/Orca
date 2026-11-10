@@ -54,6 +54,7 @@ for (const width of widths) {
       test(`${route.name}: shows its heading and logs no errors`, async ({ page }) => {
         const errors = await open(page, route.path);
         await expect(page.locator("h1")).toBeVisible();
+        await expect(page.getByRole("contentinfo")).toContainText("Not investment advice.");
         expect(errors).toEqual([]);
       });
 

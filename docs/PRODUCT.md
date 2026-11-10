@@ -25,6 +25,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Shipped | Fund page panels (below) | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code) |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
 | Shipped | How it works page, Not found page | `web/src/pages/Method.tsx`, `NotFound.tsx` (code) |
+| Shipped | Site-wide footer on every page: "Estimates from SEC 13F filings. Not investment advice." with a link to How it works | `web/src/App.tsx` (code) |
 | Shipped | Pre-rendered fund pages (title/description/noscript) for the largest 15,000 funds | `web/scripts/prerender.mjs` (code) |
 | Shipped | Background loading (first 50 rows, fill to 200, Show 100 more; all weekly prices prefetched) | `web/src/fund/loading.ts`, `prefetch.ts` (code) |
 | Shipped (PR #3, a2a1554) | HSTS, noindex on pages.dev, sitemap/robots/canonical | (git 006b9d8, a2a1554) |

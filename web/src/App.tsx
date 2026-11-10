@@ -44,6 +44,13 @@ export default function App() {
           </ErrorBoundary>
         </TooltipProvider>
       </main>
+      <footer className="site-foot">
+        <div className="wrap">
+          <p className="cap">
+            Estimates from SEC 13F filings. Not investment advice. <Link to="/how-it-works">How it works</Link>
+          </p>
+        </div>
+      </footer>
     </>
   );
 }
