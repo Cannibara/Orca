@@ -249,14 +249,8 @@ def compute_batch(
     """Compute every fund of `holdings` / `reports` (the rows of a set of CIKs), one at a time:
     the prices of every stock the batch holds are loaded first, then each fund's result is
     yielded in CIK order, so only one fund's full output is alive at a time."""
-    filed_quarters = reports.select("cik", q="period").unique()
-    filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters)
-    ctx.load(_stock_ids(ctx, filled).to_list() + ([ctx.spy_id] if ctx.spy_id is not None else []))
-    rows_of = filled.partition_by("cik", as_dict=True) if filled.height else {}
-    reports_of = reports.partition_by("cik", as_dict=True) if reports.height else {}
-    empty = filled.clear()
-    for row in status.sort("cik").iter_rows(named=True):
-        yield compute_fund(ctx, row, rows_of.pop((row["cik"],), empty), reports_of[(row["cik"],)])
+    for _, result in prepare_batch(ctx, holdings, reports):
+        yield result
 
 
 @dataclass(frozen=True)
@@ -356,6 +350,7 @@ def compute_prepared(ctx: Context, p: Prepared) -> FundResult:
     cik, start, end_q, status, rows, reports = p.cik, p.start, p.end_q, p.status, p.rows, p.reports
     adjusted = p.adjusted
     end = int(status["segments"][-1]["end"])
+    # the split check reads the shares as filed, so rebuild that frame from `filed`
     reported = pl.DataFrame(
         [(cik, q, sid, sh) for sid, series in p.filed.items() for q, (sh, _) in series.items()],
         schema={"cik": pl.Int64, "q": pl.Int64, "stock_id": pl.Int64, "shares": pl.Float64},
@@ -470,8 +465,8 @@ def _share_series(
     ctx: Context, shares_rows: pl.DataFrame
 ) -> tuple[dict[int, dict[int, tuple[float, float]]], pl.DataFrame]:
     """Per stock and quarter the split-adjusted shares (`split_adjust_shares`, from the stock's
-    precomputed factors) and reported value (share classes of one stock summed), and the summed frame (cik, q,
-    stock_id, shares as filed, value_usd)."""
+    precomputed factors) and reported value (share classes of one stock summed), and the
+    summed frame (cik, q, stock_id, shares as filed, value_usd)."""
     summed = (
         shares_rows.group_by("cik", "q", "stock_id")
         .agg(pl.col("shares").sum(), pl.col("value_usd").sum())
