@@ -56,6 +56,12 @@ jobs:
         env:
           FUND_IDS: ${{ inputs.fund_ids }}
         run: |
+          # A newline would hide further lines from `read` (the count and number checks would
+          # see only the first), so any control character is refused outright.
+          if [[ "$FUND_IDS" =~ [[:cntrl:]] ]]; then
+            echo "::error::fund ids must be on one line, separated by spaces"
+            exit 1
+          fi
           read -r -a ids <<< "$FUND_IDS"
           if [ "${#ids[@]}" -lt 1 ] || [ "${#ids[@]}" -gt 20 ]; then
             echo "::error::give between 1 and 20 fund ids (got ${#ids[@]})"
@@ -67,6 +73,8 @@ jobs:
               exit 1
             fi
           done
+          # The build step uses only this validated list (digits and single spaces).
+          echo "VALID_FUND_IDS=${ids[*]}" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -83,13 +91,15 @@ jobs:
           secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           endpoint: ${{ secrets.R2_ENDPOINT }}
       - name: Build the workbooks
-        env:
-          FUND_IDS: ${{ inputs.fund_ids }}
         run: |
+          set -f # no globbing of the unquoted list below
           args=()
-          for id in $FUND_IDS; do args+=(--fund "$id"); done
+          for id in $VALID_FUND_IDS; do args+=(--fund "$id"); done
           uv run --locked --no-dev python -m orca.run workbook "${args[@]}" --out data/workbooks
       - name: Upload to the private lake bucket
+        # Also when another fund failed: the funds that built are still stored, and the job stays
+        # red through the failed build step. Nothing to upload (no file built): skipped.
+        if: ${{ !cancelled() && hashFiles('pipeline/data/workbooks/**') != '' }}
         env:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

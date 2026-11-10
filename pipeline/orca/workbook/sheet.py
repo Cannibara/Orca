@@ -11,6 +11,14 @@ from xlsxwriter.worksheet import Worksheet
 
 from orca.workbook.layout import DATE
 
+# The fast Sheet below overrides a private xlsxwriter method. A different version may change it
+# silently, so a bump must be deliberate: re-run the equivalence test (tests/test_workbook_model.py)
+# and then update this pin.
+assert xlsxwriter.__version__ == "3.3.1", (
+    f"xlsxwriter {xlsxwriter.__version__}: the fast Sheet overrides a private method; "
+    "re-run the equivalence test when bumping, then update this check"
+)
+
 INPUT, FORMULA, OTHER_TAB_FORMULA = "#0000FF", "#000000", "#008000"  # blue, black, green
 # A sheet reference, or a defined name of Summary's From and To years (Model's In range row),
 # reads another tab. Summary's own formulas use the cells, not the names.

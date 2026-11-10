@@ -244,7 +244,9 @@ jobs:
           # say what the data holds, so a save cut off half way leaves old bookkeeping over newer
           # data (work redone next run), never bookkeeping that claims data the bucket lacks.
           # Temporary files that a killed write left behind are not saved.
-          rclone sync data/lake "r2:${R2_LAKE_BUCKET}" --exclude "*.json" --exclude "*.tmp"
+          # workbooks/** lives only in the bucket (the Workbook workflow): excluded here as on
+          # restore, or this sync would delete it.
+          rclone sync data/lake "r2:${R2_LAKE_BUCKET}" --exclude "*.json" --exclude "*.tmp" --exclude "workbooks/**"
           rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "*.json"
 
   verify:
