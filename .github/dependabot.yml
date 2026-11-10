@@ -1,0 +1,36 @@
+# Dependabot opens at most one grouped pull request per ecosystem per month, so updates never flood
+# the repository. Merging to main deploys production (web.yml), so every update PR must be read and
+# pass the tests before it is merged; none is merged automatically.
+#
+# `uv` is the ecosystem name GitHub supports for uv.lock projects (it keeps uv.lock in step with
+# pyproject.toml), so it is used instead of `pip`. `github-actions` also updates the SHA-pinned
+# actions (it rewrites the commit SHA and the version comment).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      npm:
+        patterns: ["*"]
+    labels: [dependencies]
+  - package-ecosystem: uv
+    directory: /pipeline
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      uv:
+        patterns: ["*"]
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: [dependencies]

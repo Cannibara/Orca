@@ -31,3 +31,8 @@ jobs:
         env:
           ORCA_REQUIRE_LIBREOFFICE: "1"
         run: uv run pytest -m "not network"
+      # Not blocking yet: existing advisories must not stop work. The project itself is not on PyPI,
+      # so pip-audit skips it and checks the installed dependencies.
+      - name: Audit dependencies
+        continue-on-error: true
+        run: uv run --with pip-audit pip-audit || { echo "::warning::pip-audit found vulnerable dependencies"; exit 1; }
