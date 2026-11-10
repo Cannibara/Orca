@@ -5,6 +5,23 @@ Last verified: 2026-11-10
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-10 — Roadmap safety net: health gates, failure alert, lake backup
+
+| What changed | Why | Files |
+|---|---|---|
+| `check_health` aborts a run (before the manifest) when no CUSIP is mapped, median coverage is under 0.90 or owed funds were not computed; scheduled run/verify failures open a GitHub issue; each successful scheduled run copies the small lake state to `backups/<date>/` (3 kept), excluded from restore and save (code) | ROADMAP D2, E2, E3: run 5 published 0 tickers silently; failures went unseen; one bad run overwrote the only lake copy (chat) | `pipeline/orca/run/gates.py`, `pipeline/orca/config.py`, `.github/workflows/pipeline.yml`, `.github/actions/restore-r2/action.yml`, `docs/ARCHITECTURE.md`, `docs/domain-and-data-hosting.md` |
+
+- Open: the `alert` job and the backup step have only been linted (actionlint, shellcheck, a stubbed-rclone run of the backup script); neither has run on GitHub. Do the restore drill once on a scratch bucket. The freshness monitor (rest of E2) is not built.
+
+## 2026-11-10 — Roadmap batch: safety net and quick wins (PR after #4)
+
+| What changed | Why | Files |
+|---|---|---|
+| Health gates abort a run before the manifest when no stock is mapped, coverage_median < 0.90 or every tried fund came out empty (`run/gates.py`); failure issue for scheduled pipeline/verify runs; monthly lake-state backup to `backups/<date>/` (keep 3, schedule only, excluded from the restore and save syncs) (ROADMAP D2, E2, E3) | Bad data was never published only by luck (go-live run 5 published 0 tickers); failures were silent; the lake had one copy | `pipeline/orca/run/gates.py`, `weekly.py`, `.github/workflows/pipeline.yml`, `.github/actions/restore-r2/action.yml`, `docs/ARCHITECTURE.md`, `docs/domain-and-data-hosting.md` |
+| Dependabot (monthly, grouped, uv/npm/github-actions) and non-blocking `npm audit` / `pip-audit`; site-wide estimate footer; `types.ts` vs `contract.md` test; stale-doc fixes (contract, virtualisation, Tiingo licence, F1–F5 backlog) (ROADMAP X3, U3, D3, H1–H3) | Quick wins from the audit | `.github/dependabot.yml`, `ci.yml`, `web.yml`, `web/src/App.tsx`, `web/tests/contract-types.test.ts`, docs |
+
+Not done: ROADMAP U1 (URL state) waits for the saved-views work it is groundwork for; L1 (Tiingo licence), E1 (`ORCA_SCHEDULE_ENABLED`), P1 (data-host cache key, `r2.dev`), X4 (old `orca-eiq` token), secret scanning and push protection are owner or dashboard actions. The alert and backup steps and the rclone filters have only been checked offline (stubbed rclone, actionlint, shellcheck); Issues must be enabled on the repo.
+
 ## 2026-11-10 — Per-fund Excel workbook, phase 1 built (owner-only)
 
 | What changed | Why | Files |
@@ -199,6 +216,8 @@ Setup by the owner, step by step (chat): `main` created from the feature branch 
 | Website T1–T8 against demo data (git adfff7a … e63e1c6); final-review fixes: What drove capped at 15 + 15 + "N other stocks" with Show all, route-aware tab titles (git 4523ef0, 2b5c9ab) | A 16,000-stock fund drew ~500 screens of bars; the tab title stuck on the first fund (chat) | `web/` |
 | Pipeline T14 (weekly orchestrator, incremental recompute, demo data) and T15 (schedule, CI, golden test) (git 3ae1b4a, 65f4fd0, ab2e0b4) | Plan A | `pipeline/orca/run.py` (later `run/`), `.github/workflows/{pipeline,ci}.yml` |
 | Rulings R1–R33 and deferred findings logged (git b8c9864) | Taken by the controller during subagent-driven execution, with no owner review ("I settled 16 conflicts in the website plan on my own, all logged") (chat) | `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md` |
+
+- Note added 2026-11-10: the "golden test" in this entry is the harness `pipeline/tests/test_golden.py` (network, needs keys). No snapshots were ever committed (`pipeline/tests/golden/` holds only `.gitkeep`), so it fails when run until a person hand-checks and commits them (ROADMAP D1). The "exits within 8 quarters" above is also outdated: `EXIT_REFRESH_QUARTERS = 6`.
 
 - 671 pipeline tests after the fix wave; final: 680 pipeline (1 skipped), 339 web unit, 46 browser (chat).
 - actionlint and shellcheck were blocked by the session's permission policy; the owner switched the mode to approve one run, and both found 0 errors (chat).

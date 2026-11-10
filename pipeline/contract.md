@@ -44,8 +44,8 @@ website builds its TypeScript types from it. Change this file first, then the wr
   `v` is the format version.
 - `securities.json`: one entry per stock, ordered by `stock_id`. `sector` is a string.
 - `latest_prices.json`: each stock's latest stored close, ordered by `stock_id`. `price` is the close and `date`
-  (ISO) the day of it; both are `null` for a stock without one. `asof` is the latest `date` of all. Every week the
-  pipeline refreshes the stocks held in the latest quarter and those sold out within the last 8 quarters (the
+  (ISO) the day of it; both are `null` for a stock without one. `asof` is the latest `date` of all. Every month the
+  pipeline refreshes the stocks held in the latest quarter and those sold out within the last 6 quarters (the
   benchmark too); a stock sold out longer ago, or delisted, keeps its last close, and its `date` says how old
   that is. Show a price as current only when its `date` is recent.
 

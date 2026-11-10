@@ -70,7 +70,7 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 | Retries | up to 4, sleeping 2/4/8/16 s, on transport errors, 429 and 5xx; other 4xx and all 3xx raise (no redirects) (`Client._request`) |
 | Breakers | prices stop on 401/403/429 or 25 consecutive failures (`prices.py`); live ingest stops after 3 refused days/downloads or a 429 (`live.py`) |
 | Idempotency | `ingested.json` (ZIP name → sha256; the skip check is by name only); per-quarter parts replaced by (accession, source); `state.json` pending sets are cleared only after a successful publish; `_reconcile_published` compares `published.json` with the site manifest; only changed files upload; `manifest.json` last |
-| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` abort before the manifest; the lake is saved after any run |
+| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` / `HealthGateError` abort before the manifest; the lake is saved after any run. Health gates (`run/gates.check_health`, called in `run_weekly` after the CUSIP scan): lake has CUSIPs but none mapped to a stock; median `priced_pct` below `config.COVERAGE_MIN` = 0.90 (live 0.988); funds with reports were tried and none was computed (`_Funds.with_reports`; funds without a report are not counted, and not when the time budget cut the run). `run_home` is not gated |
 | verify | rebuilds 50 random published funds from raw parts and compares sha256 with `published.json`; no API calls |
 
 ### 13F quirks handled
@@ -143,6 +143,12 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`), `published.json` |
 
+### Lake backups (`pipeline.yml`, step "Back up the lake state")
+- After a scheduled run that succeeded end to end (pipeline and save; never a manual run, so reruns cannot flush the good monthly backups), `rclone copy` puts the small, hard-to-rebuild lake state in `backups/<UTC date>/` of the PRIVATE lake bucket: `ingested.json`, `state.json`, `published.json`, `fund_state`, `cusip_map`, `vendor_tickers`, `securities`, `rf`. Not `prices_daily` (large; refetched from Tiingo) and not `filings`/`raw_holdings`/`holdings`/`reports` (rebuilt from the SEC's files). The source is the local lake just saved, not a server-side copy (no overlap with the live keys).
+- Then the 3 newest folders named exactly `YYYY-MM-DD/` are kept and older ones removed with `rclone purge`; nothing is removed unless today's folder is listed. Anything else under `backups/` is never touched.
+- `restore-r2` and the save both `--exclude "backups/**"`, like `workbooks/**`: backups are never restored into a run and the save's `sync` never deletes them.
+- The step is the last one, with a 10-minute timeout. A failed copy removes today's partial folder, prints `::error::` and fails the run (red run, and the `alert` job opens an issue); the site and lake are already published and saved by then. Restore drill: `docs/domain-and-data-hosting.md`, "Restore from backup".
+
 Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.publish_fund`); `funds.json`, `securities.json`, `latest_prices.json`, `home/*.json` (`publish.publish_shared`); `stock/{id}/weekly.json` (`publish.publish_weekly`); `health.json`, `manifest.json`. They are minified with sorted keys and brotli quality 9, uploaded with `Content-Encoding: br` and `Cache-Control: public, max-age=300`, which the Cloudflare cache rule overrides. CUSIP guard: `_json_ready` refuses a `cusip` key and `publish_step.cusip_leaks` scans the staged files. Field meanings and units: `pipeline/contract.md`.
 
 ### Workbook (`pipeline/orca/workbook/`, phase 1: owner-only)
@@ -153,7 +159,7 @@ Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.pu
 - CLI: `python -m orca.run workbook --fund ID [--fund ID …]` (`run/workbook.py`). It reads the lake like `verify`, then per fund validates the inputs, checks `from_json(to_json(fi)) == fi`, and writes `<out>/inputs/<id>.json` and `<out>/orca-<id>-<name>-<price date>.xlsx`. Unknown fund: `fund N: not found`, exit 1. No priced positions: skipped, exit 0. Output lines carry only ids, sizes and timings.
 - Action `.github/workflows/workbook.yml` (manual, `fund_ids`, at most 20 numeric ids on one line, checked in a step that refuses control characters and passes only the validated list on): restores the lake (`production` environment, `concurrency: pipeline`), builds, and copies `pipeline/data/workbooks` to the PRIVATE lake bucket under `workbooks/manual/<UTC date>/`. It never saves the lake and uploads no artifact (the repository is public). The upload step runs even when a fund failed (`!cancelled()` and some file built), so the funds that built are stored while the job stays red through the failed build step.
 - A fund that fails for any reason (unknown, invalid inputs, any other exception) prints `fund N: ...` (the exception type only), leaves no file (workbook built to `.part` and renamed, inputs file written last, partial files removed), and the other funds still build; the command exits 1.
-- The lake sync in `restore-r2` and the save in `pipeline.yml` both `--exclude "workbooks/**"`: past workbooks are not restored (no run reads them), and the save would otherwise delete them from the bucket.
+- The lake sync in `restore-r2` and the save in `pipeline.yml` both `--exclude "workbooks/**"` and `--exclude "backups/**"` (see Lake backups below): past workbooks are not restored (no run reads them), and the save would otherwise delete them from the bucket.
 - Private paths: `workbooks/manual/<date>/` in the lake bucket only. Nothing is public, so `pipeline/contract.md` is unchanged.
 - Design: workbooks are built on demand, never pre-built (a monthly pre-build was estimated at ~2.5 h on four cores). GitHub Actions are only for this owner-only phase.
 - Phase 2 (own spec, not built): the monthly run writes small private input files for every fund; a Worker checks payment; a Cloudflare Container builds the file. Needs login and payments, and Tiingo's redistribution licence.
@@ -180,7 +186,6 @@ GitHub secrets (names): `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT
 Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest, demo build, Playwright) runs first. Then the deploy job fetches `funds.json` from `VITE_DATA_URL`, builds with `PRERENDER_FUNDS`, `SITE_URL` and `HSTS_MAX_AGE`, and runs wrangler. PRs run tests only.
 
 ## Tech debt and risks
-- `pipeline/contract.md` is stale. It says prices refresh "every week" and exits are refreshed for 8 quarters; the code runs monthly with `EXIT_REFRESH_QUARTERS = 6` (code).
 - Confidential-treatment 13F filings are not handled (code).
 - Only the latest tracking segment is computed, so history before a gap of 2+ quarters is dropped (code).
 - The bulk ZIP skip ignores the checksum; there is no `is_finite` check on VALUE (code).
@@ -188,7 +193,7 @@ Deploy: a push to `main` touching `web/**` runs `web.yml`. The test job (vitest,
 - Deferred review items: the weights ≈ 100% invariant is unchecked; a crash window between `write_manifest` and the `fund_state` writes; a `pending_all` run doesn't republish every weekly file (rulings doc).
 - The Site CORS workflow lacks an R2 Admin token; the purge clears the whole zone (chat).
 - A big fund fetches ~2,000+ `weekly.json` files when stepping back a quarter before the prefetch is done (about 7 s measured). A per-fund quarter-end price file would fix that (chat).
-- A plain `<table>` with all rows: layout cost grows with rows; capped by `loading.ts`, not virtualised (chat).
+- The fund Positions and What-if tables, and every Home table, are plain `<table>`s with all loaded rows: layout cost grows with rows; capped by `loading.ts` (fund tables) and not virtualised. `DataTable` has a `virtual` mode (`@tanstack/react-virtual`), but no caller turns it on (code).
 - No server-side gating is possible while all data is public (chat).
 - Fund compute runs on one core (~48 min); parallel compute was estimated at 17–20 min, not built (chat)(code).
 - `home/just_filed.json` is built and published with no reader since 2026-11-06 (code).

@@ -12,8 +12,8 @@ next run carries on from the state.
 
 Modules: `state` (lake tables, state.json, stored fund state), `sources` (what a run fetches),
 `budget` (the time budget), `ingest` (bulk and live filings), `market` (securities, prices,
-T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `weekly` (the
-run and `verify`), `cli`.
+T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `gates`
+(health gates), `weekly` (the run and `verify`), `cli`.
 
 Lake layout (all under `lake.root`):
 - `filings/qNNN`, `raw_holdings/qNNN`: every filing of report period NNN and its raw rows, one
@@ -32,6 +32,7 @@ A fund is identified by its CIK (`fund_id` = CIK), so ids never depend on ingest
 
 from orca.run.cli import main
 from orca.run.compute import InvariantError, affected_funds, price_flags, split_suspects
+from orca.run.gates import HealthGateError, check_health
 from orca.run.ingest import live_watermark
 from orca.run.publish_step import CusipLeakError, copy_published, cusip_check_digit
 from orca.run.sources import Sources, production_sources
@@ -40,10 +41,12 @@ from orca.run.weekly import RunStats, deadline_quarter, run_home, run_weekly, ve
 
 __all__ = [
     "CusipLeakError",
+    "HealthGateError",
     "InvariantError",
     "RunStats",
     "Sources",
     "affected_funds",
+    "check_health",
     "copy_published",
     "cusip_check_digit",
     "deadline_quarter",

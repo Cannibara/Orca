@@ -77,5 +77,5 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 - Part years are derived from quarter counts, not labels (the demo labels a part year "2014").
 - jsdom has no IntersectionObserver/ResizeObserver. Hooks in `web/src/fund/hooks.ts` degrade, and tests stub `requestIdleCallback` (`web/tests/idle.ts`).
 - The R2 CORS policy was set in the dashboard. The Site CORS workflow fails (`AccessDenied`) until its token has Admin rights.
-- The pipeline job is named `weekly` but runs monthly. `contract.md` still says prices refresh "every week".
+- The pipeline job is named `weekly` but runs monthly.
 - The cloud shell's cwd drifts: use absolute paths. Running 4+ heavy agents in parallel hit the 5-hour usage limit twice.

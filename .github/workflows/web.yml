@@ -59,6 +59,11 @@ jobs:
         run: npm ci
       - name: Run the unit tests
         run: npx vitest run
+      # Not blocking yet: advisories that already exist must not stop a deploy. Make it blocking
+      # (drop continue-on-error) once the report is clean.
+      - name: Audit production dependencies
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high || { echo "::warning::npm audit found high or critical advisories in production dependencies"; exit 1; }
       - name: Build with the demo data
         run: npm run build
       - name: Install Chromium

@@ -5,8 +5,8 @@ name: Pipeline
 # new filings and prices, recompute the funds they touch, upload the changed files to the public R2
 # bucket (manifest.json last), clear the Cloudflare cache of the data site, save the lake back. On the
 # 1st: rebuild a sample of funds from the lake's raw filings and compare them with what is published.
-# A failed run leaves the site on the last good version; GitHub's default notifications email the
-# failure.
+# A failed run leaves the site on the last good version. A failed scheduled run (the run or the
+# monthly check) also opens a GitHub issue (the `alert` job at the end).
 #
 # Every run has a time budget (ORCA_TIME_BUDGET_MIN, 270 minutes by default): when it is spent the
 # pipeline stops its long stages cleanly, publishes the funds it computed (nothing, if it got no
@@ -17,7 +17,9 @@ name: Pipeline
 # Bootstrapping: an empty lake needs more than one run (years of bulk ZIPs, CUSIP lookups and
 # price histories). Leave the schedule off (repository variable ORCA_SCHEDULE_ENABLED unset) and
 # start the workflow by hand (Actions > Pipeline > Run workflow) again after each run finishes,
-# until a run's health.json has no "time_budget" flag. Then set ORCA_SCHEDULE_ENABLED to "true":
+# until a run's health.json has no "time_budget" flag. A run that finishes within its budget but
+# with the median fund pricing under 90% of its book (prices still being fetched) fails the health
+# gate (orca/run/gates.py) and publishes nothing; run again. Then set ORCA_SCHEDULE_ENABLED to "true":
 # the cron entries below do nothing until it is.
 #
 # The R2 credentials can write the private lake (it holds CUSIPs) and the public site, so only the
@@ -215,7 +217,8 @@ jobs:
           fi
           echo "::error::Once that is fixed, run Actions > Purge cache > Run workflow to clear the cache by hand."
           exit 1
-      - name: Save the lake
+      - id: save
+        name: Save the lake
         # Also after a failed, cancelled or timed-out step: what the run stored is progress, and the
         # lake's state says what is still owed. If the upload did not complete, the lake's
         # published.json is ahead of the site: the next run compares it with the site's manifest
@@ -244,10 +247,67 @@ jobs:
           # say what the data holds, so a save cut off half way leaves old bookkeeping over newer
           # data (work redone next run), never bookkeeping that claims data the bucket lacks.
           # Temporary files that a killed write left behind are not saved.
-          # workbooks/** lives only in the bucket (the Workbook workflow): excluded here as on
-          # restore, or this sync would delete it.
-          rclone sync data/lake "r2:${R2_LAKE_BUCKET}" --exclude "*.json" --exclude "*.tmp" --exclude "workbooks/**"
+          # workbooks/** (the Workbook workflow) and backups/** (the backup step below) live only
+          # in the bucket: excluded here as on restore, or this sync would delete them.
+          rclone sync data/lake "r2:${R2_LAKE_BUCKET}" --exclude "*.json" --exclude "*.tmp" --exclude "workbooks/**" \
+            --exclude "backups/**"
           rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "*.json"
+      - name: Back up the lake state
+        # Only on the monthly schedule, after a run that went all the way (no `always()`: every
+        # step before, the pipeline and the save included, succeeded). A manual run (a rerun, a
+        # `full` rebuild, home_only) makes no backup, so a burst of reruns cannot push the good
+        # monthly backups out of the 3 kept. The last step: a failure here turns the run red (and
+        # the alert job opens an issue) after the site is already published.
+        if: steps.save.outcome == 'success' && github.event_name == 'schedule'
+        timeout-minutes: 10
+        env:
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          # Secrets pasted with a trailing line break or space break the Authorization header: strip them.
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
+          backup() {
+            day="$(date -u +%F)"
+            # The small state only (the JSON bookkeeping and the tables that are costly or
+            # impossible to rebuild), copied from the lake just saved. Not prices_daily (large,
+            # fetched again from Tiingo) nor filings/raw_holdings/holdings/reports (rebuilt from
+            # the SEC's files). A same-day rerun overwrites that day's folder.
+            [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
+            test -f data/lake/state.json
+            # A copy that fails half way leaves a partial folder for today: remove it (only
+            # today's, the name checked above), so a partial backup is never mistaken for a whole one.
+            rclone copy data/lake "r2:${R2_LAKE_BUCKET}/backups/${day}" \
+              --include "/ingested.json" --include "/state.json" --include "/published.json" \
+              --include "/fund_state.parquet" --include "/fund_state/**" \
+              --include "/cusip_map.parquet" --include "/cusip_map/**" \
+              --include "/vendor_tickers.parquet" --include "/vendor_tickers/**" \
+              --include "/securities.parquet" --include "/securities/**" \
+              --include "/rf.parquet" --include "/rf/**" || {
+              rclone purge "r2:${R2_LAKE_BUCKET}/backups/${day}" || true
+              exit 1
+            }
+            # Keep the 3 newest dated folders. Only names of exactly the form YYYY-MM-DD/ can be
+            # deleted; anything else under backups/ is left alone. Nothing is pruned unless
+            # today's folder is listed, so a listing that came back empty deletes nothing.
+            listing="$(rclone lsf --dirs-only "r2:${R2_LAKE_BUCKET}/backups")"
+            dated="$(printf '%s\n' "$listing" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}/$' | sort || true)"
+            printf '%s\n' "$dated" | grep -qx "${day}/"
+            for old in $(printf '%s\n' "$dated" | head -n -3); do
+              [[ "$old" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}/$ ]] || continue
+              echo "removing the old backup ${old}"
+              rclone purge "r2:${R2_LAKE_BUCKET}/backups/${old%/}"
+            done
+            echo "backups now: $(printf '%s\n' "$dated" | tail -n 3 | tr -d '/' | xargs)"
+          }
+          # A separate shell: inside `if`, a function would run without `set -e`.
+          export -f backup
+          if ! bash -c 'set -euo pipefail; backup'; then
+            echo "::error::The lake backup failed. The site and the lake are published and saved; only the backup is missing. See the lines above, and docs/domain-and-data-hosting.md."
+            exit 1
+          fi
 
   verify:
     # These strings must equal the cron entries above.
@@ -276,3 +336,41 @@ jobs:
           endpoint: ${{ secrets.R2_ENDPOINT }}
       - name: Rebuild a sample of funds and compare
         run: uv run --locked --no-dev python -m orca.run verify --sample 50
+
+  alert:
+    # A failed scheduled run (the monthly run or the 1st's check) opens an issue, so the failure is
+    # seen without anyone watching Actions. It cannot fire when ORCA_SCHEDULE_ENABLED is unset
+    # (the jobs are then skipped, not failed) or when GitHub switched the schedule off. Needs
+    # Issues enabled on the repository. Holds no secrets and checks nothing out; the issue says
+    # only where to look.
+    needs: [weekly, verify]
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      (needs.weekly.result == 'failure' || needs.verify.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          REF: ${{ github.ref }}
+        run: |
+          title="Pipeline failed: ${RUN_ID}"
+          body="$(printf 'Run: %s\nWorkflow: %s\nRef: %s\nDate: %s\n' "$RUN_URL" "$WORKFLOW" "$REF" "$(date -u +%F)")"
+          # A re-run of the same run (same id) comments on the issue it already has.
+          number="$(gh issue list --state open --search "\"${title}\" in:title" --json number,title \
+            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -80,4 +80,17 @@ describe("page title follows the route", () => {
     await screen.findByRole("heading", { level: 1, name: "Page not found" });
     await waitFor(() => expect(document.title).toBe("Not found · Orca"));
   });
+});
+
+describe("site footer", () => {
+  it.each(["/", `/fund/${FUND}`, `/fund/${FUND}/stock/${STOCK}`, "/how-it-works", "/no-such-page"])(
+    "shows the estimate disclaimer and a link to How it works on %s",
+    async (path) => {
+      stubData();
+      renderApp(path);
+      const foot = await screen.findByRole("contentinfo");
+      expect(foot).toHaveTextContent("Estimates from SEC 13F filings. Not investment advice.");
+      expect(within(foot).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/how-it-works");
+    },
+  );
 });

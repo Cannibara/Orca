@@ -6,6 +6,14 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-10 — Planned features conflict with earlier positions
+Planned features F1–F5 (`docs/ROADMAP.md`, proposals until the owner approves) cut across earlier decisions. Resolve each with the owner before building:
+- "No database server" (2026-10-30 architecture): F2 saved views across devices need accounts, so some server-side state.
+- "No market-flow estimates" (spec 1 scope): F4 sector volume is a flow-like measure.
+- R23 "no SPY benchmark on fund pages" (rulings doc): F5 rankings need benchmarks.
+- The rejected "luck vs skill" idea (2026-10-30): F5 reopens it.
+- Related, already recorded: the parked Excel export (2026-11-09) is superseded by F1 (2026-11-10 workbook entry).
+
 ## 2026-11-10 — Workbook phase 1: implementation rulings that changed the design
 Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Where the build departs from the spec as first written, the spec now says what was built:
 - Year cells reference the year's contiguous quarter range directly (`SUM`, `MIN`, the last or first quarter's cell), not `SUMIF` on the Year row. Equivalent, simpler, and `MINIFS` is not in Excel 2016.
@@ -212,7 +220,7 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 ## 2026-11-01 — Tiingo personal plan for now
 - Decision: the owner bought Tiingo's paid personal plan and will move to business when commercialising (chat).
 - Context: the free plan's 50 requests/hour stopped run 7 at 48 stocks (chat).
-- Consequences: risk: a public site showing Tiingo prices probably needs the business plan; check Tiingo's terms (chat).
+- Consequences: risk: a public site showing Tiingo prices needs a separate redistribution licence. Correction 2026-11-10: moving to the business plan is not enough. Tiingo's docs say every self-serve plan, the commercial one included, is internal-use only; showing prices on a public site or app needs a redistribution licence (email sales@tiingo.com; source https://api.tiingo.com/documentation) (chat).
 
 ## 2026-11-01 — Invalid CUSIPs are not repaired
 - Decision: about 29,000 CUSIPs in filings that OpenFIGI rejects (often a dropped leading zero) stay unmapped and out of returns (chat)(code `securities.py`: an OpenFIGI error gets method "error").

@@ -25,6 +25,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Shipped | Fund page panels (below) | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code) |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
 | Shipped | How it works page, Not found page | `web/src/pages/Method.tsx`, `NotFound.tsx` (code) |
+| Shipped | Site-wide footer on every page: "Estimates from SEC 13F filings. Not investment advice." with a link to How it works | `web/src/App.tsx` (code) |
 | Shipped | Pre-rendered fund pages (title/description/noscript) for the largest 15,000 funds | `web/scripts/prerender.mjs` (code) |
 | Shipped | Background loading (first 50 rows, fill to 200, Show 100 more; all weekly prices prefetched) | `web/src/fund/loading.ts`, `prefetch.ts` (code) |
 | Shipped (PR #3, a2a1554) | HSTS, noindex on pages.dev, sitemap/robots/canonical | (git 006b9d8, a2a1554) |
@@ -34,6 +35,11 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Backlog | Per-fund quarter-end price file (fewer requests) | (chat) |
 | Phase 1 built (owner-only) | Paid per-fund workbook (phase 1: owner-only): an Excel file per fund with the raw quarterly data and formulas for every fund-page metric, reconciled to Orca's figures; built by hand with Actions > Workbook into the private bucket; not for sale until the Tiingo licence is settled; login, payment and on-demand build are phase 2 | `pipeline/orca/workbook/`, `docs/superpowers/specs/2026-11-10-fund-workbook-design.md` (code)(chat) |
 | Backlog | Gated paid tier, login | (spec)(chat) |
+| Backlog (F1) | Paid per-fund workbook, the phase 2 of the row above | `docs/ROADMAP.md` (proposal until the owner approves) |
+| Backlog (F2) | Column choices and saved views (may need accounts) | `docs/ROADMAP.md` (proposal) |
+| Backlog (F3) | Weekly popularity list | `docs/ROADMAP.md` (proposal) |
+| Backlog (F4) | Sector momentum and volume | `docs/ROADMAP.md` (proposal) |
+| Backlog (F5) | Manager rankings, with benchmarks | `docs/ROADMAP.md` (proposal) |
 | Backlog | Spec 2 skill scores, spec 3 sector rotation, stock pages "who holds X", alerts, pre-2013 history | (spec) |
 
 ## Home list rules

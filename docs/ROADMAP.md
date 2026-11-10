@@ -2,7 +2,7 @@
 
 Last verified: 2026-11-10
 
-Status: **proposal, not approved by the owner.** Nothing here is built.
+Status: **proposal, not approved by the owner.** Built so far: F1 as a paid workbook (phase 1), D1/D3 partly (parity and schema tests), D2, E2, E3, X3, U3, H1–H3 (WORKLOG 2026-11-10). Not built: everything else.
 
 Update 2026-11-10: F1 is now a paid per-fund Excel workbook, built on demand (DECISIONS 2026-11-10). This supersedes X1 (client-side export) and the F1 approach below. New scaling rule: GitHub Actions only for tests, deploys and the monthly batch; anything a user triggers runs on Cloudflare. Escape hatch: the pipeline is packaged in the same Container image as the workbook builder.
 
