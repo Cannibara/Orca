@@ -305,6 +305,14 @@ def test_all_checks_pass(cases, computed):
 
 
 @pytest.mark.libreoffice
+def test_no_error_values_on_any_tab(cases, computed):
+    # LibreOffice writes an error as a string such as #VALUE!, #NUM!, #N/A, #DIV/0!, #NAME?
+    for key in real(cases):
+        errors = {k: v for k, v in computed[key].items() if isinstance(v, str) and v[:1] == "#"}
+        assert not errors, (key, dict(list(errors.items())[:10]))
+
+
+@pytest.mark.libreoffice
 def test_a_broken_formula_fails_a_check(cases, computed):
     read = Read(cases["broken"], computed["broken"])
     failed = [c.measure for c in CHECKS if read.check(c.measure) != "PASS"]

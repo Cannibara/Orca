@@ -1,6 +1,6 @@
 # Roadmap: design audit against the planned features
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Status: **proposal, not approved by the owner.** Nothing here is built.
 

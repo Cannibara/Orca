@@ -342,8 +342,8 @@ lake (private) ── run/compute.prepare_fund() ──┬─> engine (compute_f
 **Workflow `.github/workflows/workbook.yml`** (manual):
 - input: `fund_ids` (space-separated, at most 20);
 - environment: `production`; concurrency group `pipeline`, so it never reads a lake that is half saved;
-- steps: restore the lake read-only; run the CLI; `rclone copy` to `R2_LAKE_BUCKET/workbooks/manual/<UTC date>/`;
-- no save step, and nothing uploaded as a GitHub artifact (the repo is public);
+- steps: restore the lake (excluding past `workbooks/**`; never saved); run the CLI; `rclone copy` to `R2_LAKE_BUCKET/workbooks/manual/<UTC date>/`;
+- no save step (the pipeline's save also excludes `workbooks/**`, so past workbooks survive it), and nothing uploaded as a GitHub artifact (the repo is public);
 - logs print fund ids, row counts, sizes and timings only.
 
 **Dependency:** `xlsxwriter` pinned exactly in `pipeline/pyproject.toml` and `uv.lock`. It is pure Python under a BSD licence, with no dependencies of its own.

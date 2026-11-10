@@ -16,7 +16,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
   - Excel has never opened these files; only LibreOffice 24.2 recalculated them. Open one in Excel and check Summary's "Checks failing" before anyone relies on it.
   - Tiingo's redistribution licence is a blocker before selling or sharing a workbook.
   - Phase 2 (login, payment, Worker, Container, per-fund private input files for every fund) needs its own spec.
-  - The Workbook Action and the CI change have not run on GitHub; `actionlint` and `shellcheck` were not installed here.
+  - actionlint 1.7.12 and shellcheck were run clean on workbook.yml and ci.yml; the Action itself has not run on GitHub yet.
 
 ## 2026-11-10 — Per-fund Excel workbook design: sections 1–2 approved
 

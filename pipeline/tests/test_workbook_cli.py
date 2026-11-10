@@ -76,3 +76,34 @@ def test_cli_refuses_inputs_that_do_not_read_back(demo_lake, tmp_path, monkeypat
     assert main(["workbook", "--fund", "9100001", "--out", str(tmp_path)]) == 1
     assert "fund 9100001: its inputs file does not read back equal" in capsys.readouterr().out
     assert not list(tmp_path.rglob("*.xlsx")) and not list(tmp_path.rglob("*.json"))
+
+
+def test_cli_mixed_known_and_unknown_funds(demo_lake, tmp_path, capsys):
+    out = tmp_path / "out"
+    assert main(["workbook", "--fund", "9100001", "--fund", "123", "--out", str(out)]) == 1
+    printed = capsys.readouterr().out
+    assert "fund 123: not found" in printed
+    assert [p.name for p in out.glob("orca-9100001-*.xlsx")] != []
+    assert [p.name for p in (out / "inputs").glob("*.json")] == ["9100001.json"]
+    assert not list(out.glob("orca-123-*"))
+
+
+def test_cli_other_exception_leaves_no_partial_files(demo_lake, tmp_path, monkeypatch, capsys):
+    real = wb.build_workbook
+
+    def boom(fi, path):
+        if fi.fund_id == 9100001:
+            path.write_bytes(b"half a workbook")  # what a build killed half way leaves
+            raise RuntimeError("secret detail 037833100")
+        return real(fi, path)
+
+    monkeypatch.setattr(wb, "build_workbook", boom)
+    out = tmp_path / "out"
+    assert main(["workbook", "--fund", "9100001", "--fund", "9100005", "--out", str(out)]) == 1
+    printed = capsys.readouterr().out
+    assert "fund 9100001: failed: RuntimeError" in printed
+    assert "secret detail" not in printed and "037833100" not in printed
+    assert sorted(p.name for p in out.rglob("*") if p.is_file() and "9100001" in p.name) == []
+    assert [p.name for p in out.glob("orca-9100005-*.xlsx")] != []
+    assert [p.name for p in (out / "inputs").glob("*.json")] == ["9100005.json"]
+    assert not list(out.glob("*.part"))
