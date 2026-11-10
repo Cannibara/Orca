@@ -32,7 +32,7 @@ from orca.workbook.build import (
     model_map,
 )
 from orca.workbook.inputs import FundInputs, build_inputs
-from orca.workbook.layout import BLOCKS
+from orca.workbook.layout import BLOCKS, MODEL_ROWS
 
 CIKS = list(range(9100001, 9100013))
 CUT_CIK, CUT_KEEP = 9100009, 3  # Seastack (18-24 positions) cut to 3 stock rows
@@ -235,18 +235,25 @@ def test_formula_like_names_stay_text(cases, tmp_path):
     fi = dataclasses.replace(fi, stocks=stocks)
     path = tmp_path / "odd.xlsx"
     build_workbook(fi, path)
-    with zipfile.ZipFile(path) as z:
-        xml = z.read("xl/worksheets/sheet1.xml").decode()
-    assert "CMD()</f>" not in xml
-    ws = openpyxl.load_workbook(path)["Model"]
-    for st, text in zip(stocks, odd):
-        for column in ("ticker", "company"):
-            ref = cell_of(fi, "Model", "C5", st.stock_id, column)
-            assert ws[ref].value == text and ws[ref].data_type == "s", (ref, ws[ref].value)
-            # xlsxwriter's string cell: an inline string, never a formula
-            cell = re.search(rf'<c r="{ref}"[^>]*>(.*?)</c>', xml).group(0)
-            assert 't="inlineStr"' in cell and "<f>" not in cell, cell
-    assert xml.count("<t>=CMD()</t>") == 2 * sum(b.per_stock for b in BLOCKS)
+    book = openpyxl.load_workbook(path)
+    # every stock block on Model, and the stock table on Outputs, carry the ticker and name
+    for sheet, tab, at in (("sheet1", "Model", ("C5", "stocks")), ("sheet2", "Outputs", None)):
+        with zipfile.ZipFile(path) as z:
+            xml = z.read(f"xl/worksheets/{sheet}.xml").decode()
+        assert "CMD()</f>" not in xml
+        ws = book[tab]
+        for st, text in zip(stocks, odd):
+            for column in ("ticker", "company"):
+                if at:
+                    ref = cell_of(fi, tab, at[0], st.stock_id, column)
+                else:
+                    ref = cell_of(fi, tab, "stocks", st.stock_id, column)
+                assert ws[ref].value == text and ws[ref].data_type == "s", (ref, ws[ref].value)
+                # xlsxwriter's string cell: an inline string, never a formula
+                cell = re.search(rf'<c r="{ref}"[^>]*>(.*?)</c>', xml).group(0)
+                assert 't="inlineStr"' in cell and "<f>" not in cell, cell
+        blocks = sum(b.per_stock for b in MODEL_ROWS) if tab == "Model" else 1
+        assert xml.count("<t>=CMD()</t>") == 2 * blocks, tab
 
 
 def test_no_cached_values_and_full_calc(cases):
@@ -296,10 +303,36 @@ def test_file_name_and_styles(cases):
     assert ws.freeze_panes == f"F{model.rows.row('held_through') + 1}"  # below the header rows
 
 
-def test_sheet_prepares_formulas_as_xlsxwriter_does(tmp_path):
+def built_formulas(cases, tmp_path, monkeypatch) -> list[str]:
+    """Every formula building the workbooks of the cut and the uncut Seastack and of the
+    inactive fund writes, on every tab, one per shape (cell references aside: xlsxwriter's
+    rewrites only look at function names)."""
+    seen: set[str] = set()
+    prepare = Sheet._prepare_formula
+
+    def record(self, formula, expand_future_functions=False):
+        seen.add(formula)
+        return prepare(self, formula, expand_future_functions)
+
+    monkeypatch.setattr(Sheet, "_prepare_formula", record)
+    for key in ("cut", str(CUT_CIK), str(INACTIVE)):
+        build_workbook(cases[key].fi, tmp_path / f"{key}.xlsx")
+    monkeypatch.undo()
+    shapes: dict[str, str] = {}
+    for formula in sorted(seen):
+        shapes.setdefault(re.sub(r"\$?\b[A-Z]{1,3}\$?[0-9]+\b", "A1", formula), formula)
+    return list(shapes.values())
+
+
+def test_sheet_prepares_formulas_as_xlsxwriter_does(cases, tmp_path, monkeypatch):
     # the builder's Sheet skips xlsxwriter's regex passes: its text must be xlsxwriter's own
-    # for every registry formula, cut or not, and for the future function the tabs use
-    formulas = rendered(False) + rendered(True) + [
+    # for every registry formula, cut or not, for every formula a build writes on any tab
+    # (Outputs, Summary, the differences and the checks), and for the future function the tabs
+    # use (ruling R18)
+    built = built_formulas(cases, tmp_path, monkeypatch)
+    for marker in ("XIRR(INDEX(", "STDEV.S(", "COUNTIFS(", '"PASS"', "1E+300", "FromYear"):
+        assert any(marker in formula for formula in built), marker
+    formulas = rendered(False) + rendered(True) + built + [
         '=IF(COUNT(J5:J9)<4,"",STDEV.S(J5:J9)*2)', '=IFERROR(XIRR(J5:Q5,J1:Q1),"")'
     ]
     book = xlsxwriter.Workbook(str(tmp_path / "x.xlsx"), {"use_future_functions": True})

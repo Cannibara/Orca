@@ -15,21 +15,28 @@ start..bound, Latest. Input rows run to bound; calculation and fund cells are wr
 quarters start..end_q only, so they are blank after end_q by construction (no "Held through"
 wrapper). Year cells follow the row's year rule (`year_formula`) over the year's contiguous
 quarter columns, which stop at end_q.
+
+The checks (spec 3.4): Model ends with Orca's figures (inputs) and a difference row or block
+beside each (ORCA_ROWS); OUTPUT_COLUMNS is the Outputs tab's stock table, its Orca columns and
+their difference columns; CHECKS lists every measure the checks table compares.
 """
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import cache
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from orca.quarters import BASE_YEAR, q_end, q_start
 
 if TYPE_CHECKING:
     from orca.workbook.inputs import FundInputs
 
-Kind = Literal["header", "input", "calc", "fund", "fund_input", "year_only"]
-YearRule = Literal["sum", "year_end", "first_start", "chained", "product", "min", "blank", "none"]
+Kind = Literal["header", "input", "calc", "fund", "fund_input", "year_only", "orca", "check"]
+YearRule = Literal[
+    "sum", "year_end", "first_start", "chained", "product", "min", "max", "own", "blank", "none"
+]
+CheckKind = Literal["money", "ratio", "exact"]
 
 ALLOWED_FUNCTIONS = frozenset(
     {
@@ -51,6 +58,7 @@ RATIO = "0.00"
 FACTOR = "0.0000"  # multipliers (split factors, growth, index): 2 dp would hide a 1:3 split
 DATE = "yyyy-mm-dd"
 GENERAL = "General"
+SCI = "0.00E+00"  # difference cells: a few parts in 1e16 when all is well
 
 
 def mid_quarter(q: int) -> date:
@@ -248,6 +256,10 @@ class Ref:
         """Row `row_id` in end_q's column (the fund's last held quarter)."""
         return self._at(row_id, self.cols.quarter_index(self.cols.end_q))
 
+    def at_latest(self, row_id: str) -> str:
+        """Row `row_id` in the Latest column."""
+        return self._at(row_id, self.cols.latest_index)
+
     def tracked(self, row_id: str) -> str:
         """Row `row_id` over the tracked quarters, start..end_q."""
         row = self.rows.row(row_id, self.stock)
@@ -286,11 +298,13 @@ class Block:
     `before` and `latest` fill the Before and Latest columns: a number (a starting value), a
     template, or the name of the input field that holds the value. `source` names the field an
     input row is written from: a StockInputs field for stock blocks, a FundInputs field (or
-    "other.<field>") for single rows. `other` fills the block's "All other positions" row when
-    the fund is cut: the name of an OtherInputs list (an input row), or a template rendered with
-    that row as the stock (a formula row). Like the block's stock rows, it covers the quarters
-    start..bound in an input block (I2) and start..end_q in a calculation block, plus its year
-    cells. `cut_only` rows exist only when the fund is cut."""
+    "other.<field>") for single rows; for Orca's figures ("orca"), a key of OrcaFund.quarters
+    and .years (single rows) or an OrcaStock field (stock blocks). `other` fills the block's
+    "All other positions" row when the fund is cut: the name of an OtherInputs list (an input
+    row), or a template rendered with that row as the stock (a formula row). Like the block's
+    stock rows, it covers the quarters start..bound in an input block (I2) and start..end_q in a
+    calculation block, plus its year cells. `cut_only` rows exist only when the fund is cut.
+    `year_cell` is the year-cell template of a row whose year rule is "own" (the differences)."""
 
     id: str
     name: str
@@ -304,11 +318,12 @@ class Block:
     source: str | None = None
     other: str | Template | None = None
     cut_only: bool = False
+    year_cell: Template | None = None
 
     @property
     def per_stock(self) -> bool:
-        """A stock block (I1-I6, C1-C20): one row per stock."""
-        return self.id[0] in "IC" and self.id[1:].isdigit()
+        """A stock block (I1-I6, C1-C20, and the checks' S1, O1-O2, D1-D2): one row per stock."""
+        return self.id[0] in "ICSOD" and self.id[1:].isdigit()
 
 
 def year_formula(block: Block, r: Ref) -> str | None:
@@ -317,13 +332,17 @@ def year_formula(block: Block, r: Ref) -> str | None:
     the last or first quarter's cell. "product" (the Growth row) and "chained" (the Return row)
     read the Year-to-date growth row at the year's last quarter: a running product, so a quarter
     of -100% or worse still gives the engine's `math.prod` (LN of it would be #NUM!). The year's
-    Return is blank without a quarterly return. None for "blank" (no year cell) and "none" (a
-    year-only block, whose formula is the year cell)."""
+    Return is blank without a quarterly return. "own" is the block's `year_cell` template. None
+    for "blank" (no year cell) and "none" (a year-only block, whose formula is the year cell)."""
     rule = block.year_rule
     if rule == "sum":
         return f"=SUM({r.year_span(block.id)})"
     if rule == "min":
         return f"=MIN({r.year_span(block.id)})"
+    if rule == "max":
+        return f"=MAX({r.year_span(block.id)})"
+    if rule == "own":
+        return block.year_cell(r)
     if rule == "year_end":
         last = r.year_last(block.id)
         return f'=IF({last}="","",{last})'  # an empty input cell stays blank, not 0
@@ -839,10 +858,604 @@ _YEAR_ROWS: tuple[Block, ...] = (
 
 BLOCKS: tuple[Block, ...] = _STOCK_INPUTS + _STOCK_CALCS + _FUND_ROWS + _YEAR_ROWS
 
-MODEL_ROWS: tuple[Block, ...] = HEADER_ROWS + FUND_INPUTS + BLOCKS  # in the tab's order
+
+# --- the checks (spec 3.4, ruling R21) ---------------------------------------------------------
+
+TOLERANCE: dict[str, float] = {"money": 1e-9, "ratio": 1e-9, "exact": 0.0}
+
+
+def difference(
+    kind: CheckKind, excel: str, orca: str, scale: str | None = None, present: str | None = None
+) -> str:
+    """A difference cell: 0 when Excel's and Orca's cells are both blank, 1E+300 when only one
+    is; else, for dollars and shares, |Excel - Orca| / MAX(1, |Orca|, scale), the scale being the
+    size of the amounts the figure is summed from (without one, as a ratio: Summary's book, a
+    sum of values that are never negative); for returns, ratios, prices and points,
+    |Excel - Orca| / MAX(1, |Orca|); for quarters, counts and text, 0 when equal, else 1. Each
+    compares with TOLERANCE[kind]. `present` is the cell whose blank stands for Excel's, when
+    that is not `excel` itself."""
+    e_blank, o_blank = f'{present or excel}=""', f'{orca}=""'
+    if kind == "exact":
+        gap = f"IF({excel}={orca},0,1)"
+    elif kind == "money" and scale is not None:
+        gap = f"ABS({excel}-{orca})/MAX(1,ABS({orca}),{scale})"
+    else:
+        gap = f"ABS({excel}-{orca})/MAX(1,ABS({orca}))"
+    return f"=IF(AND({e_blank},{o_blank}),0,IF(OR({e_blank},{o_blank}),1E+300,{gap}))"
+
+
+def stock_scale(value: str, cost: str, trades: str) -> str:
+    """A stock's scale for its dollar and share differences: the largest |Value| and |Cost| over
+    the tracked quarters, or the dollars it invested (the positive Trade $), whichever is more.
+    An expression, without the leading "="."""
+    return f'MAX(SUMPRODUCT(MAX(ABS({value}),ABS({cost}))),SUMIF({trades},">0"))'
+
+
+# Orca's fund figures on Model (spec 3.2, the last part): (id, name, kind, in the quarter
+# columns, in the year columns). Row o_<id> holds the engine's figure (FundQuarter or FundYear
+# field <id>), row d_<id> its difference from the workbook's row <id>.
+_ORCA_FUND = (
+    ("start", "Start", "money", True, True),
+    ("end", "End", "money", True, True),
+    ("market_move", "Market move", "money", True, False),
+    ("net_buying", "Net buying", "money", True, False),
+    ("trade_gains", "Trade gains", "money", True, False),
+    ("dividends", "Dividends", "money", True, True),
+    ("ret", "Return", "ratio", True, True),
+    ("gains", "Gains", "money", False, True),
+    ("inflows", "Inflows", "money", False, True),
+    ("approx_ret", "Approx. return", "ratio", False, True),
+)
+
+
+def _fund_scale(r: Ref) -> str:
+    """A quarter's scale, the bridge check's own; a year's is the largest of its quarters'."""
+    f = r.fund
+    return f"=MAX(ABS({f('start')}),ABS({f('end')}),{f('buys')}+{f('sells')})"
+
+
+def _fund_difference(row_id: str, kind: CheckKind) -> Template:
+    def template(r: Ref) -> str:
+        scale = r.this("scale") if kind == "money" else None
+        return difference(kind, r.this(row_id), r.this(f"o_{row_id}"), scale)
+
+    return template
+
+
+def _bridge_difference(r: Ref) -> str:
+    """The engine raises on a quarter whose bridge does not hold, so Orca's figure is 1."""
+    return f"=IF({r.this('bridge_ok')}=1,0,1)"
+
+
+def _s1(r: Ref) -> str:
+    return "=" + stock_scale(r.tracked("C16"), r.tracked("C14"), r.tracked("C9"))
+
+
+def _d1(r: Ref) -> str:
+    return difference("ratio", r.this("C20"), r.this("O1"))
+
+
+def _d2(r: Ref) -> str:
+    """A year's P&L of a stock is compared where it has points: the engine lists a stock's
+    contribution only for a year it was in the book with a positive denominator."""
+    return difference(
+        "money", r.this("C13"), r.this("O2"), r.at_latest("S1"), present=r.this("C20")
+    )
+
+
+def _orca_rows() -> tuple[Block, ...]:
+    rows = [Block("scale", "Scale", "check", "$", "max", USD, _fund_scale)]
+    for row_id, name, kind, quarters, years in _ORCA_FUND:
+        number_format = PCT if kind == "ratio" else USD
+        units = "%" if kind == "ratio" else "$"
+        rows.append(
+            Block(f"o_{row_id}", f"Orca: {name}", "orca", units, "blank", number_format, None,
+                  source=row_id)
+        )  # fmt: skip
+        template = _fund_difference(row_id, kind)
+        rows.append(
+            Block(
+                f"d_{row_id}", f"Difference: {name}", "check", "", "own" if years else "blank",
+                SCI, template if quarters else None, year_cell=template if years else None,
+            )
+        )  # fmt: skip
+    rows.append(Block("d_bridge", "Difference: bridge", "check", "1/0", "blank", WHOLE,
+                      _bridge_difference))  # fmt: skip
+    rows += [
+        # one cell per stock, in the Latest column: its scale over the tracked quarters
+        Block("S1", "Stock scale", "check", "$", "blank", USD, None, latest=_s1),
+        Block("O1", "Orca points", "orca", "points", "blank", RATIO, None, source="points"),
+        Block("D1", "Points difference", "check", "", "own", SCI, None, year_cell=_d1),
+        Block("O2", "Orca P&L", "orca", "$", "blank", USD, None, source="pnl"),
+        Block("D2", "P&L difference", "check", "", "own", SCI, None, year_cell=_d2),
+    ]
+    return tuple(rows)
+
+
+ORCA_ROWS: tuple[Block, ...] = _orca_rows()
+
+MODEL_ROWS: tuple[Block, ...] = HEADER_ROWS + FUND_INPUTS + BLOCKS + ORCA_ROWS  # the tab's order
 
 BY_ID: dict[str, Block] = {b.id: b for b in MODEL_ROWS}
 
 # The blocks a cut fund ends with an "All other positions" row (spec section 4): the one list
 # Rows, the templates and the builder read.
 OTHER_ROWS: frozenset[str] = frozenset(b.id for b in MODEL_ROWS if b.other is not None)
+
+
+# --- the Outputs tab's stock table (spec 3.4) --------------------------------------------------
+
+
+class OutRef(Protocol):
+    """What an Outputs template reads, for one stock's row (`outputs.OutputsRef` places it).
+    Model rows are this stock's, over a span of quarter columns: "tracked" (start..end_q),
+    "before" (Before..end_q), "all" (start..bound) or "flows" (start..Latest). Every method
+    returns an A1 reference or range, with the sheet's name when it is not Outputs."""
+
+    period_q: int  # the latest quarter filed: the site's newest quarter
+
+    def col(self, column_id: str) -> str: ...  # this row's cell of an Outputs column
+    def model(self, row_id: str, span: str = "tracked") -> str: ...  # this stock's Model row
+    def model_at(self, row_id: str, column: int | str) -> str: ...  # a quarter, "end", "latest"
+    def header(self, row_id: str, span: str = "tracked") -> str: ...  # a Model header row
+    def header_at(self, row_id: str, column: int | str) -> str: ...
+    def fund(self, row_id: str) -> str: ...  # a Model fund input row over start..bound
+    def total(self, column_id: str) -> str: ...  # the Total row's cell of a column
+
+
+OutTemplate = Callable[[OutRef], str]
+
+
+@dataclass(frozen=True)
+class Column:
+    """One column of the Outputs stock table. `formula` renders a stock's cell; an Orca column
+    has none and holds OrcaStock field `source` (an input), compared as `kind` by the difference
+    column beside it."""
+
+    id: str
+    name: str
+    units: str
+    number_format: str
+    formula: OutTemplate | None
+    source: str | None = None
+    kind: CheckKind | None = None
+
+
+def _last_where(conditions: list[str], quarters: str) -> str:
+    """The last quarter whose cells meet every condition, -1 when none (spec 3.1)."""
+    factors = "".join(f"({c})*" for c in conditions)
+    return f"SUMPRODUCT(MAX({factors}({quarters}+1)))-1"
+
+
+def _in_quarter(r: OutRef, row_id: str, q_column: str, span: str = "tracked") -> str:
+    """This stock's `row_id` in the quarter named by Outputs column `q_column`; over the span
+    "before" (one column further left), the quarter before it."""
+    return f"INDEX({r.model(row_id, span)},MATCH({r.col(q_column)},{r.header('quarter')},0))"
+
+
+def _xirr(r: OutRef, row_id: str) -> str:
+    """XIRR of this stock's flows in row `row_id` (C17 or C18) against the Mid-quarter dates,
+    from its first quarter in the book (its first trade) to Latest, as the site's search finds
+    it: blank without an answer or outside -99%..1,000%. The flows start at the first trade: from
+    an earlier quarter, leading zero flows let LibreOffice's XIRR stop at a spurious rate where
+    every flow is discounted to nearly nothing (and Excel's XIRR wants a nonzero first flow)."""
+    first = f"MATCH(1,{r.model('C6')},0)"
+
+    def run(row: str, latest: str) -> str:
+        return f"INDEX({row},{first}):{latest}"
+
+    flows = run(r.model(row_id, "flows"), r.model_at(row_id, "latest"))
+    dates = run(r.header("mid_quarter", "flows"), r.header_at("mid_quarter", "latest"))
+    x = f"XIRR({flows},{dates})"
+    return f'IFERROR(IF(AND({x}>=-0.99,{x}<=10),{x},""),"")'
+
+
+def _if_position(body: Callable[[OutRef], str]) -> OutTemplate:
+    """Blank for a stock that never entered the book (no position: the site has no row)."""
+
+    def template(r: OutRef) -> str:
+        return f'=IF({r.col("from_q")}="","",{body(r)})'
+
+    return template
+
+
+def _from_q(r: OutRef) -> str:
+    c6, q = r.model("C6"), r.header("quarter")
+    return f'=IF(COUNTIF({c6},1)=0,"",INDEX({q},MATCH(1,{c6},0)))'
+
+
+def _to_q(r: OutRef) -> str:
+    """The last exit (shares sold to 0) when nothing is held now."""
+    exit_q = _last_where([f"{r.model('C7')}<0", f"{r.model('C5')}=0"], r.header("quarter"))
+    return f'=IF(OR({r.col("from_q")}="",{r.col("shares_now")}>0),"",{exit_q})'
+
+
+def _avg_cost(r: OutRef) -> str:
+    bought = r.col("shares_bought")
+    return f'IF({bought}>0,{r.col("invested")}/{bought},"")'
+
+
+def _sold_shares(r: OutRef) -> str:
+    """Blank when nothing was sold: the stock has no what-if (exits) row."""
+    c7 = r.model("C7")
+    return f'IF(COUNTIF({c7},"<0")=0,"",-SUMIF({c7},"<0"))'
+
+
+def _sold_usd(r: OutRef) -> str:
+    return f'=IF({r.col("sold_shares")}="","",-SUMIF({r.model("C9")},"<0"))'
+
+
+def _avg_exit(r: OutRef) -> str:
+    sold, usd = r.col("sold_shares"), r.col("sold_usd")
+    return f'=IF({sold}="","",IF({sold}>0,{usd}/{sold},""))'
+
+
+def _latest_price(r: OutRef) -> str:
+    close = r.model_at("I4", "latest")
+    return f'=IF({close}="","",{close})'
+
+
+def _value_now(r: OutRef) -> str:
+    now, price = r.col("shares_now"), r.col("latest_price")
+    return f'IF({now}=0,0,IF({price}="","",{now}*{price}))'
+
+
+def _unrealised(r: OutRef) -> str:
+    now, value = r.col("shares_now"), r.col("value_now")
+    return f'IF({now}=0,0,IF({value}="","",{value}-{r.col("cost_now")}))'
+
+
+def _total_pnl(r: OutRef) -> str:
+    open_ = r.col("unrealised")
+    return f'=IF({open_}="","",{r.col("realised")}+{open_}+{r.col("dividends")})'
+
+
+def _ret(r: OutRef) -> str:
+    total, invested = r.col("total_pnl"), r.col("invested")
+    return f'=IF({total}="","",IF({invested}>0,{total}/{invested},""))'
+
+
+def _irr(r: OutRef) -> str:
+    """The position's cash flows (C17) at their mid-quarter dates, the holding at the latest
+    date; blank while held without a latest price (the site's positionFlows gives none)."""
+    return f'IF(AND({r.col("shares_now")}>0,{r.col("latest_price")}=""),"",{_xirr(r, "C17")})'
+
+
+def _weight(r: OutRef) -> str:
+    """Of the whole book at latest prices (the positions beyond a cut included); an unpriced
+    holding weighs 0, as on the site."""
+    value, total = r.col("value_now"), r.total("value_now")
+    return f'IF({total}>0,IF({value}="",0,{value})/{total},0)'
+
+
+def _lc_now(r: OutRef) -> str:
+    return f"={r.model_at('C5', r.period_q)}"
+
+
+def _lc_before(r: OutRef) -> str:
+    return f"={r.model_at('C5', r.period_q - 1)}"  # Before, when period_q is the first quarter
+
+
+def _lc_value_before(r: OutRef) -> str:
+    price = r.col("latest_price")
+    return f'=IF({price}="","",{r.col("lc_before")}*{price})'
+
+
+def _lc_tag(r: OutRef) -> str:
+    """positions.buildRows' tag at the newest quarter (period_q against the quarter before)."""
+    a, b = r.col("lc_now"), r.col("lc_before")
+    return (
+        f'=IF(AND({a}<=1E-6,{b}<=1E-6),"",IF({b}<=1E-6,"new",IF({a}<=1E-6,"exit",'
+        f'IF({a}>{b}*1.000001,"add",IF({a}<{b}*0.999999,"trim","")))))'
+    )
+
+
+def _lc_dw(r: OutRef) -> str:
+    """buildRows' weight change in points: the weight after (A of the book with this stock at
+    A, the rest as before) less the weight before (B of the book before, vb), at latest prices.
+    Shown only with a tag, as the site's Last change column."""
+    price, tag = r.col("latest_price"), r.col("lc_tag")
+    big_a, big_b = f"{r.col('lc_now')}*{price}", r.col("lc_value_before")
+    vb = r.total("lc_value_before")
+    den = f"{vb}-{big_b}+{big_a}"
+    return (
+        f'=IF(OR({tag}="",{price}=""),"",'
+        f"(IF({den}>0,{big_a}/({den}),0)-IF({vb}>0,{big_b}/{vb},0))*100)"
+    )
+
+
+def _last_q(r: OutRef) -> str:
+    return _last_where([f"{r.model('C7')}<>0"], r.header("quarter"))
+
+
+def _if_traded(body: Callable[[OutRef], str]) -> OutTemplate:
+    def template(r: OutRef) -> str:
+        return f'=IF({r.col("last_q")}="","",{body(r)})'
+
+    return template
+
+
+def _last_type(r: OutRef) -> str:
+    """publish._last_change: new or add for a buy (by the shares before), exit or trim."""
+    delta, before = r.col("lt_delta"), r.col("lt_before")
+    after = _in_quarter(r, "C5", "last_q")
+    return f'IF({delta}>0,IF({before}=0,"new","add"),IF({after}=0,"exit","trim"))'
+
+
+def _last_pct(r: OutRef) -> str:
+    kind, delta, before = r.col("last_type"), r.col("lt_delta"), r.col("lt_before")
+    return f'=IF(OR({kind}="add",{kind}="trim"),IF({before}>0,{delta}/{before},""),"")'
+
+
+def _status(r: OutRef) -> str:
+    return f'=IF({r.col("sold_shares")}="","",IF({r.col("shares_now")}=0,"Sold all","Trimmed"))'
+
+
+def _last_sale_q(r: OutRef) -> str:
+    last = _last_where([f"{r.model('C7')}<0"], r.header("quarter"))
+    return f'=IF({r.col("sold_shares")}="","",{last})'
+
+
+def _last_sale_px(r: OutRef) -> str:
+    sale = r.col("last_sale_q")
+    return f'=IF({sale}="","",{_in_quarter(r, "C8", "last_sale_q")})'
+
+
+def _year_on(r: OutRef, values: str) -> str:
+    """`values` (a row over start..bound) four quarters after the last sale: blank past bound
+    (the engine's prices stop there) or in an empty cell."""
+    sale, quarters = r.col("last_sale_q"), r.header("quarter", "all")
+    cell = f"INDEX({values},MATCH({sale}+4,{quarters},0))"
+    return f'=IF({sale}="","",IF({sale}+4>MAX({quarters}),"",IF({cell}="","",{cell})))'
+
+
+def _later_close(r: OutRef) -> str:
+    return _year_on(r, r.model("I4", "all"))
+
+
+def _one_y(r: OutRef) -> str:
+    """whatif._return_after: the close four quarters on over the sale's trade price."""
+    later, price = r.col("later_close"), r.col("last_sale_px")
+    return f'=IF(OR({later}="",{price}=""),"",IF({price}>0,{later}/{price}-1,""))'
+
+
+def _spy_at_sale(r: OutRef) -> str:
+    sale = r.col("last_sale_q")
+    cell = f"INDEX({r.fund('spy_vwap')},MATCH({sale},{r.header('quarter', 'all')},0))"
+    return f'=IF({sale}="","",IF({cell}="","",{cell}))'
+
+
+def _spy_later(r: OutRef) -> str:
+    return _year_on(r, r.fund("spy_close"))
+
+
+def _spy_one_y(r: OutRef) -> str:
+    """SPY's close four quarters on over its VWAP in the sale quarter."""
+    later, start = r.col("spy_later"), r.col("spy_at_sale")
+    return f'=IF(OR({later}="",{start}=""),"",IF({start}>0,{later}/{start}-1,""))'
+
+
+def _beat_spy(r: OutRef) -> str:
+    one_y, spy = r.col("one_y"), r.col("spy_one_y")
+    return f'=IF(OR({one_y}="",{spy}=""),"",IF({one_y}>{spy},1,0))'
+
+
+def _since_sale(r: OutRef) -> str:
+    exit_px, price = r.col("avg_exit"), r.col("latest_price")
+    return f'=IF(OR({exit_px}="",{price}=""),"",IF({exit_px}>0,{price}/{exit_px}-1,""))'
+
+
+def _missed(r: OutRef) -> str:
+    """Plus: sold too early; minus: a loss dodged."""
+    sold, price = r.col("sold_shares"), r.col("latest_price")
+    return f'=IF(OR({sold}="",{price}=""),"",{sold}*{price}-{r.col("sold_usd")})'
+
+
+def _irr_held(r: OutRef) -> str:
+    """The buys only (C18), and every share bought valued at the latest date: as if the fund
+    had never sold. For a stock with a sale."""
+    sold, price = r.col("sold_shares"), r.col("latest_price")
+    return f'=IF(OR({sold}="",{price}=""),"",{_xirr(r, "C18")})'
+
+
+def _hold(r: OutRef) -> str:
+    """metrics.hold_lengths: quarters held, ends included, to the exit or to end_q."""
+    first, to, end = r.col("from_q"), r.col("to_q"), r.header_at("quarter", "end")
+    return f'(IF({to}="",{end},{to})-{first}+1)/4'
+
+
+def _scale(r: OutRef) -> str:
+    return "=" + stock_scale(r.model("C16"), r.model("C14"), r.model("C9"))
+
+
+def _model_end(row_id: str) -> Callable[[OutRef], str]:
+    return lambda r: r.model_at(row_id, "end")
+
+
+def _model_sum(row_id: str, positive: bool = False) -> Callable[[OutRef], str]:
+    if positive:
+        return lambda r: f'SUMIF({r.model(row_id)},">0")'
+    return lambda r: f"SUM({r.model(row_id)})"
+
+
+_WORKBOOK_COLUMNS: tuple[Column, ...] = (
+    Column("from_q", "From quarter", "q", WHOLE, _from_q),
+    Column("to_q", "To quarter", "q", WHOLE, _to_q),
+    Column("shares_now", "Shares now", "shares", SHARES, _if_position(_model_end("C5"))),
+    Column("cost_now", "Cost now", "$", USD, _if_position(_model_end("C14"))),
+    Column("invested", "Invested", "$", USD, _if_position(_model_sum("C9", positive=True))),
+    Column(
+        "shares_bought", "Shares bought", "shares", SHARES,
+        _if_position(_model_sum("C7", positive=True)),
+    ),
+    Column("avg_cost", "Avg cost", "$/share", PRICE, _if_position(_avg_cost)),
+    Column("sold_shares", "Shares sold", "shares", SHARES, _if_position(_sold_shares)),
+    Column("sold_usd", "$ sold", "$", USD, _sold_usd),
+    Column("avg_exit", "Avg exit", "$/share", PRICE, _avg_exit),
+    Column("realised", "Realised", "$", USD, _if_position(_model_sum("C15"))),
+    Column("dividends", "Dividends", "$", USD, _if_position(_model_sum("C12"))),
+    Column("latest_price", "Latest price", "$/share", PRICE, _latest_price),
+    Column("value_now", "Value now", "$", USD, _if_position(_value_now)),
+    Column("unrealised", "Unrealised", "$", USD, _if_position(_unrealised)),
+    Column("total_pnl", "Total P&L", "$", USD, _total_pnl),
+    Column("ret", "Return", "%", PCT, _ret),
+    Column("irr", "IRR", "%", PCT, _if_position(_irr)),
+    Column("weight", "Weight", "%", PCT, _if_position(_weight)),
+    Column("lc_now", "Last change: shares, latest quarter filed", "shares", SHARES, _lc_now),
+    Column("lc_before", "Last change: shares, the quarter before", "shares", SHARES, _lc_before),
+    Column("lc_value_before", "Last change: before, at latest price", "$", USD, _lc_value_before),
+    Column("lc_tag", "Last change", "", GENERAL, _lc_tag),
+    Column("lc_dw", "Last change: weight", "points", RATIO, _lc_dw),
+    Column("last_q", "Last trade: quarter", "q", WHOLE, _if_position(_last_q)),
+    Column(
+        "lt_delta", "Last trade: shares", "shares", SHARES,
+        _if_traded(lambda r: _in_quarter(r, "C7", "last_q")),
+    ),
+    Column(
+        "lt_before", "Last trade: shares before", "shares", SHARES,
+        _if_traded(lambda r: _in_quarter(r, "C5", "last_q", "before")),
+    ),
+    Column("last_type", "Last trade: type", "", GENERAL, _if_traded(_last_type)),
+    Column("last_pct", "Last trade: %", "%", PCT, _last_pct),
+    Column(
+        "last_usd", "Last trade: $", "$", USD, _if_traded(lambda r: _in_quarter(r, "C9", "last_q"))
+    ),
+    Column("status", "What-if: status", "", GENERAL, _status),
+    Column("last_sale_q", "Last sale quarter", "q", WHOLE, _last_sale_q),
+    Column("last_sale_px", "Last sale price", "$/share", PRICE, _last_sale_px),
+    Column("later_close", "1 year later", "$/share", PRICE, _later_close),
+    Column("one_y", "One-year return", "%", PCT, _one_y),
+    Column("spy_at_sale", "SPY at the sale (VWAP)", "$/share", PRICE, _spy_at_sale),
+    Column("spy_later", "SPY 1 year later", "$/share", PRICE, _spy_later),
+    Column("spy_one_y", "SPY one-year", "%", PCT, _spy_one_y),
+    Column("beat_spy", "Beat SPY", "1/0", WHOLE, _beat_spy),
+    Column("since_sale", "Since sale", "%", PCT, _since_sale),
+    Column("missed", "Missed", "$", USD, _missed),
+    Column("irr_held", "IRR if held", "%", PCT, _irr_held),
+    Column("hold", "Hold length", "years", RATIO, _if_position(_hold)),
+    Column("scale", "Scale (for the checks)", "$", USD, _scale),
+)  # fmt: skip
+
+# Orca's stock figures (positions.json and exits.json fields of OrcaStock), each compared with
+# the workbook column of the same id.
+_ORCA_STOCK: tuple[tuple[str, CheckKind], ...] = (
+    ("avg_cost", "ratio"), ("avg_exit", "ratio"), ("invested", "money"), ("realised", "money"),
+    ("dividends", "money"), ("shares_now", "money"), ("cost_now", "money"), ("from_q", "exact"),
+    ("to_q", "exact"), ("last_q", "exact"), ("last_type", "exact"), ("last_pct", "ratio"),
+    ("last_usd", "money"), ("sold_shares", "money"), ("sold_usd", "money"),
+    ("last_sale_q", "exact"), ("one_y", "ratio"), ("spy_one_y", "ratio"),
+)  # fmt: skip
+
+
+def _stock_difference(field: str, kind: CheckKind) -> OutTemplate:
+    def template(r: OutRef) -> str:
+        scale = r.col("scale") if kind == "money" else None
+        return difference(kind, r.col(field), r.col(f"orca_{field}"), scale)
+
+    return template
+
+
+def _orca_columns() -> tuple[Column, ...]:
+    own = {c.id: c for c in _WORKBOOK_COLUMNS}
+    out: list[Column] = []
+    for field, kind in _ORCA_STOCK:
+        mine = own[field]
+        out.append(
+            Column(f"orca_{field}", f"Orca: {mine.name}", mine.units, mine.number_format, None,
+                   source=field, kind=kind)
+        )  # fmt: skip
+        out.append(
+            Column(f"diff_{field}", f"Difference: {mine.name}", "", SCI,
+                   _stock_difference(field, kind))
+        )  # fmt: skip
+    return tuple(out)
+
+
+OUTPUT_COLUMNS: tuple[Column, ...] = _WORKBOOK_COLUMNS + _orca_columns()
+
+
+# --- the checks table (spec 3.4) -----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Check:
+    """One row of the checks table: a measure, how it compares, and where Excel's figures,
+    Orca's and their difference cells are. A place is "<tab>:<id>", plus "@q" or "@y" on Model
+    for the tracked quarter or the year columns of a row or stock block. Outputs ids are stock
+    table columns; Summary ids are items, with ".orca" and ".diff" for the cells beside one.
+    `orca_cells` is None for the bridge, which the engine enforces (it raises otherwise)."""
+
+    measure: str
+    kind: CheckKind
+    excel_cells: str
+    orca_cells: str | None
+    diff_cells: str
+
+
+def _fund_check(span: str, row_id: str) -> Check:
+    name, kind = next((n, k) for i, n, k, _, _ in _ORCA_FUND if i == row_id)
+    where = {"Quarter": "q", "Year": "y"}[span]
+    return Check(
+        f"{span}: {name.lower()}", kind, f"Model:{row_id}@{where}", f"Model:o_{row_id}@{where}",
+        f"Model:d_{row_id}@{where}",
+    )  # fmt: skip
+
+
+def _lower(name: str) -> str:
+    """"Avg cost" -> "avg cost"; "SPY one-year" stays."""
+    return name if name[:2].isupper() else name[:1].lower() + name[1:]
+
+
+def _summary_check(measure: str, item: str, kind: CheckKind) -> Check:
+    return Check(
+        measure, kind, f"Summary:{item}", f"Summary:{item}.orca", f"Summary:{item}.diff"
+    )
+
+
+# Summary's figures that Orca publishes (summary.json metrics, exits.json summary, meta):
+# (measure, Summary item, kind), in the checks table's order.
+SUMMARY_CHECKED: tuple[tuple[str, str, CheckKind], ...] = (
+    ("Annualised return", "ann_return", "ratio"),
+    ("Sharpe", "sharpe", "ratio"),
+    ("Sortino", "sortino", "ratio"),
+    ("Volatility", "vol", "ratio"),
+    ("Max drawdown", "max_dd", "ratio"),
+    ("Calmar", "calmar", "ratio"),
+    ("% quarters positive", "quarters_pos_pct", "ratio"),
+    ("Best year", "best_year", "exact"),
+    ("Best year return", "best_year_ret", "ratio"),
+    ("Worst year", "worst_year", "exact"),
+    ("Worst year return", "worst_year_ret", "ratio"),
+    ("Years positive", "years_pos", "exact"),
+    ("Full years", "years_total", "exact"),
+    ("Turnover", "turnover", "ratio"),
+    ("Average hold (all)", "hold_all", "ratio"),
+    ("Average hold (sold)", "hold_sold", "ratio"),
+    ("Buys: return 12 months after", "buys_12m", "ratio"),
+    ("Sales: return 12 months after", "sells_12m", "ratio"),
+    ("Sales beating SPY", "beat_spy_pct", "ratio"),
+    ("Book", "book", "money"),
+    ("Holdings now", "n_holdings", "exact"),
+    ("% priced", "priced_pct", "ratio"),
+)
+
+_WHOLE_PERIOD = 16  # SUMMARY_CHECKED[:16] are the whole-period metrics, then exits and header
+
+CHECKS: tuple[Check, ...] = (
+    *(_fund_check("Quarter", i) for i in ("start", "end", "market_move", "net_buying")),
+    *(_fund_check("Quarter", i) for i in ("trade_gains", "dividends")),
+    Check("Quarter: bridge", "exact", "Model:bridge_ok@q", None, "Model:d_bridge@q"),
+    _fund_check("Quarter", "ret"),
+    *(_fund_check("Year", i) for i in ("ret", "start", "end", "gains", "inflows", "dividends")),
+    _fund_check("Year", "approx_ret"),
+    *(_summary_check(*row) for row in SUMMARY_CHECKED[:_WHOLE_PERIOD]),
+    Check("What drove: points", "ratio", "Model:C20@y", "Model:O1@y", "Model:D1@y"),
+    Check("What drove: P&L", "money", "Model:C13@y", "Model:O2@y", "Model:D2@y"),
+    *(
+        Check(f"Stock: {_lower(c.name.removeprefix('Orca: '))}", c.kind,
+              f"Outputs:{c.source}", f"Outputs:{c.id}", f"Outputs:diff_{c.source}")
+        for c in OUTPUT_COLUMNS
+        if c.source is not None
+    ),
+    *(_summary_check(*row) for row in SUMMARY_CHECKED[_WHOLE_PERIOD:]),
+)  # fmt: skip
