@@ -7,10 +7,12 @@ dependencies = [
     "polars",
     "httpx",
     "brotli",
+    "xlsxwriter==3.3.1",
 ]
 
 [dependency-groups]
 dev = [
+    "openpyxl==3.1.5",
     "pytest",
 ]
 
@@ -26,4 +28,5 @@ testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
     "network: runs against the real SEC, OpenFIGI, Tiingo and FRED services; needs ORCA_NETWORK=1 and their keys",
+    "libreoffice: recalculates workbooks with LibreOffice headless (soffice); skipped without it unless ORCA_REQUIRE_LIBREOFFICE=1",
 ]

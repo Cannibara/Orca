@@ -249,21 +249,37 @@ def compute_batch(
     """Compute every fund of `holdings` / `reports` (the rows of a set of CIKs), one at a time:
     the prices of every stock the batch holds are loaded first, then each fund's result is
     yielded in CIK order, so only one fund's full output is alive at a time."""
-    filed_quarters = reports.select("cik", q="period").unique()
-    filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters)
-    ctx.load(_stock_ids(ctx, filled).to_list() + ([ctx.spy_id] if ctx.spy_id is not None else []))
-    rows_of = filled.partition_by("cik", as_dict=True) if filled.height else {}
-    reports_of = reports.partition_by("cik", as_dict=True) if reports.height else {}
-    empty = filled.clear()
-    for row in status.sort("cik").iter_rows(named=True):
-        yield compute_fund(ctx, row, rows_of.pop((row["cik"],), empty), reports_of[(row["cik"],)])
+    for _, result in prepare_batch(ctx, holdings, reports):
+        yield result
 
 
-def compute_fund(
+@dataclass(frozen=True)
+class Prepared:
+    """What the engine reads for one fund, before any arithmetic of its own: the tracking segment,
+    the filled holdings, and per stock and quarter the shares as filed (share classes summed), the
+    split-adjusted series, the implied prices and the quarter prices (bounded). The fund workbook
+    reads this, so it shows exactly the engine's inputs. `px` covers every mapped stock of
+    `adjusted` (a stock without prices maps to {}); `spy_px` is the benchmark's."""
+
+    cik: int
+    status: dict
+    start: int
+    end_q: int
+    bound: int
+    rows: pl.DataFrame
+    reports: pl.DataFrame
+    filed: dict[int, dict[int, tuple[float, float]]]
+    adjusted: dict[int, dict[int, tuple[float, float]]]
+    implied: dict[int, dict[int, float]]
+    px: dict[int, dict[int, QuarterPx]]
+    spy_px: dict[int, QuarterPx]
+
+
+def prepare_fund(
     ctx: Context, status: dict, rows: pl.DataFrame, reports: pl.DataFrame
-) -> FundResult:
-    """One fund over its latest tracking segment, through its last held quarter: the carried
-    deadline quarter after a late filing, or the last filed quarter (an early filer's next
+) -> Prepared:
+    """The fund's inputs over its latest tracking segment, through its last held quarter: the
+    carried deadline quarter after a late filing, or the last filed quarter (an early filer's next
     quarter; a fund gone inactive stays frozen there). Prices count up to that quarter or the
     deadline quarter, whichever is later, so a fund's files do not move with the week's prices."""
     cik, last_q = int(status["cik"]), ctx.last_q
@@ -286,26 +302,74 @@ def compute_fund(
         shares_rows["stock_id"].unique().to_list()
         + ([ctx.spy_id] if ctx.spy_id is not None else [])
     )
-    adjusted, reported = _share_series(ctx, shares_rows)
+    adjusted, summed = _share_series(ctx, shares_rows)
+    filed: dict[int, dict[int, tuple[float, float]]] = defaultdict(dict)
+    for q, stock_id, shares, value in summed.select(
+        "q", "stock_id", "shares", "value_usd"
+    ).iter_rows():
+        filed[stock_id][q] = (float(shares), value)
+    implied = {
+        stock_id: {
+            q: value / shares for q, (shares, value) in series.items() if shares > 0 and value > 0
+        }
+        for stock_id, series in adjusted.items()
+    }
+    px = {stock_id: _bounded(ctx.px[stock_id], bound) for stock_id in adjusted}
+    spy_px = _bounded(ctx.px.get(ctx.spy_id, {}), bound) if ctx.spy_id is not None else {}
+    return Prepared(
+        cik, status, start, end_q, bound, rows, reports, dict(filed), adjusted, implied, px, spy_px
+    )
+
+
+def compute_fund(
+    ctx: Context, status: dict, rows: pl.DataFrame, reports: pl.DataFrame
+) -> FundResult:
+    """One fund over its latest tracking segment (see `prepare_fund`)."""
+    return compute_prepared(ctx, prepare_fund(ctx, status, rows, reports))
+
+
+def prepare_batch(
+    ctx: Context, holdings: pl.DataFrame, reports: pl.DataFrame
+) -> Iterator[tuple[Prepared, FundResult]]:
+    """`compute_batch`, also yielding each fund's inputs."""
+    filed_quarters = reports.select("cik", q="period").unique()
+    filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters)
+    ctx.load(_stock_ids(ctx, filled).to_list() + ([ctx.spy_id] if ctx.spy_id is not None else []))
+    rows_of = filled.partition_by("cik", as_dict=True) if filled.height else {}
+    reports_of = reports.partition_by("cik", as_dict=True) if reports.height else {}
+    empty = filled.clear()
+    for row in status.sort("cik").iter_rows(named=True):
+        prepared = prepare_fund(
+            ctx, row, rows_of.pop((row["cik"],), empty), reports_of[(row["cik"],)]
+        )
+        yield prepared, compute_prepared(ctx, prepared)
+
+
+def compute_prepared(ctx: Context, p: Prepared) -> FundResult:
+    """One fund's positions, quarters, metrics, home snapshot and flags from its `Prepared`."""
+    cik, start, end_q, status, rows, reports = p.cik, p.start, p.end_q, p.status, p.rows, p.reports
+    adjusted = p.adjusted
+    end = int(status["segments"][-1]["end"])
+    # the split check reads the shares as filed, so rebuild that frame from `filed`
+    reported = pl.DataFrame(
+        [(cik, q, sid, sh) for sid, series in p.filed.items() for q, (sh, _) in series.items()],
+        schema={"cik": pl.Int64, "q": pl.Int64, "stock_id": pl.Int64, "shares": pl.Float64},
+        orient="row",
+    )
 
     positions = []
     for stock_id in sorted(adjusted):
-        implied = {
-            q: value / shares
-            for q, (shares, value) in adjusted[stock_id].items()
-            if shares > 0 and value > 0
-        }
         shares_by_q = {q: shares for q, (shares, _) in adjusted[stock_id].items()}
         result = compute_position(
-            stock_id, shares_by_q, _bounded(ctx.px[stock_id], bound), start, end_q, implied
+            stock_id, shares_by_q, p.px[stock_id], start, end_q, p.implied[stock_id]
         )
         if result is not None:
             positions.append(result)
     quarters = aggregate_fund(positions, start, end_q)
     check_invariants(cik, positions, quarters)
 
-    px_by_stock = {p.stock_id: _bounded(ctx.px[p.stock_id], bound) for p in positions}
-    spy_px = _bounded(ctx.px.get(ctx.spy_id, {}), bound) if ctx.spy_id is not None else {}
+    px_by_stock = {pos.stock_id: p.px[pos.stock_id] for pos in positions}
+    spy_px = p.spy_px
     years = fund_years(quarters)
     rets = [(fq.q, fq.ret) for fq in quarters if fq.ret is not None]
     hold_all, hold_sold = hold_lengths(positions, end_q)
@@ -332,7 +396,7 @@ def compute_fund(
         latest_rows.select("cusip", "kind", "value_usd"),
         {c for c in latest_rows["cusip"].to_list() if c in ctx.stock_of},
     )
-    held = [p for p in positions if p.shares_now > 0]
+    held = [pos for pos in positions if pos.shares_now > 0]
     meta = FundMeta(
         fund_id=cik,
         name=name,
@@ -401,8 +465,8 @@ def _share_series(
     ctx: Context, shares_rows: pl.DataFrame
 ) -> tuple[dict[int, dict[int, tuple[float, float]]], pl.DataFrame]:
     """Per stock and quarter the split-adjusted shares (`split_adjust_shares`, from the stock's
-    precomputed factors) and reported value (share classes of one stock summed), and the same as
-    reported (cik, q, stock_id, shares) for the split check."""
+    precomputed factors) and reported value (share classes of one stock summed), and the
+    summed frame (cik, q, stock_id, shares as filed, value_usd)."""
     summed = (
         shares_rows.group_by("cik", "q", "stock_id")
         .agg(pl.col("shares").sum(), pl.col("value_usd").sum())
@@ -413,7 +477,7 @@ def _share_series(
         "q", "stock_id", "shares", "value_usd"
     ).iter_rows():
         adjusted[stock_id][q] = (float(shares) * ctx.share_factors[stock_id].of(q), value)
-    return dict(adjusted), summed.select("cik", "q", "stock_id", "shares")
+    return dict(adjusted), summed
 
 
 def check_invariants(

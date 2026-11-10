@@ -1,10 +1,52 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-10 — Workbook phase 1: implementation rulings that changed the design
+Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Where the build departs from the spec as first written, the spec now says what was built:
+- Year cells reference the year's contiguous quarter range directly (`SUM`, `MIN`, the last or first quarter's cell), not `SUMIF` on the Year row. Equivalent, simpler, and `MINIFS` is not in Excel 2016.
+- Calculation cells are blank after the last filing (`end_q`) because they are not written. The two cash-flow rows (C17, C18) hold 0 there, since those flows are truly 0 and Excel's XIRR with empty cells in its range is unverified.
+- Years chain through a running-growth row ("Year-to-date growth"), with no `LN` anywhere: `LN` gives `#NUM!` for a quarterly return of −100% or less, where the engine still returns a number.
+- Difference scale (R21): dollar and share differences divide by `MAX(1,|Orca|,scale)`, the scale computed in Excel from the same tab (a quarter's `MAX(|Start|,|End|,Buys+Sells)`, a stock's peak of |Value|, |Cost|, Invested); returns and ratios divide by `MAX(1,|Orca|)`. One tolerance, 1e-9, serves both; quarters, counts and text must be equal.
+- Each XIRR range starts at the position's first trade, not the first quarter column: after years of leading zeros LibreOffice stopped at a spurious root (14,220% against the site's −28%).
+- On Outputs the cut's "All other positions" is a labelled input block below the Total row, not a row of the stock table.
+- The block index sits just below the frozen header rows (above them, about 43 rows would be frozen).
+- Shares sold and $ sold are blank, not 0, when nothing was sold (Orca's exits fields are empty there).
+- A never-priced stock holds only a value-0 filed row: the engine prices any positive filed value through the reported-value fallback. The spec's claim that its filed value counts in % priced was corrected.
+- The CLI validates each fund's inputs, writes them, reads them back and requires equality before it writes anything. Demo data cannot prove that every value of a real fund serialises.
+- Known gaps: Excel itself has never opened these files (only LibreOffice 24.2); the Tiingo licence blocks any sale.
+
+## 2026-11-10 — Per-fund Excel workbook: paid tier, built on demand
+- Supersedes R10 (`docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`, the quarter-step IRR clock `tradeT = q/4 + 0.125`): the site now dates trades mid-quarter and divides days by 365, as Excel's XIRR does.
+- Decision (owner, chat):
+  - The workbook is a paid-tier feature.
+  - Raw data is quarterly: 13F shares and value as filed, plus per stock per quarter the close, VWAP, dividends per share and split factor. No daily bars.
+  - Funds with more than 500 positions keep their 500 largest, ranked by peak quarter-end value. One "All other positions" line, taken from Orca's own totals, keeps the fund figures exact.
+  - The site's IRR moves to Excel's XIRR convention: mid-quarter dates, days ÷ 365.
+  - Workbooks are built only when a user asks for one, never pre-built.
+- How it runs:
+  - Phase 1 (now): a Python builder (xlsxwriter) takes one fund's input file, written from exactly what the engine used. A manual Action builds workbooks for chosen funds into the private bucket.
+  - Phase 2 (own spec): the monthly run writes small private input files for every fund. A Worker checks the user has paid, then a Cloudflare Container builds the workbook (estimated ~1 s for a median fund, ~20 s for one capped at 500 positions) and keeps it until the next run. Login and payments are part of phase 2.
+- Rejected:
+  - Built in the browser: the raw data would have to be public, so nothing could be sold.
+  - Built in a Worker: CPU limits, and a second implementation in JS.
+  - Python Workers: 128 MB memory cap.
+  - GitHub Actions on click: GitHub's terms bar Actions "as part of a serverless application", the logs are public, and jobs can wait in a queue.
+  - Pre-building every workbook monthly: xlsxwriter measured ~1,255 stock-quarter rows/s per core; a 120-fund sample extrapolates to ~43M rows, so ~9.5 h on one core or ~2.5 h on the runner's 4 cores each month.
+  - Blocking "index funds" by size: the 627 funds with 1,000+ holdings include Citadel, Renaissance, Two Sigma and D. E. Shaw. Only ~26 look like index managers.
+- Scaling rule: GitHub Actions are only for tests, deploys and the monthly batch. Anything a user triggers runs on Cloudflare (Workers, Containers). Escape hatch: package the pipeline in the same Container image as the workbook builder, so the monthly run can move to a Container on a monthly timer if Actions limits or terms ever bite (estimated ~$1/month; Container time and disk limits for a 2–3 h run not verified).
+- Measured (2026-11-10):
+  - IRR, site method vs XIRR: median gap 0.011 pp (Berkshire) and 0.015 pp (Vanguard); 95% of positions under 0.18 pp; maximum 0.9 pp and 11.8 pp, all on very short holds.
+  - Vanguard has 6,177 positions and 166,891 trades. Its top 500 by peak value cover 81.5% of value in 22,438 stock-quarter rows.
+  - 1,343 funds hold more than 500 positions now.
+- Consequences:
+  - Supersedes "Excel/paid downloads parked" (2026-11-09).
+  - Tiingo's redistribution licence is needed before charging.
+  - The download path needs Workers Paid ($5/month), and Container time is included up to 375 vCPU-minutes a month.
 
 ## 2026-11-09 — Excel/paid downloads parked
 - Decision: no Excel export for now (chat).

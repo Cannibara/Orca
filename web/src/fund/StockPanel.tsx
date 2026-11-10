@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { niceTicks } from "./geometry";
-import { tradeMove, tradeT } from "../lib/live";
+import { midQuarterMs, tradeMove } from "../lib/live";
 import { qLabelFull, fM, MINUS } from "./fmt";
 import { useWeekly } from "./usePositionData";
 import type { PosRow } from "./positions";
@@ -83,7 +83,7 @@ function Chart({
   }
 
   const marks = row.pos.trades.flatMap((t, idx) => {
-    const fi = (Date.UTC(2013, 0, 1) + tradeT(t.q) * 365.25 * DAY - t0) / STEP;
+    const fi = (midQuarterMs(t.q) - t0) / STEP;
     if (fi < i0 || fi > i1) return [];
     const f0 = Math.floor(fi);
     const f1 = Math.min(n - 1, f0 + 1);

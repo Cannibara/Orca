@@ -15,7 +15,8 @@ import {
   sinceSale,
   totalPnl,
   tradeMove,
-  tradeT,
+  midQuarterMs,
+  tradeYears,
   unrealised,
 } from "../src/lib/live";
 
@@ -128,10 +129,15 @@ test("sinceSale is null without an exit price or a price", () => {
   expect(sinceSale(10, undefined)).toBeNull();
 });
 
-test("tradeT is q/4 + 0.125 years after 2013-01-01", () => {
-  expect(tradeT(0)).toBe(0.125);
-  expect(tradeT(4)).toBe(1.125);
-  expect(tradeT(53)).toBe(13.375);
+test("mid-quarter dates follow the workbook's rule", () => {
+  const iso = (q: number) => new Date(midQuarterMs(q)).toISOString().slice(0, 10);
+  expect([iso(4), iso(5), iso(6), iso(7), iso(12)]).toEqual(["2014-02-14", "2014-05-16", "2014-08-15", "2014-11-15", "2016-02-15"]);
+});
+
+test("IRR counts days ÷ 365 like XIRR", () => {
+  // buy 100 on 2014-02-14 (q=4), worth 110 on 2015-02-14: exactly 365 days
+  const t1 = (Date.UTC(2015, 1, 14) - Date.UTC(2013, 0, 1)) / (365 * 86_400_000);
+  expect(irr([[tradeYears(4), -100], [t1, 110]])).toBeCloseTo(0.1, 12);
 });
 
 test("tradeMove names a trade from its signed change and the shares left (New / Add / Trim / Exit)", () => {
@@ -148,11 +154,14 @@ test("tradeMove tolerates float noise in the share counts", () => {
   expect(tradeMove(trade(6, -10, 10, 1e-3))).toBe("Trim"); // a real remainder is not an exit
 });
 
-test("positionFlows: trade flow is -delta x px at tradeT(q), plus the holding at now (R10)", () => {
+// Years of 365 days from 2013-01-01 to a day count (q=0 trades on day 44, q=4 on 409, q=8 on 774: Feb 14).
+const yrs = (days: number): number => (days * 86_400_000) / (365 * 86_400_000);
+
+test("positionFlows: trade flow is -delta x px at tradeYears(q), plus the holding at now (R10)", () => {
   const trades = [trade(0, 100, 10, 100), trade(4, -40, 15, 60)];
   expect(positionFlows(trades, 60, 20, 3)).toEqual([
-    [0.125, -1000], // buy: money out
-    [1.125, 600], //   sale: money in
+    [yrs(44), -1000], // buy: money out
+    [yrs(409), 600], // sale: money in
     [3, 1200], //      terminal: 60 shares x 20 at now
   ]);
 });
@@ -160,7 +169,7 @@ test("positionFlows: trade flow is -delta x px at tradeT(q), plus the holding at
 test("positionFlows: a closed position has no terminal flow and needs no price", () => {
   const trades = [trade(0, 100, 10, 100), trade(8, -100, 12.1, 0)];
   const flows = positionFlows(trades, 0, undefined, 5);
-  expect(flows).toEqual([[0.125, -1000], [2.125, 1210]]);
+  expect(flows).toEqual([[yrs(44), -1000], [yrs(774), 1210]]);
   expect(irr(flows)).toBeCloseTo(0.1, 6); // 1000 -> 1210 over two years
 });
 
@@ -171,8 +180,8 @@ test("positionFlows: an open position with an unknown price has no flows (IRR sh
 test("heldFlows: only buys, plus every bought share valued at now (R10)", () => {
   const trades = [trade(0, 100, 10, 100), trade(4, -40, 15, 60), trade(8, 20, 12, 80)];
   expect(heldFlows(trades, 30, 6)).toEqual([
-    [0.125, -1000],
-    [2.125, -240],
+    [yrs(44), -1000],
+    [yrs(774), -240],
     [6, 120 * 30], // 100 + 20 bought shares, the sale ignored
   ]);
 });
@@ -183,8 +192,8 @@ test("heldFlows: no flows when the price is unknown", () => {
 
 test("heldFlows gives the IRR of never having sold", () => {
   const trades = [trade(0, 100, 10, 100), trade(8, -100, 12.1, 0)];
-  const nowT = 4.125;
-  // 100 shares bought at 10 and still worth 14 at t = 4.125: 1.4 over four years
+  const nowT = yrs(44 + 4 * 365);
+  // 100 shares bought at 10 and still worth 14 exactly 1,460 days (four 365-day years) later: 1.4 over four years
   expect(irr(heldFlows(trades, 14, nowT))).toBeCloseTo(Math.pow(1.4, 1 / 4) - 1, 6);
 });
 

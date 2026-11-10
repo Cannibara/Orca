@@ -1,0 +1,114 @@
+name: Workbook
+
+# Builds the Excel workbook of chosen funds from the lake and stores it in the PRIVATE lake bucket
+# under workbooks/manual/<UTC date>/ (the workbooks and their inputs/<id>.json). Phase 1 is
+# owner-only: nothing is published and no artifact is uploaded, because this repository is public.
+# Download the files from the bucket (dashboard or rclone).
+#
+# It restores the lake but never saves it back: the lake is only read. It shares the `pipeline`
+# concurrency group, so it never reads a lake that a pipeline run is half way through saving.
+
+on:
+  workflow_dispatch:
+    inputs:
+      fund_ids:
+        description: Fund ids (CIKs), separated by spaces, at most 20
+        type: string
+        required: true
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: pipeline
+
+env:
+  RCLONE_CONFIG_R2_TYPE: s3
+  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+  RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true" # an object-only R2 token cannot create buckets
+  RCLONE_TRANSFERS: "16"
+  RCLONE_CHECKERS: "16"
+  RCLONE_TIMEOUT: 60s
+  RCLONE_CONTIMEOUT: 15s
+  RCLONE_STATS: 30s
+  RCLONE_STATS_ONE_LINE: "true"
+  RCLONE_STATS_LOG_LEVEL: NOTICE
+  R2_LAKE_BUCKET: ${{ vars.R2_LAKE_BUCKET }}
+  R2_SITE_BUCKET: ${{ vars.R2_SITE_BUCKET }}
+  ORCA_LAKE_DIR: data/lake
+  ORCA_OUT_DIR: data/out
+
+jobs:
+  workbook:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 120
+    steps:
+      - name: Check the fund ids
+        working-directory: . # before the checkout, so pipeline/ does not exist yet
+        # The input goes through an environment variable, never into the script text.
+        env:
+          FUND_IDS: ${{ inputs.fund_ids }}
+        run: |
+          # A newline would hide further lines from `read` (the count and number checks would
+          # see only the first), so any control character is refused outright.
+          if [[ "$FUND_IDS" =~ [[:cntrl:]] ]]; then
+            echo "::error::fund ids must be on one line, separated by spaces"
+            exit 1
+          fi
+          read -r -a ids <<< "$FUND_IDS"
+          if [ "${#ids[@]}" -lt 1 ] || [ "${#ids[@]}" -gt 20 ]; then
+            echo "::error::give between 1 and 20 fund ids (got ${#ids[@]})"
+            exit 1
+          fi
+          for id in "${ids[@]}"; do
+            if [[ ! "$id" =~ ^[0-9]{1,10}$ ]]; then
+              echo "::error::fund ids are numbers only (CIKs of up to 10 digits)"
+              exit 1
+            fi
+          done
+          # The build step uses only this validated list (digits and single spaces).
+          echo "VALID_FUND_IDS=${ids[*]}" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+      - uses: ./.github/actions/setup-rclone
+      - name: Install dependencies
+        run: uv sync --locked --no-dev
+      - uses: ./.github/actions/restore-r2
+        with:
+          access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          endpoint: ${{ secrets.R2_ENDPOINT }}
+      - name: Build the workbooks
+        run: |
+          set -f # no globbing of the unquoted list below
+          args=()
+          for id in $VALID_FUND_IDS; do args+=(--fund "$id"); done
+          uv run --locked --no-dev python -m orca.run workbook "${args[@]}" --out data/workbooks
+      - name: Upload to the private lake bucket
+        # Also when another fund failed: the funds that built are still stored, and the job stays
+        # red through the failed build step. Nothing to upload (no file built): skipped.
+        if: ${{ !cancelled() && hashFiles('pipeline/data/workbooks/**') != '' }}
+        env:
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          # Secrets pasted with a trailing line break or space break the Authorization header: strip them.
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
+          day="$(date -u +%F)"
+          rclone copy data/workbooks "r2:${R2_LAKE_BUCKET}/workbooks/manual/${day}/"
+          echo "stored in the private lake bucket under workbooks/manual/${day}/"

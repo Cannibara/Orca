@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-09 (pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-10 (workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -51,10 +51,11 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
 | `home.py` | home lists (`top_funds`, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health |
-| `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
+| `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
+| `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
 | `demo.py` | synthetic offline dataset for `web/public/demo-data` |
 
-CLI: `python -m orca.run {weekly | rebuild | home | check-keys | verify [--sample N --seed S] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
+CLI: `python -m orca.run {weekly | rebuild | home | check-keys | verify [--sample N --seed S] | workbook --fund ID [--fund ID …] [--out DIR --max-positions N] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
 
 Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIINGO_RATE_PER_SEC`, `FRED_KEY`, `ORCA_TIME_BUDGET_MIN`, `ORCA_LAKE_DIR` (default `data/lake`), `ORCA_OUT_DIR` (default `data/out`), `ORCA_NETWORK` (tests).
 
@@ -143,6 +144,20 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`), `published.json` |
 
 Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.publish_fund`); `funds.json`, `securities.json`, `latest_prices.json`, `home/*.json` (`publish.publish_shared`); `stock/{id}/weekly.json` (`publish.publish_weekly`); `health.json`, `manifest.json`. They are minified with sorted keys and brotli quality 9, uploaded with `Content-Encoding: br` and `Cache-Control: public, max-age=300`, which the Cloudflare cache rule overrides. CUSIP guard: `_json_ready` refuses a `cusip` key and `publish_step.cusip_leaks` scans the staged files. Field meanings and units: `pipeline/contract.md`.
+
+### Workbook (`pipeline/orca/workbook/`, phase 1: owner-only)
+- Modules:
+  - `inputs.py`: `FundInputs`, taken from exactly what the engine used (`run.compute.Prepared` and `FundResult`); `validate`, `to_json` / `from_json` (brotli JSON, no CUSIP ever).
+  - `cut.py`: funds over 500 positions keep the top 500 by peak value; the rest become one "All other positions" line.
+  - `layout.py`: the block and column registry; `model.py`, `outputs.py`, `summary.py`: the three tabs (xlsxwriter, constant memory); `sheet.py`: fast writer and formats; `build.py`: `build_workbook`, `file_name`; `parity.py`: site-versus-Excel test support.
+- CLI: `python -m orca.run workbook --fund ID [--fund ID …]` (`run/workbook.py`). It reads the lake like `verify`, then per fund validates the inputs, checks `from_json(to_json(fi)) == fi`, and writes `<out>/inputs/<id>.json` and `<out>/orca-<id>-<name>-<price date>.xlsx`. Unknown fund: `fund N: not found`, exit 1. No priced positions: skipped, exit 0. Output lines carry only ids, sizes and timings.
+- Action `.github/workflows/workbook.yml` (manual, `fund_ids`, at most 20 numeric ids on one line, checked in a step that refuses control characters and passes only the validated list on): restores the lake (`production` environment, `concurrency: pipeline`), builds, and copies `pipeline/data/workbooks` to the PRIVATE lake bucket under `workbooks/manual/<UTC date>/`. It never saves the lake and uploads no artifact (the repository is public). The upload step runs even when a fund failed (`!cancelled()` and some file built), so the funds that built are stored while the job stays red through the failed build step.
+- A fund that fails for any reason (unknown, invalid inputs, any other exception) prints `fund N: ...` (the exception type only), leaves no file (workbook built to `.part` and renamed, inputs file written last, partial files removed), and the other funds still build; the command exits 1.
+- The lake sync in `restore-r2` and the save in `pipeline.yml` both `--exclude "workbooks/**"`: past workbooks are not restored (no run reads them), and the save would otherwise delete them from the bucket.
+- Private paths: `workbooks/manual/<date>/` in the lake bucket only. Nothing is public, so `pipeline/contract.md` is unchanged.
+- Design: workbooks are built on demand, never pre-built (a monthly pre-build was estimated at ~2.5 h on four cores). GitHub Actions are only for this owner-only phase.
+- Phase 2 (own spec, not built): the monthly run writes small private input files for every fund; a Worker checks payment; a Cloudflare Container builds the file. Needs login and payments, and Tiingo's redistribution licence.
+- Tests: LibreOffice recalculates the files (`tests/lo.py`); CI installs it and sets `ORCA_REQUIRE_LIBREOFFICE=1`, so a missing `soffice` fails there instead of skipping. Excel itself has not been run.
 
 ## Web (`web/`)
 - Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `/how-it-works`, `*`.

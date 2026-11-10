@@ -179,9 +179,9 @@ test("priceDates holds the date of each stock that has one", () => {
 
 test("yearsSince2013", () => {
   expect(yearsSince2013("2013-01-01")).toBe(0);
-  expect(yearsSince2013("2014-01-01")).toBeCloseTo(365 / 365.25, 12);
-  expect(yearsSince2013("2017-01-01")).toBeCloseTo(1461 / 365.25, 12); // 2016 is a leap year
-  expect(yearsSince2013("2026-10-30")).toBeCloseTo((Date.UTC(2026, 9, 30) - Date.UTC(2013, 0, 1)) / (365.25 * 86_400_000), 12);
+  expect(yearsSince2013("2014-01-01")).toBe(1);
+  expect(yearsSince2013("2017-01-01")).toBeCloseTo(1461 / 365, 12); // 2016 is a leap year: 1461 days = 4.0027 years
+  expect(yearsSince2013("2026-10-30")).toBeCloseTo((Date.UTC(2026, 9, 30) - Date.UTC(2013, 0, 1)) / (365 * 86_400_000), 12);
   expect(yearsSince2013("2012-07-01")).toBeLessThan(0);
 });
 

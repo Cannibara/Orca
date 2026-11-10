@@ -1,9 +1,46 @@
 # Worklog
 
-Last verified: 2026-11-09
+Last verified: 2026-11-10
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-10 — Per-fund Excel workbook, phase 1 built (owner-only)
+
+| What changed | Why | Files |
+|---|---|---|
+| Builder for a per-fund workbook (Model, Outputs, Summary tabs; every fund-page metric as formulas, 57 in-file checks against Orca's figures); `orca.run workbook` CLI that validates, round-trips and writes inputs plus the file; manual Workbook Action to the private lake bucket; CI installs LibreOffice and requires it; the site's IRR now uses Excel's XIRR convention (mid-quarter dates, days ÷ 365); docs and spec brought in line with the build (code)(git) | Owner decision: paid per-fund workbook, phase 1 for the owner only (chat) | `pipeline/orca/workbook/`, `pipeline/orca/run/workbook.py`, `pipeline/orca/run/cli.py`, `pipeline/orca/run/compute.py`, `.github/workflows/workbook.yml`, `.github/workflows/ci.yml`, `web/src/lib/live.ts`, `docs/*`, `CLAUDE.md` |
+
+- The public pipeline contract is unchanged (no public file changed).
+- Open:
+  - Excel has never opened these files; only LibreOffice 24.2 recalculated them. Open one in Excel and check Summary's "Checks failing" before anyone relies on it.
+  - Tiingo's redistribution licence is a blocker before selling or sharing a workbook.
+  - Phase 2 (login, payment, Worker, Container, per-fund private input files for every fund) needs its own spec.
+  - actionlint 1.7.12 and shellcheck were run clean on workbook.yml and ci.yml; the Action itself has not run on GitHub yet.
+
+## 2026-11-10 — Per-fund Excel workbook design: sections 1–2 approved
+
+| What changed | Why | Files |
+|---|---|---|
+| New DECISIONS entry (2026-11-10): paid per-fund Excel workbook built on demand, 500-position cut, site IRR moves to the XIRR convention, scaling rule for GitHub Actions; ROADMAP update note; ROADMAP D1 golden-dataset wording corrected (the Berkshire figures are the site's own output, not independent) (chat) | Owner's design session: "raw data first, then Excel formulas for every fund-page metric, reconciled to ours" (chat) | `docs/DECISIONS.md`, `docs/ROADMAP.md` |
+
+- Approved layout (chat):
+  - 3 tabs: Model, Outputs, Summary.
+  - Model has rows = variables, with stocks in blocks in the same order everywhere. Its columns are years | gap | quarters | Latest, and the year columns are formulas over the quarter columns.
+  - Outputs: stock snapshot (positions now and what-if) plus the checks table.
+  - Summary: header figures, the 8 tiles and the overall check status.
+- Measured (chat): xlsxwriter ~1,255 stock-quarter rows/s per core; LibreOffice headless recalculates XIRR, STDEV.S, SUMIFS and INDEX/MATCH correctly (spike in the scratchpad, not in the repo).
+- Next: design sections 3–5 (data flow and code, reconciliation and tests, ops), then the spec at `docs/superpowers/specs/2026-11-10-fund-workbook-design.md`.
+- Gaps: both inventory subagents failed on a 429 rate limit after a container restart; the inventory was redone by reading the code (chat).
+
+## 2026-11-09 — Design audit against planned features (`docs/ROADMAP.md`)
+
+| What changed | Why | Files |
+|---|---|---|
+| Prioritised audit of the design against F1 CSV/Excel export, F2 columns/saved views, F3 weekly popularity list, F4 sector momentum/volume, F5 manager rankings; from the docs, spot-checks in code and live `data.orcaetf.com` sizes/health (measured), vendor/platform limits by web search (chat) | Owner asked for best practices missing before building those features (chat) | `docs/ROADMAP.md`, `CLAUDE.md` (Read-X row) |
+
+Found (measured): live manifest from 2026-11-05 (76,080 files); Vanguard `positions.json` 3.4 MB brotli / 8.3 MB decoded; no URL state in `web/src`; disclaimer only on Method; no Dependabot/CodeQL, no failure alert, no lake backup. Web: Tiingo's self-serve plans are internal-use only (redistribution licence needed); public-repo schedules stop after 60 days without activity; Pages Free cap 20,000 files per site.
+Open: owner to approve the roadmap; confirm `ORCA_SCHEDULE_ENABLED=true` before the 2026-11-16 run; stale lines in `pipeline/contract.md` not fixed in this pass (ROADMAP H1).
 
 ## 2026-11-09 — Context backfill from the build session
 
