@@ -1,4 +1,4 @@
-"""Command line: `python -m orca.run weekly | rebuild | verify | demo`."""
+"""Command line: `python -m orca.run weekly | rebuild | verify | workbook | demo`."""
 
 import argparse
 import json
@@ -32,6 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     check.add_argument("--sample", type=int, default=50)
     check.add_argument("--seed", type=int, default=None)
+    book = commands.add_parser(
+        "workbook", help="build the Excel workbook of chosen funds from the lake (private output)"
+    )
+    book.add_argument("--fund", type=int, action="append", required=True, metavar="ID")
+    book.add_argument("--out", type=Path, default=Path("data/workbooks"))
+    book.add_argument("--max-positions", type=int, default=500)
     demo_cmd = commands.add_parser("demo", help="build the synthetic demo dataset (no network)")
     demo_cmd.add_argument("--out", type=Path, default=Path("data/demo"))
     demo_cmd.add_argument(
@@ -82,6 +88,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"differs: {path}")
         print(f"verify: {len(diffs)} file(s) differ")
         return 1 if diffs else 0
+    if args.command == "workbook":
+        from orca.run.workbook import build_workbooks
+
+        results = build_workbooks(
+            Lake(config.LAKE_DIR), args.fund, args.out, args.max_positions
+        )
+        return 1 if any(r.failed for r in results) else 0
     from orca import demo
 
     files = demo.write_demo(args.out, seed=args.seed, compress=not args.plain)
