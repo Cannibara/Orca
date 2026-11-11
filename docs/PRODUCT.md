@@ -30,7 +30,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Shipped | Background loading (first 50 rows, fill to 200, Show 100 more; all weekly prices prefetched) | `web/src/fund/loading.ts`, `prefetch.ts` (code) |
 | Shipped (PR #3, a2a1554) | HSTS, noindex on pages.dev, sitemap/robots/canonical | (git 006b9d8, a2a1554) |
 | File only | Just filed list: `home/just_filed.json` is still published; its tab was removed 2026-11-06 | `pipeline/orca/home.py` `just_filed` (code) |
-| Proposed, unanswered | Conviction: drop funds with ≥ 30% of book in ETFs; common stock only (no convertibles/preferreds); name filters for wealth managers and charities; match the two views' Quarter / Weight columns | (chat) |
+| Proposed, unanswered | Conviction: drop funds with ≥ 30% of book in ETFs; common stock only (no convertibles/preferreds); name filters for wealth managers and charities | (chat) |
 | Proposed, declined | Best & worst calls from every qualifying buy, re-cut live (owner kept the 50 + 50 file) | (chat) |
 | Backlog | Per-fund quarter-end price file (fewer requests) | (chat) |
 | Phase 1 built (owner-only) | Paid per-fund workbook (phase 1: owner-only): an Excel file per fund with the raw quarterly data and formulas for every fund-page metric, reconciled to Orca's figures; built by hand with Actions > Workbook into the private bucket; not for sale until the Tiingo licence is settled; login, payment and on-demand build are phase 2 | `pipeline/orca/workbook/`, `docs/superpowers/specs/2026-11-10-fund-workbook-design.md` (code)(chat) |
