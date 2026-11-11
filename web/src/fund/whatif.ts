@@ -163,6 +163,7 @@ function stubBase(e: ExitIn, stock: Stock | undefined, price: number | null): Po
     total: null,
     tag: null,
     dw: null,
+    wPrev: null,
     irr: () => null,
   };
 }

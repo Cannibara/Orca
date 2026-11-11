@@ -82,6 +82,7 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 | Return (position) | total P&L ÷ dollars invested | `asOf` (code) |
 | IRR | Excel's XIRR convention: trades dated mid-quarter (quarter start + half its days), days ÷ 365; terminal value at the period end; dividends excluded. Changed 2026-11-10 from the old quarter-step clock (`q/4 + 0.125`); median gap 0.011 pp on Berkshire | `web/src/lib/live.ts` (code) |
 | Weight | position value ÷ priced book at the period end | `positions.ts` (code) |
+| Weight (cell) | "was% → now%" where the fund traded in the period; bar: old weight solid grey, change striped (blue larger, orange smaller); was = weight before at the period-end prices | `positions.ts` `wPrev`, `PositionsTable.tsx` (code) |
 | Last change (box) | weight change in % of AUM from the stock's own trade: A/(vb−B+A) − B/vb at period-end prices | `positions.ts` (code) |
 | Contribution points | stock P&L ÷ (year start + ½ inflows) × 100 | `pipeline/contract.md` |
 | Conviction move | see DECISIONS "Conviction v3" and `pipeline/contract.md` Home | (git)(code) |

@@ -32,7 +32,7 @@
 /* ---------- the table ---------- */
 .fp .twrap{overflow:auto;max-height:620px;border-top:1px solid var(--line);position:relative}
 .fp .twrap:focus-visible{outline-offset:-2px}
-.fp table.t{border-collapse:separate;border-spacing:0;width:100%;min-width:1064px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+.fp table.t{border-collapse:separate;border-spacing:0;width:100%;min-width:1096px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
 .fp .t>thead>tr>th{position:sticky;top:0;z-index:2;background:var(--sunken);height:36px;padding:0 8px;text-align:right;font:500 12px/1 var(--f-sans);color:var(--ink3);border-bottom:1px solid var(--line2);white-space:nowrap;vertical-align:middle}
 .fp .t>thead>tr>th:first-child,.fp .t>tbody>tr>td:first-child{text-align:left;padding-left:var(--ppad)}
 .fp .t>thead>tr>th:last-child,.fp .t>tbody>tr>td:last-child{padding-right:var(--ppad)}
@@ -67,9 +67,14 @@
 .fp .t .stk b{font:600 13px/15px var(--f-mono);letter-spacing:-.01em;display:inline-block}
 .fp .t .stk span{color:var(--ink3);font-size:11.5px;line-height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%}
 .fp .t>tbody>tr[data-t]{cursor:pointer}
-.fp .t .wcell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;justify-content:center;width:56px}
+.fp .t .wcell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;justify-content:center;width:88px}
 .fp .t .wcell .wn{line-height:14px}
+.fp .t .mbs{display:flex;align-items:center;width:100%;height:5px}
 .fp .t .mb{display:block;height:5px;border-radius:2.5px;background:var(--ink3);flex:none}
+/* the weight added (blue) or given up (orange): hatching in the same height, after the solid weight that stayed */
+.fp .t .mb.mbx{background:repeating-linear-gradient(135deg,var(--c) 0 1.6px,transparent 1.6px 3.6px);box-shadow:inset 0 0 0 1px var(--c);border-radius:1.5px;margin-left:1px}
+.fp .t .mb.mbx.up{--c:var(--gain)}
+.fp .t .mb.mbx.dn{--c:var(--loss)}
 .fp .t .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
 .fp .twrap.is-loading .t>tbody{opacity:.5}
 /* a zero-height sticky line before the table: the note floats over the dimmed rows */

@@ -303,6 +303,8 @@ export type PosRow = {
   tag: Tag | null;
   /** Change in the position's weight over the period, percentage points of the book; null when unpriced. */
   dw: number | null;
+  /** Weight in the book just before the period (at the period's end prices, so it moves only with shares), percent; null when unpriced. */
+  wPrev: number | null;
   /** Annualised IRR, worked out on first use. */
   irr: () => number | null;
 };
@@ -349,7 +351,7 @@ export function prefetchOrder(positions: PositionRow[], tl: Timeline, prices: Re
  */
 export function buildRows(positions: PositionRow[], qs: number, qe: number, src: PriceSource, stocks: Map<number, Stock>): PosRow[] {
   const listed: { pos: PositionRow; a: number; b: number; px: number | null }[] = [];
-  let vb = 0;
+  let vb = 0; // the book before the period, at the period's end prices
   for (const pos of positions) {
     const held = inPeriod(pos, qs, qe);
     if (!held) continue;
@@ -363,10 +365,12 @@ export function buildRows(positions: PositionRow[], qs: number, qe: number, src:
     const tag: Tag | null =
       a === 0 && b === 0 ? null : b <= 1e-6 ? "new" : a <= 1e-6 ? "exit" : a > b * 1.000001 ? "add" : a < b * 0.999999 ? "trim" : null;
     let dw: number | null = null;
+    let wPrev: number | null = null;
     if (px !== null) {
       const A = a * px;
       const B = b * px;
       const den = vb - B + A;
+      wPrev = vb > 0 ? (B / vb) * 100 : 0;
       dw = ((den > 0 ? A / den : 0) - (vb > 0 ? B / vb : 0)) * 100;
     }
     const stock = stocks.get(pos.stock_id);
@@ -391,6 +395,7 @@ export function buildRows(positions: PositionRow[], qs: number, qe: number, src:
       total: f.total,
       tag,
       dw,
+      wPrev,
       irr: once(() => irr(positionFlows(pos.trades.slice(0, f.n), f.sh, px ?? undefined, tNow))),
     };
   });

@@ -112,6 +112,21 @@ describe("PositionsPanel at the newest quarter", () => {
     expect(ge.querySelector(".lc.add b")?.textContent).toBe("+6.0%");
   });
 
+  test("Weight reads was → now where the fund traded, with the old weight solid and the change striped", () => {
+    panel();
+    const row = (t: string) => rowsOf().find((r) => r.getAttribute("data-t") === t)!;
+    // untouched: just the weight, one solid bar
+    const first = rowsOf()[0].querySelectorAll("td")[2];
+    expect(first.textContent).toBe("25%");
+    expect(first.querySelector(".mbx")).toBeNull();
+    // GE was added: old weight, then the striped extension
+    const ge = row("GE").querySelectorAll("td")[2];
+    const [was, now] = (ge.querySelector(".wn")?.textContent ?? "").split(" → ").map((v) => parseInt(v, 10));
+    expect(now).toBeGreaterThan(was);
+    expect(ge.querySelector(".mb:not(.mbx)")).not.toBeNull();
+    expect(ge.querySelector(".mbx.up")).not.toBeNull();
+  });
+
   test("the newest quarter needs no weekly file before the browser is idle; then the background prefetch begins", async () => {
     panel();
     expect(weeklyMock).not.toHaveBeenCalled();
@@ -366,6 +381,7 @@ describe("a fund with thousands of positions", () => {
       total: i,
       tag: null,
       dw: null,
+    wPrev: null,
       irr: () => null,
     };
   };

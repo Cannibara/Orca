@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Positions table: Weight shows was → now
+
+| What changed | Why | Files |
+|---|---|---|
+| Weight cell reads "was% → now%" where the fund traded in the period (sold out: "was% → 0%"); bar = old weight solid grey, then a striped extension (blue if larger, orange if smaller; the striped part is the weight added or given up). New `PosRow.wPrev` (weight before, at the period's end prices). Weight column 72 → 104px, table min width 1064 → 1096px | Fold Last change into Weight (chat) | `fund/PositionsTable.tsx`, `fund/positions.ts`, `fund/positions.css`, `fund/whatif.ts`, tests |
+
+- Last change box and column kept, `dw` unchanged (the Excel workbook uses the same formula; parity test). `dw` isolates the stock's own trade, while was → now are the book's real weights, so they can differ by a point or two when other stocks traded too (code).
+
 ## 2026-11-11 — Positions tab count = holdings now
 
 | What changed | Why | Files |

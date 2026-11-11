@@ -277,7 +277,11 @@ describe("table rows", () => {
     expect(by.get(1)!.dw).toBeCloseTo((2000 / (vb - 1000 + 2000) - 1000 / vb) * 100, 9);
     expect(by.get(2)!.dw).toBeCloseTo((200 / (vb + 200)) * 100, 9);
     expect(by.get(3)!.dw).toBeCloseTo(-(250 / vb) * 100, 9);
-  });
+    // the weight before, at the end prices: it plus the change is the weight now
+    expect(by.get(1)!.wPrev).toBeCloseTo((1000 / vb) * 100, 9);
+    expect(by.get(2)!.wPrev).toBe(0);
+    expect(by.get(3)!.wPrev).toBeCloseTo((250 / vb) * 100, 9);
+      });
 
   test("a position without a price shows null figures and stays out of the weights", () => {
     const rows = buildRows(
