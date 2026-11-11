@@ -5,6 +5,13 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Position page titles bigger; smoke test follows the rename
+
+| What changed | Why | Files |
+|---|---|---|
+| Position page panel titles (`.pos-page .pt`) 16px → 28px (22px under 640px), like the fund page | Owner (chat) | `web/src/pages/position.css` |
+| Playwright smoke test looked for "What drove": now "Return Constituents". PR #15's Web run failed on it and the deploy was skipped; I had run only vitest. Run `npx playwright test` before merging UI text changes | CI red (code) | `web/e2e/smoke.spec.ts` |
+
 ## 2026-11-11 — Positions: no Last change column; bigger panel titles; Return Constituents
 
 | What changed | Why | Files |
