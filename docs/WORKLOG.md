@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Conviction moves: one Weight column like the Positions table
+
+| What changed | Why | Files |
+|---|---|---|
+| The Move and Weight now / Weight after columns are replaced by one "Weight" column: "was → now" over the Positions table's bar (solid grey for the weight before, striped blue/orange for the change). Before = `weight_after` less `change_pts`; exits end at 0%; the tooltip adds the change in % of AUM. Sorts by the signed change, biggest buy first. The `.wcell` bar CSS is copied under `.tbl-wrap` | Owner asked for it (chat); also closes the open question on matching the two views' Weight columns (both views now have the same column) | `web/src/pages/Home.tsx`, `web/src/styles.css`, `web/tests/home.test.tsx` |
+
 ## 2026-11-11 — Panel titles 30% smaller
 
 | What changed | Why | Files |

@@ -363,18 +363,30 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
   );
 }
 
-/** The words of the holdings table's "Last change" box. */
-const MOVE_WORD: Record<ConvictionRow["move"], string> = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" };
-/** The tint of a move's box: blue for buying, orange for trimming, grey for selling all of it. */
-const MOVE_TONE: Record<ConvictionRow["move"], string> = { new: "add", add: "add", trim: "trim", exit: "sold" };
+/** A weight in percent: "<1%" under half a percent, else whole percent (the fund page's fW0). */
+const fW0 = (w: number) => (w > 0 && w < 0.5 ? "<1%" : Math.round(w) + "%");
 
-/** A move as the holdings table shows its last change: the word, then the weight change in % of the fund's AUM, in a tinted box. */
-function MoveBox({ move, pts }: { move: ConvictionRow["move"]; pts: number }) {
-  const change = fAum(pts);
+/** The weight before a move, in percent: after less the change (floating-point dust clamped to 0). */
+const weightBefore = (r: ConvictionRow) => Math.max(0, r.weight_after * 100 - r.change_pts);
+
+/**
+ * A move's weight as the fund page's Positions table draws it: "was → now" over a bar of the weight before in
+ * solid grey, then the change as a striped extension (blue past the old end for a bigger weight, orange back from
+ * it for a smaller one). A new position starts from 0%, a sale of everything ends at 0%.
+ */
+function WeightCell({ r, maxW }: { r: ConvictionRow; maxW: number }) {
+  const prev = weightBefore(r);
+  const now = r.move === "exit" ? 0 : r.weight_after * 100;
+  const pct = (v: number) => (v / maxW) * 100;
+  const solid = Math.min(now, prev);
+  const diff = Math.abs(now - prev);
   return (
-    <span className={`lc ${MOVE_TONE[move]}`} role="img" aria-label={`${MOVE_WORD[move]}, ${change} of the fund's AUM`}>
-      <span className="lw">{MOVE_WORD[move]}</span>
-      <b>{change}</b>
+    <span className="wcell" title={`Weight ${fW0(prev)} before, ${fW0(now)} after (${fAum(r.change_pts)} of the fund's AUM)`}>
+      <span className="wn">{`${fW0(prev)} → ${fW0(now)}`}</span>
+      <span className="mbs">
+        {solid > 0 && <i className="mb" style={{ width: Math.max(2, pct(solid)).toFixed(1) + "%" }} />}
+        {diff > 0 && <i className={"mb mbx " + (now > prev ? "up" : "dn")} style={{ width: Math.max(2, pct(diff)).toFixed(1) + "%" }} />}
+      </span>
     </span>
   );
 }
@@ -419,7 +431,10 @@ const CONVICTION_RULE =
 
 function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; onWin: (w: CallWindow) => void }) {
   const list = useLoad(() => loadHome(win === "q" ? "conviction_q" : "conviction_y"), [win]);
+  const rows = list.status === "ready" ? list.data.rows : null;
   const columns = useMemo<Col<ConvictionRow>[]>(() => {
+    // The longest bar (the biggest weight before or after) sets the scale, so bars compare across rows.
+    const maxW = Math.max(1, ...(rows ?? []).map((r) => Math.max(weightBefore(r), r.weight_after * 100)));
     const now = (r: ConvictionRow) => lookup.prices.get(r.stock_id) ?? null;
     const since = (r: ConvictionRow) => change(lookup.prices.get(r.stock_id), r.est_price);
     const quarter: Col<ConvictionRow>[] =
@@ -428,14 +443,8 @@ function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; o
       fundCol(lookup, (r) => r.fund_id, (r) => r.name),
       stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
       ...quarter,
-      // Sorts by the signed change in the fund's AUM, so buys lead and sales trail (or the reverse).
-      { header: "Move", key: "move", by: (r) => r.change_pts, cell: (r) => <MoveBox move={r.move} pts={r.change_pts} /> },
-      {
-        header: win === "q" ? "Weight now" : "Weight after",
-        key: "weight",
-        by: (r) => r.weight_after,
-        cell: (r) => fWeight(r.weight_after),
-      },
+      // Sorts by the signed change in the fund's AUM, so the biggest buys lead and sales trail (or the reverse).
+      { header: "Weight", key: "weight", by: (r) => r.change_pts, cell: (r) => <WeightCell r={r} maxW={maxW} /> },
       { header: "$ bought / sold", key: "usd", by: (r) => r.usd, cell: (r) => <Signed v={r.usd}>{fBook(r.usd, true)}</Signed> },
       { header: "Est. price", key: "est", by: (r) => r.est_price, cell: (r) => fPrice(r.est_price) },
       { header: "Price now", key: "now", by: now, cell: (r) => fPrice(now(r)) },
@@ -449,7 +458,7 @@ function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; o
         },
       },
     ];
-  }, [lookup, win]);
+  }, [lookup, win, rows]);
   return (
     <Panel
       title="Conviction moves"
