@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Opened-row trade list matches the fund page's tables
+
+| What changed | Why | Files |
+|---|---|---|
+| The trade list under an opened row (Positions and What-if share `.xtbl`): rows are on the surface fill, 38px, with the light rule and the hover tint (were sunken, so they blended into the sunken opened row); heading type is the tables' 12px/1 muted; the grey action box is back to the same 9% grey as the other tables | Owner: the table's fill and heading style differed from the other fund-page tables (chat) | `web/src/fund/positions.css` |
+
 ## 2026-11-11 — Position panel (row click): filled action boxes, % cut labels
 
 | What changed | Why | Files |
