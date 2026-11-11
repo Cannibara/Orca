@@ -60,9 +60,8 @@
 .pos-page .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:0;min-width:0;display:flex;flex-direction:column}
 .pos-page .ph{padding:16px var(--ppad) 0}
 .pos-page .ph-t{min-width:0}
-/* As large as the fund page's panel titles (and its key-figure numbers); smaller on a phone. */
-.pos-page .pt{font:600 28px/34px var(--f-sans);letter-spacing:-.025em}
-@media (max-width:640px){.pos-page .pt{font-size:22px;line-height:28px}}
+/* The same size as the fund page's panel titles. */
+.pos-page .pt{font:600 19.6px/26px var(--f-sans);letter-spacing:-.02em}
 .pos-page .ps{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;max-width:80ch;text-wrap:pretty}
 .pos-page .pb{padding:12px var(--ppad) 10px;min-width:0}
 .pos-page .empty{padding:24px 0;text-align:center;font-size:13px;color:var(--ink3)}
