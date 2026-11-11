@@ -196,9 +196,9 @@ a.stk{text-decoration:none}
 a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
 .tbl-wrap a.stk{font-weight:inherit}
 /* lc: the holdings table's tinted "Last change" box: a word (Added) and a signed figure, or just a figure (+20%); blue-tinted up, orange-tinted down, grey for a sale of everything */
-.tbl-wrap .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
-.tbl-wrap .lc .lw{font-size:11.5px;color:var(--ink2)}
-.tbl-wrap .lc b{font:600 14px/18px var(--f-sans);letter-spacing:-.01em;color:var(--ink)}
+.tbl-wrap .lc{display:inline-flex;align-items:baseline;gap:5px;padding:1px 6px;border-radius:var(--r-1);background:var(--sunken)}
+.tbl-wrap .lc .lw{font-size:11px;color:var(--ink2)}
+.tbl-wrap .lc b{font:600 12.5px/18px var(--f-sans);letter-spacing:0;color:var(--ink)}
 .tbl-wrap .lc.add{background:var(--gain)}
 .tbl-wrap .lc.trim{background:var(--loss)}
 .tbl-wrap .lc:is(.add,.trim) :is(.lw,b){color:var(--invfg)}

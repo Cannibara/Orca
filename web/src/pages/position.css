@@ -89,8 +89,8 @@
 .pos-page .t td .up{color:var(--up,var(--gain))}
 .pos-page .t td .down{color:var(--down,var(--loss))}
 /* Move: the tinted boxes of the fund page's "Last change" column */
-.pos-page .t .lc{display:inline-flex;align-items:baseline;gap:6px;padding:3px 8px;border-radius:var(--r-2);background:var(--sunken)}
-.pos-page .t .lc .lw{font:500 12px/18px var(--f-sans);color:var(--ink)}
+.pos-page .t .lc{display:inline-flex;align-items:baseline;gap:5px;padding:1px 6px;border-radius:var(--r-1);background:var(--sunken)}
+.pos-page .t .lc .lw{font:500 11px/18px var(--f-sans);color:var(--ink)}
 .pos-page .t .lc.add{background:var(--gain)}
 .pos-page .t .lc.trim{background:var(--loss)}
 .pos-page .t .lc:is(.add,.trim) :is(.lw,b){color:var(--invfg)}
