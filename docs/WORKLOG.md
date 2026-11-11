@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Last-change boxes smaller
+
+| What changed | Why | Files |
+|---|---|---|
+| Last-change boxes (`.lc`) and What-if status pills (`.st`): padding 1px 6px (was 3px 8px), 3px radius, word 11px, figure 12.5px (was 14px); `.st` 11.5px | The solid colour made them overwhelming next to 13px table text (chat) | `web/src/styles.css`, `fund/positions.css`, `fund/whatif.css`, `pages/position.css` |
+
 ## 2026-11-11 — Last-change boxes in solid gain and loss colours
 
 | What changed | Why | Files |
