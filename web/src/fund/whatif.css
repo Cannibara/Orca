@@ -46,7 +46,7 @@
 
 /* status and last change: a box tinted by what the fund did, as the Positions table's Last change */
 .fp .wi .lc,.fp .wi .st{display:inline-flex;align-items:baseline;gap:5px;padding:1px 6px;border-radius:var(--r-1);background:var(--sunken)}
-.fp .wi .st{font:600 11.5px/18px var(--f-sans);color:var(--ink)}
+.fp .wi .st{font:400 11.5px/18px var(--f-sans);color:var(--ink)}
 .fp .wi .lc .lw{font-size:11px;color:var(--ink2)}
 .fp .wi .lc b{font:600 12.5px/18px var(--f-sans);letter-spacing:0;color:var(--ink)}
 .fp .wi :is(.lc,.st).add{background:var(--gain)}

@@ -28,7 +28,7 @@ import "./whatif.css";
 const COLS: { key: SaleKey; head: string; w: number }[] = [
   { key: "t", head: "Stock", w: 116 },
   { key: "status", head: "Status", w: 82 },
-  { key: "sh", head: "Shares sold", w: 92 },
+  { key: "usd", head: "Value sold", w: 92 },
   { key: "ac", head: "Avg cost", w: 62 },
   { key: "px", head: "Price", w: 56 },
   { key: "ax", head: "Avg exit", w: 60 },
@@ -45,7 +45,8 @@ const COLS: { key: SaleKey; head: string; w: number }[] = [
 const LEFT: ReadonlySet<SaleKey> = new Set<SaleKey>(["t", "status"]);
 
 const WORD = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" } as const;
-const TONE = { new: "add", add: "add", trim: "trim", exit: "sold" } as const;
+// Both a trim and a full sale are cuts, so both wear the loss colour.
+const TONE = { new: "add", add: "add", trim: "trim", exit: "trim" } as const;
 
 const n0 = (v: number): string => Math.round(v).toLocaleString("en-US");
 
@@ -90,8 +91,8 @@ function cells(r: SaleRow): Record<SaleKey, ReactNode> {
         <span>{r.name}</span>
       </div>
     ),
-    status: <span className={"st " + (r.status === "trimmed" ? "trim" : "sold")}>{statusWord(r.status)}</span>,
-    sh: n0(r.soldShares),
+    status: <span className="st sold">{statusWord(r.status)}</span>,
+    usd: fMm(r.soldUsd),
     ac: fPx(r.ac),
     px: fPx(r.px),
     ax: fPx(r.ax),

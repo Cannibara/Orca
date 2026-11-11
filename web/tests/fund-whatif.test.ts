@@ -46,8 +46,8 @@ describe("sale figures keep the old rules", () => {
     expect(ids("t", 1)).toEqual([1, 2, 3, 4, 5]);
     expect(ids("t", -1)).toEqual([5, 4, 3, 2, 1]);
     expect(ids("status", 1)).toEqual([1, 3, 4, 5, 2]); // "Sold all" before "Trimmed"
-    expect(ids("sh", 1)).toEqual([5, 4, 1, 2, 3]);
-    expect(ids("sh", -1)).toEqual([1, 2, 3, 4, 5]);
+    expect(ids("usd", 1)).toEqual([5, 1, 2, 4, 3]);
+    expect(ids("usd", -1)).toEqual([3, 1, 2, 4, 5]);
     expect(ids("since", -1)).toEqual([1, 2, 4, 3, 5]);
     expect(ids("since", 1)).toEqual([3, 4, 2, 1, 5]);
   });

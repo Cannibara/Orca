@@ -41,6 +41,8 @@ export type SaleRow = {
   name: string;
   status: ExitStatus;
   soldShares: number;
+  /** What the sales brought in (dollars, from exits.json): the sold shares' value at the time. */
+  soldUsd: number;
   /** The as-of row of the position at the newest quarter: what the price chart and trade list under an opened row read. */
   base: PosRow;
   /** False when positions.json has no row for the stock: its position figures are dashes. */
@@ -223,6 +225,7 @@ export function buildSaleRows(input: WhatIfInput): SaleRow[] {
       name: row.name,
       status: e.status,
       soldShares: e.sold_shares,
+      soldUsd: e.sold_usd,
       base: row,
       hasPos: pos !== undefined,
       px: price ?? null,
@@ -268,7 +271,7 @@ export function tileFigures(rows: SaleRow[]): TileFigures {
 // ---- sorting ----------------------------------------------------------------------------------
 
 /** The 14 columns, in order. */
-export type SaleKey = "t" | "status" | "sh" | "ac" | "px" | "ax" | "ret" | "irr" | "irrHeld" | "last" | "since" | "one" | "spy" | "missed";
+export type SaleKey = "t" | "status" | "usd" | "ac" | "px" | "ax" | "ret" | "irr" | "irrHeld" | "last" | "since" | "one" | "spy" | "missed";
 
 /** Columns that sort A to Z first; the others largest first. */
 export const TEXT_KEYS: ReadonlySet<SaleKey> = new Set<SaleKey>(["t", "status"]);
@@ -282,8 +285,8 @@ function sortVal(r: SaleRow, k: SaleKey): number | string | null {
       return r.ticker;
     case "status":
       return STATUS_WORD[r.status];
-    case "sh":
-      return r.soldShares;
+    case "usd":
+      return r.soldUsd;
     case "ac":
       return r.ac;
     case "px":
