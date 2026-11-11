@@ -1,9 +1,19 @@
 # Worklog
 
-Last verified: 2026-11-10
+Last verified: 2026-11-11
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-11 — Home page paper look
+
+| What changed | Why | Files |
+|---|---|---|
+| Home page only: white page and content box (hairline on left, right and bottom), paper-80 top bar, paper-50 panel and tab strip, paper-80 heading row, paper-30 cells, paper-100 toggle trough, #C8BAA7 borders on input, heading row and pager buttons; panel header and pager rows about 10px shorter (chat)(code) | The paper page colour (#FAF3EA) was too dominant; the owner picked this combination from design-canvas options (chat) | `web/src/tokens.css`, `web/src/pages/home.css` |
+
+- Roles are tokens (`--home-*`, built on `--white`, `--paper-30/50/80/100`, `--sand-border`). Dark values equal the old dark neutrals, so dark is unchanged (code).
+- Scoped with `:has(.home)`; fund, position and method pages are unchanged (code).
+- Open: fund/position pages still use the #FAF3EA page colour; extend the look there if wanted (chat).
 
 ## 2026-11-10 — Roadmap safety net: health gates, failure alert, lake backup
 

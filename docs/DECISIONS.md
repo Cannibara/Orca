@@ -1,6 +1,6 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-10
+Last verified: 2026-11-11
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
@@ -61,6 +61,12 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 - Context: owner may want a gated paid feature. Every published JSON file is public, so anything built client-side cannot be gated (chat).
 - Rejected: client-side export now; pipeline-generated .xlsx per fund (thousands of files, stale prices) (chat).
 - Consequences: a gated version needs login plus a server step and the data moved behind it. Check the price vendor's redistribution terms before exporting prices. Guard against formula injection (`=`, `+`, `-`, `@`) (chat).
+
+## 2026-11-11 — Home page on white with paper panels
+- Decision: home page uses a white page and content box, paper-80 top bar and heading row, paper-50 panel and tab strip, paper-30 cells (chat)(code `web/src/pages/home.css`, `web/src/tokens.css`).
+- Context: the #FAF3EA page colour was too dominant; eight options were compared and one chosen (chat).
+- Rejected: all-paper variants where page, table and heading share one shade (chat).
+- Consequences: other pages keep the old paper page colour until restyled. Tokens `--home-*` map the roles and carry dark values.
 
 ## 2026-11-09 — HSTS, noindex on pages.dev, sitemap/robots/canonical (PR #3, merged as a2a1554)
 - Decision: HSTS 6 months, no `includeSubDomains`/`preload`; `X-Robots-Tag: noindex` only on `*.pages.dev`; canonical only on pre-rendered fund pages (chat)(code).
