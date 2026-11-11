@@ -5,6 +5,13 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Day / night slider; opened-row colours the other way round
+
+| What changed | Why | Files |
+|---|---|---|
+| The theme button is now a slider (`role="switch"`, name "Dark mode"): a sun on the left, a moon on the right, a knob that slides to the side in force | Owner: a single button was silly (chat) | `web/src/components/ThemeToggle.tsx`, `web/src/styles.css`, `web/tests/theme.test.tsx` |
+| Opened stock (Positions and What-if): the chart and the area behind it are the lighter paper (`--surface`); the darker paper (`--sunken`) is on the opened stock's own row and on the trade list's column headings. Before: the panel was sunken and the row banded. Supersedes the fill change two entries down, which only made the trade list's rows lighter | Owner meant this when asking for consistent table colours (chat) | `web/src/fund/positions.css`, `web/src/fund/whatif.css` |
+
 ## 2026-11-11 — Light / dark switch back, search moved to the tab row
 
 | What changed | Why | Files |
