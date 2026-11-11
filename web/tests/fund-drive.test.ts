@@ -221,7 +221,7 @@ describe("itemTip", () => {
   test("a stock names its ticker and the period", () => {
     expect(itemTip(items[0], "2020 to 2022")).toEqual({
       title: "Co 8",
-      color: "var(--gain)",
+      color: "var(--gain-soft)",
       value: "+9.00 points",
       note: "T8 in 2020 to 2022",
     });
@@ -237,7 +237,7 @@ describe("itemTip", () => {
     expect(t).toMatchObject({ title: "Total of listed stocks", value: "−2.50 points", note: "The sum of every contribution in 2022" });
   });
   test("a losing stock is coloured as a loss", () => {
-    expect(itemTip(row(1, -1), "2020").color).toBe("var(--loss)");
+    expect(itemTip(row(1, -1), "2020").color).toBe("var(--loss-soft)");
   });
 });
 
