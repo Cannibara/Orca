@@ -385,9 +385,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
               <th scope="col" className="tl">
                 Direction
               </th>
-              <th scope="col" className="tl">
-                In annual figures
-              </th>
               <th scope="col">Book at year end</th>
             </tr>
           </thead>
@@ -405,7 +402,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
                 </th>
                 <td>{fPct(vals[i])}</td>
                 <td className="tl">{vals[i] >= 0 ? "Gain" : "Loss"}</td>
-                <td className="tl">{y.part ? "Not counted" : "Counted"}</td>
                 <td>{fMoney(y.end)}</td>
               </tr>
             ))}

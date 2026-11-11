@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Part years count in Years positive; AUM gains bar edge
+
+| What changed | Why | Files |
+|---|---|---|
+| How it actually was: a part year's bar was already its return to date (the quarters compounded, never annualised), and its quarters were already inside the annualised return, growth of $1, volatility, drawdown and "% of quarters positive" of any span that included it. What it was left out of: the "Years positive X of N" tile (full years only), the best / worst year highlight, and the numbers table's "Counted / Not counted" column. So the old subtitle "Part years are shown but not counted" was wrong for the headline figures and right only for those three | Owner asked why, and whether the commentary or the numbers were wrong (chat) | |
+| Years positive now counts every year with a return, part years included (demo fund: "6 of 13", was "6 of 11"), and its tick picture has a tick per year. `spanKpi` keeps `up` / `nFull` (full years, the workbook's definition and the parity test) and adds `upAll` / `nAll` for the tile. The "In annual figures" column is gone from the numbers table. Best / worst highlighting still skips part years (a label aid, not a count). Not changed: the published `metrics.years_pos` / `years_total` / `best_year` / `worst_year`, the turnover over full years, and the workbook's range tiles all stay full-year | Owner: part years should count (chat) | `web/src/fund/series.ts`, `KpiStrip.tsx`, `ReturnsPanel.tsx`, tests incl. new `web/tests/fund-partyear.test.ts` |
+| AUM: the gains bar gets a 1px edge in its own colour like the bars beneath it, so it is no longer narrower | Owner (chat) | `web/src/fund/aum.css` |
+
 ## 2026-11-11 — Fewer explanations on the fund page
 
 | What changed | Why | Files |

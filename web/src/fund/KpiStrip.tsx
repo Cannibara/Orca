@@ -29,7 +29,7 @@ export function growthSpark(idx: number[]) {
   return { d, zy: H - 3 - ((1 - mn) / range) * (H - 8), last: pts[pts.length - 1] };
 }
 
-/** One tick per full year in the span, up for a gain and down for a loss. */
+/** One tick per year in the span (a part year included), up for a gain and down for a loss. */
 export function tickSpark(rets: number[]) {
   const k = Math.max(1, rets.length);
   const gap = k > 14 ? 1 : 2;
@@ -107,11 +107,10 @@ export function KpiStrip({
   const bs = resolveBracket(labels, br);
   const inSpan = ry.slice(bs.a, bs.b + 1);
   const k: SpanKpi | null = ry.length ? spanKpi(series, ry[bs.a].year, ry[bs.b].year) : null;
-  const full = inSpan.filter((y) => !y.part).map((y) => y.ret as number);
   const rets = inSpan.map((y) => y.ret as number);
 
   const growth = k ? growthSpark(k.idx) : null;
-  const ticks = k ? tickSpark(full) : null;
+  const ticks = k ? tickSpark(rets) : null;
   const under = k ? underwaterSpark(k.dd) : null;
   const sizes = k ? sizeSpark(rets) : [];
 
@@ -150,9 +149,9 @@ export function KpiStrip({
           <div className="kpi-v">
             {k ? (
               <>
-                {k.up}
+                {k.upAll}
                 <span className="vh"> </span>
-                <small>of {k.nFull}</small>
+                <small>of {k.nAll}</small>
               </>
             ) : (
               dash

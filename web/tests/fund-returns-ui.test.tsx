@@ -161,7 +161,7 @@ describe("KpiStrip", () => {
     const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
     expect(tiles(container)).toEqual([
       { label: "Annualised return", value: "+0.6%", note: "Growth of $1: $1.07" },
-      { label: "Years positive", value: "6 of 11", note: "55% of quarters positive" },
+      { label: "Years positive", value: "6 of 13", note: "55% of quarters positive" }, // part years count: 2014 and 2026 H1,
       { label: "Max drawdown", value: "−29.7%", note: "Peak to trough, quarterly" },
       { label: "Volatility", value: "16.1%", note: "Annualised" },
       { label: "Risk-adjusted return", value: undefined, note: "Sharpe and Sortino use 3-month T-bill rates; Calmar = return per year ÷ max drawdown" },
@@ -268,7 +268,7 @@ describe("KpiStrip", () => {
     const t = tiles(container);
     expect(t[0].value).toBe("–");
     expect(t[3].value).toBe("–");
-    expect(t[1].value).toBe("0 of 0");
+    expect(t[1].value).toBe("0 of 1"); // the one part year counts
     expect(t[2].value).toMatch(/%$/);
     expect(trio(container)).toEqual(["Sharpe −0.01", "Sortino −0.01", "Calmar 0.02"]);
     expect(t[5].value).toBe("40%");
@@ -595,17 +595,16 @@ describe("ReturnsPanel", () => {
       "Year",
       "Return",
       "Direction",
-      "In annual figures",
       "Book at year end",
     ]);
     const rows = within(table).getAllByRole("row");
     expect(rows).toHaveLength(14);
     const cells = (r: HTMLElement) => within(r).getAllByRole("cell").map((c) => c.textContent);
     expect(within(rows[1]).getByRole("rowheader")).toHaveTextContent("2014 Part year");
-    expect(cells(rows[1])).toEqual(["−20.9%", "Loss", "Not counted", "$1.50B"]);
+    expect(cells(rows[1])).toEqual(["−20.9%", "Loss", "$1.50B"]);
     expect(within(rows[3]).getByRole("rowheader")).toHaveTextContent(/^2016$/);
-    expect(cells(rows[3])).toEqual(["+11.0%", "Gain", "Counted", "$2.52B"]);
-    expect(cells(rows[13])).toEqual(["−16.7%", "Loss", "Not counted", "$11.1B"]);
+    expect(cells(rows[3])).toEqual(["+11.0%", "Gain", "$2.52B"]);
+    expect(cells(rows[13])).toEqual(["−16.7%", "Loss", "$11.1B"]);
     // the selected year's row is marked
     expect(rows[12]).toHaveAttribute("aria-current", "true");
     expect(rows[12]).toHaveClass("is-sel");

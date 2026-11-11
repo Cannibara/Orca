@@ -71,7 +71,7 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 | Metric | Definition | Source |
 |---|---|---|
 | Quarter return | (end − start − net buying + dividends) ÷ (start + ½ net buying) | spec §5.3; pipeline engine |
-| Year / span return | product of (1 + quarterly returns) − 1; part years are never annualised | `web/src/fund/series.ts` (code) |
+| Year / span return | product of (1 + quarterly returns) − 1; part years are never annualised, and they count in the span figures and in "Years positive" (the workbook and the published `metrics` still count full years only) | `web/src/fund/series.ts` (code) |
 | Annualised return | growth^(4 / n quarters) − 1, null under 4 quarters | `spanKpi` (code) |
 | Volatility | stdev of quarterly returns × 2, null under 4 quarters | `spanKpi` (code) |
 | Max drawdown | worst peak-to-trough of the chained quarterly index | `spanKpi` (code) |
