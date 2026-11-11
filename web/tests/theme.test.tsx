@@ -17,11 +17,15 @@ describe("theme toggle", () => {
   it("switches the page between dark and light and remembers the pick", async () => {
     const user = userEvent.setup();
     render(<ThemeToggle />);
-    // jsdom has no dark preference: the page starts light, so the button offers dark
-    await user.click(screen.getByRole("button", { name: "Switch to dark mode" }));
+    // jsdom has no dark preference: the page starts light, so the switch is off (day)
+    const sw = screen.getByRole("switch", { name: "Dark mode" });
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    await user.click(sw);
+    expect(sw).toHaveAttribute("aria-checked", "true");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("orca-theme")).toBe("dark");
-    await user.click(screen.getByRole("button", { name: "Switch to light mode" }));
+    await user.click(sw);
+    expect(sw).toHaveAttribute("aria-checked", "false");
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(localStorage.getItem("orca-theme")).toBe("light");
   });

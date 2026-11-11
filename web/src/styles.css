@@ -134,12 +134,19 @@ details[open] summary{margin-bottom:8px}
 .tab:focus-visible{outline-offset:-3px}
 .tabs .ind{position:absolute;left:0;bottom:0;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40));pointer-events:none}
 
-/* theme-btn: the light / dark switch at the top right of every page, level with the page heading */
-.theme-btn{flex:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink2);cursor:pointer}
-.theme-btn:hover{border-color:var(--control);color:var(--ink)}
-.theme-btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
-.theme-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-@media (hover:none),(pointer:coarse){.theme-btn{width:44px;height:44px}}
+/* theme-sw: the day / night switch at the top right of every page, level with the page heading. Sun left, moon right;
+   the knob sits over the side in force and that icon is dark, the other muted. */
+.theme-sw{position:relative;flex:none;width:60px;height:32px;padding:0;border:1px solid var(--line2);border-radius:16px;background:var(--sunken);color:var(--ink3);cursor:pointer}
+.theme-sw:hover{border-color:var(--control)}
+.theme-sw:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.theme-sw .th{position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:var(--surface);border:1px solid var(--line2);box-shadow:var(--shadow-1);box-sizing:border-box}
+.theme-sw[aria-checked="true"] .th{transform:translateX(28px)}
+.theme-sw svg{position:absolute;top:7px;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.theme-sw .sun{left:7px}
+.theme-sw .moon{left:35px}
+.theme-sw[aria-checked="false"] .sun,.theme-sw[aria-checked="true"] .moon{color:var(--ink)}
+@media (hover:none),(pointer:coarse){.theme-sw::before{content:"";position:absolute;inset:-6px}}
+@media (prefers-reduced-motion:no-preference){:root:not([data-motion="reduce"]) .theme-sw .th{transition:transform var(--d-base) var(--ease-out)}}
 
 /* ---------- inputs (the home search is in pages/home.css) ---------- */
 .input{height:36px;width:100%;padding:0 12px;border:1px solid var(--control);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans);min-width:0}

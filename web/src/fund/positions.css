@@ -43,7 +43,8 @@
 .fp .t>thead>tr>th[aria-sort="ascending"] .sort,.fp .t>thead>tr>th[aria-sort="descending"] .sort{color:var(--ink);font-weight:600}
 .fp .t>tbody>tr>td{height:var(--row);padding:0 8px;overflow:hidden;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface);vertical-align:middle}
 .fp .t>tbody>tr:hover>td{background:var(--hover)}
-.fp .t>tbody>tr.is-sel>td{background:var(--band)}
+/* the opened stock's row: the darker paper, like the column headings, so it ties to the panel below */
+.fp .t>tbody>tr.is-sel>td{background:var(--sunken)}
 .fp .t>tbody>tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .fp .t>tbody>tr:last-child>td{border-bottom:0}
 /* the Stock column stays in view while the rest scrolls sideways */
@@ -80,7 +81,8 @@
 .fp .t-note{padding:8px var(--ppad);font-size:12px;line-height:18px;color:var(--ink3);border-top:1px solid var(--line)}
 
 /* ---------- the expanded row ---------- */
-.fp .t>tbody>tr.xrow>td{padding:0;height:auto;text-align:left;background:var(--sunken);border-bottom:1px solid var(--line2);overflow:visible}
+/* the opened panel (chart and the area behind it): the lighter paper */
+.fp .t>tbody>tr.xrow>td{padding:0;height:auto;text-align:left;background:var(--surface);border-bottom:1px solid var(--line);overflow:visible}
 .fp .t>tbody>tr.xrow>td:first-child{position:static;box-shadow:none}
 .fp .xpanel{position:sticky;left:0;padding:16px 20px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;box-sizing:border-box;white-space:normal}
 .fp .xhead{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
