@@ -13,6 +13,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 
 - Roles are tokens (`--home-*`, built on `--white`, `--paper-30/50/80/100`, `--sand-border`). Dark values equal the old dark neutrals, so dark is unchanged (code).
 - Scoped with `:has(.home)`; fund, position and method pages are unchanged (code).
+- Follow-up: tab strip is white (`--home-tabs`); lists whose table follows the header directly (Crowded buys, Best & worst calls) get a 100px header-to-heading height like Top funds (`web/src/pages/home.css`) (chat)(code).
 - Open: fund/position pages still use the #FAF3EA page colour; extend the look there if wanted (chat).
 
 ## 2026-11-10 — Roadmap safety net: health gates, failure alert, lake backup
