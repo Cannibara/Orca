@@ -6,21 +6,23 @@ import { sortRows, type PosRow, type SortKey } from "./positions";
 import { StockPanel } from "./StockPanel";
 import "./positions.css";
 
-// The 12 columns, always in this order: key, heading, width in px. The widths add up to the table's
-// minimum width (960px); the table scrolls sideways inside its wrapper when the panel is narrower.
+// The 12 columns, always in this order: key, heading, width in px. Stock, Held and Weight are fixed; 0 = the
+// nine figure columns, which share what is left equally, so the gaps between figures stay alike at any
+// width. The table's minimum width is 1026px (the fixed three plus 80px a figure column); it scrolls sideways
+// inside its wrapper when the panel is narrower.
 const COLS: { key: SortKey; head: string; w: number }[] = [
-  { key: "t", head: "Stock", w: 124 },
-  { key: "held", head: "Held", w: 78 },
-  { key: "w", head: "Weight", w: 104 },
-  { key: "ret", head: "Return", w: 62 },
-  { key: "irr", head: "IRR", w: 62 },
-  { key: "val", head: "Value", w: 80 },
-  { key: "ac", head: "Avg cost", w: 62 },
-  { key: "px", head: "Price", w: 62 },
-  { key: "ax", head: "Avg exit", w: 62 },
-  { key: "re", head: "Realised", w: 84 },
-  { key: "unreal", head: "Unrealised", w: 84 },
-  { key: "total", head: "Total P&L", w: 96 },
+  { key: "t", head: "Stock", w: 150 },
+  { key: "held", head: "Held", w: 68 },
+  { key: "w", head: "Weight", w: 92 },
+  { key: "ret", head: "Return", w: 0 },
+  { key: "irr", head: "IRR", w: 0 },
+  { key: "val", head: "Value", w: 0 },
+  { key: "ac", head: "Avg cost", w: 0 },
+  { key: "px", head: "Price", w: 0 },
+  { key: "ax", head: "Avg exit", w: 0 },
+  { key: "re", head: "Realised", w: 0 },
+  { key: "unreal", head: "Unrealised", w: 0 },
+  { key: "total", head: "Total P&L", w: 0 },
 ];
 
 const count = (n: number): string => n.toLocaleString("en-US");
@@ -142,7 +144,7 @@ const Row = memo(function Row({ r, maxW, isOpen, tw, fundId, latest, onToggle, o
         onKeyDown={(e) => onKey(e, r.id)}
       >
         {COLS.map((col) => (
-          <td key={col.key} className={col.key === "held" ? "held" : undefined}>
+          <td key={col.key} className={col.key === "held" ? "held" : col.key === "w" ? "wk" : undefined}>
             {c[col.key]}
           </td>
         ))}
@@ -224,7 +226,7 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, latest
         <table className="t" aria-label="Positions">
           <colgroup>
             {COLS.map((c) => (
-              <col key={c.key} style={{ width: c.w + "px" }} />
+              <col key={c.key} style={c.w ? { width: c.w + "px" } : undefined} />
             ))}
           </colgroup>
           <thead>
@@ -235,7 +237,7 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, latest
                   <th
                     key={c.key}
                     scope="col"
-                    className={c.key === "held" ? "held" : undefined}
+                    className={c.key === "held" ? "held" : c.key === "w" ? "wk" : undefined}
                     aria-sort={on ? (sort.dir < 0 ? "descending" : "ascending") : "none"}
                   >
                     <button type="button" className="sort" onClick={() => onSort(c.key)}>
