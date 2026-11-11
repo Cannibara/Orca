@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Web deploy failed on a data-site error; fetch step retries harder
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 125 (merge of #25) failed in the deploy job's "Fetch funds.json from the data site" step: `data.orcaetf.com` answered 502, then dropped the HTTP/2 stream (curl exit 92). The tests job and the PR run of the same code passed, and the host was back at 200 minutes later, so it was transient. The failed job was re-run. The step now uses `--retry 5 --retry-all-errors --retry-delay 15 --max-time 60` (plain `--retry` skips an error like exit 92) | Owner: deploy failed, find out why (chat) | `.github/workflows/web.yml` |
+
 ## 2026-11-11 — Dark mode: lighter greys, one blue in both modes; switch resized
 
 | What changed | Why | Files |
