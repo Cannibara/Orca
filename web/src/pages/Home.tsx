@@ -201,7 +201,7 @@ function FundSearch() {
             /
           </kbd>
         </div>
-        <button className="btn btn-primary" type="submit" disabled={matches.length === 0}>
+        <button className="btn btn-secondary" type="submit" disabled={matches.length === 0}>
           Open fund
         </button>
       </form>

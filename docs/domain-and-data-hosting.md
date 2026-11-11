@@ -73,7 +73,7 @@ All of it is written by every real build, nothing to switch on.
   www. The custom domain does not get it. `robots.txt` must therefore stay open (`Allow: /`): a search
   engine has to be allowed to read the old address to see the "do not list" note.
 - **Fund pages name their own address** (a "canonical" link to `www.orcaetf.com/fund/<id>/`), and the
-  build writes `sitemap.xml` (home, How it works and every pre-rendered fund page, at most 15,000) and
+  build writes `sitemap.xml` (home and every pre-rendered fund page, at most 15,000) and
   `robots.txt` (everything may be crawled, plus the sitemap's address). They come from `SITE_URL`.
   Other pages get no canonical link. The list in the sitemap changes only when the site is rebuilt, so
   Web needs a run after a data refresh adds funds. Optional, in Google Search Console: add the property

@@ -5,7 +5,17 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-11 — Home page paper look
+## 2026-11-11 — Home matches the fund page; How it works removed
+
+| What changed | Why | Files |
+|---|---|---|
+| Deleted the How it works page: route, nav, footer and Position-page links, sitemap entry, its CSS and tests | Users need no 13F education (chat) | `web/src/App.tsx`, `pages/Method.tsx`, `pages/method.css`, `pages/Position.tsx`, `scripts/prerender.mjs`, tests |
+| Removed the home paper look: the home page now uses the fund page's cream page, surface panels, sunken heading row and trough, line borders; heading is the fund page's 34px; "Open fund" is a secondary button like the fund page's | Home should match the fund pages (chat) | `web/src/pages/home.css`, `Home.tsx`, `tokens.css` (code) |
+
+- Checked: vitest (923), typecheck, build, Playwright e2e (44, 1280 and 400 px, light and dark), home screenshots light and dark at 1280 px.
+- Original entry below is superseded by this one.
+
+## 2026-11-11 — Home page paper look (superseded)
 
 | What changed | Why | Files |
 |---|---|---|

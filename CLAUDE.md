@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-10
+Last verified: 2026-11-11
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -32,7 +32,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ```
 pipeline/            Python package `orca` (ingest → lake → engine → publish), tests/, contract.md
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
-web/src/pages/       Home, Fund (assembles the fund page), Position, Method, NotFound (+ page css)
+web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
 web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css
 web/src/charts/      PriceChart, StepChart, shared Tooltip (one #tip for the app), scale.ts

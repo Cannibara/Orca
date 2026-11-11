@@ -221,7 +221,7 @@ function PositionTiles({ data }: { data: PositionData }) {
       </div>
       <p className="kpi-cap">
         13F estimates, not actual fills: trades are inferred from quarter-end holdings and priced at each quarter's
-        volume-weighted average. <Link to="/how-it-works">How it works</Link>
+        volume-weighted average.
       </p>
     </div>
   );
