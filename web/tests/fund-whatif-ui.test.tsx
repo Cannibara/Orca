@@ -142,7 +142,7 @@ describe("What if they'd kept it", () => {
     expect(within(salesTable()).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Stock",
       "Status",
-      "Shares sold",
+      "Sale proceeds",
       "Avg cost",
       "Price",
       "Avg exit",
@@ -191,10 +191,10 @@ describe("What if they'd kept it", () => {
     await userEvent.click(sortButton("Status")); // "Sold all" before "Trimmed"
     expect(tickersOf()).toEqual(["S1", "S3", "S4", "S5", "S2"]);
 
-    await userEvent.click(sortButton("Shares sold")); // 100, 100, 100, 50, 10: ties keep the list's order
-    expect(tickersOf()).toEqual(["S1", "S2", "S3", "S4", "S5"]);
-    await userEvent.click(sortButton("Shares sold"));
-    expect(tickersOf()).toEqual(["S5", "S4", "S1", "S2", "S3"]);
+    await userEvent.click(sortButton("Sale proceeds")); // $1,000m, $1,000m, $2,000m, $1,000m, $100m: ties keep the list's order
+    expect(tickersOf()).toEqual(["S3", "S1", "S2", "S4", "S5"]);
+    await userEvent.click(sortButton("Sale proceeds"));
+    expect(tickersOf()).toEqual(["S5", "S1", "S2", "S4", "S3"]);
 
     // Since sale: S1 +100% · S2 +11% · S3 −50% · S4 −14% · S5 no price
     await userEvent.click(sortButton("Since sale"));
@@ -215,10 +215,10 @@ describe("What if they'd kept it", () => {
     expect(figure("S5").textContent).toBe("–");
   });
 
-  it("tints Status like the Positions table's Last change boxes", () => {
+  it("shows Status in the same grey box for Sold all and Trimmed", () => {
     renderWhatIf({ exits, prices });
     expect(trOf("S1").querySelector(".st")).toHaveClass("sold");
-    expect(trOf("S2").querySelector(".st")).toHaveClass("trim");
+    expect(trOf("S2").querySelector(".st")).toHaveClass("sold");
   });
 
   describe("tiles", () => {
@@ -283,7 +283,7 @@ describe("What if they'd kept it", () => {
       renderWhatIf({ positions: [p], exits: e, prices: pricesOf({ 2: 12.5 }) });
       const row = rowOf("S2");
       expect(row["Status"]).toBe("Trimmed");
-      expect(row["Shares sold"]).toBe("1,234,567");
+      expect(row["Sale proceeds"]).toBe("$12m"); // 1,234,567.4 × 10
       expect(row["Avg exit"]).toBe("$20"); // the position's own sells, as the Positions table reads them
       expect(row["Price"]).toBe("$13"); // whole dollars
       expect(row["Since sale"]).toBe("+25%");
@@ -323,7 +323,7 @@ describe("What if they'd kept it", () => {
         prices: pricesOf({ 1: 40, 2: 10 }),
       });
       const box = trOf("S1").querySelector(".lc") as HTMLElement;
-      expect(box).toHaveClass("sold");
+      expect(box).toHaveClass("trim");
       expect(box.querySelector(".lw")?.textContent).toBe("Sold all");
       expect(box.querySelector("b")?.textContent).toBe("−40.0%");
       expect(trOf("S1").querySelector(".lq")?.textContent).toBe("Q2 ’25");
@@ -341,7 +341,7 @@ describe("What if they'd kept it", () => {
       const word = (t: string) => trOf(t).querySelector(".lc .lw")?.textContent;
       expect([1, 2, 3, 4].map((i) => word(`S${i}`))).toEqual(["New", "Sold all", "Added", "Trimmed"]);
       expect(trOf("S1").querySelector(".lc")).toHaveClass("add");
-      expect(trOf("S2").querySelector(".lc")).toHaveClass("sold");
+      expect(trOf("S2").querySelector(".lc")).toHaveClass("trim");
       expect(trOf("S3").querySelector(".lc")).toHaveClass("add");
       expect(trOf("S4").querySelector(".lc")).toHaveClass("trim");
       expect(["S1", "S2", "S3", "S4"].map((t) => trOf(t).querySelector(".lq")?.textContent)).toEqual(["Q2 ’26", "Q2 ’25", "Q1 ’26", "Q4 ’25"]);
@@ -383,7 +383,7 @@ describe("What if they'd kept it", () => {
       for (const header of ["Avg cost", "Return", "IRR actual", "IRR if held", "Last change", "Price"]) {
         expect(noPosition[header], header).toBe("–");
       }
-      expect(noPosition["Shares sold"]).toBe("100");
+      expect(noPosition["Sale proceeds"]).toBe("$0m");
       expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
     });
 

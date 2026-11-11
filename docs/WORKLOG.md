@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — What-if table: status, last change, value sold
+
+| What changed | Why | Files |
+|---|---|---|
+| Status pill is the grey "Sold all" box for both Trimmed and Sold all, regular weight (was bold, orange for Trimmed) | Status needn't repeat the colour; Last change carries it (chat) | `fund/WhatIfPanel.tsx`, `fund/whatif.css` |
+| Last change: "Sold all" now orange like "Trimmed" (What-if only; Positions table unchanged) | A full sale is a cut too (chat) | `fund/WhatIfPanel.tsx` |
+| "Shares sold" column → "Sale proceeds" (`sold_usd`, whole $m, key `usd`) | Dollars compare across stocks; shares don't (chat) | `fund/WhatIfPanel.tsx`, `fund/whatif.ts`, tests |
+
 ## 2026-11-11 — Last-change boxes smaller
 
 | What changed | Why | Files |
