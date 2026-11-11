@@ -343,7 +343,7 @@ describe("What if they'd kept it", () => {
       expect(trOf("S1").querySelector(".lc")).toHaveClass("add");
       expect(trOf("S2").querySelector(".lc")).toHaveClass("trim");
       expect(trOf("S3").querySelector(".lc")).toHaveClass("add");
-      expect(trOf("S4").querySelector(".lc")).toHaveClass("trim");
+      expect(trOf("S4").querySelector(".lc")).toHaveClass("sold"); // a trim: grey
       expect(["S1", "S2", "S3", "S4"].map((t) => trOf(t).querySelector(".lq")?.textContent)).toEqual(["Q2 ’26", "Q2 ’25", "Q1 ’26", "Q4 ’25"]);
     });
 

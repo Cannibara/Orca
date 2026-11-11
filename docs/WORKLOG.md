@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — What-if Last change: orange only for Sold all
+
+| What changed | Why | Files |
+|---|---|---|
+| Last change: "Trimmed" back to the grey box; only "Sold all" is orange (What-if only) | Owner wants the full sale to stand out, not trims (chat) | `fund/WhatIfPanel.tsx`, `tests/fund-whatif-ui.test.tsx` |
+
 ## 2026-11-11 — What-if table: status, last change, value sold
 
 | What changed | Why | Files |
