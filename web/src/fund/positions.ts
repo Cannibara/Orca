@@ -406,8 +406,8 @@ export function buildRows(positions: PositionRow[], qs: number, qe: number, src:
 
 // ---- sorting ----------------------------------------------------------------------------
 
-/** The 13 columns, in order. */
-export type SortKey = "t" | "held" | "w" | "ret" | "irr" | "val" | "ac" | "px" | "ax" | "last" | "re" | "unreal" | "total";
+/** The 12 columns, in order. */
+export type SortKey = "t" | "held" | "w" | "ret" | "irr" | "val" | "ac" | "px" | "ax" | "re" | "unreal" | "total";
 
 function sortVal(r: PosRow, k: SortKey): number | string | null {
   switch (k) {
@@ -415,8 +415,6 @@ function sortVal(r: PosRow, k: SortKey): number | string | null {
       return r.ticker;
     case "held":
       return r.from;
-    case "last":
-      return r.tag ? r.dw : null;
     case "ax":
       return r.open ? null : r.ax;
     case "irr":

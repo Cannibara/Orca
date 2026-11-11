@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Positions: no Last change column; bigger panel titles; Return Constituents
+
+| What changed | Why | Files |
+|---|---|---|
+| Positions table: Last change column removed (12 columns, min width 1096 → 960px, `mode` prop and the `last` sort key gone, dead `.lc` CSS removed). The What-if table keeps its Last change | Weight's was → now carries the movement (chat) | `fund/PositionsTable.tsx`, `fund/PositionsPanel.tsx`, `fund/positions.ts`, `fund/positions.css`, tests |
+| Panel titles (`.fp .pt`: Annual returns, Return Constituents, AUM, Positions, What if) 16px → 28px, the size of the key-figure tiles' numbers; 22px under 640px wide. The Position page's own `.pos-page .pt` is unchanged | Owner wanted titles as large as the tile figures (chat) | `fund/base.css` |
+| "What drove 2023 to 2025" → "Return Constituents 2023 to 2025" (no years: "Return Constituents") | Owner's wording (chat) | `fund/DrivePanel.tsx`, tests |
+
 ## 2026-11-11 — Positions table: Weight shows was → now
 
 | What changed | Why | Files |

@@ -1,13 +1,13 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { fMm, fP0, fPc1, fPx, fW0, qShort } from "./fmt";
+import { fMm, fP0, fPx, fW0, qShort } from "./fmt";
 import { useWidth } from "./hooks";
 import { moreLabel, useRowBudget } from "./loading";
-import { sortRows, type Mode, type PosRow, type SortKey } from "./positions";
+import { sortRows, type PosRow, type SortKey } from "./positions";
 import { StockPanel } from "./StockPanel";
 import "./positions.css";
 
-// The 13 columns, always in this order: key, heading, width in px. The widths add up to the table's
-// minimum width (1096px); the table scrolls sideways inside its wrapper when the panel is narrower.
+// The 12 columns, always in this order: key, heading, width in px. The widths add up to the table's
+// minimum width (960px); the table scrolls sideways inside its wrapper when the panel is narrower.
 const COLS: { key: SortKey; head: string; w: number }[] = [
   { key: "t", head: "Stock", w: 124 },
   { key: "held", head: "Held", w: 78 },
@@ -18,7 +18,6 @@ const COLS: { key: SortKey; head: string; w: number }[] = [
   { key: "ac", head: "Avg cost", w: 62 },
   { key: "px", head: "Price", w: 62 },
   { key: "ax", head: "Avg exit", w: 62 },
-  { key: "last", head: "Last change", w: 136 },
   { key: "re", head: "Realised", w: 84 },
   { key: "unreal", head: "Unrealised", w: 84 },
   { key: "total", head: "Total P&L", w: 96 },
@@ -26,24 +25,11 @@ const COLS: { key: SortKey; head: string; w: number }[] = [
 
 const count = (n: number): string => n.toLocaleString("en-US");
 
-const WORD = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" } as const;
-const TONE = { new: "add", add: "add", trim: "trim", exit: "sold" } as const;
-
 function SortIcon({ desc }: { desc: boolean }) {
   return (
     <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
       <path d={desc ? "M4 6.25 8 10.25l4-4" : "M4 9.75l4-4 4 4"} />
     </svg>
-  );
-}
-
-function LastChange({ r }: { r: PosRow }) {
-  if (!r.tag) return <span className="lc-none">–</span>;
-  return (
-    <span className={"lc " + TONE[r.tag]}>
-      <span className="lw">{WORD[r.tag]}</span>
-      <b>{fPc1(r.dw)}</b>
-    </span>
   );
 }
 
@@ -110,7 +96,6 @@ function cells(r: PosRow, maxW: number): Record<SortKey, ReactNode> {
     ac: fPx(r.ac),
     px: fPx(r.px),
     ax: r.open ? "–" : fPx(r.ax),
-    last: <LastChange r={r} />,
     re: fMm(r.re, true),
     unreal: r.unreal == null ? "–" : fMm(r.unreal, true),
     total: fMm(r.total, true),
@@ -127,7 +112,6 @@ type Props = {
   failed: number;
   /** Weekly files in, of those the period needs: the count in "Loading prices…". */
   progress?: { done: number; total: number };
-  mode: Mode;
   /** Latest close per stock, for the price chart's last point. */
   latest: Map<number, number>;
 };
@@ -158,7 +142,7 @@ const Row = memo(function Row({ r, maxW, isOpen, tw, fundId, latest, onToggle, o
         onKeyDown={(e) => onKey(e, r.id)}
       >
         {COLS.map((col) => (
-          <td key={col.key} className={col.key === "held" ? "held" : col.key === "last" ? "lastc" : undefined}>
+          <td key={col.key} className={col.key === "held" ? "held" : undefined}>
             {c[col.key]}
           </td>
         ))}
@@ -183,7 +167,7 @@ const Row = memo(function Row({ r, maxW, isOpen, tw, fundId, latest, onToggle, o
  * AUTO_FILL_MAX, in the sorted order, and "Show more" adds the rest MORE_STEP at a time (see ./loading). A new
  * sort or period starts again from the first rows.
  */
-export function PositionsTable({ fundId, rows, pending, failed, progress, mode, latest }: Props) {
+export function PositionsTable({ fundId, rows, pending, failed, progress, latest }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "w", dir: -1 });
   const [open, setOpen] = useState<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -255,7 +239,7 @@ export function PositionsTable({ fundId, rows, pending, failed, progress, mode, 
                     aria-sort={on ? (sort.dir < 0 ? "descending" : "ascending") : "none"}
                   >
                     <button type="button" className="sort" onClick={() => onSort(c.key)}>
-                      {c.key === "last" && mode !== "quarter" ? "Change" : c.head}
+                      {c.head}
                       {on && <SortIcon desc={sort.dir < 0} />}
                     </button>
                   </th>

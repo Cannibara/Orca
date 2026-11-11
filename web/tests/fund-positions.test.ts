@@ -317,10 +317,6 @@ describe("table rows", () => {
     // Avg exit: only the sold out one has it shown; open positions sort after it either way
     expect(sortRows(rows, "ax", -1)[0].id).toBe(3);
     expect(sortRows(rows, "ax", 1)[0].id).toBe(3);
-    // Last change: the weight change for rows that changed, the untouched row last either way
-    expect(ids(sortRows(rows, "last", -1)).pop()).toBe(4);
-    expect(ids(sortRows(rows, "last", 1)).pop()).toBe(4);
-    expect(sortRows(rows, "last", -1)[0].id).toBe(2);
     // IRR is computed only when asked for
     expect(sortRows(rows, "irr", -1)).toHaveLength(4);
   });

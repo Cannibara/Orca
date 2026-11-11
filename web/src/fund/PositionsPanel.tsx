@@ -54,7 +54,6 @@ function Panel({ fundId, summary, positions, prices, stocks, asof }: PositionsPa
           pending={data.pending}
           failed={data.failed}
           progress={data.progress}
-          mode={period.mode}
           latest={prices}
         />
       </section>

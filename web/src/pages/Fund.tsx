@@ -90,7 +90,7 @@ function FundView({ data }: { data: FundData }) {
     const next = windowYears(series, r);
     if (sel === null || !next.years.some((y) => y.label === sel)) setSel(lastFullLabel(next.years));
   };
-  // Picking a year selects it and resets What drove to just that year.
+  // Picking a year selects it and resets Return Constituents to just that year.
   const select = (label: string) => {
     setSel(label);
     setCr({ a: label, b: label });
