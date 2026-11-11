@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Position panel (row click): filled action boxes, % cut labels
+
+| What changed | Why | Files |
+|---|---|---|
+| The trade list's Action is a filled box like the What-if Status and the Position page: blue for New/Added, grey for Trimmed and Sold all (was an outlined neutral tag with a +/− icon) | Owner: the panel did not look like the other graphs and tables; Trimmed should be a grey filled box (chat) | `web/src/fund/StockPanel.tsx`, `web/src/fund/positions.css` |
+| Each sale on the price chart carries a small label under its triangle: shares sold as % of the shares held at the end of the quarter before (`sharesAfter − delta`); "−100%" for a sale of everything, "−<1%" under 1%. A legend note says so | Owner (chat) | same, `web/tests/fund-stockpanel.test.tsx` |
+| Open: the sell triangles on the chart stay orange (as on the Position page), while the Trimmed box is grey; not changed, no answer yet | | |
+
 ## 2026-11-11 — Conviction moves: one Weight column like the Positions table
 
 | What changed | Why | Files |
