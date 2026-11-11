@@ -142,7 +142,7 @@ describe("What if they'd kept it", () => {
     expect(within(salesTable()).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Stock",
       "Status",
-      "Value sold",
+      "Sale proceeds",
       "Avg cost",
       "Price",
       "Avg exit",
@@ -191,9 +191,9 @@ describe("What if they'd kept it", () => {
     await userEvent.click(sortButton("Status")); // "Sold all" before "Trimmed"
     expect(tickersOf()).toEqual(["S1", "S3", "S4", "S5", "S2"]);
 
-    await userEvent.click(sortButton("Value sold")); // $1,000m, $1,000m, $2,000m, $1,000m, $100m: ties keep the list's order
+    await userEvent.click(sortButton("Sale proceeds")); // $1,000m, $1,000m, $2,000m, $1,000m, $100m: ties keep the list's order
     expect(tickersOf()).toEqual(["S3", "S1", "S2", "S4", "S5"]);
-    await userEvent.click(sortButton("Value sold"));
+    await userEvent.click(sortButton("Sale proceeds"));
     expect(tickersOf()).toEqual(["S5", "S1", "S2", "S4", "S3"]);
 
     // Since sale: S1 +100% · S2 +11% · S3 −50% · S4 −14% · S5 no price
@@ -283,7 +283,7 @@ describe("What if they'd kept it", () => {
       renderWhatIf({ positions: [p], exits: e, prices: pricesOf({ 2: 12.5 }) });
       const row = rowOf("S2");
       expect(row["Status"]).toBe("Trimmed");
-      expect(row["Value sold"]).toBe("$12m"); // 1,234,567.4 × 10
+      expect(row["Sale proceeds"]).toBe("$12m"); // 1,234,567.4 × 10
       expect(row["Avg exit"]).toBe("$20"); // the position's own sells, as the Positions table reads them
       expect(row["Price"]).toBe("$13"); // whole dollars
       expect(row["Since sale"]).toBe("+25%");
@@ -383,7 +383,7 @@ describe("What if they'd kept it", () => {
       for (const header of ["Avg cost", "Return", "IRR actual", "IRR if held", "Last change", "Price"]) {
         expect(noPosition[header], header).toBe("–");
       }
-      expect(noPosition["Value sold"]).toBe("$0m");
+      expect(noPosition["Sale proceeds"]).toBe("$0m");
       expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
     });
 

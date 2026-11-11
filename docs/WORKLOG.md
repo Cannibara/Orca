@@ -11,7 +11,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | Status pill is the grey "Sold all" box for both Trimmed and Sold all, regular weight (was bold, orange for Trimmed) | Status needn't repeat the colour; Last change carries it (chat) | `fund/WhatIfPanel.tsx`, `fund/whatif.css` |
 | Last change: "Sold all" now orange like "Trimmed" (What-if only; Positions table unchanged) | A full sale is a cut too (chat) | `fund/WhatIfPanel.tsx` |
-| "Shares sold" column → "Value sold" (`sold_usd`, whole $m, key `usd`) | Dollars compare across stocks; shares don't (chat) | `fund/WhatIfPanel.tsx`, `fund/whatif.ts`, tests |
+| "Shares sold" column → "Sale proceeds" (`sold_usd`, whole $m, key `usd`) | Dollars compare across stocks; shares don't (chat) | `fund/WhatIfPanel.tsx`, `fund/whatif.ts`, tests |
 
 ## 2026-11-11 — Last-change boxes smaller
 

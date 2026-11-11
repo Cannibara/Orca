@@ -28,7 +28,7 @@ import "./whatif.css";
 const COLS: { key: SaleKey; head: string; w: number }[] = [
   { key: "t", head: "Stock", w: 116 },
   { key: "status", head: "Status", w: 82 },
-  { key: "usd", head: "Value sold", w: 92 },
+  { key: "usd", head: "Sale proceeds", w: 92 },
   { key: "ac", head: "Avg cost", w: 62 },
   { key: "px", head: "Price", w: 56 },
   { key: "ax", head: "Avg exit", w: 60 },
