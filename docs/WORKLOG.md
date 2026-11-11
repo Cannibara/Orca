@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Weight bar: solid and striped parts flush
+
+| What changed | Why | Files |
+|---|---|---|
+| The striped part sits directly against the solid one (the 1px gap is gone) and the join is square; only the outer ends are rounded | Owner (chat) | `web/src/fund/positions.css` |
+
 ## 2026-11-11 — Position page titles bigger; smoke test follows the rename
 
 | What changed | Why | Files |
