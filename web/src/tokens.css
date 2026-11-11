@@ -37,10 +37,6 @@
   --ease-out:cubic-bezier(.2,.7,.2,1);--ease-std:cubic-bezier(.4,0,.2,1);
   --d-instant:0ms;--d-fast:120ms;--d-base:200ms;--d-grow:600ms;--d-label:300ms;--d-ambient:1400ms;
   --ppad:20px;
-  /* Paper shades (light theme) and the home page's roles. Dark values equal the dark neutrals above, so dark is unchanged. */
-  --white:#FFFFFF;--paper-30:#FFFDFA;--paper-50:#FFFCF8;--paper-80:#FCF6EE;--paper-100:#F5EDE1;--sand-border:#C8BAA7;
-  --home-page:var(--white);--home-top:var(--paper-80);--home-tabs:var(--white);--home-panel:var(--paper-50);
-  --home-head:var(--paper-80);--home-cell:var(--paper-30);--home-trough:var(--paper-100);--home-pill:var(--paper-80);--home-border:var(--sand-border);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --page:#14110E;
@@ -71,8 +67,6 @@
   --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
   --shimmer:rgba(243,236,227,.06);
-  --home-page:#14110E;--home-top:#1C1814;--home-tabs:#14110E;--home-panel:#1C1814;
-  --home-head:#26211C;--home-cell:#1C1814;--home-trough:#14110E;--home-pill:#1C1814;--home-border:#433B33;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --page:#14110E;
@@ -103,6 +97,4 @@
   --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
   --shimmer:rgba(243,236,227,.06);
-  --home-page:#14110E;--home-top:#1C1814;--home-tabs:#14110E;--home-panel:#1C1814;
-  --home-head:#26211C;--home-cell:#1C1814;--home-trough:#14110E;--home-pill:#1C1814;--home-border:#433B33;
   color-scheme:dark}

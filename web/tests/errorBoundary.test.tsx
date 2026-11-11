@@ -9,7 +9,7 @@ import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { clearDataCache } from "../src/data/api";
 
 // A page that throws while rendering, standing in for malformed data that gets past the loaders.
-vi.mock("../src/pages/Method", () => ({
+vi.mock("../src/pages/NotFound", () => ({
   default: () => {
     throw new Error("boom");
   },
@@ -66,14 +66,14 @@ describe("ErrorBoundary", () => {
     );
     const user = userEvent.setup();
     render(
-      <MemoryRouter initialEntries={["/how-it-works"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={["/no-such-page"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <App />
       </MemoryRouter>,
     );
     expect(screen.getByRole("alert")).toHaveTextContent(/something went wrong/i);
     expect(screen.getByRole("link", { name: "Orca home" })).toBeInTheDocument(); // the header is outside the boundary
 
-    await user.click(screen.getByRole("link", { name: "Home" }));
+    await user.click(screen.getByRole("link", { name: "Orca home" }));
     expect(await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });

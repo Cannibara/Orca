@@ -68,6 +68,12 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 - Rejected: all-paper variants where page, table and heading share one shade (chat).
 - Consequences: other pages keep the old paper page colour until restyled. Tokens `--home-*` map the roles and carry dark values.
 
+## 2026-11-11 — Home page back on the fund page's look; How it works removed
+- Decision: the home page drops its paper look and uses the fund page's colours: cream page, `--surface` panels and header bar, `--sunken` heading row and toggle trough, `--line`/`--line2` borders, secondary (surface plus `--line2`) buttons, the fund page's 34px heading. The How it works page, its nav link, footer link, route and sitemap entry are deleted (chat)(code).
+- Context: the owner reviewed fund pages closely and is happy with them; home should match them in colour, buttons and borders. Users need no 13F education (chat).
+- Supersedes: "Home page on white with paper panels" above. `--home-*`, `--paper-*`, `--white`, `--sand-border` tokens are gone.
+- Consequences: no top nav (the logo links home). `/how-it-works` now shows Not found. The Position page's "How it works" link is gone.
+
 ## 2026-11-09 — HSTS, noindex on pages.dev, sitemap/robots/canonical (PR #3, merged as a2a1554)
 - Decision: HSTS 6 months, no `includeSubDomains`/`preload`; `X-Robots-Tag: noindex` only on `*.pages.dev`; canonical only on pre-rendered fund pages (chat)(code).
 - Context: duplicate content across `orca-88p.pages.dev` and `www.orcaetf.com`; `/robots.txt` returned the SPA HTML (chat).

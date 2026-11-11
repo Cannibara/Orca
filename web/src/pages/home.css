@@ -6,7 +6,8 @@
 /* ---------- hero: eyebrow and heading on the left, the search on the right ---------- */
 .home .hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px 24px;align-items:end;padding:8px 0}
 .home .hero-t{display:flex;flex-direction:column;gap:14px;min-width:0}
-.home .hero h1{overflow-wrap:anywhere}
+/* the fund page's heading size, so the two pages open alike */
+.home .hero h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;overflow-wrap:anywhere}
 @container app (max-width:719px){
   .home .hero{grid-template-columns:minmax(0,1fr);padding-top:0}
 }
@@ -82,24 +83,3 @@
   .home .in-wrap>input{height:44px;font-size:16px}
   .home .search .btn{--h:44px}
 }
-
-/* ---------- paper look (approved in the design review, 2026-11-11) ----------
-   White page and content box (hairline on three sides, none on top, under the top bar), a paper-80 top bar,
-   paper-50 panel and tab strip, paper-80 heading row, paper-30 cells, paper-100 toggle trough. Roles are
-   tokens (--home-*) so the dark theme keeps its own values. `:has(.home)` keeps the other pages as they were. */
-body:has(.home){background:var(--home-page)}
-body:has(.home) .top{background:var(--home-top)}
-main.wrap:has(.home){background:var(--home-page);border:1px solid var(--line);border-top:0}
-.home .tabs{background:var(--home-tabs)}
-.home .panel,.home .pager{background:var(--home-panel)}
-.home .in-wrap>input{background:var(--home-page);border-color:var(--home-border)}
-.home .seg{background:var(--home-trough)}
-.home .seg button{background:var(--home-pill)}
-.home .seg .thumb{background:var(--home-pill);box-shadow:0 0 0 1px var(--home-border)}
-.home .pager .btn-secondary{background:var(--home-panel);border-color:var(--home-border)}
-.home .tbl-wrap{background:var(--home-cell)}
-.home .tbl-wrap thead th{background:var(--home-head);border-bottom-color:var(--home-border)}
-.home .tbl-wrap tbody td{background:var(--home-cell)}
-.home .tbl-wrap tbody tr:hover>td{background:var(--hover)}
-/* a list whose table follows the header directly (no pager row) gets the same header-to-heading height as Top funds */
-.home .ph:has(+ .tbl-wrap){min-height:100px}

@@ -61,16 +61,11 @@ p{margin:0}
 .hint{font-size:13px;color:var(--ink2)}
 .hint b{color:var(--ink);font-weight:600}
 
-/* ---------- top bar: logo, two nav links, a hairline under it ---------- */
+/* ---------- top bar: the logo and a hairline under it ---------- */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topbar{display:flex;align-items:stretch;gap:20px;min-height:56px}
 .brand{display:flex;align-items:center;gap:9px;flex:none;font:600 16px/1 var(--f-sans);letter-spacing:-.02em;color:var(--ink);text-decoration:none}
 .brand svg{width:22px;height:22px;flex:none;display:block}
-.nav{display:flex;align-items:stretch;gap:2px;min-width:0}
-.nav a{position:relative;display:flex;align-items:center;padding:0 10px;font:500 13px/1 var(--f-sans);color:var(--ink3);text-decoration:none}
-.nav a:hover,.nav a[aria-current="page"]{color:var(--ink)}
-.nav a[aria-current="page"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--ink)}
-.nav a:focus-visible{outline-offset:-3px}
 
 /* ---------- page frame ---------- */
 main{padding-block:32px 40px}
@@ -243,14 +238,6 @@ a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
 .base{stroke:var(--line2);stroke-width:1}
 .base.crosshair{stroke:var(--ink3);stroke-dasharray:1 3;stroke-linecap:round;pointer-events:none}
 
-/* ---------- how it works ---------- */
-.prose{max-width:72ch;display:flex;flex-direction:column;gap:28px}
-.prose section{display:flex;flex-direction:column;gap:10px}
-.prose p,.prose li{color:var(--ink2);line-height:1.55;text-wrap:pretty}
-.prose ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
-.prose li::marker{color:var(--ink3)}
-.formula{font:400 12.5px/1.6 var(--f-mono);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-2);padding:10px 14px;color:var(--ink);overflow-x:auto;white-space:pre}
-
 @media (min-width:720px){
   .wrap{padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
 }
@@ -270,6 +257,6 @@ a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
   .input{height:44px}
 }
 @media (prefers-reduced-motion:no-preference){
-  .btn,.chip,.tab,.nav a,.linkbtn,.tbl-wrap tbody td{transition:background-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),border-color var(--d-fast) var(--ease-out)}
+  .btn,.chip,.tab,.linkbtn,.tbl-wrap tbody td{transition:background-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),border-color var(--d-fast) var(--ease-out)}
   :root:not([data-motion="reduce"]) .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out)}
 }

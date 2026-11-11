@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -67,13 +67,6 @@ describe("page title follows the route", () => {
     await waitFor(() => expect(document.title).toBe("NVDA · Kelpwood Capital LP · Orca"));
   });
 
-  it("is 'How it works · Orca' on the methodology page", async () => {
-    stubData();
-    renderApp("/how-it-works");
-    await screen.findByRole("heading", { level: 1, name: /How Orca estimates/ });
-    await waitFor(() => expect(document.title).toBe("How it works · Orca"));
-  });
-
   it.each(["/no-such-page", "/fund/424242", "/fund/abc"])("is 'Not found · Orca' on %s", async (path) => {
     stubData();
     renderApp(path);
@@ -83,14 +76,13 @@ describe("page title follows the route", () => {
 });
 
 describe("site footer", () => {
-  it.each(["/", `/fund/${FUND}`, `/fund/${FUND}/stock/${STOCK}`, "/how-it-works", "/no-such-page"])(
-    "shows the estimate disclaimer and a link to How it works on %s",
+  it.each(["/", `/fund/${FUND}`, `/fund/${FUND}/stock/${STOCK}`, "/no-such-page"])(
+    "shows the estimate disclaimer on %s",
     async (path) => {
       stubData();
       renderApp(path);
       const foot = await screen.findByRole("contentinfo");
       expect(foot).toHaveTextContent("Estimates from SEC 13F filings. Not investment advice.");
-      expect(within(foot).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/how-it-works");
     },
   );
 });

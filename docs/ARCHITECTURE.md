@@ -166,7 +166,7 @@ Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.pu
 - Tests: LibreOffice recalculates the files (`tests/lo.py`); CI installs it and sets `ORCA_REQUIRE_LIBREOFFICE=1`, so a missing `soffice` fails there instead of skipping. Excel itself has not been run.
 
 ## Web (`web/`)
-- Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `/how-it-works`, `*`.
+- Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `*` (`/how-it-works` was removed 2026-11-11).
 - Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files. `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
 - Row budget for big tables: `web/src/fund/loading.ts` (50 / 200 / 25 / 100).
 - Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3, merged a2a1554) it also writes `sitemap.xml`, `robots.txt` and canonical links. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.

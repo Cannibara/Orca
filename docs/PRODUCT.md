@@ -24,8 +24,8 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Shipped | Home: fund search (`/` focuses it) and 5 tabs (Top funds 1y/3y/5y/10y/15y/since start + Index giants, Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
 | Shipped | Fund page panels (below) | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code) |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
-| Shipped | How it works page, Not found page | `web/src/pages/Method.tsx`, `NotFound.tsx` (code) |
-| Shipped | Site-wide footer on every page: "Estimates from SEC 13F filings. Not investment advice." with a link to How it works | `web/src/App.tsx` (code) |
+| Shipped | Not found page (the How it works page was removed 2026-11-11: users need no 13F education) | `web/src/pages/NotFound.tsx` (chat)(code) |
+| Shipped | Site-wide footer on every page: "Estimates from SEC 13F filings. Not investment advice." | `web/src/App.tsx` (code) |
 | Shipped | Pre-rendered fund pages (title/description/noscript) for the largest 15,000 funds | `web/scripts/prerender.mjs` (code) |
 | Shipped | Background loading (first 50 rows, fill to 200, Show 100 more; all weekly prices prefetched) | `web/src/fund/loading.ts`, `prefetch.ts` (code) |
 | Shipped (PR #3, a2a1554) | HSTS, noindex on pages.dev, sitemap/robots/canonical | (git 006b9d8, a2a1554) |
@@ -90,7 +90,7 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 See `docs/DECISIONS.md`. Key points: quarterly returns are the source of truth; tiles follow the bracket; tables show all columns; first paint is kept small; a "Max" range always shows.
 
 ## Non-goals
-- Not a fund's real return: no claims beyond 13F estimates; "Not investment advice" (spec)(code `Method.tsx`).
+- Not a fund's real return: no claims beyond 13F estimates; "Not investment advice" in the site footer (code `App.tsx`).
 - No SPY benchmark columns on fund pages (ruling R23); SPY appears only in what-if comparisons (code).
 - No always-on server, database server, or competitor data sources (spec §1).
 - No real-time or intra-quarter data; pre-2013 history is out of scope (spec).

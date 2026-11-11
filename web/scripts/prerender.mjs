@@ -192,9 +192,9 @@ https://:version.:project.pages.dev/*
   return text;
 }
 
-/** dist/sitemap.xml: the home page, the methodology and the pre-rendered fund pages (sitemaps.org protocol). */
+/** dist/sitemap.xml: the home page and the pre-rendered fund pages (sitemaps.org protocol). */
 function renderSitemap(site, funds) {
-  const urls = [`${site}/`, `${site}/how-it-works`, ...funds.map((f) => `${site}${fundPath(f.id)}`)];
+  const urls = [`${site}/`, ...funds.map((f) => `${site}${fundPath(f.id)}`)];
   if (urls.length > MAX_SITEMAP_URLS) {
     fail(`sitemap.xml would list ${urls.length} URLs and one file may list ${MAX_SITEMAP_URLS}: lower PRERENDER_MAX`);
   }

@@ -19,7 +19,6 @@ const routes = [
   { name: "home", path: "/" },
   { name: "fund page", path: `/fund/${fundId}` },
   { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
-  { name: "how it works", path: "/how-it-works" },
   { name: "not found", path: "/no-such-page" },
 ];
 const widths = [1280, 400];
@@ -106,9 +105,6 @@ test("the title follows the route when navigating inside the app", async ({ page
   await page.getByRole("link", { name: "Orca home" }).click();
   await expect(page.locator("h1")).toHaveText(/Fund Manager Research/);
   await expect(page).toHaveTitle("Orca");
-  await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "How it works" }).click();
-  await expect(page.locator("h1")).toHaveText(/How Orca estimates/);
-  await expect(page).toHaveTitle("How it works · Orca");
 });
 
 // Instrument Sans and Geist Mono are variable fonts served from the site (hashed files under

@@ -360,7 +360,7 @@ describe("prerender: pages.dev addresses are not indexed, the custom domain is",
     const robots = (url: string) => headersFor(text, url)["X-Robots-Tag"];
     expect(robots("https://orca-88p.pages.dev/")).toBe("noindex");
     expect(robots("https://orca-88p.pages.dev/fund/9100002/")).toBe("noindex");
-    expect(robots("https://orca.pages.dev/how-it-works")).toBe("noindex");
+    expect(robots("https://orca.pages.dev/fund/1/")).toBe("noindex");
     expect(robots("https://3f9a1c2b.orca-88p.pages.dev/")).toBe("noindex");
     expect(robots("https://main.orca-88p.pages.dev/fund/1/")).toBe("noindex");
     for (const url of [
@@ -483,18 +483,18 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
   });
 
-  it("writes sitemap.xml: the XML declaration, the sitemap namespace, the home page, the methodology and each fund page", async () => {
+  it("writes sitemap.xml: the XML declaration, the sitemap namespace, the home page and each fund page", async () => {
     const dist = makeDist();
     const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
     const xml = read(join(dist, "sitemap.xml"));
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')).toBe(true);
     expect(xml.endsWith("</urlset>\n")).toBe(true);
     const urls = sitemapUrls(dist);
-    expect(urls.slice(0, 2)).toEqual([`${SITE}/`, `${SITE}/how-it-works`]);
-    expect(urls.slice(2).sort()).toEqual(demo.id.map((id) => `${SITE}/fund/${id}/`).sort());
+    expect(urls[0]).toBe(`${SITE}/`);
+    expect(urls.slice(1).sort()).toEqual(demo.id.map((id) => `${SITE}/fund/${id}/`).sort());
     expect(new Set(urls).size).toBe(urls.length);
     expect(xml.match(/<url>/g)).toHaveLength(urls.length);
-    expect(r.stdout).toContain(`prerender: wrote sitemap.xml (${demo.id.length + 2} URLs) and robots.txt for ${SITE}`);
+    expect(r.stdout).toContain(`prerender: wrote sitemap.xml (${demo.id.length + 1} URLs) and robots.txt for ${SITE}`);
     // every URL is absolute https on the site, and every fund URL is a page that was written
     for (const url of urls) expect(url.startsWith(`${SITE}/`)).toBe(true);
     for (const id of demo.id) expect(existsSync(page(dist, id))).toBe(true);
@@ -504,14 +504,14 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE, PRERENDER_MAX: "3" });
     const urls = sitemapUrls(dist);
-    expect(urls).toHaveLength(5);
-    expect(urls.slice(2).map((u) => u.split("/")[4]).sort()).toEqual(pageDirs(dist).sort());
+    expect(urls).toHaveLength(4);
+    expect(urls.slice(1).map((u) => u.split("/")[4]).sort()).toEqual(pageDirs(dist).sort());
   });
 
-  it("PRERENDER_MAX=0 still writes the sitemap with the home page and the methodology", async () => {
+  it("PRERENDER_MAX=0 still writes the sitemap with the home page", async () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE, PRERENDER_MAX: "0" });
-    expect(sitemapUrls(dist)).toEqual([`${SITE}/`, `${SITE}/how-it-works`]);
+    expect(sitemapUrls(dist)).toEqual([`${SITE}/`]);
   });
 
   it("writes robots.txt: everyone may crawl everything, and the sitemap is named", async () => {
@@ -541,7 +541,7 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
   });
 
   it("stops the build at the sitemap limit of 50,000 URLs, before writing any page", { timeout: 60_000 }, async () => {
-    const count = 49_999; // plus the home page and the methodology: 50,001
+    const count = 50_000; // plus the home page: 50,001
     const ids = Array.from({ length: count }, (_, i) => i + 1);
     const funds = writeFunds({ v: 1, id: ids, name: ids.map((id) => `Fund ${id}`), book: ids, n: ids.map(() => 1) });
     const dist = makeDist();
@@ -559,7 +559,7 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     const dist = makeDist();
     const r = await run(dist, { PRERENDER_FUNDS: funds, SITE_URL: SITE });
     expect(r.code).toBe(0);
-    expect(sitemapUrls(dist)).toHaveLength(15_002);
+    expect(sitemapUrls(dist)).toHaveLength(15_001);
     expect(statSync(join(dist, "sitemap.xml")).size).toBeLessThan(2 * 1024 * 1024);
   });
 });
