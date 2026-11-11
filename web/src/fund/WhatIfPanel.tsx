@@ -45,8 +45,8 @@ const COLS: { key: SaleKey; head: string; w: number }[] = [
 const LEFT: ReadonlySet<SaleKey> = new Set<SaleKey>(["t", "status"]);
 
 const WORD = { new: "New", add: "Added", trim: "Trimmed", exit: "Sold all" } as const;
-// Both a trim and a full sale are cuts, so both wear the loss colour.
-const TONE = { new: "add", add: "add", trim: "trim", exit: "trim" } as const;
+// Only a full sale wears the loss colour; a trim stays grey.
+const TONE = { new: "add", add: "add", trim: "sold", exit: "trim" } as const;
 
 const n0 = (v: number): string => Math.round(v).toLocaleString("en-US");
 
