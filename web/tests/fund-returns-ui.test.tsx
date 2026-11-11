@@ -373,7 +373,7 @@ describe("ReturnsPanel", () => {
     const seg = within(panel).getByRole("group", { name: "Years shown" });
     expect(within(seg).getByRole("button", { name: "15 years" })).toHaveAttribute("aria-pressed", "true");
     expect(within(seg).getByRole("button", { name: "Max" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(panel).getByRole("button", { name: "Show the numbers" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Table view" })).toBeInTheDocument();
   });
 
   test("one button per year with its return, direction and part-year note; the selected one is pressed", () => {
@@ -581,15 +581,17 @@ describe("ReturnsPanel", () => {
     expect(tipEl()).not.toBeVisible();
   });
 
-  test("Show the numbers swaps the chart for an accessible table and back", async () => {
+  test("Table view swaps the chart for an accessible table and back", async () => {
     const user = userEvent.setup();
     render(<Host />);
     const panel = screen.getByRole("region", { name: "Annual returns" });
-    const btn = within(panel).getByRole("button", { name: "Show the numbers" });
+    const btn = within(panel).getByRole("button", { name: "Table view" });
     expect(btn).toHaveAttribute("aria-pressed", "false");
     await user.click(btn);
-    expect(document.querySelector("#retPanel svg.viz")).toBeNull();
-    expect(within(panel).getByRole("button", { name: "Show the chart" })).toHaveAttribute("aria-pressed", "true");
+    const retSvg = document.querySelector("#retPanel svg.viz") as SVGElement;
+    expect(retSvg.closest(".vchart")).toHaveAttribute("inert"); // held in place, out of sight and of the accessibility tree
+    expect(retSvg.closest(".vchart")).toHaveAttribute("aria-hidden", "true");
+    expect(within(panel).getByRole("button", { name: "Chart view" })).toHaveAttribute("aria-pressed", "true");
     const table = within(panel).getByRole("table", { name: "Estimated annual return by year" });
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Year",
@@ -610,9 +612,9 @@ describe("ReturnsPanel", () => {
     expect(rows[12]).toHaveClass("is-sel");
     expect(rows[11]).not.toHaveAttribute("aria-current");
 
-    await user.click(within(panel).getByRole("button", { name: "Show the chart" }));
+    await user.click(within(panel).getByRole("button", { name: "Chart view" }));
     expect(within(panel).queryByRole("table")).toBeNull();
-    expect(document.querySelector("#retPanel svg.viz")).not.toBeNull();
+    expect(document.querySelector("#retPanel svg.viz")!.closest(".vchart")).not.toHaveAttribute("inert");
   });
 
   test("the years seg reports a change of range", async () => {
@@ -666,7 +668,7 @@ describe("ReturnsPanel", () => {
     render(<Host summary={none} />);
     expect(screen.getByText("No annual returns yet")).toBeInTheDocument();
     expect(document.querySelector("#retPanel svg.viz")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show the numbers" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Table view" })).toBeNull();
   });
 
   test("a single year draws no bracket", () => {

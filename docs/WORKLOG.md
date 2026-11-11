@@ -5,6 +5,15 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
+
+| What changed | Why | Files |
+|---|---|---|
+| "Show the numbers" / "Show the chart" are now "Table view" / "Chart view" on Annual returns, Return constituents and AUM. "Return Constituents" is "Return constituents" everywhere | Owner (chat) | the three panels, tests, `e2e/smoke.spec.ts`, `docs/PRODUCT.md` |
+| Switching views no longer changes the panel's height (it moved by −24 to +40 px before). The chart stays mounted but hidden (`ChartSlot`: `visibility:hidden`, `inert`, `aria-hidden`) and holds the height; the table fills the same box (`.tview`, absolute, `inset:0`) and scrolls inside it with a sticky heading, so the whole list is reachable. Measured before / after in the browser: Annual returns 432 / 432 and 430 / 430, Return constituents 521.6 and 519.1, AUM 521 and 514, at 1280 and 400 px. The scrolling box is keyboard-focusable and labelled "…, scrollable". `max-height:340px` on `.tbl-box` is gone | Owner: tables as big as the graph, showing more rows (chat); designed and measured by an agent | `web/src/fund/ChartSlot.tsx` (new), `base.css`, `ReturnsPanel.tsx`, `DrivePanel.tsx`, `AumPanel.tsx`, three test files |
+| Annual returns table: the selected row's band now covers the row header cell too (it painted only the data cells, so the year cell looked unshaded next to its neighbour), and the Part year tag no longer makes its row taller than the others | Owner: inconsistent shading on the part-year row (chat) | `web/src/fund/base.css` |
+| Risk: a tooltip opened from the keyboard on the hidden chart could stay on screen; not seen, no fix | | |
+
 ## 2026-11-11 — Part years count in Years positive; AUM gains bar edge
 
 | What changed | Why | Files |

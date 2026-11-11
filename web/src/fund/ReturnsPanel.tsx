@@ -14,6 +14,7 @@ import {
 import { useTooltip, type TipContent, type TipRow } from "../charts/Tooltip";
 import { axisPct, f1, fMoney, fPct } from "./fmt";
 import { endRound, stepFor, textW, xLabelItems, xLabels } from "./geometry";
+import { ChartSlot } from "./ChartSlot";
 import { useGrowOnce, useWidth } from "./hooks";
 import { colLayout, dragBracket, idxAtX, keyBracket, type BracketMode } from "./returnsLayout";
 import { Seg } from "./Seg";
@@ -375,7 +376,8 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
 
   function numbers(): ReactNode {
     return (
-      <div className="tbl-box">
+      <div className="tview">
+      <div className="tbl-box" tabIndex={0} role="region" aria-label="Estimated annual return by year, scrollable">
         <table className="tbl-mini">
           <caption>Estimated annual return by year</caption>
           <thead>
@@ -407,6 +409,7 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     );
   }
@@ -441,7 +444,7 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
                   </>
                 )}
               </svg>
-              <span>{table ? "Show the chart" : "Show the numbers"}</span>
+              <span>{table ? "Chart view" : "Table view"}</span>
             </button>
           )}
         </div>
@@ -453,10 +456,11 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
               <h4>No annual returns yet</h4>
               <p>A return needs at least one quarter between two filings. The chart appears once this fund has one.</p>
             </div>
-          ) : table ? (
-            numbers()
           ) : (
-            chart()
+            <>
+              <ChartSlot table={table}>{chart()}</ChartSlot>
+              {table && numbers()}
+            </>
           )}
         </div>
       </div>

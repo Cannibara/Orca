@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { ChartSlot } from "./ChartSlot";
 import { useTooltip, type TipContent } from "../charts/Tooltip";
 import { aumLayout, aumRows, aumTotals } from "./aum";
 import "./aum.css";
@@ -45,7 +46,7 @@ function ViewIcon({ table }: { table: boolean }) {
 }
 
 /** The chart: one static column per year. It is not clickable and keeps no selection. */
-function AumChart({ win, grow }: { win: Win; grow: string }) {
+function AumChart({ win, grow, table, years }: { win: Win; grow: string; table: boolean; years: YearPoint[] }) {
   const host = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const W = useWidth(host, 280, 600);
@@ -89,6 +90,7 @@ function AumChart({ win, grow }: { win: Win; grow: string }) {
   const bandX = L.G.ml + L.G.band * band.i;
   return (
     <div className="chart" ref={host}>
+      <ChartSlot table={table}>
       <svg
         ref={svg}
         className={"viz c2" + grow}
@@ -155,14 +157,16 @@ function AumChart({ win, grow }: { win: Win; grow: string }) {
           <rect key={h.i} className="hit" data-i={h.i} x={h.x} y={0} width={h.width} height={L.H} rx={6} tabIndex={0} role="img" aria-label={h.label} />
         ))}
       </svg>
+      </ChartSlot>
+      {table && <AumTable years={years} />}
     </div>
   );
 }
 
 function AumTable({ years }: { years: YearPoint[] }) {
   return (
-    <div className="chart">
-      <div className="tbl-box">
+    <div className="tview">
+      <div className="tbl-box" tabIndex={0} role="region" aria-label="Book value, net inflows and gains by year, scrollable">
         <table className="tbl-mini">
           <caption>Book value, net inflows and gains by year</caption>
           <thead>
@@ -223,7 +227,7 @@ function AumBody({ win }: { win: Win }) {
         <div className="ph-c">
           <button type="button" className="btn btn-secondary sm" aria-pressed={table} onClick={() => setTable((t) => !t)}>
             <ViewIcon table={table} />
-            <span>{table ? "Show the chart" : "Show the numbers"}</span>
+            <span>{table ? "Chart view" : "Table view"}</span>
           </button>
         </div>
       </div>
@@ -266,7 +270,7 @@ function AumBody({ win }: { win: Win }) {
         </div>
       </div>
       <div className="pb" ref={grow}>
-        {table ? <AumTable years={years} /> : <AumChart win={win} grow={anim.cls} />}
+        <AumChart win={win} grow={anim.cls} table={table} years={years} />
       </div>
     </>
   );

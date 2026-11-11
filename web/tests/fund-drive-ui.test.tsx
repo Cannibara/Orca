@@ -140,12 +140,14 @@ describe("DrivePanel", () => {
     expect(screen.getByRole("heading", { name: "Return constituents 2023" })).toBeInTheDocument();
   });
 
-  test("Show the numbers swaps the chart for an accessible table with a Total row", () => {
+  test("Table view swaps the chart for an accessible table with a Total row", () => {
     render(<Host sel="2025" cr={{ a: "2020", b: "2022" }} />);
-    const btn = screen.getByRole("button", { name: "Show the numbers" });
+    const btn = screen.getByRole("button", { name: "Table view" });
     expect(btn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(btn);
-    expect(panel().querySelector("svg.wf")).toBeNull();
+    const wfSvg = panel().querySelector("svg.wf") as SVGElement;
+    expect(wfSvg.closest(".vchart")).toHaveAttribute("inert"); // held in place, out of sight and of the accessibility tree
+    expect(wfSvg.closest(".vchart")).toHaveAttribute("aria-hidden", "true");
     const table = screen.getByRole("table");
     expect(within(table).getByText("Contribution to return, 2020 to 2022, percentage points")).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Ticker", "Company", "Points"]);
@@ -156,10 +158,11 @@ describe("DrivePanel", () => {
     // biggest contribution first
     const pts = rows.slice(0, -1).map((r) => Number((r.lastChild?.textContent ?? "").replace("−", "-")));
     expect([...pts].sort((x, y) => y - x)).toEqual(pts);
-    const back = screen.getByRole("button", { name: "Show the chart" });
+    const back = screen.getByRole("button", { name: "Chart view" });
     expect(back).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(back);
-    expect(panel().querySelector("svg.wf")).not.toBeNull();
+    expect(panel().querySelector("svg.wf")!.closest(".vchart")).not.toHaveAttribute("inert");
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   test("a fund with thousands of stocks prints the biggest 200 and a Show all button", () => {
@@ -169,7 +172,7 @@ describe("DrivePanel", () => {
       by_year: { "2025": { stock_id: Array.from({ length: n }, (_, i) => 5000 + i), points: Array.from({ length: n }, (_, i) => 3 - i * 0.002), pnl: Array(n).fill(0) } },
     };
     render(<Host sel="2025" contrib={big} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show the numbers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Table view" }));
     const table = screen.getByRole("table");
     // 200 stocks, the line for the other 2800, and the total
     expect(within(table).getAllByRole("row")).toHaveLength(1 + 200 + 1 + 1);

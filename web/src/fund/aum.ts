@@ -231,7 +231,7 @@ export function aumTotals(years: Pick<YearPoint, "end" | "inflows" | "gains">[])
   return { end: years.length ? years[years.length - 1].end : 0, flows, gains };
 }
 
-/** A row of the "Show the numbers" table. */
+/** A row of the "Table view" table. */
 export type AumRow = {
   label: string;
   part: boolean;
