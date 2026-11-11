@@ -50,9 +50,9 @@
 .home .ph-c{min-width:0;max-width:100%}
 .home .seg{overflow-x:auto;scrollbar-width:none}
 .home .seg::-webkit-scrollbar{display:none}
-.home .ph{padding-bottom:12px}
+.home .ph{padding-top:14px;padding-bottom:8px}
 .home .pager{padding:10px var(--ppad)}
-.home .ph+.pager{padding-top:0}
+.home .ph+.pager{padding-top:0;padding-bottom:8px}
 .home .tbl-wrap+.pager{border-top:1px solid var(--line)}
 .home .pb{padding-bottom:var(--ppad)}
 .home .pf{border-top:1px solid var(--line);padding-top:10px}
@@ -82,3 +82,22 @@
   .home .in-wrap>input{height:44px;font-size:16px}
   .home .search .btn{--h:44px}
 }
+
+/* ---------- paper look (approved in the design review, 2026-11-11) ----------
+   White page and content box (hairline on three sides, none on top, under the top bar), a paper-80 top bar,
+   paper-50 panel and tab strip, paper-80 heading row, paper-30 cells, paper-100 toggle trough. Roles are
+   tokens (--home-*) so the dark theme keeps its own values. `:has(.home)` keeps the other pages as they were. */
+body:has(.home){background:var(--home-page)}
+body:has(.home) .top{background:var(--home-top)}
+main.wrap:has(.home){background:var(--home-page);border:1px solid var(--line);border-top:0}
+.home .tabs{background:var(--home-tabs)}
+.home .panel,.home .pager{background:var(--home-panel)}
+.home .in-wrap>input{background:var(--home-page);border-color:var(--home-border)}
+.home .seg{background:var(--home-trough)}
+.home .seg button{background:var(--home-pill)}
+.home .seg .thumb{background:var(--home-pill);box-shadow:0 0 0 1px var(--home-border)}
+.home .pager .btn-secondary{background:var(--home-panel);border-color:var(--home-border)}
+.home .tbl-wrap{background:var(--home-cell)}
+.home .tbl-wrap thead th{background:var(--home-head);border-bottom-color:var(--home-border)}
+.home .tbl-wrap tbody td{background:var(--home-cell)}
+.home .tbl-wrap tbody tr:hover>td{background:var(--hover)}
