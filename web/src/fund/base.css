@@ -79,9 +79,8 @@
 .fp .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:0;min-width:0;display:flex;flex-direction:column}
 .fp .ph{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:space-between;align-items:flex-start;padding:16px var(--ppad) 0}
 .fp .ph-t{min-width:0;flex:1 1 240px}
-/* Panel titles are as large as the figures of the key-figure tiles (.kpi-v), smaller on a phone. */
-.fp .pt{font:600 28px/34px var(--f-sans);letter-spacing:-.025em}
-@media (max-width:640px){.fp .pt{font-size:22px;line-height:28px}}
+/* Panel titles: 30% under the key-figure tiles' numbers (.kpi-v, 28px), the same on a phone. */
+.fp .pt{font:600 19.6px/26px var(--f-sans);letter-spacing:-.02em}
 .fp .ps{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;text-wrap:pretty}
 .fp .ph-c{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .fp .pb{padding:12px var(--ppad) 6px;min-width:0;flex:1}

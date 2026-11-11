@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Panel titles 30% smaller
+
+| What changed | Why | Files |
+|---|---|---|
+| Panel titles on the fund page (`.fp .pt`) and the Position page (`.pos-page .pt`): 28px → 19.6px (line height 26px), no separate phone size | Owner found 28px too big; asked for 30% smaller (chat) | `web/src/fund/base.css`, `web/src/pages/position.css` |
+
 ## 2026-11-11 — Positions columns: Weight left-aligned, even gaps
 
 | What changed | Why | Files |
