@@ -19,6 +19,8 @@ const MB = 24;
 const SZ = 5.5; // half the width of a trade marker
 
 const MOVE_WORD = { New: "New", Add: "Added", Trim: "Trimmed", Exit: "Sold all" } as const;
+// The box fill, as the What-if table's Status and the Position page: blue for buying, grey for any sale.
+const MOVE_TONE = { New: "add", Add: "add", Trim: "sold", Exit: "sold" } as const;
 
 const n0 = (v: number): string => Math.round(v).toLocaleString("en-US");
 
@@ -97,7 +99,11 @@ function Chart({
       ? `M${x.toFixed(1)},${(y - SZ - 2).toFixed(1)}l${SZ},${(SZ * 1.7).toFixed(1)}h${-2 * SZ}z`
       : `M${x.toFixed(1)},${(y + SZ + 2).toFixed(1)}l${SZ},${(-SZ * 1.7).toFixed(1)}h${-2 * SZ}z`;
     const title = `${buy ? "Bought " : "Sold "}${n0(Math.abs(t.delta))} shares at $${t.px.toFixed(2)}, ${qLabelFull(t.q)}`;
-    return [{ key: idx, buy, path, title }];
+    // A sale's label: the shares sold as a share of those held at the end of the quarter before.
+    const before = t.sharesAfter - t.delta;
+    const cut = !buy && before > 0 ? Math.min(100, (-t.delta / before) * 100) : null;
+    const label = cut === null ? null : { text: MINUS + (cut >= 1 ? Math.round(cut) + "%" : "<1%"), x, y: Math.min(y + SZ + 14, MT + ih - 2) };
+    return [{ key: idx, buy, path, title, label }];
   });
 
   const last = latestPrice ?? (close[iLast] as number);
@@ -129,19 +135,24 @@ function Chart({
           <title>{m.title}</title>
         </path>
       ))}
+      {marks.map(
+        (m) =>
+          m.label && (
+            <text
+              key={"c" + m.key}
+              className="cut"
+              x={Math.min(W - MR - 12, Math.max(ML + 12, m.label.x)).toFixed(1)}
+              y={m.label.y.toFixed(1)}
+              textAnchor="middle"
+            >
+              {m.label.text}
+            </text>
+          ),
+      )}
       <circle className="pxdot" cx={X(iLast).toFixed(1)} cy={Y(last).toFixed(1)} r={3.5} />
       <text className="blab" x={(X(iLast) - 8).toFixed(1)} y={(Y(last) - 9).toFixed(1)} textAnchor="end">
         {"$" + last.toFixed(2)}
       </text>
-    </svg>
-  );
-}
-
-/** Inline plus or minus for the action tags. */
-function Sign({ plus }: { plus: boolean }) {
-  return (
-    <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
-      <path d={plus ? "M8 3.5v9M3.5 8h9" : "M3.5 8h9"} />
     </svg>
   );
 }
@@ -176,6 +187,7 @@ export function StockPanel({ row, fundId, width, latestPrice }: StockPanelProps)
             Sold
           </span>
           <span>Share price, $</span>
+          <span className="xnote">−% = shares sold, as % of those held at the end of the quarter before</span>
           <Link className="xlink" to={`/fund/${fundId}/stock/${row.id}`}>
             Open full page
           </Link>
@@ -212,10 +224,7 @@ export function StockPanel({ row, fundId, width, latestPrice }: StockPanelProps)
               <tr key={t.q}>
                 <td>{qLabelFull(t.q)}</td>
                 <td className="tl">
-                  <span className="tag">
-                    <Sign plus={t.delta > 0} />
-                    {MOVE_WORD[move]}
-                  </span>
+                  <span className={"st " + MOVE_TONE[move]}>{MOVE_WORD[move]}</span>
                 </td>
                 <td>{(t.delta < 0 ? MINUS : "+") + n0(Math.abs(t.delta))}</td>
                 <td>{"$" + t.px.toFixed(2)}</td>
