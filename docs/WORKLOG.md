@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Light / dark switch back, search moved to the tab row
+
+| What changed | Why | Files |
+|---|---|---|
+| A square icon button (`ThemeToggle`) switches light and dark at the top right of every page: level with the fund's name on the fund page, level with the heading on the position page, in the hero where the search was on Home, and above the card on the not-found page. The pick is kept in this browser (`localStorage` key `orca-theme`) and applied in `main.tsx` before the first render; with no pick the device's setting rules, as before (`tokens.css` already read `<html data-theme>`) | Owner asked for it (chat); DECISIONS line 125 had left the theme switch out of the fund page | `web/src/lib/theme.ts`, `web/src/components/ThemeToggle.tsx`, `main.tsx`, `FundHeader.tsx`, `Home.tsx`, `Position.tsx`, `NotFound.tsx`, `styles.css`, `returns.css`, `home.css`, `position.css`, `state.css` |
+| Home: the fund search moved down into the tab row, at the right, level with Top funds / Conviction moves …; its label is visually hidden (still its accessible name). On narrow screens the search stacks above the tabs. The tab order is now tabs, then search, then the page | Owner (chat) | `web/src/pages/Home.tsx`, `home.css`, `web/tests/home.test.tsx` |
+| Known: a visitor with a saved dark pick sees a short light flash on first paint, since the strict CSP rules out an inline script in `index.html` | | |
+
 ## 2026-11-11 — Opened-row trade list matches the fund page's tables
 
 | What changed | Why | Files |

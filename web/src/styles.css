@@ -134,6 +134,13 @@ details[open] summary{margin-bottom:8px}
 .tab:focus-visible{outline-offset:-3px}
 .tabs .ind{position:absolute;left:0;bottom:0;height:2px;width:1px;background:var(--ink);transform-origin:0 0;transform:translateX(var(--x,0px)) scaleX(var(--w,40));pointer-events:none}
 
+/* theme-btn: the light / dark switch at the top right of every page, level with the page heading */
+.theme-btn{flex:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink2);cursor:pointer}
+.theme-btn:hover{border-color:var(--control);color:var(--ink)}
+.theme-btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.theme-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:none),(pointer:coarse){.theme-btn{width:44px;height:44px}}
+
 /* ---------- inputs (the home search is in pages/home.css) ---------- */
 .input{height:36px;width:100%;padding:0 12px;border:1px solid var(--control);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans);min-width:0}
 .input::placeholder{color:var(--ink3);opacity:1}

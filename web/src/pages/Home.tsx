@@ -8,6 +8,7 @@ import { Signed } from "../components/Signed";
 import { State } from "../components/State";
 import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { loadFunds, loadHome, loadLatestPrices, loadSecurities, priceMap, stockMap, type Stock } from "../data/api";
 import type {
   CallRow,
@@ -179,7 +180,10 @@ function FundSearch() {
           if (matches.length > 0) navigate(`/fund/${matches[0].id}`);
         }}
       >
-        <label htmlFor="fund-search">Search a fund or manager</label>
+        {/* Hidden: the field sits in the tab row, which has no room for a caption above it. */}
+        <label htmlFor="fund-search" className="vh">
+          Search a fund or manager
+        </label>
         <div className="in-wrap">
           <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="7" cy="7" r="4.25" />
@@ -716,10 +720,14 @@ export default function Home() {
             <p className="eyebrow">Quarterly 13F Data from SEC.gov</p>
             <h1>Fund Manager Research</h1>
           </div>
-          <FundSearch />
+          <ThemeToggle className="hero-theme" />
         </header>
 
-        <Tabs tabs={TABS} value={tab} onChange={setTab} label="Home lists" idPrefix="home" />
+        {/* The search sits level with the tabs, at the right. */}
+        <div className="tabrow">
+          <Tabs tabs={TABS} value={tab} onChange={setTab} label="Home lists" idPrefix="home" />
+          <FundSearch />
+        </div>
         <div className="home-body" {...tabPanelProps("home", tab)}>
           {panel}
         </div>

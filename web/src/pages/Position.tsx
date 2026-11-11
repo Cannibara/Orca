@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PriceChart } from "../charts/PriceChart";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { StepChart } from "../charts/StepChart";
 import {
   NotFoundError,
@@ -164,10 +165,13 @@ function Header({ data }: { data: PositionData }) {
       <Link className="crumb" to={`/fund/${summary.id}`}>
         {`← ${summary.name}`}
       </Link>
-      <h1>
-        <span className="mono">{security?.ticker ?? `#${p.stock_id}`}</span>
-        {security && ` · ${tidyName(security.name)}`}
-      </h1>
+      <div className="pos-title">
+        <h1>
+          <span className="mono">{security?.ticker ?? `#${p.stock_id}`}</span>
+          {security && ` · ${tidyName(security.name)}`}
+        </h1>
+        <ThemeToggle />
+      </div>
       <div className="pos-meta">
         <span className="pill">
           Sector <b>{security?.sector ?? DASH}</b>

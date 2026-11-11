@@ -2,6 +2,9 @@
    one action. Used by the not-found page and the position page's load error. Class names are prefixed
    (pg-) so nothing here can meet another sheet's rules; tokens only. */
 
+/* the theme switch, alone at the top right of a page that has no heading row of its own */
+.pg-tools{display:flex;justify-content:flex-end;margin-bottom:12px}
+
 .pg-state{
   display:flex;flex-direction:column;align-items:flex-start;gap:10px;
   max-width:640px;padding:24px 20px;

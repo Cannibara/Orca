@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import type { Summary } from "../data/types";
 import { fmtDate, money } from "../lib/format";
 import { reducedMotion } from "./hooks";
@@ -111,6 +112,7 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
             )}
           </div>
         </div>
+        <ThemeToggle className="fh-theme" />
       </header>
       {s.inactive && (
         <p className="fh-note" role="note">
