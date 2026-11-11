@@ -63,7 +63,10 @@
 .fp .t .mbs{display:flex;align-items:center;width:100%;height:5px}
 .fp .t .mb{display:block;height:5px;border-radius:2.5px;background:var(--ink3);flex:none}
 /* the weight added (blue) or given up (orange): hatching in the same height, after the solid weight that stayed */
-.fp .t .mb.mbx{background:repeating-linear-gradient(135deg,var(--c) 0 1.6px,transparent 1.6px 3.6px);box-shadow:inset 0 0 0 1px var(--c);border-radius:1.5px;margin-left:1px}
+.fp .t .mb.mbx{background:repeating-linear-gradient(135deg,var(--c) 0 1.6px,transparent 1.6px 3.6px);box-shadow:inset 0 0 0 1px var(--c);border-radius:0 2.5px 2.5px 0}
+/* the two parts of one bar meet with no gap and a square join: rounded only at the outer ends */
+.fp .t .mbs .mb:not(:last-child){border-top-right-radius:0;border-bottom-right-radius:0}
+.fp .t .mbs .mb.mbx:first-child{border-radius:2.5px}
 .fp .t .mb.mbx.up{--c:var(--gain)}
 .fp .t .mb.mbx.dn{--c:var(--loss)}
 .fp .t .t-empty{height:auto;padding:28px var(--ppad);text-align:left;color:var(--ink3);white-space:normal}
