@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Tab underline sits on the hairline, spans the tab exactly
+
+| What changed | Why | Files |
+|---|---|---|
+| One shared tab strip: `.tabs` has 1px bottom padding so the hairline and the 2px dark bar (`.ind`) both sit inside its scroll box (the bar used to be clipped to 1px above the line); the fund page's own `.fp .tabs` rules are deleted and its buttons use `.tab`; Home's `.tabrow` hairline is an inset shadow on the same pixel. The bar's `--x` / `--w` come from `getBoundingClientRect` (fractional) instead of `offsetLeft` / `offsetWidth` (rounded, bar ~0.2px too wide). Measured: bar bottom = strip bottom, bar span = tab span, on Home and the fund page at 1280 and 400 px. Touch devices now get the 44px `.tab` height on the fund tabs too | Owner: the underline under Top funds / Overview was not aligned (chat); diagnosed by a design agent | `web/src/styles.css`, `web/src/fund/returns.css`, `web/src/fund/FundHeader.tsx`, `web/src/components/Tabs.tsx`, `web/src/pages/home.css` |
+
 ## 2026-11-11 — Web deploy failed on a data-site error; fetch step retries harder
 
 | What changed | Why | Files |

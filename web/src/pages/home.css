@@ -15,12 +15,11 @@
 }
 
 /* ---------- the tab row: the list tabs on the left, the fund search on the right at the tabs' height ---------- */
-.home .tabrow{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line)}
-.home .tabrow>.tabs{flex:1 1 auto;min-width:0;border-bottom:0}
+.home .tabrow{display:flex;align-items:center;gap:16px;box-shadow:inset 0 -1px 0 var(--line)}
+.home .tabrow>.tabs{flex:1 1 auto;min-width:0}
 .home .tabrow>.search-box{flex:0 1 400px;width:auto}
 @container app (max-width:719px){
-  .home .tabrow{flex-direction:column-reverse;align-items:stretch;gap:8px;border-bottom:0}
-  .home .tabrow>.tabs{border-bottom:1px solid var(--line)}
+  .home .tabrow{flex-direction:column-reverse;align-items:stretch;gap:8px;box-shadow:none}
   .home .tabrow>.search-box{flex:none;width:100%}
 }
 
