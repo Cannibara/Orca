@@ -6,8 +6,8 @@
 /* ---------- header ---------- */
 .fp .fh-wrap{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
 .fp .fh{display:flex;flex-wrap:wrap;gap:14px 24px;justify-content:space-between;align-items:flex-end;min-width:0}
-/* the theme switch sits at the top right, level with the fund's name rather than with the line under it */
-.fp .fh .fh-theme{align-self:flex-start;margin-left:auto}
+/* the theme switch sits at the top right, level with the fund's name (a little below its top edge) rather than with the line under it */
+.fp .fh .fh-theme{align-self:flex-start;margin-left:auto;margin-top:8px}
 .fp .fh-main{display:flex;flex-direction:column;gap:10px;min-width:0}
 .fp .fh h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
 .fp .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:var(--ink2)}

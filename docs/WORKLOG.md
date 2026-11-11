@@ -5,6 +5,15 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Dark mode: lighter greys, one blue in both modes; switch resized
+
+| What changed | Why | Files |
+|---|---|---|
+| Dark tokens, both blocks kept identical: page `#181512`, panels, table rows and chart areas (`--surface`) `#28241F` (was `#1C1814`), table headings and opened row (`--sunken`) `#1F1B17` (was equal to the page), hover `#322D27`, band `#38322B`, raised `#302B25`, lines, `--control` and `--ink2` / `--ink3` lightened. All text pairs stay ≥ 4.5:1 (computed). `meta theme-color` (dark) `#28241F` | Owner: lighter grey for graph and table areas in dark mode (chat); values from a design agent | `web/src/tokens.css`, `web/index.html` |
+| `--gain` is one blue, `#267CAA`, in light and dark (light was `#0E658C`, dark `#3A8FC2`, and signed text mixed another blue). Fills, strokes and swatches use `--gain`; blue text uses the new `--up-text` (`#0E658C` light, `#5BA3CE` dark); text on a blue box uses the new `--gain-fg` (`#FFFCF8`, since the dark `--invfg` gave only 4.1:1). The dark `--up` colour-mix is gone. Orange unchanged | Owner: the annual-gains blue must stay the same in dark mode (chat). Note it moved the light blue a little lighter (4.5:1 on the paper, was 6.3:1) | `tokens.css`, `styles.css`, `positions.css`, `whatif.css`, `position.css` |
+| Theme switch 72×38 with a rounded-rectangle track and knob (was a 60×32 pill); on the fund page 8px lower | Owner (chat) | `styles.css`, `returns.css` |
+| Open: the tinted fills (`.bar.corp`, step-chart area, `.pill.buy`) still mix `--gain` with the surface, so they look a touch different per mode | | |
+
 ## 2026-11-11 — Day / night slider; opened-row colours the other way round
 
 | What changed | Why | Files |

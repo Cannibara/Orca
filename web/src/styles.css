@@ -18,16 +18,16 @@
   --tip-bg:var(--inv); --tip-ink:var(--invfg); --tip-muted:var(--inv2);
   --f-display:var(--f-sans); --f-body:var(--f-sans);
   /* Signed figures. Blue for a gain; for a loss the orange is deepened in the light theme so small
-     orange text on paper keeps 4.5:1 (and the dark blue is lifted a touch for the hover tone). The
+     orange text on paper keeps 4.5:1 (and the blue text is lifted in the dark theme: --up-text). The
      sign is always printed too: colour is never the only cue. */
-  --up:var(--gain);
+  --up:var(--up-text);
   --down:color-mix(in srgb,var(--loss) 78%,var(--ink));
   /* The quarter low-high bars on the price chart: a neutral wash that shows on both surfaces. */
   --range:color-mix(in srgb,var(--ink) 15%,transparent);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}}
-:root[data-theme="dark"]{--up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}
+  --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}}
+:root[data-theme="dark"]{--down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}
 
 /* ---------- base ---------- */
 *,*::before,*::after{box-sizing:border-box}
@@ -136,14 +136,14 @@ details[open] summary{margin-bottom:8px}
 
 /* theme-sw: the day / night switch at the top right of every page, level with the page heading. Sun left, moon right;
    the knob sits over the side in force and that icon is dark, the other muted. */
-.theme-sw{position:relative;flex:none;width:60px;height:32px;padding:0;border:1px solid var(--line2);border-radius:16px;background:var(--sunken);color:var(--ink3);cursor:pointer}
+.theme-sw{position:relative;flex:none;width:72px;height:38px;padding:0;border:1px solid var(--line2);border-radius:10px;background:var(--sunken);color:var(--ink3);cursor:pointer}
 .theme-sw:hover{border-color:var(--control)}
 .theme-sw:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.theme-sw .th{position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:var(--surface);border:1px solid var(--line2);box-shadow:var(--shadow-1);box-sizing:border-box}
-.theme-sw[aria-checked="true"] .th{transform:translateX(28px)}
-.theme-sw svg{position:absolute;top:7px;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.theme-sw .sun{left:7px}
-.theme-sw .moon{left:35px}
+.theme-sw .th{position:absolute;top:2px;left:2px;width:32px;height:32px;border-radius:8px;background:var(--surface);border:1px solid var(--line2);box-shadow:var(--shadow-1);box-sizing:border-box}
+.theme-sw[aria-checked="true"] .th{transform:translateX(34px)}
+.theme-sw svg{position:absolute;top:8px;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.theme-sw .sun{left:8px}
+.theme-sw .moon{left:42px}
 .theme-sw[aria-checked="false"] .sun,.theme-sw[aria-checked="true"] .moon{color:var(--ink)}
 @media (hover:none),(pointer:coarse){.theme-sw::before{content:"";position:absolute;inset:-6px}}
 @media (prefers-reduced-motion:no-preference){:root:not([data-motion="reduce"]) .theme-sw .th{transition:transform var(--d-base) var(--ease-out)}}
@@ -215,7 +215,8 @@ a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
 .tbl-wrap .lc b{font:600 12.5px/18px var(--f-sans);letter-spacing:0;color:var(--ink)}
 .tbl-wrap .lc.add{background:var(--gain)}
 .tbl-wrap .lc.trim{background:var(--loss)}
-.tbl-wrap .lc:is(.add,.trim) :is(.lw,b){color:var(--invfg)}
+.tbl-wrap .lc.add :is(.lw,b){color:var(--gain-fg)}
+.tbl-wrap .lc.trim :is(.lw,b){color:var(--invfg)}
 .tbl-wrap .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
 /* wcell: the Positions table's weight cell ("was → now" over a bar: solid grey for the weight before, then the change striped, blue up / orange down) */
 .tbl-wrap .wcell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;justify-content:center;width:76px}
