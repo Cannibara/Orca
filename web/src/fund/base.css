@@ -112,24 +112,28 @@
 .fp .skbars{display:flex;align-items:flex-end;gap:7px;height:150px;border-bottom:1px solid var(--line2);padding:0 4px}
 .fp .skbars .sk{flex:1;border-radius:3px 3px 0 0}
 
-/* ---------- accessible tables (the "Show the numbers" views) ---------- */
+/* ---------- accessible tables (the "Table view" of each chart) ---------- */
 .fp .tbl-mini{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 .fp .tbl-mini caption{text-align:left;font-size:12px;color:var(--ink3);padding:8px 10px}
 .fp .tbl-mini th{font:500 12px/1.2 var(--f-sans);color:var(--ink3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;background:var(--sunken)}
 .fp .tbl-mini td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
 .fp .tbl-mini th:first-child,.fp .tbl-mini td:first-child{text-align:left}
-.fp .tbl-mini tr.is-sel td{background:var(--band)}
-.fp .tbl-mini td .tag{margin-left:6px}
+/* the Part year tag sits in the row header and must not make its row taller than the others */
+.fp .tbl-mini .tag{margin-block:-3px}
 /* the app-wide table rules (38px cells, sticky head, row hover) must not reach these small accessible tables */
 .fp .tbl-mini th,.fp .tbl-mini td{height:auto;line-height:normal}
 .fp .tbl-mini thead th{position:static;vertical-align:middle}
 .fp .tbl-mini tbody tr:last-child td{border-bottom:1px solid var(--line)}
 .fp .tbl-mini tbody tr:hover td{background:transparent}
-.fp .tbl-mini tbody tr.is-sel:hover td{background:var(--band)}
+.fp .tbl-mini tbody tr.is-sel>:is(th,td){background:var(--band)}
 .fp .tbl-mini tbody th[scope="row"]{text-align:left;font-weight:500;background:inherit;position:static;border-bottom:1px solid var(--line);padding:7px 10px;color:var(--ink);white-space:nowrap}
 .fp .tbl-mini .tl{text-align:left}
-.fp .tbl-box{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-2)}
-.fp .tbl-box .tbl-mini thead th{position:sticky;top:0}
+.fp .tbl-box{overflow:auto;border:1px solid var(--line);border-radius:var(--r-2)}
+.fp .tbl-box .tbl-mini thead th{position:sticky;top:0;z-index:1}
+/* the table view: the chart stays mounted (hidden) and sets the height, the table fills the same box and scrolls inside it */
+.fp .tview{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0}
+.fp .tview .tbl-box{flex:1 1 auto;min-height:0}
+.fp .vchart[inert]{visibility:hidden}
 
 /* ---------- charts: base ---------- */
 .fp .viz{display:block;width:100%;height:auto;overflow:visible;font-family:var(--f-sans);font-variant-numeric:tabular-nums;-webkit-user-select:none;user-select:none}

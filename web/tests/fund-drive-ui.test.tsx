@@ -58,10 +58,8 @@ const handle = (d: "a" | "b") => panel().querySelector<SVGElement>(`.scr-h[data-
 describe("DrivePanel", () => {
   test("title, subtitle, stepper, strip and the one-line headline for the selected year", () => {
     render(<Host />);
-    expect(screen.getByRole("heading", { name: "Return Constituents 2025" })).toBeInTheDocument();
-    expect(
-      screen.getByText("Contribution to return, percentage points. The biggest movers are named; the rest are grouped. Drag the handles to add years."),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents 2025" })).toBeInTheDocument();
+    expect(screen.queryByText(/Contribution to return, percentage points/)).toBeNull(); // no explanation under the title
     const stepper = screen.getByRole("group", { name: "Period" });
     expect(stepper.querySelector("output")).toHaveTextContent("2025");
     const head = panel().querySelector(".headline") as HTMLElement;
@@ -94,7 +92,7 @@ describe("DrivePanel", () => {
     render(<Host sel="2025" onCr={onCr} />);
     fireEvent.click(screen.getByRole("button", { name: "Earlier period" }));
     expect(onCr).toHaveBeenLastCalledWith({ a: "2024", b: "2024" });
-    expect(screen.getByRole("heading", { name: "Return Constituents 2024" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents 2024" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Later period" }));
     fireEvent.click(screen.getByRole("button", { name: "Later period" }));
     expect(onCr).toHaveBeenLastCalledWith({ a: "2026 H1", b: "2026 H1" });
@@ -104,7 +102,7 @@ describe("DrivePanel", () => {
   test("a multi-year period sums the years; the stepper keeps its length", () => {
     const onCr = vi.fn();
     render(<Host sel="2025" cr={{ a: "2020", b: "2022" }} onCr={onCr} />);
-    expect(screen.getByRole("heading", { name: "Return Constituents 2020 to 2022" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents 2020 to 2022" })).toBeInTheDocument();
     expect(panel().querySelector(".stepper output")).toHaveTextContent("2020 to 2022");
     expect(panel().querySelector(".hmeta")).toHaveTextContent("3 years, 12 quarters");
     expect(hits()[hits().length - 1].getAttribute("aria-label")).toMatch(/^Total of listed stocks: −17\.\d\d percentage points$/);
@@ -122,7 +120,7 @@ describe("DrivePanel", () => {
     b.focus();
     fireEvent.keyDown(b, { key: "ArrowRight" });
     expect(onCr).toHaveBeenLastCalledWith({ a: "2025", b: "2026 H1" });
-    expect(screen.getByRole("heading", { name: "Return Constituents 2025 to 2026 H1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents 2025 to 2026 H1" })).toBeInTheDocument();
     expect(document.activeElement).toBe(handle("b"));
     fireEvent.keyDown(handle("a"), { key: "ArrowLeft" });
     expect(onCr).toHaveBeenLastCalledWith({ a: "2024", b: "2026 H1" });
@@ -139,15 +137,17 @@ describe("DrivePanel", () => {
 
   test("an unset or stale period falls back to the selected year", () => {
     render(<Host sel="2023" cr={{ a: "1999", b: "2001" }} />);
-    expect(screen.getByRole("heading", { name: "Return Constituents 2023" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents 2023" })).toBeInTheDocument();
   });
 
-  test("Show the numbers swaps the chart for an accessible table with a Total row", () => {
+  test("Table view swaps the chart for an accessible table with a Total row", () => {
     render(<Host sel="2025" cr={{ a: "2020", b: "2022" }} />);
-    const btn = screen.getByRole("button", { name: "Show the numbers" });
+    const btn = screen.getByRole("button", { name: "Table view" });
     expect(btn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(btn);
-    expect(panel().querySelector("svg.wf")).toBeNull();
+    const wfSvg = panel().querySelector("svg.wf") as SVGElement;
+    expect(wfSvg.closest(".vchart")).toHaveAttribute("inert"); // held in place, out of sight and of the accessibility tree
+    expect(wfSvg.closest(".vchart")).toHaveAttribute("aria-hidden", "true");
     const table = screen.getByRole("table");
     expect(within(table).getByText("Contribution to return, 2020 to 2022, percentage points")).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Ticker", "Company", "Points"]);
@@ -158,10 +158,11 @@ describe("DrivePanel", () => {
     // biggest contribution first
     const pts = rows.slice(0, -1).map((r) => Number((r.lastChild?.textContent ?? "").replace("−", "-")));
     expect([...pts].sort((x, y) => y - x)).toEqual(pts);
-    const back = screen.getByRole("button", { name: "Show the chart" });
+    const back = screen.getByRole("button", { name: "Chart view" });
     expect(back).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(back);
-    expect(panel().querySelector("svg.wf")).not.toBeNull();
+    expect(panel().querySelector("svg.wf")!.closest(".vchart")).not.toHaveAttribute("inert");
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   test("a fund with thousands of stocks prints the biggest 200 and a Show all button", () => {
@@ -171,7 +172,7 @@ describe("DrivePanel", () => {
       by_year: { "2025": { stock_id: Array.from({ length: n }, (_, i) => 5000 + i), points: Array.from({ length: n }, (_, i) => 3 - i * 0.002), pnl: Array(n).fill(0) } },
     };
     render(<Host sel="2025" contrib={big} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show the numbers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Table view" }));
     const table = screen.getByRole("table");
     // 200 stocks, the line for the other 2800, and the total
     expect(within(table).getAllByRole("row")).toHaveLength(1 + 200 + 1 + 1);
@@ -199,7 +200,7 @@ describe("DrivePanel", () => {
         <DrivePanel series={series} win={{ years: [], offset: 0, total: 0 }} contrib={contrib} stocks={stocks} sel={null} cr={null} onCr={() => {}} />
       </TooltipProvider>,
     );
-    expect(screen.getByRole("heading", { name: "Return Constituents" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return constituents" })).toBeInTheDocument();
     expect(screen.getByText("Orca needs two consecutive filings to attribute a period.")).toBeInTheDocument();
   });
 

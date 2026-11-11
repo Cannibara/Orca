@@ -19,6 +19,8 @@
   --focus:#0E658C;
   --gain:#267CAA;
   --gain-fg:#FFFCF8;
+  --gain-soft:color-mix(in srgb,var(--gain) 55%,var(--surface));
+  --loss-soft:color-mix(in srgb,var(--loss) 55%,var(--surface));
   --up-text:#0E658C;
   --loss:#D4561F;
   --inv2:#BDB4A8;
@@ -58,6 +60,8 @@
   --focus:#6BB6E0;
   --gain:#267CAA;
   --gain-fg:#FFFCF8;
+  --gain-soft:color-mix(in srgb,var(--gain) 62%,var(--ink));
+  --loss-soft:color-mix(in srgb,var(--loss) 62%,var(--ink));
   --up-text:#5BA3CE;
   --loss:#F48D60;
   --inv2:#6A635A;
@@ -90,6 +94,8 @@
   --focus:#6BB6E0;
   --gain:#267CAA;
   --gain-fg:#FFFCF8;
+  --gain-soft:color-mix(in srgb,var(--gain) 62%,var(--ink));
+  --loss-soft:color-mix(in srgb,var(--loss) 62%,var(--ink));
   --up-text:#5BA3CE;
   --loss:#F48D60;
   --inv2:#6A635A;

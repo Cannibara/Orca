@@ -111,9 +111,12 @@ export type SpanKpi = {
   mdd: number;
   /** Share of quarters with a gain, 0..1; null without quarters. */
   qpos: number | null;
-  /** Full years with a gain / full years in the span. */
+  /** Full years with a gain / full years in the span (the workbook's definition). */
   up: number;
   nFull: number;
+  /** Years with a gain / years with a return in the span, part years included (a part year is its return to date). What the tile shows. */
+  upAll: number;
+  nAll: number;
   /** Growth of $1 over the span. */
   growth: number;
   /** Chained index (starts at 1) and its drawdown from the running peak. */
@@ -152,8 +155,13 @@ export function spanKpi(series: Series, yearFrom: number, yearTo: number): SpanK
   const sd = n > 1 ? Math.sqrt(Math.max(0, (sq - n * mean * mean) / (n - 1))) : null;
   let nFull = 0;
   let up = 0;
+  let nAll = 0;
+  let upAll = 0;
   for (const y of series.years) {
-    if (y.year < yearFrom || y.year > yearTo || y.part || y.ret == null) continue;
+    if (y.year < yearFrom || y.year > yearTo || y.ret == null) continue;
+    nAll++;
+    if (y.ret > 0) upAll++;
+    if (y.part) continue;
     nFull++;
     if (y.ret > 0) up++;
   }
@@ -165,6 +173,8 @@ export function spanKpi(series: Series, yearFrom: number, yearTo: number): SpanK
     qpos: n ? pos / n : null,
     up,
     nFull,
+    upAll,
+    nAll,
     growth: g,
     idx,
     dd,

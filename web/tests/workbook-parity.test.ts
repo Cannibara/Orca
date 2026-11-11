@@ -132,7 +132,7 @@ tally = fresh();
   tally.profitable = 1;
   same(bad, `${c.name} % profitable`, profitablePct(positions, prices), c.expected.profitable);
 
-  // Return Constituents: the points of every year added up per stock (drive.periodRows).
+  // Return constituents: the points of every year added up per stock (drive.periodRows).
   const drove = new Map(periodRows(c.contrib, new Map(), c.contrib.years).map((r) => [r.id, r.v]));
   for (const [id, want] of Object.entries(c.expected.points)) same(bad, `${c.name} stock ${id} points`, drove.get(Number(id)) ?? 0, want);
 

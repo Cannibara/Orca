@@ -39,8 +39,11 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
     const b = el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
     const ind = el?.querySelector<HTMLElement>(".ind");
     if (!b || !ind) return;
-    ind.style.setProperty("--x", b.offsetLeft + "px");
-    ind.style.setProperty("--w", String(b.offsetWidth));
+    // Fractional edges (offsetWidth rounds), so the bar spans exactly the tab.
+    const er = el!.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    ind.style.setProperty("--x", br.left - er.left + el!.scrollLeft + "px");
+    ind.style.setProperty("--w", String(br.width));
   }, []);
   useLayoutEffect(place, [place, view]);
   useEffect(() => {
@@ -121,7 +124,7 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
       )}
       <div className={"tabs" + (ready ? " ready" : "")} role="tablist" aria-label="Fund sections" ref={tabs} onKeyDown={onKeyDown}>
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={t.id === view} data-view={t.id} onClick={() => pick(t.id)}>
+          <button key={t.id} className="tab" type="button" role="tab" aria-selected={t.id === view} data-view={t.id} onClick={() => pick(t.id)}>
             {t.label}
             {/* What the fund holds in its newest quarter, not every position it ever had (that is in the line above). */}
             {t.id === "positions" && <span className="cnt">{s.n_holdings}</span>}

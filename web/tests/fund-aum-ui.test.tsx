@@ -53,12 +53,12 @@ afterEach(() => {
 });
 
 describe("AumPanel: head, stats, legend", () => {
-  test("names the panel and explains how to read it", () => {
+  test("names the panel, with no explanation under the title", () => {
     mount();
     const section = screen.getByRole("region", { name: "Assets under management" });
     expect(section).toHaveAttribute("id", "flowPanel");
     expect(within(section).getByRole("heading", { level: 3, name: "Assets under management" })).toBeInTheDocument();
-    expect(section).toHaveTextContent("Each bar is last year's book plus net inflows and gains. Dotted boxes show what was lost or withdrawn.");
+    expect(section).not.toHaveTextContent("Each bar is last year's book");
     expect(section).not.toHaveTextContent(/billions/i);
   });
 
@@ -98,7 +98,7 @@ describe("AumPanel: head, stats, legend", () => {
     mount(win([], 0));
     expect(screen.getByText(/No year-end book values/)).toBeInTheDocument();
     expect(svgEl()).toBeNull();
-    expect(screen.queryByRole("button", { name: /Show the numbers/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Table view/ })).toBeNull();
   });
 });
 
@@ -289,11 +289,12 @@ describe("AumPanel: tooltip", () => {
 describe("AumPanel: show the numbers", () => {
   test("swaps the chart for an accessible table and back; stats and legend stay", () => {
     const { container } = mount();
-    const btn = screen.getByRole("button", { name: "Show the numbers" });
+    const btn = screen.getByRole("button", { name: "Table view" });
     expect(btn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(btn);
-    expect(svgEl()).toBeNull();
-    const back = screen.getByRole("button", { name: "Show the chart" });
+    expect(svgEl().closest(".vchart")).toHaveAttribute("inert"); // held in place, out of sight and of the accessibility tree
+    expect(svgEl().closest(".vchart")).toHaveAttribute("aria-hidden", "true");
+    const back = screen.getByRole("button", { name: "Chart view" });
     expect(back).toHaveAttribute("aria-pressed", "true");
     const table = screen.getByRole("table");
     expect(within(table).getByText("Book value, net inflows and gains by year")).toBeInTheDocument();
@@ -310,9 +311,9 @@ describe("AumPanel: show the numbers", () => {
     expect(container.querySelector(".stats")).toBeInTheDocument();
     expect(container.querySelector(".legend")).toBeInTheDocument();
     fireEvent.click(back);
-    expect(svgEl()).not.toBeNull();
+    expect(svgEl().closest(".vchart")).not.toHaveAttribute("inert");
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getByRole("button", { name: "Show the numbers" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Table view" })).toHaveAttribute("aria-pressed", "false");
   });
 });
 
@@ -358,8 +359,8 @@ describe("AumPanel: grow-in", () => {
         vi.advanceTimersByTime(2500);
       });
       expect(svgEl().getAttribute("class")).toBe("viz c2");
-      fireEvent.click(screen.getByRole("button", { name: "Show the numbers" }));
-      fireEvent.click(screen.getByRole("button", { name: "Show the chart" }));
+      fireEvent.click(screen.getByRole("button", { name: "Table view" }));
+      fireEvent.click(screen.getByRole("button", { name: "Chart view" }));
       expect(svgEl().getAttribute("class")).toBe("viz c2");
     } finally {
       vi.useRealTimers();

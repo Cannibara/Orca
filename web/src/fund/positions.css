@@ -16,6 +16,8 @@
 .fp .stepper .pi{position:relative;flex:none;width:62px;height:26px;padding:0 4px;border:0;border-radius:4px;background:transparent;color:var(--ink2);font:500 12px/1 var(--f-sans);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:3px}
 .fp .stepper .pi:hover{background:var(--hover);color:var(--ink)}
 .fp .stepper .pi.on{background:var(--inv);color:var(--invfg);font-weight:600}
+/* the chosen period keeps its black on hover (base.css's stepper button hover is more specific than .pi.on) */
+.fp .stepper button.pi.on:hover:not(:disabled):not([aria-disabled="true"]){background:var(--inv);color:var(--invfg)}
 .fp .stepper .pi.edge{color:var(--ink3)}
 .fp .stepper .pi.hole{cursor:default;pointer-events:none}
 .fp .stepper .pi .caret{width:11px;height:11px;stroke-width:2;flex:none}

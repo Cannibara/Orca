@@ -5,6 +5,49 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
+
+| What changed | Why | Files |
+|---|---|---|
+| "Show the numbers" / "Show the chart" are now "Table view" / "Chart view" on Annual returns, Return constituents and AUM. "Return Constituents" is "Return constituents" everywhere | Owner (chat) | the three panels, tests, `e2e/smoke.spec.ts`, `docs/PRODUCT.md` |
+| Switching views no longer changes the panel's height (it moved by −24 to +40 px before). The chart stays mounted but hidden (`ChartSlot`: `visibility:hidden`, `inert`, `aria-hidden`) and holds the height; the table fills the same box (`.tview`, absolute, `inset:0`) and scrolls inside it with a sticky heading, so the whole list is reachable. Measured before / after in the browser: Annual returns 432 / 432 and 430 / 430, Return constituents 521.6 and 519.1, AUM 521 and 514, at 1280 and 400 px. The scrolling box is keyboard-focusable and labelled "…, scrollable". `max-height:340px` on `.tbl-box` is gone | Owner: tables as big as the graph, showing more rows (chat); designed and measured by an agent | `web/src/fund/ChartSlot.tsx` (new), `base.css`, `ReturnsPanel.tsx`, `DrivePanel.tsx`, `AumPanel.tsx`, three test files |
+| Annual returns table: the selected row's band now covers the row header cell too (it painted only the data cells, so the year cell looked unshaded next to its neighbour), and the Part year tag no longer makes its row taller than the others | Owner: inconsistent shading on the part-year row (chat) | `web/src/fund/base.css` |
+| Risk: a tooltip opened from the keyboard on the hidden chart could stay on screen; not seen, no fix | | |
+
+## 2026-11-11 — Part years count in Years positive; AUM gains bar edge
+
+| What changed | Why | Files |
+|---|---|---|
+| How it actually was: a part year's bar was already its return to date (the quarters compounded, never annualised), and its quarters were already inside the annualised return, growth of $1, volatility, drawdown and "% of quarters positive" of any span that included it. What it was left out of: the "Years positive X of N" tile (full years only), the best / worst year highlight, and the numbers table's "Counted / Not counted" column. So the old subtitle "Part years are shown but not counted" was wrong for the headline figures and right only for those three | Owner asked why, and whether the commentary or the numbers were wrong (chat) | |
+| Years positive now counts every year with a return, part years included (demo fund: "6 of 13", was "6 of 11"), and its tick picture has a tick per year. `spanKpi` keeps `up` / `nFull` (full years, the workbook's definition and the parity test) and adds `upAll` / `nAll` for the tile. The "In annual figures" column is gone from the numbers table. Best / worst highlighting still skips part years (a label aid, not a count). Not changed: the published `metrics.years_pos` / `years_total` / `best_year` / `worst_year`, the turnover over full years, and the workbook's range tiles all stay full-year | Owner: part years should count (chat) | `web/src/fund/series.ts`, `KpiStrip.tsx`, `ReturnsPanel.tsx`, tests incl. new `web/tests/fund-partyear.test.ts` |
+| AUM: the gains bar gets a 1px edge in its own colour like the bars beneath it, so it is no longer narrower | Owner (chat) | `web/src/fund/aum.css` |
+
+## 2026-11-11 — Fewer explanations on the fund page
+
+| What changed | Why | Files |
+|---|---|---|
+| Removed the line under Overview / Positions ("The first four tiles follow the Annual returns bracket…"), the subtitles under Annual returns, Return constituents and AUM, and the footnote under the What-if table (mid-quarter IRR, "1y after", "$ missed / dodged", last change). The KPI caption stays in the page as screen-reader-only text (`vh`), so the tiles' span is still announced. The What-if subtitle and the other panels are unchanged. Unused `fullYears` deleted | Owner: users don't need everything explained (chat) | `web/src/fund/KpiStrip.tsx`, `ReturnsPanel.tsx`, `DrivePanel.tsx`, `AumPanel.tsx`, `WhatIfPanel.tsx`, five test files |
+| Note: with the Annual returns subtitle gone, "estimate" is carried by the page footer ("Every figure is an Orca estimate…"), not by that panel | CLAUDE.md says every figure is labelled as an estimate | |
+
+## 2026-11-11 — Return constituents: solid total, lighter parts; period pill keeps its black on hover
+
+| What changed | Why | Files |
+|---|---|---|
+| Return constituents waterfall: the Total bar is solid `--gain` (solid `--loss` when the total is negative, as in the demo's 2025 for fund 9100003); the bars that add up to it use new tokens `--gain-soft` / `--loss-soft` (light theme: 55% of the colour over the paper; dark: 62% over the ink, so they read lighter) with a 1px full-colour edge, since a tint alone is under 3:1 on the light panel. Tooltip swatches match. Scoped to `.viz.wf`; other charts' bars are unchanged | Owner: Total should be the main blue, the parts lighter blues (chat) | `web/src/fund/drive.css`, `drive.ts`, `web/src/tokens.css` |
+| Positions period selector: the chosen (black) pill no longer changes colour on hover. The cause was base.css's `.fp .stepper button:hover:not(:disabled):not([aria-disabled])` (0,5,1), which beat `.pi.on`; the override repeats that selector with `.pi.on` so it outranks it. Unchosen pills keep their hover tint. Checked in the browser: computed colours identical before and after hover | Owner (chat) | `web/src/fund/positions.css` |
+
+## 2026-11-11 — Tab underline sits on the hairline, spans the tab exactly
+
+| What changed | Why | Files |
+|---|---|---|
+| One shared tab strip: `.tabs` has 1px bottom padding so the hairline and the 2px dark bar (`.ind`) both sit inside its scroll box (the bar used to be clipped to 1px above the line); the fund page's own `.fp .tabs` rules are deleted and its buttons use `.tab`; Home's `.tabrow` hairline is an inset shadow on the same pixel. The bar's `--x` / `--w` come from `getBoundingClientRect` (fractional) instead of `offsetLeft` / `offsetWidth` (rounded, bar ~0.2px too wide). Measured: bar bottom = strip bottom, bar span = tab span, on Home and the fund page at 1280 and 400 px. Touch devices now get the 44px `.tab` height on the fund tabs too | Owner: the underline under Top funds / Overview was not aligned (chat); diagnosed by a design agent | `web/src/styles.css`, `web/src/fund/returns.css`, `web/src/fund/FundHeader.tsx`, `web/src/components/Tabs.tsx`, `web/src/pages/home.css` |
+
+## 2026-11-11 — Web deploy failed on a data-site error; fetch step retries harder
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 125 (merge of #25) failed in the deploy job's "Fetch funds.json from the data site" step: `data.orcaetf.com` answered 502, then dropped the HTTP/2 stream (curl exit 92). The tests job and the PR run of the same code passed, and the host was back at 200 minutes later, so it was transient. The failed job was re-run. The step now uses `--retry 5 --retry-all-errors --retry-delay 15 --max-time 60` (plain `--retry` skips an error like exit 92) | Owner: deploy failed, find out why (chat) | `.github/workflows/web.yml` |
+
 ## 2026-11-11 — Dark mode: lighter greys, one blue in both modes; switch resized
 
 | What changed | Why | Files |

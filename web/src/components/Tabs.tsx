@@ -42,8 +42,11 @@ export function Tabs<T extends string>({
     const b = el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
     const ind = el?.querySelector<HTMLElement>(".ind");
     if (!b || !ind) return;
-    ind.style.setProperty("--x", b.offsetLeft + "px");
-    ind.style.setProperty("--w", String(b.offsetWidth));
+    // Fractional edges (offsetWidth rounds), so the bar spans exactly the tab.
+    const er = el!.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    ind.style.setProperty("--x", br.left - er.left + el!.scrollLeft + "px");
+    ind.style.setProperty("--w", String(br.width));
   }, []);
   useLayoutEffect(place, [place, value, tabs]);
   useEffect(() => {

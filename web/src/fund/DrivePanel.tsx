@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { ChartSlot } from "./ChartSlot";
 import { useTooltip } from "../charts/Tooltip";
 import type { Stock } from "../data/api";
 import type { Contrib } from "../data/types";
@@ -44,7 +45,7 @@ const STRIP_LABEL = "Period for what drove the return. Drag the handles or the b
 const WF_LABEL = "Contribution to return by stock, percentage points, as a waterfall";
 
 /**
- * "Return Constituents ...": the stocks behind the return of a period of years as a waterfall of
+ * "Return constituents ...": the stocks behind the return of a period of years as a waterfall of
  * percentage points, with the strip that picks the period, a one-line summary and a
  * numbers table. The period itself lives in the page (`cr`), so it survives the window.
  */
@@ -132,11 +133,8 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
       <div className="ph">
         <div className="ph-t">
           <h3 className="pt" id="drvTitle">
-            {has ? "Return Constituents " + span : "Return Constituents"}
+            {has ? "Return constituents " + span : "Return constituents"}
           </h3>
-          <p className="ps">
-            Contribution to return, percentage points. The biggest movers are named; the rest are grouped. Drag the handles to add years.
-          </p>
         </div>
         {has && (
           <div className="ph-c">
@@ -151,7 +149,7 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
             </div>
             <button type="button" className="btn btn-secondary sm" aria-pressed={table} onClick={() => setTable((t) => !t)}>
               <Ico name={table ? "bars" : "table"} />
-              <span>{table ? "Show the chart" : "Show the numbers"}</span>
+              <span>{table ? "Chart view" : "Table view"}</span>
             </button>
           </div>
         )}
@@ -174,55 +172,9 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
               <h4>{has ? "No stock-level detail for " + span : "No stock-level detail yet"}</h4>
               <p>Orca needs two consecutive filings to attribute a period.</p>
             </div>
-          ) : tv ? (
-            <>
-              <div className="tbl-box">
-                <table className="tbl-mini">
-                  <caption>Contribution to return, {span}, percentage points</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Ticker</th>
-                      <th scope="col" className="tl">
-                        Company
-                      </th>
-                      <th scope="col">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tv.rows.map((r) => (
-                      <tr key={r.id}>
-                        <th scope="row">{r.t}</th>
-                        <td className="tl">{r.name}</td>
-                        <td>{fPP(r.v, 2)}</td>
-                      </tr>
-                    ))}
-                    {tv.hidden > 0 && (
-                      <tr>
-                        <th scope="row">Other</th>
-                        <td className="tl">{tv.hidden} smaller contributors</td>
-                        <td>{fPP(tv.hiddenSum, 2)}</td>
-                      </tr>
-                    )}
-                    <tr>
-                      <th scope="row">Total</th>
-                      <td className="tl">Sum of listed</td>
-                      <td>{fPP(tv.total, 2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {tv.hidden > 0 && (
-                <div className="tbl-more">
-                  <span>
-                    Showing the {TABLE_CAP} biggest movers of {rows.length} stocks.
-                  </span>
-                  <button type="button" className="btn btn-secondary sm" onClick={() => setShowAll(sig)}>
-                    Show all {rows.length}
-                  </button>
-                </div>
-              )}
-            </>
           ) : (
+            <>
+              <ChartSlot table={!!tv}>
             <svg
               className={"viz wf c3" + cls}
               viewBox={`0 0 ${wf.W} ${wf.H}`}
@@ -291,6 +243,57 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
                 />
               ))}
             </svg>
+              </ChartSlot>
+              {tv && (
+                <div className="tview">
+              <div className="tbl-box" tabIndex={0} role="region" aria-label={"Contribution to return, " + span + ", scrollable"}>
+                <table className="tbl-mini">
+                  <caption>Contribution to return, {span}, percentage points</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Ticker</th>
+                      <th scope="col" className="tl">
+                        Company
+                      </th>
+                      <th scope="col">Points</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tv.rows.map((r) => (
+                      <tr key={r.id}>
+                        <th scope="row">{r.t}</th>
+                        <td className="tl">{r.name}</td>
+                        <td>{fPP(r.v, 2)}</td>
+                      </tr>
+                    ))}
+                    {tv.hidden > 0 && (
+                      <tr>
+                        <th scope="row">Other</th>
+                        <td className="tl">{tv.hidden} smaller contributors</td>
+                        <td>{fPP(tv.hiddenSum, 2)}</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <th scope="row">Total</th>
+                      <td className="tl">Sum of listed</td>
+                      <td>{fPP(tv.total, 2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              {tv.hidden > 0 && (
+                <div className="tbl-more">
+                  <span>
+                    Showing the {TABLE_CAP} biggest movers of {rows.length} stocks.
+                  </span>
+                  <button type="button" className="btn btn-secondary sm" onClick={() => setShowAll(sig)}>
+                    Show all {rows.length}
+                  </button>
+                </div>
+              )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

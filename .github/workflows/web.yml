@@ -111,8 +111,10 @@ jobs:
             echo "::error::Set the repository variable VITE_DATA_URL to the data site's URL (https://...)."
             exit 1
           fi
-          # The files are brotli-encoded: --compressed makes curl decode them.
-          curl --fail --silent --show-error --compressed --retry 3 --max-time 120 \
+          # The files are brotli-encoded: --compressed makes curl decode them. A 502 or a dropped HTTP/2
+          # stream from the data host (seen on 2026-11-11) is brief, so retry any failure, with a pause.
+          curl --fail --silent --show-error --compressed --max-time 60 \
+            --retry 5 --retry-all-errors --retry-delay 15 \
             --output "$RUNNER_TEMP/funds.json" "${VITE_DATA_URL%/}/funds.json"
       - name: Build
         env:

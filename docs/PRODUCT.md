@@ -60,7 +60,7 @@ The 15y tab stays empty until 2028: SEC bulk 13F data starts in 2013 (chat).
 | Fund header | Name (the `<h1>` text equals the fund name, which e2e checks), "$X reported book", "N holdings now, M positions ever", "Updated <filed date> · Qn filing", a priced-% badge below 80%, an inactive note, and Overview/Positions tabs (code `FundHeader.tsx`) |
 | Key figures (8 tiles) | Row 1 follows the Annual-returns bracket: annualised return (+growth of $1), years positive (+% quarters positive), max drawdown, volatility. Row 2 covers the whole period: Sharpe/Sortino/Calmar, turnover per year, average hold length, positions profitable (code `KpiStrip.tsx`) |
 | Annual returns | Bars per year, 15 years or Max, % labels, draggable annualised-return bracket, year tooltip (max drawdown, volatility, each quarter), "Show the numbers" table (code `ReturnsPanel.tsx`, `returnsLayout.ts`) |
-| Return Constituents (was "What drove") | Waterfall of contribution points for a year or a period (strip, stepper), named stocks by \|contribution\| + "Other stocks", one-line headline (code `DrivePanel.tsx`, `drive.ts`) |
+| Return constituents (was "What drove") | Waterfall of contribution points for a year or a period (strip, stepper), named stocks by \|contribution\| + "Other stocks", one-line headline (code `DrivePanel.tsx`, `drive.ts`) |
 | Assets under management | Static stacked bars: carried-over book, net inflows, gains; dotted boxes for losses and outflows; tooltip pinned top-left (code `AumPanel.tsx`, `aum.ts`) |
 | Positions | Quarter/Year/Custom period picker (wheel, arrows, jiggle at the ends); 12 columns (Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total P&L), all as of the period end; click a row to see its price chart and trades (code `PositionsPanel.tsx`, `PositionsTable.tsx`, `PeriodPicker.tsx`, `StockPanel.tsx`) |
 | What if they'd kept it | Tiles (sold too early, losses dodged, sold stocks that beat SPY next year, buys vs sells next 12 months) and a sold/trimmed table in the Positions style (code `WhatIfPanel.tsx`, `whatif.ts`) |
@@ -71,7 +71,7 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 | Metric | Definition | Source |
 |---|---|---|
 | Quarter return | (end − start − net buying + dividends) ÷ (start + ½ net buying) | spec §5.3; pipeline engine |
-| Year / span return | product of (1 + quarterly returns) − 1; part years are never annualised | `web/src/fund/series.ts` (code) |
+| Year / span return | product of (1 + quarterly returns) − 1; part years are never annualised, and they count in the span figures and in "Years positive" (the workbook and the published `metrics` still count full years only) | `web/src/fund/series.ts` (code) |
 | Annualised return | growth^(4 / n quarters) − 1, null under 4 quarters | `spanKpi` (code) |
 | Volatility | stdev of quarterly returns × 2, null under 4 quarters | `spanKpi` (code) |
 | Max drawdown | worst peak-to-trough of the chained quarterly index | `spanKpi` (code) |

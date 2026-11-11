@@ -14,6 +14,7 @@ import {
 import { useTooltip, type TipContent, type TipRow } from "../charts/Tooltip";
 import { axisPct, f1, fMoney, fPct } from "./fmt";
 import { endRound, stepFor, textW, xLabelItems, xLabels } from "./geometry";
+import { ChartSlot } from "./ChartSlot";
 import { useGrowOnce, useWidth } from "./hooks";
 import { colLayout, dragBracket, idxAtX, keyBracket, type BracketMode } from "./returnsLayout";
 import { Seg } from "./Seg";
@@ -51,15 +52,6 @@ function focusVisible(el: Element): boolean {
 }
 
 const vars = (o: Record<string, string | number>) => o as CSSProperties;
-
-/** "full years 2015 to 2025" for the subtitle; null when no year is full. */
-function fullYears(labels: string[], part: boolean[]): string | null {
-  const full = labels.filter((_, i) => !part[i]);
-  if (full.length === 0) return null;
-  const a = full[0];
-  const b = full[full.length - 1];
-  return a === b ? `full year ${a}` : `full years ${a} to ${b}`;
-}
 
 /**
  * Annual returns: one bar per year with a return, the selected year highlighted, and the
@@ -207,10 +199,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
   };
 
   // ---- drawing ----
-  const subtitle = (() => {
-    const fy = fullYears(cats, part);
-    return (fy ? `Estimated, ${fy}.` : "Estimated.") + " Part years are shown but not counted.";
-  })();
 
   function chart(): ReactNode {
     const { G, H } = L;
@@ -388,7 +376,8 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
 
   function numbers(): ReactNode {
     return (
-      <div className="tbl-box">
+      <div className="tview">
+      <div className="tbl-box" tabIndex={0} role="region" aria-label="Estimated annual return by year, scrollable">
         <table className="tbl-mini">
           <caption>Estimated annual return by year</caption>
           <thead>
@@ -397,9 +386,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
               <th scope="col">Return</th>
               <th scope="col" className="tl">
                 Direction
-              </th>
-              <th scope="col" className="tl">
-                In annual figures
               </th>
               <th scope="col">Book at year end</th>
             </tr>
@@ -418,12 +404,12 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
                 </th>
                 <td>{fPct(vals[i])}</td>
                 <td className="tl">{vals[i] >= 0 ? "Gain" : "Loss"}</td>
-                <td className="tl">{y.part ? "Not counted" : "Counted"}</td>
                 <td>{fMoney(y.end)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     );
   }
@@ -435,7 +421,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
           <h3 className="pt" id="c1t">
             Annual returns
           </h3>
-          <p className="ps">{subtitle}</p>
         </div>
         <div className="ph-c">
           <Seg
@@ -459,7 +444,7 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
                   </>
                 )}
               </svg>
-              <span>{table ? "Show the chart" : "Show the numbers"}</span>
+              <span>{table ? "Chart view" : "Table view"}</span>
             </button>
           )}
         </div>
@@ -471,10 +456,11 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
               <h4>No annual returns yet</h4>
               <p>A return needs at least one quarter between two filings. The chart appears once this fund has one.</p>
             </div>
-          ) : table ? (
-            numbers()
           ) : (
-            chart()
+            <>
+              <ChartSlot table={table}>{chart()}</ChartSlot>
+              {table && numbers()}
+            </>
           )}
         </div>
       </div>
