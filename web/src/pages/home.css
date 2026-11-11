@@ -101,3 +101,5 @@ main.wrap:has(.home){background:var(--home-page);border:1px solid var(--line);bo
 .home .tbl-wrap thead th{background:var(--home-head);border-bottom-color:var(--home-border)}
 .home .tbl-wrap tbody td{background:var(--home-cell)}
 .home .tbl-wrap tbody tr:hover>td{background:var(--hover)}
+/* a list whose table follows the header directly (no pager row) gets the same header-to-heading height as Top funds */
+.home .ph:has(+ .tbl-wrap){min-height:100px}

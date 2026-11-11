@@ -39,7 +39,7 @@
   --ppad:20px;
   /* Paper shades (light theme) and the home page's roles. Dark values equal the dark neutrals above, so dark is unchanged. */
   --white:#FFFFFF;--paper-30:#FFFDFA;--paper-50:#FFFCF8;--paper-80:#FCF6EE;--paper-100:#F5EDE1;--sand-border:#C8BAA7;
-  --home-page:var(--white);--home-top:var(--paper-80);--home-tabs:var(--paper-50);--home-panel:var(--paper-50);
+  --home-page:var(--white);--home-top:var(--paper-80);--home-tabs:var(--white);--home-panel:var(--paper-50);
   --home-head:var(--paper-80);--home-cell:var(--paper-30);--home-trough:var(--paper-100);--home-pill:var(--paper-80);--home-border:var(--sand-border);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
