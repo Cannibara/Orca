@@ -287,7 +287,7 @@ describe("Fund page", () => {
       expect(meta).toHaveTextContent("$24.0B reported book");
       expect(meta).toHaveTextContent("10 holdings now, 22 positions ever"); // 22 positions in positions.json
       expect(meta).toHaveTextContent("Updated 11 Aug 2026 · Q2 filing");
-      expect(screen.getByRole("tab", { name: /^Positions\s*22$/ })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Positions\s*10$/ })).toBeInTheDocument(); // the count of holdings now, as in the line above
     });
 
     it("key figures: the first four tiles follow the Annual returns bracket", async () => {
@@ -469,7 +469,7 @@ describe("Fund page", () => {
       expect(tileValue("Positions profitable")).toBe("–");
       expect(tile("Positions profitable").querySelector(".kpi-bar")).toBeNull();
       expect(ratioValue("Sharpe")).toBe("0.30");
-      expect(screen.getByRole("tab", { name: /^Positions\s*0$/ })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Positions\s*10$/ })).toBeInTheDocument(); // from summary.json, not from the positions list
     });
   });
 

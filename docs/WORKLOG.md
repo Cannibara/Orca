@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Positions tab count = holdings now
+
+| What changed | Why | Files |
+|---|---|---|
+| The number on the Positions tab is `summary.n_holdings` (positions held in the newest quarter), was every position ever (sold ones included) | It disagreed with "N holdings now" in the line above (chat) | `web/src/fund/FundHeader.tsx`, tests |
+
 ## 2026-11-11 — What-if Last change: orange only for Sold all
 
 | What changed | Why | Files |
