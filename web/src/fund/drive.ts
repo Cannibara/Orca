@@ -117,7 +117,7 @@ export function driveItems(byMag: DriveRow[], W: number): WfItem[] {
 export type WfBar = {
   i: number;
   item: WfItem;
-  cls: "gain" | "loss" | "tot";
+  cls: "gain" | "loss" | "tot" | "tot neg";
   d: string;
   /** The bar grows from its bottom edge when it goes up, from its top when it goes down. */
   up: boolean;
@@ -204,7 +204,7 @@ export function waterfall(items: WfItem[], total: number, W: number): WfLayout {
     bars.push({
       i,
       item: it,
-      cls: it.tot ? "tot" : it.v >= 0 ? "gain" : "loss",
+      cls: it.tot ? (it.v >= 0 ? "tot" : "tot neg") : it.v >= 0 ? "gain" : "loss",
       d: endRound(+x.toFixed(2), +bw.toFixed(2), +yf.toFixed(2), +yt.toFixed(2), 3),
       up,
       cx: f1(cx(i)),
@@ -238,8 +238,8 @@ export function waterfall(items: WfItem[], total: number, W: number): WfLayout {
 /** What the tooltip of a bar says. `span` names the period ("2022", "2020 to 2022"). */
 export function itemTip(it: WfItem, span: string): { title: string; color: string; value: string; note: string } {
   const value = fPP(it.v, 2) + " points";
-  if (it.tot) return { title: "Total of listed stocks", color: "var(--ink2)", value, note: "The sum of every contribution in " + span };
-  const color = it.v >= 0 ? "var(--gain)" : "var(--loss)";
+  if (it.tot) return { title: "Total of listed stocks", color: it.v >= 0 ? "var(--gain)" : "var(--loss)", value, note: "The sum of every contribution in " + span };
+  const color = it.v >= 0 ? "var(--gain-soft)" : "var(--loss-soft)"; // the bar's own tint
   if (it.other) {
     const n = it.n ?? 0;
     const list = (it.list ?? []).slice(0, 4).map((r) => r.t).join(", ");

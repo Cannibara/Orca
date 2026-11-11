@@ -11,3 +11,10 @@
 
 /* "Show all N" under the numbers table */
 .fp .tbl-more{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding-top:8px;font-size:12px;color:var(--ink3)}
+
+/* waterfall: the parts that add up are the lighter tint (--gain-soft / --loss-soft: toward the paper in light, toward the ink in dark; with a
+   full-colour edge, since a tint alone is under 3:1 on the light panel), the total is the solid colour: blue, or orange when the total is negative */
+.fp .viz.wf .bar.gain{fill:var(--gain-soft);stroke:var(--gain);stroke-width:1}
+.fp .viz.wf .bar.loss{fill:var(--loss-soft);stroke:var(--loss);stroke-width:1}
+.fp .viz.wf .bar.tot{fill:var(--gain);stroke:none}
+.fp .viz.wf .bar.tot.neg{fill:var(--loss)}

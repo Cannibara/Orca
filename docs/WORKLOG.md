@@ -5,6 +5,13 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Return constituents: solid total, lighter parts; period pill keeps its black on hover
+
+| What changed | Why | Files |
+|---|---|---|
+| Return constituents waterfall: the Total bar is solid `--gain` (solid `--loss` when the total is negative, as in the demo's 2025 for fund 9100003); the bars that add up to it use new tokens `--gain-soft` / `--loss-soft` (light theme: 55% of the colour over the paper; dark: 62% over the ink, so they read lighter) with a 1px full-colour edge, since a tint alone is under 3:1 on the light panel. Tooltip swatches match. Scoped to `.viz.wf`; other charts' bars are unchanged | Owner: Total should be the main blue, the parts lighter blues (chat) | `web/src/fund/drive.css`, `drive.ts`, `web/src/tokens.css` |
+| Positions period selector: the chosen (black) pill no longer changes colour on hover. The cause was base.css's `.fp .stepper button:hover:not(:disabled):not([aria-disabled])` (0,5,1), which beat `.pi.on`; the override repeats that selector with `.pi.on` so it outranks it. Unchosen pills keep their hover tint. Checked in the browser: computed colours identical before and after hover | Owner (chat) | `web/src/fund/positions.css` |
+
 ## 2026-11-11 — Tab underline sits on the hairline, spans the tab exactly
 
 | What changed | Why | Files |
