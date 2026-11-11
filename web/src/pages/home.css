@@ -8,12 +8,24 @@
 .home .hero-t{display:flex;flex-direction:column;gap:14px;min-width:0}
 /* the fund page's heading size, so the two pages open alike */
 .home .hero h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;overflow-wrap:anywhere}
+/* the theme switch takes the place the search had: the hero's right edge, level with the heading's foot */
+.home .hero .hero-theme{justify-self:end}
 @container app (max-width:719px){
-  .home .hero{grid-template-columns:minmax(0,1fr);padding-top:0}
+  .home .hero{grid-template-columns:minmax(0,1fr) auto;padding-top:0}
+}
+
+/* ---------- the tab row: the list tabs on the left, the fund search on the right at the tabs' height ---------- */
+.home .tabrow{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line)}
+.home .tabrow>.tabs{flex:1 1 auto;min-width:0;border-bottom:0}
+.home .tabrow>.search-box{flex:0 1 400px;width:auto}
+@container app (max-width:719px){
+  .home .tabrow{flex-direction:column-reverse;align-items:stretch;gap:8px;border-bottom:0}
+  .home .tabrow>.tabs{border-bottom:1px solid var(--line)}
+  .home .tabrow>.search-box{flex:none;width:100%}
 }
 
 /* ---------- search: the artifact's command field (surface, hairline, 36px, icon, "/" hint) ---------- */
-.home .search-box{position:relative;display:flex;flex-direction:column;min-width:0;justify-self:end;width:min(100%,520px)}
+.home .search-box{position:relative;display:flex;flex-direction:column;min-width:0;width:min(100%,520px)}
 .home .search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center}
 .home .search label{grid-column:1/-1;font:500 12px/1 var(--f-sans);color:var(--ink)}
 .home .in-wrap{position:relative;display:flex;align-items:center;min-width:0}

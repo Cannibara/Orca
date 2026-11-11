@@ -201,8 +201,9 @@ describe("Home", () => {
     expect(results()).not.toBeNull();
     await user.tab(); // the second result
     expect(results()).not.toBeNull();
-    await user.tab(); // out of the box, onto the tabs
-    expect(screen.getByRole("tab", { name: "Top funds" })).toHaveFocus();
+    await user.tab(); // out of the box (the search follows the tabs), onto the page below
+    expect(box).not.toHaveFocus();
+    expect(screen.getByRole("button", { name: "1 year" })).toHaveFocus();
     expect(results()).toBeNull();
   });
 

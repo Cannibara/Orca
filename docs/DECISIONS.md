@@ -122,7 +122,7 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 - Decision: Conviction shows one "Move" box (New/Added/Trimmed/Sold all + `change_pts` to 1 dp); Calls show "Bought Q2 ’26" (calls rows have no weight change) (chat)(code `web/src/pages/Home.tsx` `MoveBox`, `BoughtBox`).
 
 ## 2026-11-08 — Port the approved artifact to the fund page
-- Decision: the fund page matches the artifact from the fund-name heading down. Guidebook parts are left out (theme switch, command palette, crumbs, Compare/Watch, Trades/Filings tabs) (chat).
+- Decision: the fund page matches the artifact from the fund-name heading down. Guidebook parts are left out (command palette, crumbs, Compare/Watch, Trades/Filings tabs) (chat).
 - Context: owner approved "Orca Modern UI" v13 (chat).
 - Consequences: the parallel-agent build used fixed file ownership (`web/src/fund/*`) and stub contracts (chat).
 

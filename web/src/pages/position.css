@@ -20,6 +20,9 @@
 
 /* ---------- header: breadcrumb back link, the title, three pills ---------- */
 .pos-head{display:flex;flex-direction:column;gap:10px;min-width:0}
+/* the heading and, level with it at the right, the theme switch */
+.pos-head .pos-title{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-width:0}
+.pos-head .pos-title h1{min-width:0}
 .pos-head h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
 .pos-head h1 .mono{font-family:var(--f-mono);font-weight:600;letter-spacing:-.02em}
 .pos-head .crumb{align-self:flex-start;display:inline-flex;align-items:center;min-height:24px;border-radius:var(--r-1);font:500 12px/1.2 var(--f-sans);color:var(--ink3);text-decoration:none}
