@@ -5,6 +5,12 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Positions columns: Weight left-aligned, even gaps
+
+| What changed | Why | Files |
+|---|---|---|
+| Weight heading left-aligned like its cells (`.wk`); Held 68px, Weight 92px, Stock 150px fixed; the nine figure columns have no width and share the rest equally (table min width 1026px) | The gaps between columns looked uneven, and Held to Weight too wide: a fixed table stretches every column in proportion, so the wide Held column got wider (chat) | `fund/PositionsTable.tsx`, `fund/positions.css` |
+
 ## 2026-11-11 — Weight bar: solid and striped parts flush
 
 | What changed | Why | Files |
