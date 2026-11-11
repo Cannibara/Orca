@@ -5,6 +5,14 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Last-change boxes in solid gain and loss colours
+
+| What changed | Why | Files |
+|---|---|---|
+| New/Added/Trimmed boxes (`.lc.add`, `.lc.trim`, What-if `.st`) are solid blue (`--gain`) and orange (`--loss`) with `--invfg` text, the bar chart's colours; "Sold all" stays grey | The light tints looked inconsistent with the bars (chat) | `web/src/styles.css`, `fund/positions.css`, `fund/whatif.css`, `pages/position.css` |
+
+- Light theme: `--invfg` on `--loss` is about 4:1, a little under AA for the 11.5px word (code, computed).
+
 ## 2026-11-11 — Home matches the fund page; How it works removed
 
 | What changed | Why | Files |
