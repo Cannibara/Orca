@@ -115,7 +115,7 @@
 .fp .xtbl .tbl-mini tbody tr:last-child td{border-bottom:0}
 /* the action of a trade: a filled box as the What-if Status and the Position page, blue for a buy, grey for a sale */
 .fp .xtbl .st{display:inline-flex;align-items:baseline;padding:1px 6px;border-radius:var(--r-1);background:var(--sunken);font:400 11.5px/18px var(--f-sans);color:var(--ink)}
-.fp .xtbl .st.add{background:var(--gain);color:var(--invfg)}
+.fp .xtbl .st.add{background:var(--gain);color:var(--gain-fg)}
 .fp .xtbl .st.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
 
 @container app (max-width:559px){

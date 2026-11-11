@@ -18,16 +18,16 @@
   --tip-bg:var(--inv); --tip-ink:var(--invfg); --tip-muted:var(--inv2);
   --f-display:var(--f-sans); --f-body:var(--f-sans);
   /* Signed figures. Blue for a gain; for a loss the orange is deepened in the light theme so small
-     orange text on paper keeps 4.5:1 (and the dark blue is lifted a touch for the hover tone). The
+     orange text on paper keeps 4.5:1 (and the blue text is lifted in the dark theme: --up-text). The
      sign is always printed too: colour is never the only cue. */
-  --up:var(--gain);
+  --up:var(--up-text);
   --down:color-mix(in srgb,var(--loss) 78%,var(--ink));
   /* The quarter low-high bars on the price chart: a neutral wash that shows on both surfaces. */
   --range:color-mix(in srgb,var(--ink) 15%,transparent);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}}
-:root[data-theme="dark"]{--up:color-mix(in srgb,var(--gain) 88%,var(--ink)); --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}
+  --down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}}
+:root[data-theme="dark"]{--down:var(--loss); --range:color-mix(in srgb,var(--ink) 20%,transparent)}
 
 /* ---------- base ---------- */
 *,*::before,*::after{box-sizing:border-box}
@@ -215,7 +215,8 @@ a.stk:hover>:is(.mono,.nm){text-decoration:underline;text-underline-offset:3px}
 .tbl-wrap .lc b{font:600 12.5px/18px var(--f-sans);letter-spacing:0;color:var(--ink)}
 .tbl-wrap .lc.add{background:var(--gain)}
 .tbl-wrap .lc.trim{background:var(--loss)}
-.tbl-wrap .lc:is(.add,.trim) :is(.lw,b){color:var(--invfg)}
+.tbl-wrap .lc.add :is(.lw,b){color:var(--gain-fg)}
+.tbl-wrap .lc.trim :is(.lw,b){color:var(--invfg)}
 .tbl-wrap .lc.sold{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
 /* wcell: the Positions table's weight cell ("was → now" over a bar: solid grey for the weight before, then the change striped, blue up / orange down) */
 .tbl-wrap .wcell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;justify-content:center;width:76px}
