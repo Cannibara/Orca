@@ -121,7 +121,8 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === view} data-view={t.id} onClick={() => pick(t.id)}>
             {t.label}
-            {t.id === "positions" && <span className="cnt">{positionsEver}</span>}
+            {/* What the fund holds in its newest quarter, not every position it ever had (that is in the line above). */}
+            {t.id === "positions" && <span className="cnt">{s.n_holdings}</span>}
           </button>
         ))}
         <span className="ind" aria-hidden="true" />

@@ -140,7 +140,7 @@ const region = (name: string) => screen.getByRole("region", { name });
 const bars = () => Array.from(document.querySelectorAll<SVGElement>("#retPanel rect.hit"));
 const pressedBars = () => bars().filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("aria-label")?.split(":")[0]);
 const bar = (label: string) => screen.getByRole("button", { name: new RegExp(`^${label}: `) });
-const drovTitle = (span: string) => screen.getByRole("heading", { name: `What drove ${span}` });
+const drovTitle = (span: string) => screen.getByRole("heading", { name: `Return Constituents ${span}` });
 const kpiCaption = () => document.querySelector(".kpi-cap")?.textContent;
 /** The caption above the key figures when the bracket spans `span`. */
 const bracketCaption = (span: string) => `The first four tiles follow the Annual returns bracket: ${span}. The rest cover the whole tracked period.`;
@@ -164,7 +164,7 @@ describe("Fund page", () => {
       expect(screen.getByRole("status")).toHaveTextContent("Loading…");
       expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
       await loaded("Kelpwood Capital LP");
-      expect(screen.queryByText("Loading…")).toBeNull(); // (the period stepper of What drove is an <output>, a status too)
+      expect(screen.queryByText("Loading…")).toBeNull(); // (the period stepper of Return Constituents is an <output>, a status too)
     });
 
     it("titles the tab '{name} · Orca' once the fund has loaded, not before", async () => {
@@ -264,7 +264,7 @@ describe("Fund page", () => {
         heading("Kelpwood Capital LP"),
         region("Key figures"),
         heading("Annual returns"),
-        heading(/^What drove /),
+        heading(/^Return Constituents /),
         heading("Assets under management"),
         heading("Positions"),
         heading("What if they'd kept it"),
@@ -274,7 +274,7 @@ describe("Fund page", () => {
       });
 
       // each one is a named region, except the header and the key figures strip
-      for (const name of ["Annual returns", "What drove 2025", "Assets under management", "Positions", "What if they'd kept it"]) {
+      for (const name of ["Annual returns", "Return Constituents 2025", "Assets under management", "Positions", "What if they'd kept it"]) {
         expect(region(name)).toBeInTheDocument();
       }
     });
@@ -287,7 +287,7 @@ describe("Fund page", () => {
       expect(meta).toHaveTextContent("$24.0B reported book");
       expect(meta).toHaveTextContent("10 holdings now, 22 positions ever"); // 22 positions in positions.json
       expect(meta).toHaveTextContent("Updated 11 Aug 2026 · Q2 filing");
-      expect(screen.getByRole("tab", { name: /^Positions\s*22$/ })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Positions\s*10$/ })).toBeInTheDocument(); // the count of holdings now, as in the line above
     });
 
     it("key figures: the first four tiles follow the Annual returns bracket", async () => {
@@ -322,11 +322,11 @@ describe("Fund page", () => {
       expect(screen.getByRole("note")).toHaveTextContent(/filed nothing in the latest two quarters/i);
     });
 
-    it("What drove names the selected year and draws its stocks, with company names tidied", async () => {
+    it("Return Constituents names the selected year and draws its stocks, with company names tidied", async () => {
       stubData();
       renderFund();
       await loaded("Kelpwood Capital LP");
-      const drive = region("What drove 2025");
+      const drive = region("Return Constituents 2025");
       expect(within(drive).getByRole("group", { name: "Contribution to return by stock, percentage points, as a waterfall" })).toBeInTheDocument();
       expect(drive.querySelector(".headline")).toHaveTextContent(/Exxon Mobil added 6\.9 points/); // XOM, "EXXON MOBIL CORP" in securities.json
     });
@@ -469,7 +469,7 @@ describe("Fund page", () => {
       expect(tileValue("Positions profitable")).toBe("–");
       expect(tile("Positions profitable").querySelector(".kpi-bar")).toBeNull();
       expect(ratioValue("Sharpe")).toBe("0.30");
-      expect(screen.getByRole("tab", { name: /^Positions\s*0$/ })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Positions\s*10$/ })).toBeInTheDocument(); // from summary.json, not from the positions list
     });
   });
 
@@ -480,7 +480,7 @@ describe("Fund page", () => {
       );
       renderFund();
       await loaded("Kelpwood Capital LP");
-      expect(screen.getByRole("heading", { name: "What drove the return" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Return Constituents" })).toBeInTheDocument();
       expect(within(region("Annual returns")).getByText("No annual returns yet")).toBeInTheDocument();
       expect(bars()).toHaveLength(0);
       expect(kpiCaption()).toBe("No year with a return yet.");
@@ -508,7 +508,7 @@ describe("Fund page", () => {
   });
 
   describe("state shared by the panels", () => {
-    it("clicking a year bar in Annual returns changes the What drove title to that year", async () => {
+    it("clicking a year bar in Annual returns changes the Return Constituents title to that year", async () => {
       stubData();
       const user = userEvent.setup();
       renderFund();
@@ -516,7 +516,7 @@ describe("Fund page", () => {
       expect(drovTitle("2025")).toBeInTheDocument();
       await user.click(bar("2023"));
       expect(drovTitle("2023")).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "What drove 2025" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Return Constituents 2025" })).toBeNull();
       expect(pressedBars()).toEqual(["2023"]);
       expect(handle("Start of the period")).toHaveAttribute("aria-valuetext", "2023");
       expect(handle("End of the period")).toHaveAttribute("aria-valuetext", "2023");
@@ -533,7 +533,7 @@ describe("Fund page", () => {
       expect(pressedBars()).toEqual(["2019"]);
     });
 
-    it("selecting a bar resets the What drove period to that single year", async () => {
+    it("selecting a bar resets the Return Constituents period to that single year", async () => {
       stubData();
       const user = userEvent.setup();
       renderFund();
@@ -545,7 +545,7 @@ describe("Fund page", () => {
 
       await user.click(bar("2023"));
       expect(drovTitle("2023")).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: /^What drove 2024/ })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /^Return Constituents 2024/ })).toBeNull();
       expect(handle("Start of the period")).toHaveAttribute("aria-valuetext", "2023");
       expect(handle("End of the period")).toHaveAttribute("aria-valuetext", "2023");
     });
@@ -572,7 +572,7 @@ describe("Fund page", () => {
       fireEvent.keyDown(handle("End of the annualised return span"), { key: "ArrowLeft" });
       expect(kpiCaption()).toBe(bracketCaption("2015 to 2025"));
       expect(within(region("Key figures")).getAllByRole("article")[0].textContent).not.toBe(before);
-      // the bracket does not move the year selected for What drove
+      // the bracket does not move the year selected for Return Constituents
       expect(drovTitle("2025")).toBeInTheDocument();
     });
 
@@ -622,7 +622,7 @@ describe("Fund page", () => {
         expect(handle("End of the period")).toHaveAttribute("aria-valuetext", "2025");
       });
 
-      it("the What drove period survives a change of window when its years are still in it", async () => {
+      it("the Return Constituents period survives a change of window when its years are still in it", async () => {
         stubData(summaryWith(longHistory));
         const user = userEvent.setup();
         renderFund();

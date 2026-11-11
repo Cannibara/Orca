@@ -5,6 +5,28 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Positions: no Last change column; bigger panel titles; Return Constituents
+
+| What changed | Why | Files |
+|---|---|---|
+| Positions table: Last change column removed (12 columns, min width 1096 → 960px, `mode` prop and the `last` sort key gone, dead `.lc` CSS removed). The What-if table keeps its Last change | Weight's was → now carries the movement (chat) | `fund/PositionsTable.tsx`, `fund/PositionsPanel.tsx`, `fund/positions.ts`, `fund/positions.css`, tests |
+| Panel titles (`.fp .pt`: Annual returns, Return Constituents, AUM, Positions, What if) 16px → 28px, the size of the key-figure tiles' numbers; 22px under 640px wide. The Position page's own `.pos-page .pt` is unchanged | Owner wanted titles as large as the tile figures (chat) | `fund/base.css` |
+| "What drove 2023 to 2025" → "Return Constituents 2023 to 2025" (no years: "Return Constituents") | Owner's wording (chat) | `fund/DrivePanel.tsx`, tests |
+
+## 2026-11-11 — Positions table: Weight shows was → now
+
+| What changed | Why | Files |
+|---|---|---|
+| Weight cell reads "was% → now%" where the fund traded in the period (sold out: "was% → 0%"); bar = old weight solid grey, then a striped extension (blue if larger, orange if smaller; the striped part is the weight added or given up). New `PosRow.wPrev` (weight before, at the period's end prices). Weight column 72 → 104px, table min width 1064 → 1096px | Fold Last change into Weight (chat) | `fund/PositionsTable.tsx`, `fund/positions.ts`, `fund/positions.css`, `fund/whatif.ts`, tests |
+
+- Last change box and column kept, `dw` unchanged (the Excel workbook uses the same formula; parity test). `dw` isolates the stock's own trade, while was → now are the book's real weights, so they can differ by a point or two when other stocks traded too (code).
+
+## 2026-11-11 — Positions tab count = holdings now
+
+| What changed | Why | Files |
+|---|---|---|
+| The number on the Positions tab is `summary.n_holdings` (positions held in the newest quarter), was every position ever (sold ones included) | It disagreed with "N holdings now" in the line above (chat) | `web/src/fund/FundHeader.tsx`, tests |
+
 ## 2026-11-11 — What-if Last change: orange only for Sold all
 
 | What changed | Why | Files |

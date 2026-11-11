@@ -58,7 +58,7 @@ const handle = (d: "a" | "b") => panel().querySelector<SVGElement>(`.scr-h[data-
 describe("DrivePanel", () => {
   test("title, subtitle, stepper, strip and the one-line headline for the selected year", () => {
     render(<Host />);
-    expect(screen.getByRole("heading", { name: "What drove 2025" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents 2025" })).toBeInTheDocument();
     expect(
       screen.getByText("Contribution to return, percentage points. The biggest movers are named; the rest are grouped. Drag the handles to add years."),
     ).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("DrivePanel", () => {
     render(<Host sel="2025" onCr={onCr} />);
     fireEvent.click(screen.getByRole("button", { name: "Earlier period" }));
     expect(onCr).toHaveBeenLastCalledWith({ a: "2024", b: "2024" });
-    expect(screen.getByRole("heading", { name: "What drove 2024" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents 2024" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Later period" }));
     fireEvent.click(screen.getByRole("button", { name: "Later period" }));
     expect(onCr).toHaveBeenLastCalledWith({ a: "2026 H1", b: "2026 H1" });
@@ -104,7 +104,7 @@ describe("DrivePanel", () => {
   test("a multi-year period sums the years; the stepper keeps its length", () => {
     const onCr = vi.fn();
     render(<Host sel="2025" cr={{ a: "2020", b: "2022" }} onCr={onCr} />);
-    expect(screen.getByRole("heading", { name: "What drove 2020 to 2022" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents 2020 to 2022" })).toBeInTheDocument();
     expect(panel().querySelector(".stepper output")).toHaveTextContent("2020 to 2022");
     expect(panel().querySelector(".hmeta")).toHaveTextContent("3 years, 12 quarters");
     expect(hits()[hits().length - 1].getAttribute("aria-label")).toMatch(/^Total of listed stocks: −17\.\d\d percentage points$/);
@@ -122,7 +122,7 @@ describe("DrivePanel", () => {
     b.focus();
     fireEvent.keyDown(b, { key: "ArrowRight" });
     expect(onCr).toHaveBeenLastCalledWith({ a: "2025", b: "2026 H1" });
-    expect(screen.getByRole("heading", { name: "What drove 2025 to 2026 H1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents 2025 to 2026 H1" })).toBeInTheDocument();
     expect(document.activeElement).toBe(handle("b"));
     fireEvent.keyDown(handle("a"), { key: "ArrowLeft" });
     expect(onCr).toHaveBeenLastCalledWith({ a: "2024", b: "2026 H1" });
@@ -139,7 +139,7 @@ describe("DrivePanel", () => {
 
   test("an unset or stale period falls back to the selected year", () => {
     render(<Host sel="2023" cr={{ a: "1999", b: "2001" }} />);
-    expect(screen.getByRole("heading", { name: "What drove 2023" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents 2023" })).toBeInTheDocument();
   });
 
   test("Show the numbers swaps the chart for an accessible table with a Total row", () => {
@@ -199,7 +199,7 @@ describe("DrivePanel", () => {
         <DrivePanel series={series} win={{ years: [], offset: 0, total: 0 }} contrib={contrib} stocks={stocks} sel={null} cr={null} onCr={() => {}} />
       </TooltipProvider>,
     );
-    expect(screen.getByRole("heading", { name: "What drove the return" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Return Constituents" })).toBeInTheDocument();
     expect(screen.getByText("Orca needs two consecutive filings to attribute a period.")).toBeInTheDocument();
   });
 

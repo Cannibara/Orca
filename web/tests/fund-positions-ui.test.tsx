@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,7 +73,7 @@ const asOfText = () => document.querySelector(".asof")?.textContent;
 const selected = () => document.querySelector(".pi.on > span")?.textContent;
 
 describe("PositionsPanel at the newest quarter", () => {
-  test("title, as-of date, the 13 columns in order, 38px rows' content and Weight descending by default", () => {
+  test("title, as-of date, the 12 columns in order, 38px rows' content and Weight descending by default", () => {
     panel();
     expect(screen.getByRole("heading", { name: "Positions" })).toBeInTheDocument();
     expect(asOfText()).toBe("Positions and prices as of 30 Oct 2026");
@@ -88,12 +88,11 @@ describe("PositionsPanel at the newest quarter", () => {
       "Avg cost",
       "Price",
       "Avg exit",
-      "Last change",
       "Realised",
       "Unrealised",
       "Total P&L",
     ]);
-    expect(document.querySelectorAll("colgroup col")).toHaveLength(13);
+    expect(document.querySelectorAll("colgroup col")).toHaveLength(12);
     expect(screen.getByRole("columnheader", { name: "Weight" })).toHaveAttribute("aria-sort", "descending");
     expect(screen.getByRole("columnheader", { name: "Stock" })).toHaveAttribute("aria-sort", "none");
     // the demo fund holds 9 positions now; sold-out ones are not in the newest quarter's view
@@ -102,14 +101,27 @@ describe("PositionsPanel at the newest quarter", () => {
     expect(screen.getByRole("region", { name: "Positions table, scrollable" })).toHaveAttribute("tabindex", "0");
   });
 
-  test("the first row prints the artifact's figures: whole numbers, money in millions, tinted change boxes", () => {
+  test("the first row prints the artifact's figures: whole numbers, money in millions, the weight as was → now", () => {
     panel();
     const cells = Array.from(rowsOf()[0].querySelectorAll("td")).map((td) => td.textContent);
-    // Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Last change, Realised, Unrealised, Total
-    expect(cells.slice(1)).toEqual(["Q3 ’20", "25%", "−5%", "−5%", "$2,968m", "$158", "$137", "–", "–", "+$469m", "−$789m", "−$235m"]);
-    const ge = rowsOf().find((r) => r.getAttribute("data-t") === "GE")!;
-    expect(within(ge).getByText("Added")).toBeInTheDocument();
-    expect(ge.querySelector(".lc.add b")?.textContent).toBe("+6.0%");
+    // Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total
+    expect(cells.slice(1)).toEqual(["Q3 ’20", "25%", "−5%", "−5%", "$2,968m", "$158", "$137", "–", "+$469m", "−$789m", "−$235m"]);
+    expect(document.querySelector("td .lc")).toBeNull(); // no Last change box: Weight carries the movement
+  });
+
+  test("Weight reads was → now where the fund traded, with the old weight solid and the change striped", () => {
+    panel();
+    const row = (t: string) => rowsOf().find((r) => r.getAttribute("data-t") === t)!;
+    // untouched: just the weight, one solid bar
+    const first = rowsOf()[0].querySelectorAll("td")[2];
+    expect(first.textContent).toBe("25%");
+    expect(first.querySelector(".mbx")).toBeNull();
+    // GE was added: old weight, then the striped extension
+    const ge = row("GE").querySelectorAll("td")[2];
+    const [was, now] = (ge.querySelector(".wn")?.textContent ?? "").split(" → ").map((v) => parseInt(v, 10));
+    expect(now).toBeGreaterThan(was);
+    expect(ge.querySelector(".mb:not(.mbx)")).not.toBeNull();
+    expect(ge.querySelector(".mbx.up")).not.toBeNull();
   });
 
   test("the newest quarter needs no weekly file before the browser is idle; then the background prefetch begins", async () => {
@@ -260,13 +272,12 @@ describe("the period picker", () => {
     expect(screen.getByRole("button", { name: "Later year" })).toHaveAttribute("aria-disabled", "true");
   });
 
-  test("Custom shows the strip of quarters, hides the stepper, and the Last change column becomes Change", () => {
+  test("Custom shows the strip of quarters and hides the stepper", () => {
     panel();
-    expect(screen.getByRole("columnheader", { name: "Last change" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Last change" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     expect(screen.getByRole("group", { name: /Custom period for the positions table/ })).toBeInTheDocument();
     expect(document.querySelector(".stepper")).toHaveAttribute("hidden");
-    expect(screen.getByRole("columnheader", { name: "Change" })).toBeInTheDocument();
     // the strip starts on the last four quarters: Q3 ’25 .. Q2 ’26
     expect(screen.getByRole("slider", { name: "Start of the period" })).toHaveAttribute("aria-valuetext", "Q3 ’25");
     expect(screen.getByRole("slider", { name: "End of the period" })).toHaveAttribute("aria-valuetext", "Q2 ’26");
@@ -366,6 +377,7 @@ describe("a fund with thousands of positions", () => {
       total: i,
       tag: null,
       dw: null,
+    wPrev: null,
       irr: () => null,
     };
   };
@@ -378,7 +390,7 @@ describe("a fund with thousands of positions", () => {
 
   const table = (r: PosRow[] = rows, failed = 0) => (
     <MemoryRouter>
-      <PositionsTable fundId={1} rows={r} pending={false} failed={failed} mode="quarter" latest={new Map()} />
+      <PositionsTable fundId={1} rows={r} pending={false} failed={failed} latest={new Map()} />
     </MemoryRouter>
   );
   const byWeight = rows.map((r) => r.ticker).reverse(); // Weight descending: the last row first
@@ -559,7 +571,7 @@ describe("a fund with thousands of positions", () => {
   test("'Loading prices…' says how far the files are", () => {
     render(
       <MemoryRouter>
-        <PositionsTable fundId={1} rows={rows.slice(0, 5)} pending failed={0} progress={{ done: 120, total: 340 }} mode="quarter" latest={new Map()} />
+        <PositionsTable fundId={1} rows={rows.slice(0, 5)} pending failed={0} progress={{ done: 120, total: 340 }} latest={new Map()} />
       </MemoryRouter>,
     );
     expect(screen.getByRole("status")).toHaveTextContent("Loading prices… 120 of 340");
@@ -568,7 +580,7 @@ describe("a fund with thousands of positions", () => {
   test("an empty period says the fund held nothing", () => {
     render(
       <MemoryRouter>
-        <PositionsTable fundId={1} rows={[]} pending={false} failed={0} mode="year" latest={new Map()} />
+        <PositionsTable fundId={1} rows={[]} pending={false} failed={0} latest={new Map()} />
       </MemoryRouter>,
     );
     expect(screen.getByText("The fund held nothing in this period.")).toBeInTheDocument();

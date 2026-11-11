@@ -277,7 +277,11 @@ describe("table rows", () => {
     expect(by.get(1)!.dw).toBeCloseTo((2000 / (vb - 1000 + 2000) - 1000 / vb) * 100, 9);
     expect(by.get(2)!.dw).toBeCloseTo((200 / (vb + 200)) * 100, 9);
     expect(by.get(3)!.dw).toBeCloseTo(-(250 / vb) * 100, 9);
-  });
+    // the weight before, at the end prices: it plus the change is the weight now
+    expect(by.get(1)!.wPrev).toBeCloseTo((1000 / vb) * 100, 9);
+    expect(by.get(2)!.wPrev).toBe(0);
+    expect(by.get(3)!.wPrev).toBeCloseTo((250 / vb) * 100, 9);
+      });
 
   test("a position without a price shows null figures and stays out of the weights", () => {
     const rows = buildRows(
@@ -313,10 +317,6 @@ describe("table rows", () => {
     // Avg exit: only the sold out one has it shown; open positions sort after it either way
     expect(sortRows(rows, "ax", -1)[0].id).toBe(3);
     expect(sortRows(rows, "ax", 1)[0].id).toBe(3);
-    // Last change: the weight change for rows that changed, the untouched row last either way
-    expect(ids(sortRows(rows, "last", -1)).pop()).toBe(4);
-    expect(ids(sortRows(rows, "last", 1)).pop()).toBe(4);
-    expect(sortRows(rows, "last", -1)[0].id).toBe(2);
     // IRR is computed only when asked for
     expect(sortRows(rows, "irr", -1)).toHaveLength(4);
   });

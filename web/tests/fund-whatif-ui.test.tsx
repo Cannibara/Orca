@@ -656,14 +656,13 @@ describe("the demo fund", () => {
     expect(differing.length).toBeGreaterThan(0);
   });
 
-  it("prints the same Return, IRR, Avg cost, Price, Avg exit and Last change as the Positions table for every stock in both", async () => {
+  it("prints the same Return, IRR, Avg cost, Price and Avg exit as the Positions table for every stock in both", async () => {
     both();
     await act(async () => {});
     const pos = figures("posPanel");
     const sales = figures("whatIfPanel");
     expect(sales.size).toBe(exits.rows.stock_id.length);
     let compared = 0;
-    let lastCompared = 0;
     for (const [ticker, w] of sales) {
       const p = pos.get(ticker);
       if (!p) continue; // sold out in an earlier quarter: not in the Positions table at the newest quarter
@@ -672,13 +671,7 @@ describe("the demo fund", () => {
         expect(w[col === "IRR" ? "IRR actual" : col], `${ticker} ${col}`).toBe(p[col]);
       }
       if (p["Avg exit"] !== "–") expect(w["Avg exit"], `${ticker} Avg exit`).toBe(p["Avg exit"]);
-      // the Positions table says "Added +1.3%" in a box; ours adds the quarter after it
-      if (p["Last change"] !== "–") {
-        lastCompared++;
-        expect(w["Last change"], `${ticker} Last change`).toBe(p["Last change"] + "Q2 ’26");
-      }
     }
     expect(compared).toBeGreaterThan(5);
-    expect(lastCompared).toBeGreaterThan(0);
   });
 });

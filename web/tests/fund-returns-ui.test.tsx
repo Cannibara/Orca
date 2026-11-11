@@ -49,6 +49,11 @@ describe("FundHeader", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Halyard Point Partners$/);
   });
 
+  test("the Positions tab counts what the fund holds now, not every position it ever had", () => {
+    const { container } = render(<FundHeader summary={demo} positionsEver={18} />);
+    expect(container.querySelector('[data-view="positions"] .cnt')).toHaveTextContent(/^9$/);
+  });
+
   test("line under it: reported book, holdings now and ever, and the filing pill", () => {
     const { container } = render(<FundHeader summary={demo} positionsEver={18} />);
     const meta = container.querySelector(".meta") as HTMLElement;
@@ -107,7 +112,7 @@ describe("FundHeader", () => {
     const tabs = within(list).getAllByRole("tab");
     expect(tabs.map((t) => t.getAttribute("data-view"))).toEqual(["overview", "positions"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[1]).toHaveTextContent("Positions18");
+    expect(tabs[1]).toHaveTextContent("Positions9");
 
     await user.click(tabs[1]);
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
