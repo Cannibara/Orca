@@ -1,4 +1,4 @@
-/* "Return Constituents ...": the headline line, the waterfall and its table. The panel frame,
+/* "Return constituents ...": the headline line, the waterfall and its table. The panel frame,
    the stepper, the period strip, .viz, .state and .tbl-mini come from base.css. */
 
 .fp .headline{padding:10px var(--ppad) 0;font-size:13.5px;line-height:1.45;color:var(--ink);text-wrap:pretty}

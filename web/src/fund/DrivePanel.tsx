@@ -44,7 +44,7 @@ const STRIP_LABEL = "Period for what drove the return. Drag the handles or the b
 const WF_LABEL = "Contribution to return by stock, percentage points, as a waterfall";
 
 /**
- * "Return Constituents ...": the stocks behind the return of a period of years as a waterfall of
+ * "Return constituents ...": the stocks behind the return of a period of years as a waterfall of
  * percentage points, with the strip that picks the period, a one-line summary and a
  * numbers table. The period itself lives in the page (`cr`), so it survives the window.
  */
@@ -132,7 +132,7 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
       <div className="ph">
         <div className="ph-t">
           <h3 className="pt" id="drvTitle">
-            {has ? "Return Constituents " + span : "Return Constituents"}
+            {has ? "Return constituents " + span : "Return constituents"}
           </h3>
         </div>
         {has && (

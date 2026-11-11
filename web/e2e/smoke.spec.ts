@@ -70,13 +70,13 @@ for (const width of widths) {
 
     // jsdom cannot measure, so the unit tests draw every chart at a fixed fallback width: this is the
     // one place the panels are laid out for real, at a desktop and a phone width.
-    test("fund page: every section is there, and clicking a year bar picks that year for Return Constituents", async ({ page }) => {
+    test("fund page: every section is there, and clicking a year bar picks that year for Return constituents", async ({ page }) => {
       const errors = await open(page, `/fund/${fundId}`);
       await expect(page.locator("h1")).toHaveText(fundName);
       for (const name of ["Annual returns", "Assets under management", "Positions", "What if they'd kept it"]) {
         await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
       }
-      await expect(page.getByRole("heading", { name: /^Return Constituents / })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /^Return constituents / })).toBeVisible();
       await expect(page.locator("#retPanel rect.hit").first()).toBeAttached();
 
       // a bar in the middle: the first and last carry the bracket's handles
@@ -84,7 +84,7 @@ for (const width of widths) {
       const aria = await hits.nth(Math.floor((await hits.count()) / 2)).getAttribute("aria-label");
       const label = (aria as string).split(":")[0];
       await page.getByRole("button", { name: new RegExp(`^${label}: `) }).click();
-      await expect(page.getByRole("heading", { name: `Return Constituents ${label}`, exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: `Return constituents ${label}`, exact: true })).toBeVisible();
       await expect(page.locator("#retPanel rect.hit[aria-pressed='true']")).toHaveCount(1);
       expect(errors).toEqual([]);
     });

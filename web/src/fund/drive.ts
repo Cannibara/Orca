@@ -1,4 +1,4 @@
-// The pure logic behind "Return Constituents ...": a period's contribution rows, the waterfall's
+// The pure logic behind "Return constituents ...": a period's contribution rows, the waterfall's
 // items and geometry, the headline sentence and the table. Ported from the approved
 // artifact (app.js drvRows/drvRange/drvItems/drvSvg/renderC3Body). The panel only draws
 // what these return, so everything here is testable without a DOM.
