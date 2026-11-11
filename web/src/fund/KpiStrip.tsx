@@ -117,7 +117,8 @@ export function KpiStrip({
 
   return (
     <>
-      <p className="kpi-cap">
+      {/* Not shown on screen (the tiles speak for themselves); kept for screen readers, which are told which years the first four tiles cover. */}
+      <p className="kpi-cap vh">
         {k ? (
           <>
             The first four tiles follow the Annual returns bracket: <b>{spanName(labels[bs.a], labels[bs.b])}</b>. The rest cover the whole

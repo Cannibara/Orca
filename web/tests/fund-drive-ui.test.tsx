@@ -59,9 +59,7 @@ describe("DrivePanel", () => {
   test("title, subtitle, stepper, strip and the one-line headline for the selected year", () => {
     render(<Host />);
     expect(screen.getByRole("heading", { name: "Return Constituents 2025" })).toBeInTheDocument();
-    expect(
-      screen.getByText("Contribution to return, percentage points. The biggest movers are named; the rest are grouped. Drag the handles to add years."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Contribution to return, percentage points/)).toBeNull(); // no explanation under the title
     const stepper = screen.getByRole("group", { name: "Period" });
     expect(stepper.querySelector("output")).toHaveTextContent("2025");
     const head = panel().querySelector(".headline") as HTMLElement;

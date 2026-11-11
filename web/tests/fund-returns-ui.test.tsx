@@ -366,10 +366,10 @@ const blur = (el: HTMLElement | SVGElement) => act(() => el.blur());
 const G = slots(600, 13, 46);
 
 describe("ReturnsPanel", () => {
-  test("header: title, subtitle with the full years, years seg, numbers button", () => {
+  test("header: title (no subtitle), years seg, numbers button", () => {
     render(<Host />);
     const panel = screen.getByRole("region", { name: "Annual returns" });
-    expect(within(panel).getByText("Estimated, full years 2015 to 2025. Part years are shown but not counted.")).toBeInTheDocument();
+    expect(within(panel).queryByText(/Part years are shown but not counted/)).toBeNull();
     const seg = within(panel).getByRole("group", { name: "Years shown" });
     expect(within(seg).getByRole("button", { name: "15 years" })).toHaveAttribute("aria-pressed", "true");
     expect(within(seg).getByRole("button", { name: "Max" })).toHaveAttribute("aria-pressed", "false");
@@ -668,7 +668,6 @@ describe("ReturnsPanel", () => {
     expect(screen.getByText("No annual returns yet")).toBeInTheDocument();
     expect(document.querySelector("#retPanel svg.viz")).toBeNull();
     expect(screen.queryByRole("button", { name: "Show the numbers" })).toBeNull();
-    expect(screen.getByText("Estimated. Part years are shown but not counted.")).toBeInTheDocument();
   });
 
   test("a single year draws no bracket", () => {

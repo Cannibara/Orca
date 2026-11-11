@@ -219,9 +219,6 @@ function AumBody({ win }: { win: Win }) {
           <h3 className="pt" id="aumTitle">
             Assets under management
           </h3>
-          <p className="ps">
-            Book value at each year end, in US dollars. Each bar is last year's book plus net inflows and gains. Dotted boxes show what was lost or withdrawn.
-          </p>
         </div>
         <div className="ph-c">
           <button type="button" className="btn btn-secondary sm" aria-pressed={table} onClick={() => setTable((t) => !t)}>

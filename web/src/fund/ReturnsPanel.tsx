@@ -52,15 +52,6 @@ function focusVisible(el: Element): boolean {
 
 const vars = (o: Record<string, string | number>) => o as CSSProperties;
 
-/** "full years 2015 to 2025" for the subtitle; null when no year is full. */
-function fullYears(labels: string[], part: boolean[]): string | null {
-  const full = labels.filter((_, i) => !part[i]);
-  if (full.length === 0) return null;
-  const a = full[0];
-  const b = full[full.length - 1];
-  return a === b ? `full year ${a}` : `full years ${a} to ${b}`;
-}
-
 /**
  * Annual returns: one bar per year with a return, the selected year highlighted, and the
  * draggable annualised-return bracket above the bars. Selecting a bar picks the year the
@@ -207,10 +198,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
   };
 
   // ---- drawing ----
-  const subtitle = (() => {
-    const fy = fullYears(cats, part);
-    return (fy ? `Estimated, ${fy}.` : "Estimated.") + " Part years are shown but not counted.";
-  })();
 
   function chart(): ReactNode {
     const { G, H } = L;
@@ -435,7 +422,6 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
           <h3 className="pt" id="c1t">
             Annual returns
           </h3>
-          <p className="ps">{subtitle}</p>
         </div>
         <div className="ph-c">
           <Seg

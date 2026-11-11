@@ -5,6 +5,13 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-11 — Fewer explanations on the fund page
+
+| What changed | Why | Files |
+|---|---|---|
+| Removed the line under Overview / Positions ("The first four tiles follow the Annual returns bracket…"), the subtitles under Annual returns, Return constituents and AUM, and the footnote under the What-if table (mid-quarter IRR, "1y after", "$ missed / dodged", last change). The KPI caption stays in the page as screen-reader-only text (`vh`), so the tiles' span is still announced. The What-if subtitle and the other panels are unchanged. Unused `fullYears` deleted | Owner: users don't need everything explained (chat) | `web/src/fund/KpiStrip.tsx`, `ReturnsPanel.tsx`, `DrivePanel.tsx`, `AumPanel.tsx`, `WhatIfPanel.tsx`, five test files |
+| Note: with the Annual returns subtitle gone, "estimate" is carried by the page footer ("Every figure is an Orca estimate…"), not by that panel | CLAUDE.md says every figure is labelled as an estimate | |
+
 ## 2026-11-11 — Return constituents: solid total, lighter parts; period pill keeps its black on hover
 
 | What changed | Why | Files |

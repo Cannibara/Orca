@@ -134,9 +134,6 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
           <h3 className="pt" id="drvTitle">
             {has ? "Return Constituents " + span : "Return Constituents"}
           </h3>
-          <p className="ps">
-            Contribution to return, percentage points. The biggest movers are named; the rest are grouped. Drag the handles to add years.
-          </p>
         </div>
         {has && (
           <div className="ph-c">

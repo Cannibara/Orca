@@ -119,7 +119,7 @@ describe("What if they'd kept it", () => {
   );
   const prices = pricesOf({ 1: 20, 2: 11.1, 3: 10, 4: 17.2 });
 
-  it("is a named panel: heading, one-line subtitle and the explanation under the table", () => {
+  it("is a named panel: heading and one-line subtitle, no explanation under the table", () => {
     renderWhatIf({ exits, prices });
     const section = screen.getByRole("region", { name: "What if they'd kept it" });
     expect(section).toHaveAttribute("id", "whatIfPanel");
@@ -128,8 +128,7 @@ describe("What if they'd kept it", () => {
       within(section).getByText("For every stock they sold or trimmed: what it did afterwards, and what holding on would have earned."),
     ).toBeInTheDocument();
     expect(within(section).getByRole("table", { name: SALES })).toBeInTheDocument();
-    expect(within(section).getByText(/^IRR uses mid-quarter trade dates and today's price for anything still held/)).toBeInTheDocument();
-    expect(within(section).getByText(/All figures are 13F estimates\.$/)).toBeInTheDocument();
+    expect(within(section).queryByText(/IRR uses mid-quarter trade dates/)).toBeNull();
   });
 
   it("has no period picker", () => {

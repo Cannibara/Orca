@@ -53,12 +53,12 @@ afterEach(() => {
 });
 
 describe("AumPanel: head, stats, legend", () => {
-  test("names the panel and explains how to read it", () => {
+  test("names the panel, with no explanation under the title", () => {
     mount();
     const section = screen.getByRole("region", { name: "Assets under management" });
     expect(section).toHaveAttribute("id", "flowPanel");
     expect(within(section).getByRole("heading", { level: 3, name: "Assets under management" })).toBeInTheDocument();
-    expect(section).toHaveTextContent("Each bar is last year's book plus net inflows and gains. Dotted boxes show what was lost or withdrawn.");
+    expect(section).not.toHaveTextContent("Each bar is last year's book");
     expect(section).not.toHaveTextContent(/billions/i);
   });
 

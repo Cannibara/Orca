@@ -331,13 +331,6 @@ function Panel({ fundId, positions, exits, prices, stocks, asof, summary }: What
           </button>
         </div>
       )}
-      <p className="pf wi-foot">
-        IRR uses mid-quarter trade dates and today's price for anything still held; "IRR if held" assumes no share was ever sold.
-        "1y after" compares the stock with SPY over the 12 months after the sale. "$ missed / dodged": plus means the shares sold
-        would be worth more now than they sold for (missed), minus means less (dodged). Last change is how far the stock's weight in
-        the fund's book moved in the quarter of its last trade; before the newest quarter it is estimated from the fund's own trade
-        prices. All figures are 13F estimates.
-      </p>
     </section>
   );
 }
