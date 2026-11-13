@@ -18,7 +18,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 
 | What changed | Why | Files |
 |---|---|---|
-| Home title is "Orca: estimated 13F fund returns, stock by stock" with a new description (index.html and `useTitle` on Home) | SEO plan step 1, draft copy for the owner to edit (chat) | `web/index.html`, `web/src/pages/Home.tsx`, `web/tests/app.test.tsx` |
+| Home title is "Hedge fund search and holdings" with a new description (index.html and `useTitle` on Home) | SEO plan step 1, draft copy for the owner to edit (chat) | `web/index.html`, `web/src/pages/Home.tsx`, `web/tests/app.test.tsx` |
 | With `SITE_URL` set, prerender adds Open Graph and Twitter tags to every fund page and to the shared shell (the shell has no `og:url`, since it serves every route), plus JSON-LD on fund pages (`<` escaped). `og:image` and `summary_large_image` appear only when `og-default.png` is in the build, so no broken image link | SEO plan steps 3–4 | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` |
 | Five draft logos and a preview sheet, made by one design agent. Recommended C (fluke on blue), second A (the current mark made bolder). Not wired into the site | Owner asked for low-effort drafts (chat) | `docs/superpowers/logo-drafts/` |
 | Spec gained a "when to add a database" decision | Owner (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |

@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import App from "../src/App";
 import { clearDataCache } from "../src/data/api";
 
-const HOME_TITLE = "Orca: estimated 13F fund returns, stock by stock";
+const HOME_TITLE = "Hedge fund search and holdings";
 
 // The whole app on a MemoryRouter, with the demo files served through a mocked fetch.
 const DEMO = join(dirname(fileURLToPath(import.meta.url)), "../public/demo-data");
