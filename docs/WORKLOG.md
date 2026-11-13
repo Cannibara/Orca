@@ -1,6 +1,6 @@
 # Worklog
 
-Last verified: 2026-11-11
+Last verified: 2026-11-13
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
