@@ -139,16 +139,36 @@ const BODY_OPEN = /<body[^>]*>/i;
  * `site` is the website's address, or null: the canonical link names this very page (the one with
  * the trailing slash, which is where Pages serves dist/fund/{id}/index.html).
  */
-function renderFund(template, fund, site) {
+function renderFund(template, fund, site, image) {
   const name = escapeHtml(fund.name);
-  const canonical = site === null ? "" : `\n    <link rel="canonical" href="${escapeHtml(`${site}${fundPath(fund.id)}`)}" />`;
+  const page = site === null ? null : `${site}${fundPath(fund.id)}`;
+  const canonical = page === null ? "" : `\n    <link rel="canonical" href="${escapeHtml(page)}" />`;
   const description = `Estimated returns, P&amp;L and trades for ${name} from 13F filings.`;
   const noscript = `<noscript><p>${name}: 13F book ${money(fund.book)}. Turn on JavaScript to see estimated returns, P&amp;L and trades from 13F filings.</p></noscript>`;
+  const share = shareTags(`${name} · Orca`, description, page, image);
+  const ld = page === null ? "" : `\n    ${jsonLd({ "@context": "https://schema.org", "@type": "WebPage", name: fund.name, description: `Estimated returns, P&L and trades for ${fund.name} from 13F filings.`, url: page, isPartOf: { "@type": "WebSite", name: "Orca", url: site } })}`;
   return template
     .replace(TITLE, () => `<title>${name} · Orca</title>`)
-    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}`)
+    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}${share}${ld}`)
     .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
 }
+
+/** Open Graph and Twitter tags. `page` is null for the shared shell (it is every route, so no fixed og:url); `image` is an absolute URL or null. */
+function shareTags(title, description, page, image) {
+  const tags = [
+    ["property", "og:type", "website"],
+    ["property", "og:site_name", "Orca"],
+    ["property", "og:title", title],
+    ["property", "og:description", description],
+    ...(page === null ? [] : [["property", "og:url", escapeHtml(page)]]),
+    ...(image === null ? [] : [["property", "og:image", image]]),
+    ["name", "twitter:card", image === null ? "summary" : "summary_large_image"],
+  ];
+  return tags.map(([k, n, v]) => `\n    <meta ${k}="${n}" content="${v}" />`).join("");
+}
+
+/** A JSON-LD block. "<" is escaped so a fund name can never close the script tag. */
+const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj).replace(/</g, "\\u003c")}</script>`;
 
 /**
  * The text of dist/_headers. `origin` is the data site's origin when the app loads its data from
@@ -240,6 +260,16 @@ async function main() {
   // Made before anything is written, so a sitemap over the limit stops the build early.
   const sitemap = site === null ? null : renderSitemap(site, chosen);
 
+  // The share image is optional: only linked when the file was shipped in public/.
+  const hasImage = await stat(path.join(dist, "og-default.png")).then(() => true, () => false);
+  const image = site !== null && hasImage ? `${site}/og-default.png` : null;
+  if (site !== null) {
+    // The shared shell serves every other route: share tags without a page address.
+    const desc = (template.match(DESCRIPTION)?.[0].match(/content="([^"]*)"/) ?? [])[1] ?? "";
+    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags("Orca", desc, null, image)}`);
+    await writeFile(indexFile, shell);
+  }
+
   await writeFile(path.join(dist, "_headers"), renderHeaders(origin, hsts));
   console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
   if (origin !== null && (await stat(path.join(dist, "demo-data")).then(() => true, () => false))) {
@@ -258,7 +288,7 @@ async function main() {
       chosen.slice(i, i + WRITE_BATCH).map(async (fund) => {
         const dir = path.join(dist, "fund", String(fund.id));
         await mkdir(dir, { recursive: true });
-        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, site));
+        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, site, image));
       }),
     );
   }

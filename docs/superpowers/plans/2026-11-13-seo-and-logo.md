@@ -1,7 +1,7 @@
 # Plan: SEO and logo
 
 Last verified: 2026-11-13
-Status: plan only, not built, awaiting the owner's go-ahead.
+Status: started 2026-11-13. Done: step 1 draft copy applied (owner can change it), steps 3 and 4 (share tags and JSON-LD in `prerender.mjs`, tests), step 7 for those. Logo drafts A–E are in `docs/superpowers/logo-drafts/` (open `preview.png`); the owner has not picked one. Steps 2 (icon files, `og-default.png`), 5, 6 and 8 are open. The share image is linked only once `web/public/og-default.png` exists.
 
 ## Goal
 `orcaetf.com` and fund pages are easy to find and show a proper title, description and logo in search and when shared.

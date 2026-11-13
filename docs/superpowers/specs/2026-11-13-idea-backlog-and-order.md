@@ -37,3 +37,20 @@ F. 12, after licence confirmation, a legal view and 7.
 
 ## Architecture rule for every item
 Compute in the pipeline and publish static JSON (ROADMAP S1). Order of work per feature: contract change in `pipeline/contract.md` → pipeline → `orca/demo.py` data → web panel → tests. One area per session; agents one after another, not in parallel.
+
+## Decision: when to add a database
+Status: proposal.
+- Fund and market data stay precomputed static JSON: it is the same for every visitor, so it is calculated once a month, costs almost nothing per visit, cannot be overloaded and has no server to attack.
+- A database is storage plus a machine that answers each query, so cost, speed and limits grow with visits (Cloudflare D1: one query at a time per database, 30 s cap, daily row limits on Free).
+- Add a small database only for per-user data: logins, saved views, paid tier (ROADMAP X6, F2 phase 2). Not for fund data.
+- Revisit for open-ended live filters across all funds, only if precomputed lists cannot cover them.
+
+| | Static files (now) | Database |
+|---|---|---|
+| Cost per visit | about 0 (cached) | pays per query/CPU |
+| Speed | fast | slower |
+| Traffic spike | handled | can hit limits |
+| Upkeep | almost none | server, backups, security |
+| Custom questions | only precomputed | any, live |
+| Freshness | monthly | can be live |
+| Per-user features | no | yes |

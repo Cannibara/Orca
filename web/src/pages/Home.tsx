@@ -689,7 +689,7 @@ const TABS: TabItem<TabId>[] = [
 ];
 
 export default function Home() {
-  useTitle("Orca");
+  useTitle("Orca: estimated 13F fund returns, stock by stock");
   const [tab, setTab] = useState<TabId>("top");
   // The toggles live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");
