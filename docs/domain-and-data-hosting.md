@@ -78,6 +78,9 @@ All of it is written by every real build, nothing to switch on.
   Other pages get no canonical link. The list in the sitemap changes only when the site is rebuilt, so
   Web needs a run after a data refresh adds funds. Optional, in Google Search Console: add the property
   `https://www.orcaetf.com` and submit `https://www.orcaetf.com/sitemap.xml`.
+- **Link previews** (Slack, X, iMessage…): every page carries Open Graph tags, and with `SITE_URL` the
+  build adds `og:image` = `https://www.orcaetf.com/og-image.png` (1200×630, from `web/public/`, made
+  in `docs/brand/`). Change the card by replacing that file. Previews are cached by each service.
 - **No demo data in production**: with a `VITE_DATA_URL` that is a full address, the fictional demo files
   are removed from the deployed site (they stay in tests and local builds).
 

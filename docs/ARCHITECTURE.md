@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-10 (workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-14 (workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -169,7 +169,7 @@ Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.pu
 - Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `*` (`/how-it-works` was removed 2026-11-11).
 - Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files. `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
 - Row budget for big tables: `web/src/fund/loading.ts` (50 / 200 / 25 / 100).
-- Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3, merged a2a1554) it also writes `sitemap.xml`, `robots.txt` and canonical links. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.
+- Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`. With `SITE_URL` (PR #3, merged a2a1554) it also writes `sitemap.xml`, `robots.txt` and canonical links, and (2026-11-14) the link-preview tags: absolute `og:image` for `og-image.png` in `index.html` and every fund page, `og:url` on fund pages only. Fund pages also get their own `og:title` / `og:description`. Logo and icons: `docs/brand/`. With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`.
 
 ## Cloudflare setup
 | Service | Setting |

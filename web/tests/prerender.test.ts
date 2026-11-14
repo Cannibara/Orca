@@ -36,6 +36,8 @@ const TEMPLATE = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="description" content="Orca turns 13F filings into estimated results for the big funds, stock by stock." />
     <title>Orca</title>
+    <meta property="og:title" content="Orca" />
+    <meta property="og:description" content="Orca turns 13F filings into estimated results for the big funds, stock by stock." />
     <script type="module" crossorigin src="/assets/index-abc123.js"></script>
   </head>
   <body>
@@ -477,7 +479,7 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     }
   });
 
-  it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them", async () => {
+  it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them (no og-image.png here, so it is untouched)", async () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
     expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
@@ -816,5 +818,76 @@ describe("prerender: fails loudly", () => {
     expect(r.code).not.toBe(0);
     expect(r.stderr).toContain("404");
     expect(pageDirs(dist)).toEqual([]);
+  });
+});
+
+describe("prerender: link previews (Open Graph)", () => {
+  const SITE = "https://www.orcaetf.com";
+  const meta = (html: string, prop: string) => [...html.matchAll(new RegExp(`<meta property="${prop}" content="([^"]*)" />`, "g"))].map((m) => m[1]);
+  /** A dist with index.html and the preview image Vite copies from public/. */
+  const distWithImage = () => {
+    const dist = makeDist();
+    copyFileSync(join(ROOT, "public", "og-image.png"), join(dist, "og-image.png"));
+    return dist;
+  };
+
+  it("gives each fund page its own og:title and og:description, like <title> and the meta description", async () => {
+    const dist = makeDist();
+    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS })).code).toBe(0);
+    demo.id.forEach((id, i) => {
+      const html = read(page(dist, id));
+      expect(meta(html, "og:title")).toEqual([`${demo.name[i]} · Orca`]);
+      expect(meta(html, "og:description")).toEqual([description(html)]);
+    });
+  });
+
+  it("with SITE_URL: the absolute og:image in index.html (no og:url: it is every route), and og:url plus og:image in each fund page", async () => {
+    const dist = distWithImage();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`og:image ${SITE}/og-image.png`);
+
+    const index = read(join(dist, "index.html"));
+    expect(meta(index, "og:image")).toEqual([`${SITE}/og-image.png`]);
+    expect(meta(index, "og:image:width")).toEqual(["1200"]);
+    expect(meta(index, "og:image:height")).toEqual(["630"]);
+    expect(meta(index, "og:image:alt")).toHaveLength(1);
+    expect(meta(index, "og:url")).toEqual([]);
+    expect(index).not.toContain("canonical");
+    // the tags close the head; the rest of the page is what Vite wrote
+    expect(index.indexOf("og:image")).toBeLessThan(index.indexOf("</head>"));
+    expect(index.replace(/\n\s*<meta property="og:(image|url)[^\n]*/g, "")).toBe(TEMPLATE);
+
+    for (const id of demo.id) {
+      const html = read(page(dist, id));
+      expect(meta(html, "og:url"), String(id)).toEqual([`${SITE}/fund/${id}/`]);
+      expect(meta(html, "og:image"), String(id)).toEqual([`${SITE}/og-image.png`]);
+      expect(html.indexOf("og:image")).toBeLessThan(html.indexOf("</head>"));
+    }
+  });
+
+  it("without SITE_URL there is no og:image or og:url anywhere, even with the image in dist", async () => {
+    const dist = distWithImage();
+    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS })).code).toBe(0);
+    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
+    for (const id of demo.id) {
+      expect(meta(read(page(dist, id)), "og:image")).toEqual([]);
+      expect(meta(read(page(dist, id)), "og:url")).toEqual([]);
+    }
+  });
+
+  it("with SITE_URL but no og-image.png in dist, no tag names the missing image", async () => {
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
+    expect(r.code).toBe(0);
+    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
+    for (const id of demo.id) expect(meta(read(page(dist, id)), "og:image")).toEqual([]);
+    expect(r.stdout).not.toContain("og:image");
+  });
+
+  it("the image is the 1200×630 PNG the tags announce", () => {
+    const png = readFileSync(join(ROOT, "public", "og-image.png"));
+    expect(png.subarray(1, 4).toString("latin1")).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
   });
 });

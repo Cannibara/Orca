@@ -1,8 +1,8 @@
 // Pre-renders one page per fund so a search engine (or a reader without JavaScript) finds the
 // fund's name, a description and its 13F book without running the app: dist/fund/{id}/index.html
-// is dist/index.html with the <title> and meta description replaced and a <noscript> line added.
-// The app mounts over it as usual. dist/index.html itself is left alone, and no 404.html is
-// written: Cloudflare Pages then serves index.html for every other path.
+// is dist/index.html with the <title>, the meta description and their Open Graph twins replaced and
+// a <noscript> line added. The app mounts over it as usual. No 404.html is written: Cloudflare Pages
+// then serves index.html for every other path.
 //
 // It also writes dist/_headers, which Cloudflare Pages applies to every response: the security
 // headers (a Content-Security-Policy that names the data site's origin, so it is made here, from
@@ -17,7 +17,11 @@
 // When SITE_URL (the website's own address) is set it also writes the search-engine files:
 // <link rel="canonical"> in every pre-rendered fund page (and only there: the other routes are one
 // shared index.html, which cannot know its own address), dist/sitemap.xml and dist/robots.txt.
-// Without it none of those exist, and the demo build used by CI and the e2e tests is unchanged.
+// It also adds the link-preview image: og:image must be an absolute URL, so the tags for
+// og-image.png (copied from public/) go into dist/index.html and every fund page, with og:url on
+// the fund pages only (for the same reason as the canonical link). This is the one change made to
+// dist/index.html, and it is skipped when dist has no og-image.png. Without SITE_URL none of those
+// exist, and the demo build used by CI and the e2e tests is unchanged.
 //
 // Run by `npm run build` after `vite build`. Needs Node 22.18 or later (it imports money() from
 // src/lib/format.ts, which Node runs by stripping the types). Environment, read from the process
@@ -132,7 +136,12 @@ const fundPath = (id) => `/fund/${id}/`;
 
 const TITLE = /<title>[\s\S]*?<\/title>/;
 const DESCRIPTION = /<meta\s+name=["']description["'][^>]*>/i;
+const OG_TITLE = /<meta\s+property=["']og:title["'][^>]*>/i;
+const OG_DESCRIPTION = /<meta\s+property=["']og:description["'][^>]*>/i;
 const BODY_OPEN = /<body[^>]*>/i;
+const HEAD_CLOSE = /\n([ \t]*)<\/head>/i;
+// The link-preview card (docs/brand/og-image.png, copied to public/ and so to dist/).
+const OG_IMAGE = { file: "og-image.png", width: 1200, height: 630, alt: "The Orca logo and the line: Estimated fund returns from SEC 13F filings" };
 
 /**
  * The shell's page for one fund. Replacers are functions so a "$&" in a name is copied as typed.
@@ -147,7 +156,25 @@ function renderFund(template, fund, site) {
   return template
     .replace(TITLE, () => `<title>${name} · Orca</title>`)
     .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}`)
+    .replace(OG_TITLE, () => `<meta property="og:title" content="${name} · Orca" />`)
+    .replace(OG_DESCRIPTION, () => `<meta property="og:description" content="${description}" />`)
     .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
+}
+
+/**
+ * `html` with the link-preview image tags added at the end of <head>: og:image is absolute, as Open
+ * Graph requires, so they exist only with a site address. `url` is the page's own address for
+ * og:url, or null for dist/index.html, which is every other route and so has no one address.
+ */
+function withPreviewImage(html, site, url) {
+  const tags = [
+    ...(url === null ? [] : [`<meta property="og:url" content="${escapeHtml(url)}" />`]),
+    `<meta property="og:image" content="${escapeHtml(`${site}/${OG_IMAGE.file}`)}" />`,
+    `<meta property="og:image:width" content="${OG_IMAGE.width}" />`,
+    `<meta property="og:image:height" content="${OG_IMAGE.height}" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(OG_IMAGE.alt)}" />`,
+  ];
+  return html.replace(HEAD_CLOSE, (_, indent) => `\n${tags.map((t) => `${indent}  ${t}`).join("\n")}\n${indent}</head>`);
 }
 
 /**
@@ -239,6 +266,8 @@ async function main() {
   const chosen = [...funds].sort((a, b) => bookOf(b) - bookOf(a) || a.id - b.id).slice(0, max);
   // Made before anything is written, so a sitemap over the limit stops the build early.
   const sitemap = site === null ? null : renderSitemap(site, chosen);
+  // A preview tag that names a missing image is worse than none.
+  const preview = site !== null && HEAD_CLOSE.test(template) && (await stat(path.join(dist, OG_IMAGE.file)).then((s) => s.isFile(), () => false));
 
   await writeFile(path.join(dist, "_headers"), renderHeaders(origin, hsts));
   console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
@@ -252,13 +281,18 @@ async function main() {
     await writeFile(path.join(dist, "robots.txt"), renderRobots(site));
     console.log(`prerender: wrote sitemap.xml (${sitemap.count} URLs) and robots.txt for ${site}`);
   }
+  if (preview) {
+    await writeFile(indexFile, withPreviewImage(template, site, null));
+    console.log(`prerender: added og:image ${site}/${OG_IMAGE.file} to index.html and the fund pages`);
+  }
 
   for (let i = 0; i < chosen.length; i += WRITE_BATCH) {
     await Promise.all(
       chosen.slice(i, i + WRITE_BATCH).map(async (fund) => {
         const dir = path.join(dist, "fund", String(fund.id));
         await mkdir(dir, { recursive: true });
-        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, site));
+        const html = renderFund(template, fund, site);
+        await writeFile(path.join(dir, "index.html"), preview ? withPreviewImage(html, site, `${site}${fundPath(fund.id)}`) : html);
       }),
     );
   }
