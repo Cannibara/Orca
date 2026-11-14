@@ -5,6 +5,15 @@ Last verified: 2026-11-14
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-14 — Home lists: longer fund names, steady columns across pages
+
+| What changed | Why | Files |
+|---|---|---|
+| Fund names on the home lists show about 8 more characters before the "…": the cap is 19em (was 15em for Top funds, 14em for the fund cell in the other tabs), about 37 characters of Instrument Sans 600 at 13 px (≈ 6.6 px a character). Phones keep 10em; the Big wins & losses pair keeps 9em on phones | Owner: names were cut off while the column had room to spare (chat) | `web/src/pages/home.css` (`--nm-w`, `--stk-w`), `Home.tsx` (`stk fund`) |
+| Paged home lists (Top funds, Conviction moves) and Index giants lay out fixed: the Fund column is the name cap plus padding (275 px at 1280, was ~440 px of mostly empty space), Stock is its 14em cap plus padding, and the other columns share the rest equally, never under `--col-min` (8.5em, the "Max Drawdown" heading with its chevron) | Owner: the columns changed width from page to page (auto layout sized them to each page's rows: Fund went 440 → 200 → 446 px on a test list) | `web/src/components/DataTable.tsx` (`fixed`, `Column.width`), `styles.css`, `Home.tsx` (`FUND_W`, `STOCK_W`, `ListTable fixed`) |
+| Trade-off: on a 400 px phone the Top funds table is now 703 px wide (was ~520) because every number column gets the same floor; it still scrolls sideways with the Fund column pinned | | |
+| Checked: typecheck, unit tests (2 new), 48 Playwright smoke tests; measured with a 250-row list in Chromium at 1280 and 400 px: identical column widths on pages 1–3 | | |
+
 ## 2026-11-14 — Official logo ("Lune", v1.1) on the site
 
 | What changed | Why | Files |

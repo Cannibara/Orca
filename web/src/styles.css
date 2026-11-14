@@ -181,6 +181,8 @@ details[open] summary{margin-bottom:8px}
 .panel>.tbl-wrap,.fp .panel>.tbl-wrap{--tpad:var(--ppad);border-width:1px 0 0;border-radius:0}
 .panel>.tbl-wrap:last-child,.fp .panel>.tbl-wrap:last-child{border-radius:0 0 var(--r-3) var(--r-3)}
 .tbl-wrap table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums;--row:38px}
+/* fixed: the columns keep their widths whatever the rows (DataTable's `fixed`); --col-min is the floor of a column without a width */
+.tbl-wrap table.fixed{table-layout:fixed;--col-min:8.5em}
 .tbl-wrap :is(th,td){height:var(--row);padding:0 8px;text-align:right;white-space:nowrap;vertical-align:middle;border-bottom:1px solid var(--line)}
 .tbl-wrap :is(th,td).l,.tbl-wrap :is(th,td):first-child{text-align:left}
 .tbl-wrap :is(th,td):first-child{padding-left:var(--tpad)}

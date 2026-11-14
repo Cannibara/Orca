@@ -323,6 +323,10 @@ describe("Home", () => {
     expect(pagers[0]).toHaveTextContent("Showing 1–100 of 250 funds");
     expect(within(pagers[0]).getByRole("button", { name: "Previous" })).toBeDisabled();
 
+    // fixed layout with a sized Fund column, so the columns keep their widths from page to page
+    expect(table).toHaveClass("fixed");
+    expect(table.querySelector("col")?.style.width).toContain("var(--nm-w)");
+
     await user.click(within(pagers[1]).getByRole("button", { name: "Next" }));
     expect(screen.getAllByRole("navigation", { name: "Pages of funds" })[0]).toHaveTextContent("Showing 101–200 of 250 funds");
     expect(within(rows()[0]).getAllByRole("link")[0]).toHaveTextContent("Fund 101");
