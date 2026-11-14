@@ -84,6 +84,9 @@ All of it is written by every real build, nothing to switch on.
   into its HTML; the sitemap's `lastmod` is the manifest's `built` date. The Web run's log says
   `prerender: holdings text for 500 of 500 fund pages asked for`; a smaller first number means some
   files could not be read (those pages keep their basic text). `PRERENDER_RICH=0` turns it off.
+- **Link previews** (Slack, X, iMessage…): with `SITE_URL`, every page gets Open Graph tags and
+  `og:image` = `https://www.orcaetf.com/og-default.png` (1200×630, in `web/public/`, made in
+  `docs/brand/`). Change the card by replacing that file. Previews are cached by each service.
 
 ### Search Console and Bing (owner, after the first deploy)
 1. search.google.com/search-console > Add property > **Domain** > `orcaetf.com`. Google shows a TXT

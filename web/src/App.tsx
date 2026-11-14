@@ -1,6 +1,7 @@
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 import { TooltipProvider } from "./charts/Tooltip";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Logo, Mark } from "./components/Logo";
 import Fund from "./pages/Fund";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
@@ -13,12 +14,7 @@ export default function App() {
       <header className="top">
         <div className="wrap topbar">
           <Link className="brand" to="/" aria-label="Orca home">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect width="24" height="24" rx="6" fill="var(--inv)" />
-              <ellipse cx="15.6" cy="9" rx="4.6" ry="2.5" transform="rotate(-24 15.6 9)" fill="var(--invfg)" />
-              <path d="M4.5 16.2c3.4 1.8 9.2 2 15-.6" fill="none" stroke="var(--invfg)" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            Orca
+            <Logo />
           </Link>
         </div>
       </header>
@@ -37,7 +33,8 @@ export default function App() {
         </TooltipProvider>
       </main>
       <footer className="site-foot">
-        <div className="wrap">
+        <div className="wrap foot-row">
+          <Mark className="foot-mark" />
           <p className="cap">
             Estimates from SEC 13F filings. Not investment advice.
           </p>
