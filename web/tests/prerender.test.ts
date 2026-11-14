@@ -852,8 +852,36 @@ describe("prerender: where the funds come from", () => {
     const funds = writeFunds({ v: 1, id: [42], name: ["Only Fund"], book: [1e9], n: [1] });
     const r = await run(dist, { PRERENDER_FUNDS: funds, VITE_DATA_URL: base });
     expect(r.code).toBe(0);
-    expect(requested).toEqual([]);
+    // the funds come from the file (funds.json is never asked for); only the optional holdings files are tried
+    expect(requested).not.toContain("/funds.json");
+    expect(requested.sort()).toEqual(["/latest_prices.json", "/securities.json"]);
     expect(pageDirs(dist)).toEqual(["42"]);
+  });
+
+  it("the production shape: funds from a file, holdings text and the sitemap date from the data site", async () => {
+    const DATA = join(ROOT, "public", "demo-data");
+    const files = new Map<string, unknown>(
+      ["securities.json", "latest_prices.json", "manifest.json"].map((f) => [`/${f}`, JSON.parse(readFileSync(join(DATA, f), "utf8"))]),
+    );
+    for (const id of demo.id) files.set(`/fund/${id}/summary.json`, JSON.parse(readFileSync(join(DATA, "fund", String(id), "summary.json"), "utf8")));
+    const requested: string[] = [];
+    const server = createServer((req, res) => {
+      requested.push(req.url ?? "");
+      const body = files.get(req.url ?? "");
+      res.writeHead(body === undefined ? 404 : 200, { "content-type": "application/json" });
+      res.end(JSON.stringify(body ?? {}));
+    });
+    servers.push(server);
+    await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: base, SITE_URL: "https://www.orcaetf.com" });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`holdings text for ${demo.id.length} of ${demo.id.length}`);
+    expect(read(page(dist, demo.id[0]))).toContain("<caption>Largest positions at the latest prices (Orca estimate)</caption>");
+    expect(read(join(dist, "sitemap.xml"))).toContain("<lastmod>2026-10-30</lastmod>");
+    expect(requested).not.toContain("/funds.json");
   });
 });
 

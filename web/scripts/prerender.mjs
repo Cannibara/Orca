@@ -34,6 +34,7 @@
 //                    estimated return written into the HTML, read from the data site's per-fund
 //                    summary.json (default 500; 0 turns it off). The rest get the fund's name and book.
 //                    A file that cannot be read only costs that fund its extra text, never the build.
+//                    The files are read from VITE_DATA_URL even when PRERENDER_FUNDS names the funds file.
 //   SITE_URL         the website's own address, https://www.orcaetf.com (https, no path, no
 //                    trailing slash); unset means no canonical links, sitemap.xml or robots.txt
 //   HSTS_MAX_AGE     seconds of the Strict-Transport-Security header (default 15552000, six
@@ -221,7 +222,7 @@ async function loadRich(dist, funds) {
   if (funds.length === 0) return new Map();
   const [securities, latest] = await Promise.all([readData(dist, "securities.json"), readData(dist, "latest_prices.json")]);
   if (!securities || !latest || !Array.isArray(securities.stock_id) || !Array.isArray(latest.stock_id)) {
-    console.warn("prerender: securities.json or latest_prices.json could not be read: fund pages get no holdings text");
+    console.log("prerender: securities.json or latest_prices.json could not be read: fund pages get no holdings text");
     return new Map();
   }
   const stocks = new Map(securities.stock_id.map((id, i) => [id, { ticker: securities.ticker?.[i] ?? "", name: securities.name?.[i] ?? "" }]));
@@ -358,14 +359,15 @@ https://:version.:project.pages.dev/*
 }
 
 /** dist/sitemap.xml: the home page and the pre-rendered fund pages (sitemaps.org protocol). */
-function renderSitemap(site, funds) {
+function renderSitemap(site, funds, lastmod = null) {
   const urls = [`${site}/`, ...funds.map((f) => `${site}${fundPath(f.id)}`)];
+  const stamp = lastmod === null ? "" : `<lastmod>${lastmod}</lastmod>`;
   if (urls.length > MAX_SITEMAP_URLS) {
     fail(`sitemap.xml would list ${urls.length} URLs and one file may list ${MAX_SITEMAP_URLS}: lower PRERENDER_MAX`);
   }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((url) => `  <url><loc>${escapeHtml(url)}</loc></url>`).join("\n")}
+${urls.map((url) => `  <url><loc>${escapeHtml(url)}</loc>${stamp}</url>`).join("\n")}
 </urlset>
 `;
   const bytes = Buffer.byteLength(xml);
@@ -404,10 +406,13 @@ async function main() {
   const bookOf = (f) => (Number.isFinite(f.book) ? f.book : -Infinity);
   const chosen = [...funds].sort((a, b) => bookOf(b) - bookOf(a) || a.id - b.id).slice(0, max);
   // Made before anything is written, so a sitemap over the limit stops the build early.
-  const sitemap = site === null ? null : renderSitemap(site, chosen);
+  // The date the data was last built (manifest.json "built"), when the data site says: every page's content is that old at most.
+  const built = site === null ? null : (await readData(dist, "manifest.json"))?.built;
+  const lastmod = typeof built === "string" && /^\d{4}-\d{2}-\d{2}/.test(built) ? built.slice(0, 10) : null;
+  const sitemap = site === null ? null : renderSitemap(site, chosen, lastmod);
 
-  // A bare funds file (PRERENDER_FUNDS) has no company data beside it, so no holdings text.
-  const rich = process.env.PRERENDER_FUNDS ? new Map() : await loadRich(dist, chosen.slice(0, richMax));
+  // The production build reads funds.json from a file (PRERENDER_FUNDS) and still reads the rest from VITE_DATA_URL.
+  const rich = await loadRich(dist, chosen.slice(0, richMax));
   console.log(`prerender: holdings text for ${rich.size} of ${Math.min(richMax, chosen.length)} fund pages asked for`);
 
   // The share image is optional: only linked when the file was shipped in public/.
