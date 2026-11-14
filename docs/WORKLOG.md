@@ -1,9 +1,27 @@
 # Worklog
 
-Last verified: 2026-11-11
+Last verified: 2026-11-13
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-13 — AUM outflow outline heavier; idea backlog spec; SEO plan
+
+| What changed | Why | Files |
+|---|---|---|
+| AUM net outflows were already an orange dashed outline (no fill). The outline is now 1.75px with dashes `4 3` (was 1.25px, `3 3`), and the legend swatch border is 2px. Checked in the browser on demo funds 9100001–9100003; 932 web tests pass | Owner: outflows must be an orange dashed outline (chat) | `web/src/fund/aum.css` |
+| New short spec ranking the owner's 12 ideas by effort and value, with build order | Owner asked for a spec in the repo (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
+| New plan for SEO and logo (not built) | Owner (chat) | `docs/superpowers/plans/2026-11-13-seo-and-logo.md` |
+| Owner says Tiingo is now a commercial licence. Tiingo's docs say that tier is still internal-use only, so it needs confirming in writing that it covers showing prices on the site. ROADMAP L1 stays open until then | | |
+
+## 2026-11-13 — SEO started; logo drafts; database decision
+
+| What changed | Why | Files |
+|---|---|---|
+| Home title is "Hedge fund search and holdings" with a new description (index.html and `useTitle` on Home) | SEO plan step 1, draft copy for the owner to edit (chat) | `web/index.html`, `web/src/pages/Home.tsx`, `web/tests/app.test.tsx` |
+| With `SITE_URL` set, prerender adds Open Graph and Twitter tags to every fund page and to the shared shell (the shell has no `og:url`, since it serves every route), plus JSON-LD on fund pages (`<` escaped). `og:image` and `summary_large_image` appear only when `og-default.png` is in the build, so no broken image link | SEO plan steps 3–4 | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` |
+| Five draft logos and a preview sheet, made by one design agent. Recommended C (fluke on blue), second A (the current mark made bolder). Not wired into the site | Owner asked for low-effort drafts (chat) | `docs/superpowers/logo-drafts/` |
+| Spec gained a "when to add a database" decision | Owner (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
 
 ## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
 

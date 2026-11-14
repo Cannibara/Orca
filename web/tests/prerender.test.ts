@@ -477,10 +477,35 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     }
   });
 
+  it("adds share tags and JSON-LD to fund pages, and share tags without og:url to the shell; the image only when it was shipped", async () => {
+    const dist = makeDist();
+    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE })).code).toBe(0);
+    for (const id of demo.id) {
+      const html = read(page(dist, id));
+      expect(html).toContain(`<meta property="og:url" content="${SITE}/fund/${id}/" />`);
+      expect(html.match(/<meta property="og:title"/g)).toHaveLength(1);
+      expect(html).toContain('<meta name="twitter:card" content="summary" />');
+      expect(html).not.toContain("og:image");
+      const ld = html.match(/<script type="application\/ld\+json">([^<]*)<\/script>/);
+      expect(JSON.parse(ld![1]).url).toBe(`${SITE}/fund/${id}/`);
+    }
+    const shell = read(join(dist, "index.html"));
+    expect(shell).toContain('<meta property="og:title" content="Orca" />');
+    expect(shell).not.toContain("og:url");
+
+    const withImage = makeDist();
+    writeFileSync(join(withImage, "og-default.png"), "png");
+    expect((await run(withImage, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE })).code).toBe(0);
+    expect(read(page(withImage, demo.id[0]))).toContain(`<meta property="og:image" content="${SITE}/og-default.png" />`);
+    expect(read(page(withImage, demo.id[0]))).toContain('content="summary_large_image"');
+  });
+
   it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them", async () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
-    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
+    const shell = read(join(dist, "index.html"));
+    expect(shell).not.toContain("canonical");
+    expect(shell.replace(/\n    <meta (property|name)="(og|twitter):[^>]*>/g, "")).toBe(TEMPLATE);
   });
 
   it("writes sitemap.xml: the XML declaration, the sitemap namespace, the home page and each fund page", async () => {
