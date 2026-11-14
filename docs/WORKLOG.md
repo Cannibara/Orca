@@ -5,6 +5,14 @@ Last verified: 2026-11-14
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-14 — Popular funds: draft list of 68 names
+
+| What changed | Why | Files |
+|---|---|---|
+| Draft list of 68 well-known funds, grouped by lineage (Buffett/Graham, Tiger Cubs, macro, activists, quant, other), each matched to a live CIK, book and position count, and flagged if in a top-25 list | Owner asked for a list of famous funds for backlog item 2b, from Wikipedia and press lineage articles (chat) | `docs/superpowers/specs/2026-11-14-popular-funds-draft.md` |
+
+- Not approved: the owner picks names and whether the tab groups by lineage. Only 3 of 68 (Coatue, Slate Path, Appaloosa) are in a top-25 list. Seed Stapleton and Sequoia lineages were not found by search. Nothing built; the contract (`home/popular.json`) comes next.
+
 ## 2026-11-14 — Official logo ("Lune", v1.1) on the site
 
 | What changed | Why | Files |
