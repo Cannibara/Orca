@@ -14,7 +14,7 @@ import {
   type Stock,
 } from "../data/api";
 import type { Contrib, Exits, PositionRow, Summary } from "../data/types";
-import { tidyName } from "../lib/format";
+import { fundTitle, tidyName } from "../lib/format";
 import { positionRows, profitablePct } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
@@ -73,7 +73,7 @@ async function loadFund(id: number): Promise<FundData | null> {
 
 function FundView({ data }: { data: FundData }) {
   const { summary, contrib, positions, stocks, prices, asof } = data;
-  useTitle(`${summary.name} · Orca`);
+  useTitle(fundTitle(summary.name));
   const series = useMemo(() => buildSeries(summary), [summary]);
   // The page's shared state: the window of years, the selected year, the annualised-return bracket and the
   // What-drove period (the last two as year labels, so they survive a change of window).

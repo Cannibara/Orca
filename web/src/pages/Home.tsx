@@ -18,7 +18,7 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { count, DASH, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
+import { count, DASH, HOME_TITLE, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
 import { qShort } from "../fund/fmt";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
@@ -689,7 +689,7 @@ const TABS: TabItem<TabId>[] = [
 ];
 
 export default function Home() {
-  useTitle("Orca");
+  useTitle(HOME_TITLE);
   const [tab, setTab] = useState<TabId>("top");
   // The toggles live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");
