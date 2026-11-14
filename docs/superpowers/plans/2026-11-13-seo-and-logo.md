@@ -1,14 +1,14 @@
 # Plan: SEO and logo
 
-Last verified: 2026-11-13
-Status: started 2026-11-13. Done: step 1 draft copy applied (owner can change it), steps 3 and 4 (share tags and JSON-LD in `prerender.mjs`, tests), step 7 for those. Logo drafts A–E are in `docs/superpowers/logo-drafts/` (open `preview.png`); the owner has not picked one. Steps 2 (icon files, `og-default.png`), 5, 6 and 8 are open. The share image is linked only once `web/public/og-default.png` exists.
+Last verified: 2026-11-14
+Status: started 2026-11-13. 2026-11-14: keyword titles and descriptions, real text in the pre-built fund pages (heading, summary, ten largest positions, links to neighbouring funds, for the 500 largest funds) and the site name "OrcaETF.com" in share tags and JSON-LD are built (`web/scripts/prerender.mjs`, PRERENDER_RICH). Logo round 5 (variations of f5) is in `docs/superpowers/logo-drafts/round5/`; the owner has not chosen. Earlier: Done: step 1 draft copy applied (owner can change it), steps 3 and 4 (share tags and JSON-LD in `prerender.mjs`, tests), step 7 for those. Logo drafts A–E are in `docs/superpowers/logo-drafts/` (open `preview.png`); the owner has not picked one. Steps 2 (icon files, `og-default.png`), 5, 6 and 8 are open. The share image is linked only once `web/public/og-default.png` exists.
 
 ## Goal
 `orcaetf.com` and fund pages are easy to find and show a proper title, description and logo in search and when shared.
 
 ## Today (checked in code)
 - `web/index.html`: title "Orca", one generic description, an inline SVG favicon (data URI). No OG/Twitter tags, no manifest, no PNG icons, no structured data.
-- `web/scripts/prerender.mjs`: fund pages get `<title>{name} · Orca</title>`, a description, a canonical link and a noscript line (15,000 pages); sitemap/robots exist when `SITE_URL` is set. The home page and other routes get nothing of their own.
+- `web/scripts/prerender.mjs` (updated 2026-11-14): fund pages get `<title>{name} 13F holdings and returns · Orca</title>`, a description with the latest quarter, book and top holdings, a canonical link, and real text in the root element (15,000 pages; the 500 largest also get the holdings table); sitemap/robots exist when `SITE_URL` is set. The home page and other routes get nothing of their own.
 - `web/public/` holds only `demo-data`: no logo files.
 
 ## Steps (one session each unless noted)

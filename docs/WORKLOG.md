@@ -1,9 +1,24 @@
 # Worklog
 
-Last verified: 2026-11-13
+Last verified: 2026-11-14
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-14 — SEO: keyword titles, real text in fund pages; logo round 5; popular-funds idea
+
+| What changed | Why | Files |
+|---|---|---|
+| Fund pages: title "{name} 13F holdings and returns · Orca" (one text, `fundTitle()` in `format.ts`, used by prerender and the app, so the tab does not change when the app loads). Home title "Hedge fund holdings and returns from 13F filings · Orca" (`HOME_TITLE`; `index.html` repeats it and cannot import it) and a keyword description | Owner: be found for "13F filings", "hedge fund holdings", "hedge fund positions" (chat) | `web/src/lib/format.ts`, `index.html`, `Fund.tsx`, `Home.tsx`, tests, `e2e/smoke.spec.ts` |
+| Pre-built fund pages now carry real text inside `<div id="root">` (the app replaces it on mount): an h1, a sentence with the latest 13F quarter, filing date, positions, book and Orca's estimated annual return, a table of the ten largest positions at the latest prices (weights, labelled an Orca estimate), and links to the eight funds next in size. The 500 largest funds (`PRERENDER_RICH`, default 500, 0 = off) read `fund/{id}/summary.json`, `securities.json` and `latest_prices.json` from the data site at build time; every other fund, and any fund whose file cannot be read, gets the basic text (name and book) and the build never fails. A bare `PRERENDER_FUNDS` file gets no holdings text. The meta description names the quarter, positions, book and top three tickers. The noscript line is now only the "turn on JavaScript" note | Before, the HTML held one sentence and everything else loaded in the browser, so search engines saw little (code) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` (5 new tests) |
+| `og:site_name` is "OrcaETF.com"; the shell has a JSON-LD `WebSite` block with `alternateName` ["OrcaETF.com", "OrcaETF"]; fund `WebPage` blocks link to it | Owner wants ETF capitalised wherever the domain name is shown. A browser's address bar and Google's URL line always show a domain in lower case; only text we write can use the capitals (chat) | `prerender.mjs` |
+| Logo round 5: five variations of f5 (upright blue fin, head patch moved, blue tile, ink tile), made with the design-superpowers creative skill | Owner asked for variations of f5 (chat) | `docs/superpowers/logo-drafts/round5/` |
+| "Popular funds" tab added to the idea backlog as item 2b | Owner (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
+| Merged `claude/cool-goldberg-izesd8` (7 commits, not yet in `main`) into this branch by fast-forward; PR [#27](https://github.com/Cannibara/Orca/pull/27) opens it into `main` | Owner: PR it so work can build on it (chat) | |
+
+- Checked: 938 web tests, typecheck, a build with `SITE_URL` (a built demo page was read), Playwright smoke. Stock (position) pages `/fund/:id/stock/:stockId` are single-page-app routes: one pre-built file per fund only, because one per fund-stock pair would be millions of files (Pages allows 20,000).
+- Also fixed: the e2e title test expected "Orca" on Home, which was stale after the 2026-11-13 title change; it now expects `HOME_TITLE`.
+- Open: the real-data build has not run (the data site is not reachable from this session): 500 summary fetches add build time, so check the first Web run. Home page HTML is still the empty shell (the app renders its links after load, which Google does run). A "latest quarter" page, a `/funds` directory route, icon files and `og-default.png`, and the owner's Search Console steps are still to do. The owner has not picked a logo.
 
 ## 2026-11-13 — AUM outflow outline heavier; idea backlog spec; SEO plan
 

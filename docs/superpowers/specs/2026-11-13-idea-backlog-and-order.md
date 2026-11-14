@@ -1,6 +1,6 @@
 # Idea backlog: ranking and build order
 
-Last verified: 2026-11-13
+Last verified: 2026-11-14
 Status: proposal. The owner has not approved items 2–12. Item 1 is done.
 Source: owner's idea list (chat, 2026-11-13). Effort: S = 1 LLM session, M = 2–4, L = 1–2 weeks.
 Reads with: `docs/ROADMAP.md` (F1–F5, risks) and `docs/DECISIONS.md`.
@@ -14,6 +14,7 @@ Reads with: `docs/ROADMAP.md` (F1–F5, risks) and `docs/DECISIONS.md`.
 |---|---|---|---|---|
 | 1 | AUM net outflows: orange dashed outline | S | low | Done 2026-11-13. It was already drawn in `web/src/fund/aum.css`; made the dash heavier (1.75px, `4 3`) |
 | 2 | SEO, titles/descriptions, logo | S–M | high | Plan: `docs/superpowers/plans/2026-11-13-seo-and-logo.md` |
+| 2b | "Popular funds" tab on Home, between Top funds and Conviction moves | S–M | high (SEO and reach) | Low-hanging fruit (owner, 2026-11-14). Feeds the long-tail search plan: people search for a named manager ("Berkshire Hathaway holdings"), so the tab lists the well-known funds and links each to its page. "Popular" needs a definition: (a) a hand-kept list of the ~50–100 best-known managers, published as `home/popular.json` (contract first; no analytics needed; recommended), ordered later by Search Console impressions; (b) page views (analytics are off, ROADMAP U5); (c) search volume (external tool). Reuse the Top funds table; every row is a real link so crawlers follow it |
 | 3 | Big winners marked on the AUM chart | S–M | medium | Use top contributing stocks per year (already published). 13F cannot show real investor money into a fund, and "net inflows" here is net buying |
 | 4 | Excel workbook formatting | S–M | low until sold | `pipeline/orca/workbook/`, isolated |
 | 5 | Fund types: super, sovereign wealth, corporates | M | high | 13F has no type field. SIC code of the filer + name rules + a hand-checked list of the top ~300; new field in `funds.json`; home filters |
@@ -27,7 +28,7 @@ Reads with: `docs/ROADMAP.md` (F1–F5, risks) and `docs/DECISIONS.md`.
 | 12 | Clone-able ETF / follow via broker | L+ | high | Biggest legal risk. A real ETF needs an issuer; copy-trading may need an AFSL (AU) or adviser registration (US). Get a legal view first. Safe phase 1: a hypothetical model portfolio, tracked from filing dates, labelled. Backtest needs the survivorship fix from 7 |
 
 ## Build order
-A. Web only: 1, 2, 3.
+A. Web only: 1, 2, 2b, 3.
 B. Classification tables (contract first): 5 and the stock sector map.
 C. Benchmark table, survivorship fix, parallel compute, then 6, then 7.
 D. SEC add-ons: 8a, then 9 (13D/G, N-PORT).

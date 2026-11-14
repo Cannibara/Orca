@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { fundTitle, HOME_TITLE } from "../src/lib/format";
 
 const DEMO = join(import.meta.dirname, "..", "public", "demo-data");
 const readJson = (file: string) => JSON.parse(readFileSync(join(DEMO, file), "utf8"));
@@ -94,17 +95,17 @@ for (const width of widths) {
 // The pre-rendered page lives at dist/fund/{id}/index.html, which is the URL with the trailing slash.
 test("the pre-rendered fund page has the fund's name as its title and its heading", async ({ page }) => {
   await open(page, `/fund/${fundId}/`);
-  await expect(page).toHaveTitle(`${fundName} · Orca`);
+  await expect(page).toHaveTitle(fundTitle(fundName));
   await expect(page.locator("h1")).toHaveText(fundName);
 });
 
 // The pre-rendered title names the fund; moving around inside the app must not leave it behind.
 test("the title follows the route when navigating inside the app", async ({ page }) => {
   await open(page, `/fund/${fundId}/`);
-  await expect(page).toHaveTitle(`${fundName} · Orca`);
+  await expect(page).toHaveTitle(fundTitle(fundName));
   await page.getByRole("link", { name: "Orca home" }).click();
   await expect(page.locator("h1")).toHaveText(/Fund Manager Research/);
-  await expect(page).toHaveTitle("Orca");
+  await expect(page).toHaveTitle(HOME_TITLE);
 });
 
 // Instrument Sans and Geist Mono are variable fonts served from the site (hashed files under
