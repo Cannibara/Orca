@@ -8,6 +8,7 @@ import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import { clearDataCache, priceMap } from "../src/data/api";
 import type { FundsIndex, LatestPrices, Positions, Summary } from "../src/data/types";
+import { fundTitle } from "../src/lib/format";
 import { positionRows, profitablePct } from "../src/lib/live";
 import Fund from "../src/pages/Fund";
 
@@ -167,12 +168,12 @@ describe("Fund page", () => {
       expect(screen.queryByText("Loading…")).toBeNull(); // (the period stepper of Return constituents is an <output>, a status too)
     });
 
-    it("titles the tab '{name} · Orca' once the fund has loaded, not before", async () => {
+    it("titles the tab '{name} 13F holdings and returns · Orca' once the fund has loaded, not before", async () => {
       stubData();
       renderFund();
       expect(document.title).toBe("Orca"); // still loading: the title is left as it was
       await loaded("Kelpwood Capital LP");
-      await waitFor(() => expect(document.title).toBe("Kelpwood Capital LP · Orca"));
+      await waitFor(() => expect(document.title).toBe(fundTitle("Kelpwood Capital LP")));
     });
 
     it("the <h1> is the fund's name and nothing else", async () => {
@@ -653,7 +654,7 @@ describe("Fund page", () => {
         expect(pressedBars()).toEqual(["2025"]);
         expect(within(region("Annual returns")).getByRole("button", { name: "15 years" })).toHaveAttribute("aria-pressed", "true");
         expect(kpiCaption()).toBe(bracketCaption("2014 to 2026 H1"));
-        await waitFor(() => expect(document.title).toBe("Halyard Point Partners · Orca"));
+        await waitFor(() => expect(document.title).toBe(fundTitle("Halyard Point Partners")));
       });
 
       it("moving to a fund that is not found drops the fund that was on screen", async () => {

@@ -78,9 +78,26 @@ All of it is written by every real build, nothing to switch on.
   Other pages get no canonical link. The list in the sitemap changes only when the site is rebuilt, so
   Web needs a run after a data refresh adds funds. Optional, in Google Search Console: add the property
   `https://www.orcaetf.com` and submit `https://www.orcaetf.com/sitemap.xml`.
-- **Link previews** (Slack, X, iMessage…): every page carries Open Graph tags, and with `SITE_URL` the
-  build adds `og:image` = `https://www.orcaetf.com/og-image.png` (1200×630, from `web/public/`, made
-  in `docs/brand/`). Change the card by replacing that file. Previews are cached by each service.
+- **Holdings text in the fund pages**: the build also reads `securities.json`, `latest_prices.json`,
+  `manifest.json` and the `summary.json` of the 500 largest funds from `VITE_DATA_URL` and writes each
+  fund's latest quarter, book, estimated return, ten largest positions and links to neighbouring funds
+  into its HTML; the sitemap's `lastmod` is the manifest's `built` date. The Web run's log says
+  `prerender: holdings text for 500 of 500 fund pages asked for`; a smaller first number means some
+  files could not be read (those pages keep their basic text). `PRERENDER_RICH=0` turns it off.
+- **Link previews** (Slack, X, iMessage…): with `SITE_URL`, every page gets Open Graph tags and
+  `og:image` = `https://www.orcaetf.com/og-default.png` (1200×630, in `web/public/`, made in
+  `docs/brand/`). Change the card by replacing that file. Previews are cached by each service.
+
+### Search Console and Bing (owner, after the first deploy)
+1. search.google.com/search-console > Add property > **Domain** > `orcaetf.com`. Google shows a TXT
+   record: in Cloudflare > DNS > Records > Add record (type TXT, name `@`, the value Google gave) > back in
+   Google, Verify. A Domain property covers www and the bare domain.
+2. Search Console > Sitemaps > enter `https://www.orcaetf.com/sitemap.xml` > Submit.
+3. Search Console > URL inspection > paste `https://www.orcaetf.com/fund/1067983/` > Test live URL > View
+   tested page: the title and text from this section should be there. "Request indexing" works for a few
+   pages a day.
+4. bing.com/webmasters > Import from Google Search Console (one click, after step 1).
+Indexing 15,000 pages takes weeks; Search Console's Pages report shows the progress.
 - **No demo data in production**: with a `VITE_DATA_URL` that is a full address, the fictional demo files
   are removed from the deployed site (they stay in tests and local builds).
 

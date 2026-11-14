@@ -2,7 +2,7 @@
 
 Last verified: 2026-11-14
 
-The official logo (v1.1, approved by the owner 2026-11-14). The website uses the black-and-white mark in its header (`web/src/App.tsx`, the `-16` cut inline), and the favicon files and `og-image.png` copied into `web/public/`. `brand-sheet.png` is the full guide as an image.
+The official logo (v1.1, approved by the owner 2026-11-14). The website uses the black-and-white mark in its header (`web/src/App.tsx`, the `-16` cut inline), and the favicon files copied into `web/public/`; `og-image.png` ships there as `og-default.png`. `brand-sheet.png` is the full guide as an image.
 
 ## Idea
 An orca breaking the surface, built from three shapes, every curve a circular arc:
@@ -25,7 +25,7 @@ An orca breaking the surface, built from three shapes, every curve a circular ar
 | `orca-icon.svg`, `icon-512.png`, `apple-touch-icon.png` | App icon: paper mark on an ink tile (the touch icon is full bleed; iOS rounds it) |
 | `orca-icon-color.svg` | Outline colour mark on a paper tile |
 | `favicon.svg`, `favicon-32.png` | Browser tab; the SVG is ink on light tabs and #F3ECE3 on dark tabs (`prefers-color-scheme`). Also in `web/public/` |
-| `og-image.png` | 1200×630 link-preview card; copied to `web/public/`, and the build adds `og:image` from `SITE_URL` |
+| `og-image.png` | 1200×630 link-preview card; shipped as `web/public/og-default.png`, which the build links as `og:image` when `SITE_URL` is set |
 | `brand-sheet.png` | The guide: primary, colour, lockups, icons, rules |
 
 ## Rules

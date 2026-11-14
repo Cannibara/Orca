@@ -1,8 +1,8 @@
 // Pre-renders one page per fund so a search engine (or a reader without JavaScript) finds the
 // fund's name, a description and its 13F book without running the app: dist/fund/{id}/index.html
-// is dist/index.html with the <title>, the meta description and their Open Graph twins replaced and
-// a <noscript> line added. The app mounts over it as usual. No 404.html is written: Cloudflare Pages
-// then serves index.html for every other path.
+// is dist/index.html with the <title> and meta description replaced and a <noscript> line added.
+// The app mounts over it as usual. dist/index.html itself is left alone, and no 404.html is
+// written: Cloudflare Pages then serves index.html for every other path.
 //
 // It also writes dist/_headers, which Cloudflare Pages applies to every response: the security
 // headers (a Content-Security-Policy that names the data site's origin, so it is made here, from
@@ -17,11 +17,7 @@
 // When SITE_URL (the website's own address) is set it also writes the search-engine files:
 // <link rel="canonical"> in every pre-rendered fund page (and only there: the other routes are one
 // shared index.html, which cannot know its own address), dist/sitemap.xml and dist/robots.txt.
-// It also adds the link-preview image: og:image must be an absolute URL, so the tags for
-// og-image.png (copied from public/) go into dist/index.html and every fund page, with og:url on
-// the fund pages only (for the same reason as the canonical link). This is the one change made to
-// dist/index.html, and it is skipped when dist has no og-image.png. Without SITE_URL none of those
-// exist, and the demo build used by CI and the e2e tests is unchanged.
+// Without it none of those exist, and the demo build used by CI and the e2e tests is unchanged.
 //
 // Run by `npm run build` after `vite build`. Needs Node 22.18 or later (it imports money() from
 // src/lib/format.ts, which Node runs by stripping the types). Environment, read from the process
@@ -34,6 +30,11 @@
 //   PRERENDER_MAX    how many funds to write, largest 13F book first (default 15000): Cloudflare
 //                    Pages allows 20,000 files per deployment and funds.json can list far more
 //                    funds than that. The rest still work as single-page-app routes.
+//   PRERENDER_RICH   how many of those pages (largest book first) also get their latest holdings and
+//                    estimated return written into the HTML, read from the data site's per-fund
+//                    summary.json (default 500; 0 turns it off). The rest get the fund's name and book.
+//                    A file that cannot be read only costs that fund its extra text, never the build.
+//                    The files are read from VITE_DATA_URL even when PRERENDER_FUNDS names the funds file.
 //   SITE_URL         the website's own address, https://www.orcaetf.com (https, no path, no
 //                    trailing slash); unset means no canonical links, sitemap.xml or robots.txt
 //   HSTS_MAX_AGE     seconds of the Strict-Transport-Security header (default 15552000, six
@@ -41,11 +42,16 @@
 // Any problem (no funds.json, a malformed one, a missing index.html) stops the build.
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { money } from "../src/lib/format.ts";
+import { count, fmtDate, fundTitle, money, pct, qLabel, tidyName } from "../src/lib/format.ts";
 import { dataOrigin } from "./dataOrigin.ts";
 import { siteUrl } from "./siteUrl.ts";
 
 const DEFAULT_MAX = 15000;
+const DEFAULT_RICH = 500;
+const RICH_CONCURRENCY = 16;
+const RICH_TIMEOUT_MS = 20_000;
+const TOP_POSITIONS = 10; // rows of the holdings table in a rich page
+const RELATED_FUNDS = 8; // links to the funds next in size, so the pages link to each other
 const WRITE_BATCH = 200;
 const FETCH_TIMEOUT_MS = 60_000;
 
@@ -123,6 +129,12 @@ function parseMax(value) {
   return Number(value);
 }
 
+function parseRich(value) {
+  if (value === undefined || value === "") return DEFAULT_RICH;
+  if (!/^\d+$/.test(value)) fail(`PRERENDER_RICH must be a whole number, not "${value}"`);
+  return Number(value);
+}
+
 function parseHstsMaxAge(value) {
   if (value === undefined || value === "") return DEFAULT_HSTS_MAX_AGE;
   if (!/^\d{1,10}$/.test(value) || Number(value) > MAX_HSTS_MAX_AGE) {
@@ -132,50 +144,177 @@ function parseHstsMaxAge(value) {
   return Number(value);
 }
 
+/** The funds around position `i` of the list (largest book first), `RELATED_FUNDS` of them, not the fund itself. */
+function relatedTo(list, i) {
+  const from = Math.max(0, Math.min(i - RELATED_FUNDS / 2, list.length - RELATED_FUNDS - 1));
+  return list.slice(from, from + RELATED_FUNDS + 1).filter((_, k) => from + k !== i).slice(0, RELATED_FUNDS);
+}
+
 const fundPath = (id) => `/fund/${id}/`;
 
 const TITLE = /<title>[\s\S]*?<\/title>/;
 const DESCRIPTION = /<meta\s+name=["']description["'][^>]*>/i;
-const OG_TITLE = /<meta\s+property=["']og:title["'][^>]*>/i;
-const OG_DESCRIPTION = /<meta\s+property=["']og:description["'][^>]*>/i;
 const BODY_OPEN = /<body[^>]*>/i;
-const HEAD_CLOSE = /\n([ \t]*)<\/head>/i;
-// The link-preview card (docs/brand/og-image.png, copied to public/ and so to dist/).
-const OG_IMAGE = { file: "og-image.png", width: 1200, height: 630, alt: "The Orca logo and the line: Estimated fund returns from SEC 13F filings" };
+
+// The names the site goes by, for search engines (a browser always shows a domain in lower case; text we write can use these capitals).
+const SITE_NAMES = ["OrcaETF.com", "OrcaETF"];
+
+const ROOT_EMPTY = /<div id="root"><\/div>/;
+
+/**
+ * One JSON file of the data site (or of dist, for local data), or null when it cannot be read or is
+ * not JSON: the extra text of a page is optional, so a missing file must never stop the build.
+ */
+async function readData(dist, rel) {
+  const base = (process.env.VITE_DATA_URL ?? "/demo-data").replace(/\/+$/, "");
+  try {
+    if (/^https?:\/\//i.test(base)) {
+      const res = await fetch(`${base}/${rel}`, { signal: AbortSignal.timeout(RICH_TIMEOUT_MS) });
+      return res.ok ? JSON.parse(await res.text()) : null;
+    }
+    return JSON.parse(await readFile(path.join(dist, base, rel), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What a rich page says about a fund, from its summary.json: the latest 13F quarter, the book, the
+ * number of positions, the estimated annual return and the largest positions at the latest prices
+ * (shares x latest close; a stock without a price is left out). null for anything malformed.
+ */
+function richFrom(summary, stocks, prices) {
+  try {
+    const h = summary.holdings_now;
+    if (!Number.isInteger(summary.period_q) || !Array.isArray(h.stock_id) || !Array.isArray(h.shares)) return null;
+    const rows = [];
+    h.stock_id.forEach((id, i) => {
+      const price = prices.get(id);
+      const shares = h.shares[i];
+      if (Number.isFinite(price) && Number.isFinite(shares) && shares > 0) rows.push({ id, shares, value: price * shares });
+    });
+    const total = rows.reduce((sum, r) => sum + r.value, 0);
+    const top = total > 0
+      ? rows.sort((a, b) => b.value - a.value || a.id - b.id).slice(0, TOP_POSITIONS).map((r) => {
+          const stock = stocks.get(r.id);
+          const label = stock?.ticker || tidyName(stock?.name ?? "");
+          return { label: label === "" ? `#${r.id}` : label, name: tidyName(stock?.name ?? ""), weight: r.value / total };
+        })
+      : [];
+    const m = summary.metrics ?? {};
+    return {
+      periodQ: summary.period_q,
+      filed: typeof summary.filed === "string" ? summary.filed : null,
+      book: Number.isFinite(summary.book) ? summary.book : null,
+      n: Number.isInteger(summary.n_holdings) ? summary.n_holdings : null,
+      ann: Number.isFinite(m.ann_return) ? m.ann_return : null,
+      first: Number.isInteger(m.first_year) ? m.first_year : null,
+      last: Number.isInteger(m.last_year) ? m.last_year : null,
+      top,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** The rich text of the first `funds` (already in the order to serve), keyed by fund id; empty when securities or prices cannot be read. */
+async function loadRich(dist, funds) {
+  if (funds.length === 0) return new Map();
+  const [securities, latest] = await Promise.all([readData(dist, "securities.json"), readData(dist, "latest_prices.json")]);
+  if (!securities || !latest || !Array.isArray(securities.stock_id) || !Array.isArray(latest.stock_id)) {
+    console.log("prerender: securities.json or latest_prices.json could not be read: fund pages get no holdings text");
+    return new Map();
+  }
+  const stocks = new Map(securities.stock_id.map((id, i) => [id, { ticker: securities.ticker?.[i] ?? "", name: securities.name?.[i] ?? "" }]));
+  const prices = new Map(latest.stock_id.map((id, i) => [id, latest.price?.[i]]));
+  const out = new Map();
+  let next = 0;
+  const worker = async () => {
+    while (next < funds.length) {
+      const fund = funds[next++];
+      const summary = await readData(dist, `fund/${fund.id}/summary.json`);
+      const rich = summary === null ? null : richFrom(summary, stocks, prices);
+      if (rich !== null) out.set(fund.id, rich);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(RICH_CONCURRENCY, funds.length) }, worker));
+  return out;
+}
+
+/** A sentence for the meta description: at most about 300 characters, cut at a word. */
+function clip(text, max = 300) {
+  return text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+}
+
+/** The text a crawler reads before any script runs: heading, summary, largest positions, links. The app replaces it when it mounts. All values are escaped. */
+function renderStatic(fund, rich, related) {
+  const name = escapeHtml(fund.name);
+  const book = money(fund.book);
+  const intro = rich === null
+    ? `${name} has a 13F book of ${book}.`
+    : `${name} filed its latest 13F for ${qLabel(rich.periodQ)}${rich.filed === null ? "" : ` on ${escapeHtml(fmtDate(rich.filed))}`}.` +
+      `${rich.n === null ? "" : ` It held ${count(rich.n, "position")}`}` +
+      `${rich.n === null ? " Its" : " with a"} 13F book of ${money(rich.book ?? fund.book)}.` +
+      `${rich.ann === null || rich.first === null || rich.last === null ? "" : ` Orca estimates its return at ${pct(rich.ann)} a year from ${rich.first} to ${rich.last}.`}`;
+  const table = rich === null || rich.top.length === 0 ? "" : `
+      <table>
+        <caption>Largest positions at the latest prices (Orca estimate)</caption>
+        <thead><tr><th scope="col">Stock</th><th scope="col">Weight</th></tr></thead>
+        <tbody>${rich.top.map((r) => `<tr><td>${escapeHtml(r.label)}${r.name === "" || r.name === r.label ? "" : ` ${escapeHtml(r.name)}`}</td><td>${pct(r.weight, 1, false)}</td></tr>`).join("")}</tbody>
+      </table>`;
+  const links = related.length === 0 ? "" : `
+      <h2>Other large hedge funds</h2>
+      <ul>${related.map((f) => `<li><a href="${fundPath(f.id)}">${escapeHtml(f.name)}</a></li>`).join("")}</ul>`;
+  return `<main>
+      <h1>${name}: 13F holdings and estimated returns</h1>
+      <p>${intro}</p>${table}
+      <p><a href="/">Orca: hedge fund holdings and returns from 13F filings</a></p>${links}
+    </main>`;
+}
 
 /**
  * The shell's page for one fund. Replacers are functions so a "$&" in a name is copied as typed.
  * `site` is the website's address, or null: the canonical link names this very page (the one with
- * the trailing slash, which is where Pages serves dist/fund/{id}/index.html).
+ * the trailing slash, which is where Pages serves dist/fund/{id}/index.html). `rich` is the fund's
+ * extra text (or null) and `related` the funds linked at the bottom.
  */
-function renderFund(template, fund, site) {
+function renderFund(template, fund, site, image, rich = null, related = []) {
   const name = escapeHtml(fund.name);
-  const canonical = site === null ? "" : `\n    <link rel="canonical" href="${escapeHtml(`${site}${fundPath(fund.id)}`)}" />`;
-  const description = `Estimated returns, P&amp;L and trades for ${name} from 13F filings.`;
-  const noscript = `<noscript><p>${name}: 13F book ${money(fund.book)}. Turn on JavaScript to see estimated returns, P&amp;L and trades from 13F filings.</p></noscript>`;
+  const page = site === null ? null : `${site}${fundPath(fund.id)}`;
+  const canonical = page === null ? "" : `\n    <link rel="canonical" href="${escapeHtml(page)}" />`;
+  const top = rich === null ? [] : rich.top.slice(0, 3).map((r) => r.label);
+  const plain = `${fund.name} 13F holdings, estimated returns and stock-by-stock P&L. 13F book ${money(fund.book)}.`;
+  const detail = rich === null || rich.n === null ? plain
+    : clip(`${fund.name} 13F holdings for ${qLabel(rich.periodQ)}: ${count(rich.n, "position")}, ${money(rich.book ?? fund.book)} book.` +
+        `${top.length === 0 ? "" : ` Top: ${top.join(", ")}.`} Orca estimates its returns and stock-by-stock P&L.`);
+  const description = escapeHtml(detail);
+  const title = escapeHtml(fundTitle(fund.name));
+  const noscript = `<noscript><p>Turn on JavaScript to see ${name}'s charts, full holdings and each stock's estimated profit and loss from 13F filings.</p></noscript>`;
+  const share = shareTags(title, description, page, image);
+  const ld = page === null ? "" : `\n    ${jsonLd({ "@context": "https://schema.org", "@type": "WebPage", name: fund.name, description: detail, url: page, isPartOf: { "@type": "WebSite", name: "Orca", alternateName: SITE_NAMES, url: site } })}`;
   return template
-    .replace(TITLE, () => `<title>${name} · Orca</title>`)
-    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}`)
-    .replace(OG_TITLE, () => `<meta property="og:title" content="${name} · Orca" />`)
-    .replace(OG_DESCRIPTION, () => `<meta property="og:description" content="${description}" />`)
-    .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`);
+    .replace(TITLE, () => `<title>${title}</title>`)
+    .replace(DESCRIPTION, () => `<meta name="description" content="${description}" />${canonical}${share}${ld}`)
+    .replace(BODY_OPEN, (body) => `${body}\n    ${noscript}`)
+    .replace(ROOT_EMPTY, () => `<div id="root">\n    ${renderStatic(fund, rich, related)}\n    </div>`);
 }
 
-/**
- * `html` with the link-preview image tags added at the end of <head>: og:image is absolute, as Open
- * Graph requires, so they exist only with a site address. `url` is the page's own address for
- * og:url, or null for dist/index.html, which is every other route and so has no one address.
- */
-function withPreviewImage(html, site, url) {
+/** Open Graph and Twitter tags. `page` is null for the shared shell (it is every route, so no fixed og:url); `image` is an absolute URL or null. */
+function shareTags(title, description, page, image) {
   const tags = [
-    ...(url === null ? [] : [`<meta property="og:url" content="${escapeHtml(url)}" />`]),
-    `<meta property="og:image" content="${escapeHtml(`${site}/${OG_IMAGE.file}`)}" />`,
-    `<meta property="og:image:width" content="${OG_IMAGE.width}" />`,
-    `<meta property="og:image:height" content="${OG_IMAGE.height}" />`,
-    `<meta property="og:image:alt" content="${escapeHtml(OG_IMAGE.alt)}" />`,
+    ["property", "og:type", "website"],
+    ["property", "og:site_name", "OrcaETF.com"],
+    ["property", "og:title", title],
+    ["property", "og:description", description],
+    ...(page === null ? [] : [["property", "og:url", escapeHtml(page)]]),
+    ...(image === null ? [] : [["property", "og:image", image]]),
+    ["name", "twitter:card", image === null ? "summary" : "summary_large_image"],
   ];
-  return html.replace(HEAD_CLOSE, (_, indent) => `\n${tags.map((t) => `${indent}  ${t}`).join("\n")}\n${indent}</head>`);
+  return tags.map(([k, n, v]) => `\n    <meta ${k}="${n}" content="${v}" />`).join("");
 }
+
+/** A JSON-LD block. "<" is escaped so a fund name can never close the script tag. */
+const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj).replace(/</g, "\\u003c")}</script>`;
 
 /**
  * The text of dist/_headers. `origin` is the data site's origin when the app loads its data from
@@ -220,14 +359,15 @@ https://:version.:project.pages.dev/*
 }
 
 /** dist/sitemap.xml: the home page and the pre-rendered fund pages (sitemaps.org protocol). */
-function renderSitemap(site, funds) {
+function renderSitemap(site, funds, lastmod = null) {
   const urls = [`${site}/`, ...funds.map((f) => `${site}${fundPath(f.id)}`)];
+  const stamp = lastmod === null ? "" : `<lastmod>${lastmod}</lastmod>`;
   if (urls.length > MAX_SITEMAP_URLS) {
     fail(`sitemap.xml would list ${urls.length} URLs and one file may list ${MAX_SITEMAP_URLS}: lower PRERENDER_MAX`);
   }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((url) => `  <url><loc>${escapeHtml(url)}</loc></url>`).join("\n")}
+${urls.map((url) => `  <url><loc>${escapeHtml(url)}</loc>${stamp}</url>`).join("\n")}
 </urlset>
 `;
   const bytes = Buffer.byteLength(xml);
@@ -245,6 +385,7 @@ Sitemap: ${site}/sitemap.xml
 async function main() {
   const dist = path.resolve(process.env.PRERENDER_DIST || "dist");
   const max = parseMax(process.env.PRERENDER_MAX);
+  const richMax = parseRich(process.env.PRERENDER_RICH);
   const origin = dataOrigin(process.env.VITE_DATA_URL);
   const site = siteUrl(process.env.SITE_URL);
   const hsts = parseHstsMaxAge(process.env.HSTS_MAX_AGE);
@@ -257,7 +398,7 @@ async function main() {
   } catch (err) {
     return fail(`cannot read ${indexFile} (${err.code ?? err.message}): run vite build first`);
   }
-  for (const [what, re] of [["<title>", TITLE], ["meta description", DESCRIPTION], ["<body>", BODY_OPEN]]) {
+  for (const [what, re] of [["<title>", TITLE], ["meta description", DESCRIPTION], ["<body>", BODY_OPEN], ['<div id="root"></div>', ROOT_EMPTY]]) {
     if (!re.test(template)) fail(`${indexFile} has no ${what} to replace`);
   }
 
@@ -265,9 +406,25 @@ async function main() {
   const bookOf = (f) => (Number.isFinite(f.book) ? f.book : -Infinity);
   const chosen = [...funds].sort((a, b) => bookOf(b) - bookOf(a) || a.id - b.id).slice(0, max);
   // Made before anything is written, so a sitemap over the limit stops the build early.
-  const sitemap = site === null ? null : renderSitemap(site, chosen);
-  // A preview tag that names a missing image is worse than none.
-  const preview = site !== null && HEAD_CLOSE.test(template) && (await stat(path.join(dist, OG_IMAGE.file)).then((s) => s.isFile(), () => false));
+  // The date the data was last built (manifest.json "built"), when the data site says: every page's content is that old at most.
+  const built = site === null ? null : (await readData(dist, "manifest.json"))?.built;
+  const lastmod = typeof built === "string" && /^\d{4}-\d{2}-\d{2}/.test(built) ? built.slice(0, 10) : null;
+  const sitemap = site === null ? null : renderSitemap(site, chosen, lastmod);
+
+  // The production build reads funds.json from a file (PRERENDER_FUNDS) and still reads the rest from VITE_DATA_URL.
+  const rich = await loadRich(dist, chosen.slice(0, richMax));
+  console.log(`prerender: holdings text for ${rich.size} of ${Math.min(richMax, chosen.length)} fund pages asked for`);
+
+  // The share image is optional: only linked when the file was shipped in public/.
+  const hasImage = await stat(path.join(dist, "og-default.png")).then(() => true, () => false);
+  const image = site !== null && hasImage ? `${site}/og-default.png` : null;
+  if (site !== null) {
+    // The shared shell serves every other route: share tags without a page address.
+    const desc = (template.match(DESCRIPTION)?.[0].match(/content="([^"]*)"/) ?? [])[1] ?? "";
+    const site_ld = jsonLd({ "@context": "https://schema.org", "@type": "WebSite", name: "Orca", alternateName: SITE_NAMES, url: `${site}/` });
+    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags("Orca", desc, null, image)}\n    ${site_ld}`);
+    await writeFile(indexFile, shell);
+  }
 
   await writeFile(path.join(dist, "_headers"), renderHeaders(origin, hsts));
   console.log(`prerender: wrote _headers (data origin: ${origin ?? "the site itself"})`);
@@ -281,18 +438,13 @@ async function main() {
     await writeFile(path.join(dist, "robots.txt"), renderRobots(site));
     console.log(`prerender: wrote sitemap.xml (${sitemap.count} URLs) and robots.txt for ${site}`);
   }
-  if (preview) {
-    await writeFile(indexFile, withPreviewImage(template, site, null));
-    console.log(`prerender: added og:image ${site}/${OG_IMAGE.file} to index.html and the fund pages`);
-  }
 
   for (let i = 0; i < chosen.length; i += WRITE_BATCH) {
     await Promise.all(
-      chosen.slice(i, i + WRITE_BATCH).map(async (fund) => {
+      chosen.slice(i, i + WRITE_BATCH).map(async (fund, j) => {
         const dir = path.join(dist, "fund", String(fund.id));
         await mkdir(dir, { recursive: true });
-        const html = renderFund(template, fund, site);
-        await writeFile(path.join(dir, "index.html"), preview ? withPreviewImage(html, site, `${site}${fundPath(fund.id)}`) : html);
+        await writeFile(path.join(dir, "index.html"), renderFund(template, fund, site, image, rich.get(fund.id) ?? null, relatedTo(chosen, i + j)));
       }),
     );
   }

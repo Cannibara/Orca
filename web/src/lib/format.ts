@@ -61,6 +61,12 @@ export function shareCount(n: number | null): string {
   return (whole < 0 ? MINUS : "") + Math.abs(whole).toLocaleString("en-US");
 }
 
+/** The home page's title (also in index.html, which cannot import this: keep the two equal). */
+export const HOME_TITLE = "Hedge fund holdings and returns from 13F filings · Orca";
+
+/** A fund page's title: the pre-rendered file and the app use this one text, so the tab does not change when the app loads. */
+export const fundTitle = (name: string): string => `${name} 13F holdings and returns · Orca`;
+
 /** Quarter index counted from Q1 2013: 53 → "Q2 2026". */
 export function qLabel(q: number): string {
   return "Q" + ((q % 4) + 1) + " " + (2013 + Math.floor(q / 4));

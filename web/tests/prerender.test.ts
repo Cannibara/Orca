@@ -4,6 +4,7 @@
 import { execFile } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -19,7 +20,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { money } from "../src/lib/format";
+import { fundTitle, money, qLabel } from "../src/lib/format";
+
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // (not `new URL(..., import.meta.url)`: Vite rewrites that into an asset URL)
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,8 +39,6 @@ const TEMPLATE = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="description" content="Orca turns 13F filings into estimated results for the big funds, stock by stock." />
     <title>Orca</title>
-    <meta property="og:title" content="Orca" />
-    <meta property="og:description" content="Orca turns 13F filings into estimated results for the big funds, stock by stock." />
     <script type="module" crossorigin src="/assets/index-abc123.js"></script>
   </head>
   <body>
@@ -127,12 +128,14 @@ describe("prerender: fund pages from demo data", () => {
     expect(pageDirs(dist).sort()).toEqual(demo.id.map(String).sort());
     demo.id.forEach((id, i) => {
       const html = read(page(dist, id));
-      expect(title(html)).toBe(`${demo.name[i]} · Orca`);
+      expect(title(html)).toBe(esc(fundTitle(demo.name[i])));
       expect(description(html)).toBe(
-        `Estimated returns, P&amp;L and trades for ${demo.name[i]} from 13F filings.`,
+        `${esc(demo.name[i])} 13F holdings, estimated returns and stock-by-stock P&amp;L. 13F book ${money(demo.book[i])}.`,
       );
-      expect(noscript(html)).toContain(money(demo.book[i]));
-      expect(noscript(html)).toContain(demo.name[i]);
+      // what a crawler reads before any script runs: a heading and the book, inside the root element
+      expect(html).toContain(`<h1>${esc(demo.name[i])}: 13F holdings and estimated returns</h1>`);
+      expect(html).toContain(money(demo.book[i]));
+      expect(noscript(html)).toContain("Turn on JavaScript");
     });
   });
 
@@ -144,7 +147,7 @@ describe("prerender: fund pages from demo data", () => {
     expect(html.match(/<meta name="description"/g)).toHaveLength(1);
     expect(html.match(/<noscript>/g)).toHaveLength(1);
     expect(html).toContain('<script type="module" crossorigin src="/assets/index-abc123.js"></script>');
-    expect(html).toContain('<div id="root"></div>');
+    expect(html).toMatch(/<div id="root">\s*<main>[\s\S]*<\/main>\s*<\/div>/);
   });
 
   it("leaves dist/index.html alone and writes no 404.html (Pages' SPA fallback must stay on)", async () => {
@@ -479,10 +482,38 @@ describe("prerender: SITE_URL, canonical links, sitemap.xml and robots.txt", () 
     }
   });
 
-  it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them (no og-image.png here, so it is untouched)", async () => {
+  it("adds share tags and JSON-LD to fund pages, and share tags without og:url to the shell; the image only when it was shipped", async () => {
+    const dist = makeDist();
+    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE })).code).toBe(0);
+    for (const id of demo.id) {
+      const html = read(page(dist, id));
+      expect(html).toContain(`<meta property="og:url" content="${SITE}/fund/${id}/" />`);
+      expect(html.match(/<meta property="og:title"/g)).toHaveLength(1);
+      expect(html).toContain('<meta name="twitter:card" content="summary" />');
+      expect(html).not.toContain("og:image");
+      const ld = html.match(/<script type="application\/ld\+json">([^<]*)<\/script>/);
+      expect(JSON.parse(ld![1]).url).toBe(`${SITE}/fund/${id}/`);
+    }
+    const shell = read(join(dist, "index.html"));
+    expect(shell).toContain('<meta property="og:title" content="Orca" />');
+    expect(shell).not.toContain("og:url");
+
+    const withImage = makeDist();
+    writeFileSync(join(withImage, "og-default.png"), "png");
+    expect((await run(withImage, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE })).code).toBe(0);
+    expect(read(page(withImage, demo.id[0]))).toContain(`<meta property="og:image" content="${SITE}/og-default.png" />`);
+    expect(read(page(withImage, demo.id[0]))).toContain('content="summary_large_image"');
+  });
+
+  it("leaves dist/index.html without a canonical: it is every other route, and a fixed one would be wrong for all of them", async () => {
     const dist = makeDist();
     await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
-    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
+    const shell = read(join(dist, "index.html"));
+    expect(shell).not.toContain("canonical");
+    expect(shell.replace(/\n    <meta (property|name)="(og|twitter):[^>]*>/g, "").replace(/\n    <script type="application\/ld\+json">[^<]*<\/script>/, "")).toBe(TEMPLATE);
+    // the site's own names, with the capitals the owner wants, for search engines
+    expect(shell).toContain('<meta property="og:site_name" content="OrcaETF.com" />');
+    expect(shell).toContain('"alternateName":["OrcaETF.com","OrcaETF"]');
   });
 
   it("writes sitemap.xml: the XML declaration, the sitemap namespace, the home page and each fund page", async () => {
@@ -638,6 +669,78 @@ describe("prerender: a malformed VITE_DATA_URL never reaches a header", () => {
   });
 });
 
+describe("prerender: holdings text in the page (rich pages)", () => {
+  const DEMO_DATA = join(ROOT, "public", "demo-data");
+  const SITE = "https://www.orcaetf.com";
+
+  /** A dist whose demo-data folder holds the demo funds, securities, prices and summaries. */
+  function distWithDemoData(): string {
+    const dist = makeDist();
+    cpSync(DEMO_DATA, join(dist, "demo-data"), { recursive: true });
+    return dist;
+  }
+
+  it("writes the quarter, the book, the estimated return and the largest positions into the HTML", async () => {
+    const dist = distWithDemoData();
+    const r = await run(dist, { SITE_URL: SITE });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`holdings text for ${demo.id.length} of ${demo.id.length}`);
+
+    const id = demo.id[0];
+    const summary = JSON.parse(readFileSync(join(DEMO_DATA, "fund", String(id), "summary.json"), "utf8"));
+    const html = read(page(dist, id));
+    expect(html).toContain(`filed its latest 13F for ${qLabel(summary.period_q)}`);
+    expect(html).toContain(`It held ${summary.n_holdings.toLocaleString("en-US")} position`);
+    expect(html).toContain("Orca estimates its return at");
+    expect(html).toContain("<caption>Largest positions at the latest prices (Orca estimate)</caption>");
+    const rows = html.match(/<tr><td>/g) ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThanOrEqual(10);
+    expect(description(html)).toContain(`13F holdings for ${qLabel(summary.period_q)}`);
+    expect(description(html)).toContain("Top: ");
+    expect(description(html)!.length).toBeLessThanOrEqual(320);
+    // no CUSIP-like token anywhere on the page
+    expect(html).not.toMatch(/\b[0-9A-Z]{8}[0-9]\b(?=[^<]*<\/td>)/);
+  });
+
+  it("links to the next funds by size, never to the fund itself", async () => {
+    const dist = distWithDemoData();
+    await run(dist, { SITE_URL: SITE });
+    for (const id of demo.id) {
+      const html = read(page(dist, id));
+      const links = [...html.matchAll(/<li><a href="\/fund\/(\d+)\/">/g)].map((m) => Number(m[1]));
+      expect(links.length).toBe(Math.min(8, demo.id.length - 1));
+      expect(links).not.toContain(id);
+      expect(new Set(links).size).toBe(links.length);
+    }
+  });
+
+  it("PRERENDER_RICH=0 leaves every page with the name and the book only", async () => {
+    const dist = distWithDemoData();
+    await run(dist, { PRERENDER_RICH: "0" });
+    const html = read(page(dist, demo.id[0]));
+    expect(html).not.toContain("<caption>");
+    expect(html).toContain("has a 13F book of");
+  });
+
+  it("a fund whose summary is missing or broken keeps the basic page, and the build still succeeds", async () => {
+    const dist = distWithDemoData();
+    rmSync(join(dist, "demo-data", "fund", String(demo.id[1]), "summary.json"));
+    writeFileSync(join(dist, "demo-data", "fund", String(demo.id[2]), "summary.json"), "{not json");
+    const r = await run(dist, {});
+    expect(r.code).toBe(0);
+    expect(read(page(dist, demo.id[1]))).toContain("has a 13F book of");
+    expect(read(page(dist, demo.id[2]))).toContain("has a 13F book of");
+    expect(read(page(dist, demo.id[0]))).toContain("<caption>");
+  });
+
+  it("rejects a PRERENDER_RICH that is not a whole number", async () => {
+    const r = await run(makeDist(), { PRERENDER_FUNDS: DEMO_FUNDS, PRERENDER_RICH: "many" });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('PRERENDER_RICH must be a whole number, not "many"');
+  });
+});
+
 describe("prerender: escaping", () => {
   it("escapes fund names in the title, description and noscript, and copies $-sequences literally", async () => {
     const hostile = `A&B <script>alert("x")</script> 'q' $& $' $1 Fund`;
@@ -650,10 +753,11 @@ describe("prerender: escaping", () => {
     expect(html).not.toContain("<script>alert");
     expect(html).not.toContain('"x"');
     const escaped = `A&amp;B &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &#39;q&#39; $&amp; $&#39; $1 Fund`;
-    expect(title(html)).toBe(`${escaped} · Orca`);
-    expect(description(html)).toBe(`Estimated returns, P&amp;L and trades for ${escaped} from 13F filings.`);
+    expect(title(html)).toBe(`${escaped} 13F holdings and returns · Orca`);
+    expect(description(html)).toBe(`${escaped} 13F holdings, estimated returns and stock-by-stock P&amp;L. 13F book $2.50B.`);
     expect(noscript(html)).toContain(escaped);
-    expect(noscript(html)).toContain("$2.50B");
+    expect(html).toContain(`<h1>${escaped}: 13F holdings and estimated returns</h1>`);
+    expect(html).toContain("$2.50B");
   });
 });
 
@@ -737,7 +841,8 @@ describe("prerender: where the funds come from", () => {
     const dist = makeDist();
     const r = await run(dist, { VITE_DATA_URL: `${base}/site/` });
     expect(r.code).toBe(0);
-    expect(requested).toEqual(["/site/funds.json"]);
+    // funds.json, then the two shared files the holdings text needs (404 here: the pages go without it)
+    expect(requested).toEqual(["/site/funds.json", "/site/securities.json", "/site/latest_prices.json"]);
     expect(pageDirs(dist)).toHaveLength(demo.id.length);
   });
 
@@ -747,8 +852,36 @@ describe("prerender: where the funds come from", () => {
     const funds = writeFunds({ v: 1, id: [42], name: ["Only Fund"], book: [1e9], n: [1] });
     const r = await run(dist, { PRERENDER_FUNDS: funds, VITE_DATA_URL: base });
     expect(r.code).toBe(0);
-    expect(requested).toEqual([]);
+    // the funds come from the file (funds.json is never asked for); only the optional holdings files are tried
+    expect(requested).not.toContain("/funds.json");
+    expect(requested.sort()).toEqual(["/latest_prices.json", "/securities.json"]);
     expect(pageDirs(dist)).toEqual(["42"]);
+  });
+
+  it("the production shape: funds from a file, holdings text and the sitemap date from the data site", async () => {
+    const DATA = join(ROOT, "public", "demo-data");
+    const files = new Map<string, unknown>(
+      ["securities.json", "latest_prices.json", "manifest.json"].map((f) => [`/${f}`, JSON.parse(readFileSync(join(DATA, f), "utf8"))]),
+    );
+    for (const id of demo.id) files.set(`/fund/${id}/summary.json`, JSON.parse(readFileSync(join(DATA, "fund", String(id), "summary.json"), "utf8")));
+    const requested: string[] = [];
+    const server = createServer((req, res) => {
+      requested.push(req.url ?? "");
+      const body = files.get(req.url ?? "");
+      res.writeHead(body === undefined ? 404 : 200, { "content-type": "application/json" });
+      res.end(JSON.stringify(body ?? {}));
+    });
+    servers.push(server);
+    await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    const dist = makeDist();
+    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, VITE_DATA_URL: base, SITE_URL: "https://www.orcaetf.com" });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`holdings text for ${demo.id.length} of ${demo.id.length}`);
+    expect(read(page(dist, demo.id[0]))).toContain("<caption>Largest positions at the latest prices (Orca estimate)</caption>");
+    expect(read(join(dist, "sitemap.xml"))).toContain("<lastmod>2026-10-30</lastmod>");
+    expect(requested).not.toContain("/funds.json");
   });
 });
 
@@ -818,76 +951,5 @@ describe("prerender: fails loudly", () => {
     expect(r.code).not.toBe(0);
     expect(r.stderr).toContain("404");
     expect(pageDirs(dist)).toEqual([]);
-  });
-});
-
-describe("prerender: link previews (Open Graph)", () => {
-  const SITE = "https://www.orcaetf.com";
-  const meta = (html: string, prop: string) => [...html.matchAll(new RegExp(`<meta property="${prop}" content="([^"]*)" />`, "g"))].map((m) => m[1]);
-  /** A dist with index.html and the preview image Vite copies from public/. */
-  const distWithImage = () => {
-    const dist = makeDist();
-    copyFileSync(join(ROOT, "public", "og-image.png"), join(dist, "og-image.png"));
-    return dist;
-  };
-
-  it("gives each fund page its own og:title and og:description, like <title> and the meta description", async () => {
-    const dist = makeDist();
-    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS })).code).toBe(0);
-    demo.id.forEach((id, i) => {
-      const html = read(page(dist, id));
-      expect(meta(html, "og:title")).toEqual([`${demo.name[i]} · Orca`]);
-      expect(meta(html, "og:description")).toEqual([description(html)]);
-    });
-  });
-
-  it("with SITE_URL: the absolute og:image in index.html (no og:url: it is every route), and og:url plus og:image in each fund page", async () => {
-    const dist = distWithImage();
-    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
-    expect(r.code).toBe(0);
-    expect(r.stdout).toContain(`og:image ${SITE}/og-image.png`);
-
-    const index = read(join(dist, "index.html"));
-    expect(meta(index, "og:image")).toEqual([`${SITE}/og-image.png`]);
-    expect(meta(index, "og:image:width")).toEqual(["1200"]);
-    expect(meta(index, "og:image:height")).toEqual(["630"]);
-    expect(meta(index, "og:image:alt")).toHaveLength(1);
-    expect(meta(index, "og:url")).toEqual([]);
-    expect(index).not.toContain("canonical");
-    // the tags close the head; the rest of the page is what Vite wrote
-    expect(index.indexOf("og:image")).toBeLessThan(index.indexOf("</head>"));
-    expect(index.replace(/\n\s*<meta property="og:(image|url)[^\n]*/g, "")).toBe(TEMPLATE);
-
-    for (const id of demo.id) {
-      const html = read(page(dist, id));
-      expect(meta(html, "og:url"), String(id)).toEqual([`${SITE}/fund/${id}/`]);
-      expect(meta(html, "og:image"), String(id)).toEqual([`${SITE}/og-image.png`]);
-      expect(html.indexOf("og:image")).toBeLessThan(html.indexOf("</head>"));
-    }
-  });
-
-  it("without SITE_URL there is no og:image or og:url anywhere, even with the image in dist", async () => {
-    const dist = distWithImage();
-    expect((await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS })).code).toBe(0);
-    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
-    for (const id of demo.id) {
-      expect(meta(read(page(dist, id)), "og:image")).toEqual([]);
-      expect(meta(read(page(dist, id)), "og:url")).toEqual([]);
-    }
-  });
-
-  it("with SITE_URL but no og-image.png in dist, no tag names the missing image", async () => {
-    const dist = makeDist();
-    const r = await run(dist, { PRERENDER_FUNDS: DEMO_FUNDS, SITE_URL: SITE });
-    expect(r.code).toBe(0);
-    expect(read(join(dist, "index.html"))).toBe(TEMPLATE);
-    for (const id of demo.id) expect(meta(read(page(dist, id)), "og:image")).toEqual([]);
-    expect(r.stdout).not.toContain("og:image");
-  });
-
-  it("the image is the 1200×630 PNG the tags announce", () => {
-    const png = readFileSync(join(ROOT, "public", "og-image.png"));
-    expect(png.subarray(1, 4).toString("latin1")).toBe("PNG");
-    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
   });
 });

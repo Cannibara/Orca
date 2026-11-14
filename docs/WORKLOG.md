@@ -14,8 +14,43 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Website: the header shows the new mark (inline `-16` cut, `currentColor`, so it follows the theme) in place of the placeholder rounded square. The data-URI favicon is replaced by `/favicon.svg` (ink on light tabs, light on dark tabs), `/favicon-32.png` and `/apple-touch-icon.png`. CSP unchanged (`img-src 'self'`) | Owner: change it on the website (chat) | `web/src/App.tsx`, `web/index.html`, `web/public/` |
 | Checked: typecheck, 932 unit tests, build (icons in dist and in the pre-rendered fund pages), 44 Playwright smoke tests, icons served 200 by `vite preview` | | |
 | Colour version redrawn as outlines: blue body line, orange eye line (4 units on the 96 grid, round joins; #5BA3CE / #F48D60 on dark). Minimum size 32 px | Owner: "orange outline eyes, and blue outline body" (chat) | `docs/brand/orca-*-color*.svg`, README, brand-sheet.png |
-| Link previews: `index.html` has og:type / site_name / title / description and `twitter:card`. With `SITE_URL` and `og-image.png` in dist, `prerender.mjs` adds the absolute `og:image` (+ width, height, alt) to `index.html` and every fund page, and `og:url` (= canonical) to fund pages only; fund pages also get their own og:title / og:description. This is the first change prerender makes to `dist/index.html` | Owner: wire in the OG image (chat) | `web/index.html`, `web/public/og-image.png`, `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` (+5 tests), ARCHITECTURE, domain runbook, PRODUCT |
-| Checked: typecheck, 937 unit tests, 44 Playwright smoke tests; a build with `SITE_URL=https://www.orcaetf.com` writes the tags as above | | |
+| Link previews: the logo card (`docs/brand/og-image.png`) ships as `web/public/og-default.png`, the file `main`'s prerender already looks for: with `SITE_URL` it adds `og:image` and `twitter:card` summary_large_image to the shell and every fund page. This branch's own og-tag code in `prerender.mjs` and its static og tags in `index.html` were dropped when merging `main` (#28), which had built the same thing | Owner: wire in the OG image (chat) | `web/public/og-default.png` |
+| Checked after merging `main`: see the line below the table | | |
+- Checked after the merge: typecheck, web unit tests, Playwright smoke, and a `SITE_URL` build whose fund page has `og:image` = `…/og-default.png`.
+
+## 2026-11-14 — SEO: keyword titles, real text in fund pages; logo round 5; popular-funds idea
+
+| What changed | Why | Files |
+|---|---|---|
+| Fund pages: title "{name} 13F holdings and returns · Orca" (one text, `fundTitle()` in `format.ts`, used by prerender and the app, so the tab does not change when the app loads). Home title "Hedge fund holdings and returns from 13F filings · Orca" (`HOME_TITLE`; `index.html` repeats it and cannot import it) and a keyword description | Owner: be found for "13F filings", "hedge fund holdings", "hedge fund positions" (chat) | `web/src/lib/format.ts`, `index.html`, `Fund.tsx`, `Home.tsx`, tests, `e2e/smoke.spec.ts` |
+| Pre-built fund pages now carry real text inside `<div id="root">` (the app replaces it on mount): an h1, a sentence with the latest 13F quarter, filing date, positions, book and Orca's estimated annual return, a table of the ten largest positions at the latest prices (weights, labelled an Orca estimate), and links to the eight funds next in size. The 500 largest funds (`PRERENDER_RICH`, default 500, 0 = off) read `fund/{id}/summary.json`, `securities.json` and `latest_prices.json` from the data site at build time; every other fund, and any fund whose file cannot be read, gets the basic text (name and book) and the build never fails. A bare `PRERENDER_FUNDS` file gets no holdings text. The meta description names the quarter, positions, book and top three tickers. The noscript line is now only the "turn on JavaScript" note | Before, the HTML held one sentence and everything else loaded in the browser, so search engines saw little (code) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` (5 new tests) |
+| `og:site_name` is "OrcaETF.com"; the shell has a JSON-LD `WebSite` block with `alternateName` ["OrcaETF.com", "OrcaETF"]; fund `WebPage` blocks link to it | Owner wants ETF capitalised wherever the domain name is shown. A browser's address bar and Google's URL line always show a domain in lower case; only text we write can use the capitals (chat) | `prerender.mjs` |
+| Logo round 5: five variations of f5 (upright blue fin, head patch moved, blue tile, ink tile), made with the design-superpowers creative skill | Owner asked for variations of f5 (chat) | `docs/superpowers/logo-drafts/round5/` |
+| "Popular funds" tab added to the idea backlog as item 2b | Owner (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
+| Merged `claude/cool-goldberg-izesd8` (7 commits, not yet in `main`) into this branch by fast-forward; PR [#27](https://github.com/Cannibara/Orca/pull/27) opens it into `main` | Owner: PR it so work can build on it (chat) | |
+
+- Checked: 938 web tests, typecheck, a build with `SITE_URL` (a built demo page was read), Playwright smoke. Stock (position) pages `/fund/:id/stock/:stockId` are single-page-app routes: one pre-built file per fund only, because one per fund-stock pair would be millions of files (Pages allows 20,000).
+- Same day, second pass: the production Web build passes `PRERENDER_FUNDS` (the curl'd funds.json), and the first version of the holdings text skipped itself in that case, so it would not have appeared live. It now reads the other files from `VITE_DATA_URL` whatever supplies the fund list (test: "the production shape"). The sitemap gets `lastmod` (manifest `built`). Playwright now reads the raw pre-built fund file and the home head. Owner steps for Search Console and Bing are in `docs/domain-and-data-hosting.md`.
+- Also fixed: the e2e title test expected "Orca" on Home, which was stale after the 2026-11-13 title change; it now expects `HOME_TITLE`.
+- Open: the real-data build has not run (the data site is not reachable from this session): 500 summary fetches add build time, so check the first Web run. Home page HTML is still the empty shell (the app renders its links after load, which Google does run). A "latest quarter" page, a `/funds` directory route, icon files and `og-default.png`, and the owner's Search Console steps are still to do. The owner has not picked a logo.
+
+## 2026-11-13 — AUM outflow outline heavier; idea backlog spec; SEO plan
+
+| What changed | Why | Files |
+|---|---|---|
+| AUM net outflows were already an orange dashed outline (no fill). The outline is now 1.75px with dashes `4 3` (was 1.25px, `3 3`), and the legend swatch border is 2px. Checked in the browser on demo funds 9100001–9100003; 932 web tests pass | Owner: outflows must be an orange dashed outline (chat) | `web/src/fund/aum.css` |
+| New short spec ranking the owner's 12 ideas by effort and value, with build order | Owner asked for a spec in the repo (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
+| New plan for SEO and logo (not built) | Owner (chat) | `docs/superpowers/plans/2026-11-13-seo-and-logo.md` |
+| Owner says Tiingo is now a commercial licence. Tiingo's docs say that tier is still internal-use only, so it needs confirming in writing that it covers showing prices on the site. ROADMAP L1 stays open until then | | |
+
+## 2026-11-13 — SEO started; logo drafts; database decision
+
+| What changed | Why | Files |
+|---|---|---|
+| Home title is "Hedge fund search and holdings" with a new description (index.html and `useTitle` on Home) | SEO plan step 1, draft copy for the owner to edit (chat) | `web/index.html`, `web/src/pages/Home.tsx`, `web/tests/app.test.tsx` |
+| With `SITE_URL` set, prerender adds Open Graph and Twitter tags to every fund page and to the shared shell (the shell has no `og:url`, since it serves every route), plus JSON-LD on fund pages (`<` escaped). `og:image` and `summary_large_image` appear only when `og-default.png` is in the build, so no broken image link | SEO plan steps 3–4 | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts` |
+| Five draft logos and a preview sheet, made by one design agent. Recommended C (fluke on blue), second A (the current mark made bolder). Not wired into the site | Owner asked for low-effort drafts (chat) | `docs/superpowers/logo-drafts/` |
+| Spec gained a "when to add a database" decision | Owner (chat) | `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md` |
 
 ## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
 

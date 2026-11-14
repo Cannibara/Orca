@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { MemoryRouter } from "react-router-dom";
 import App from "../src/App";
 import { clearDataCache } from "../src/data/api";
+import { fundTitle, HOME_TITLE } from "../src/lib/format";
 
 // The whole app on a MemoryRouter, with the demo files served through a mocked fetch.
 const DEMO = join(dirname(fileURLToPath(import.meta.url)), "../public/demo-data");
@@ -34,7 +35,7 @@ const STOCK = 2; // NVDA in that fund
 
 beforeEach(() => {
   clearDataCache();
-  document.title = "Kelpwood Capital LP · Orca"; // what a pre-rendered fund page ships with
+  document.title = fundTitle("Kelpwood Capital LP"); // what a pre-rendered fund page ships with
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,7 +45,7 @@ describe("page title follows the route", () => {
     stubData();
     renderApp("/");
     await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
-    await waitFor(() => expect(document.title).toBe("Orca"));
+    await waitFor(() => expect(document.title).toBe(HOME_TITLE));
   });
 
   it("names the fund on its page, and goes back to Orca on the way home", async () => {
@@ -53,11 +54,11 @@ describe("page title follows the route", () => {
     document.title = "Orca";
     renderApp(`/fund/${FUND}`);
     await screen.findByRole("heading", { level: 1, name: "Kelpwood Capital LP" });
-    await waitFor(() => expect(document.title).toBe("Kelpwood Capital LP · Orca"));
+    await waitFor(() => expect(document.title).toBe(fundTitle("Kelpwood Capital LP")));
 
     await user.click(screen.getByRole("link", { name: "Orca home" }));
     await screen.findByRole("heading", { level: 1, name: /Fund Manager Research/ });
-    await waitFor(() => expect(document.title).toBe("Orca"));
+    await waitFor(() => expect(document.title).toBe(HOME_TITLE));
   });
 
   it("names the stock and the fund on a position page", async () => {
