@@ -5,6 +5,13 @@ Last verified: 2026-11-11
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-14 — Logo proposal ("Lune")
+
+| What changed | Why | Files |
+|---|---|---|
+| New logo kit: an orca mark built from a crescent body, blade fin and lens eye patch (true arcs), a 16 px variant, horizontal and stacked lockups (outlined Instrument Sans 600), an ocean app icon, an adaptive favicon.svg, PNG icons, an OG image and a brand sheet. Three design directions (geometric orca, orca × zero line, wordmark-first) gave six finalists. Lune was chosen after each finalist was placed in the real 56 px header | Owner asked for a professional logo from the website alone, without the earlier explorations under `docs/superpowers` (chat) | `docs/brand/` (new) |
+| Not wired in: the header (`web/src/App.tsx`) and favicon (`web/index.html`) still show the placeholder until the owner approves | | |
+
 ## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
 
 | What changed | Why | Files |
