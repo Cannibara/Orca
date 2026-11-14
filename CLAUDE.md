@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-11
+Last verified: 2026-11-14
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -19,6 +19,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | "Why is it like this?" | `docs/DECISIONS.md`, then `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md` (rulings R1–R33) |
 | Domain, DNS, cache, CORS, secrets/variables, rollback | `docs/domain-and-data-hosting.md` (owner runbook) |
 | What happened recently, open issues | `docs/WORKLOG.md` |
+| The logo, favicon or app icons | `docs/brand/README.md` (files, colours, rules; `brand-sheet.png` is the guide) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
@@ -43,7 +44,7 @@ web/scripts/         prerender.mjs (fund pages, _headers, sitemap/robots), dataO
 web/tests/, web/e2e/ vitest suites; Playwright smoke (1280/400 px, light/dark)
 web/public/demo-data synthetic demo data (funds 9100001–9100012) used by dev, tests and CI
 .github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, site-cors.yml, purge-cache.yml
-docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, superpowers/ (spec, plans, rulings)
+docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, brand/ (logo kit), superpowers/ (spec, plans, rulings)
 ```
 
 ## Commands

@@ -2,30 +2,34 @@
 
 Last verified: 2026-11-14
 
-Proposed logo. Not wired into the site yet: the header in `web/src/App.tsx` and the favicon in `web/index.html` still use the placeholder.
+The official logo (v1.1, approved by the owner 2026-11-14). The website uses the black-and-white mark in its header (`web/src/App.tsx`, the `-16` cut inline) and the favicon files copied into `web/public/`. `brand-sheet.png` is the full guide as an image.
 
 ## Idea
-An orca breaking the surface, built from three shapes, all drawn with true circular arcs:
-- **Crescent body**: circle C1 minus a larger circle C2. Its two horns are the tail and the jaw, and the hollow arc reads as the white belly.
-- **Blade fin**: two arcs, a convex leading edge and a slightly concave trailing edge.
-- **Lens eye patch**: a symmetric lens.
+An orca breaking the surface, built from three shapes, every curve a circular arc:
+- **Crescent body**: circle C1 minus a larger circle C2. The two horns are the tail and the jaw; the hollow arc reads as the white belly.
+- **Short fin**: wide and swept back, with a rounded tip. Its front edge is a convex arc and its back edge a concave arc.
+- **Lens eye patch**: a cut-out, so it shows whatever ground the mark sits on.
 
-The fin tip and both horns share one fillet (r 0.76 on the 96 grid). The tall fin and the eye patch make it an orca, not a generic whale. The mark is one colour first. It matches the site's ink/paper tokens and Instrument Sans 600 wordmark.
+## Versions
+- **Primary, black and white**: ink #1B1916 on paper, or #F3ECE3 on ink. This is the logo.
+- **Colour**: the body is gain blue #267CAA and the eye patch loss orange #D4561F (#F48D60 on dark grounds), the same pair the site uses for positive and negative returns. Use it where the logo can be louder (social card, slides). Never swap the two colours or add a third.
 
 ## Files
 | File | Use |
 |---|---|
-| `orca-mark.svg` | Symbol, `currentColor`, 96 box. Above 24 px |
-| `orca-mark-16.svg` | Same silhouette, larger eye patch. 24 px and below (header 22 px, favicon) |
+| `orca-mark.svg` | Primary mark, `currentColor`, 96 box. Above 24 px |
+| `orca-mark-16.svg` | Same mark with a larger eye patch. 24 px and below (site header, favicon) |
+| `orca-mark-color.svg` / `orca-mark-color-dark.svg` | Colour mark for light / dark grounds |
 | `orca-lockup.svg` / `orca-lockup-stacked.svg` | Mark + outlined Instrument Sans 600 "Orca" (−0.02em), `currentColor` |
-| `orca-icon.svg`, `icon-512.png` | App tile: ocean #267CAA, ink orca, paper eye patch |
-| `favicon.svg` | 32 grid; ink on light tabs, #F3ECE3 on dark tabs (`prefers-color-scheme`) |
-| `favicon-32.png`, `apple-touch-icon.png` | Raster fallbacks (blue tile; the touch icon is full-bleed, iOS rounds it) |
-| `og-image.png` | 1200×630 social card |
-| `brand-sheet.png` | Construction, clear space, minimum sizes, colourways, don'ts |
+| `orca-lockup-color.svg`, `orca-lockup-color-dark.svg`, `orca-lockup-stacked-color.svg`, `orca-lockup-stacked-color-dark.svg` | Colour lockups (the name stays `currentColor`) |
+| `orca-icon.svg`, `icon-512.png`, `apple-touch-icon.png` | App icon: paper mark on an ink tile (the touch icon is full bleed; iOS rounds it) |
+| `orca-icon-color.svg` | Colour mark on a paper tile |
+| `favicon.svg`, `favicon-32.png` | Browser tab; the SVG is ink on light tabs and #F3ECE3 on dark tabs (`prefers-color-scheme`). Also in `web/public/` |
+| `og-image.png` | 1200×630 social card (not yet referenced by the site: needs absolute `og:` URLs) |
+| `brand-sheet.png` | The guide: primary, colour, lockups, icons, rules |
 
 ## Rules
 - **Clear space:** 1X on every side, where X is the eye-patch length (about a quarter of the mark's height).
-- **Minimum size:** the mark is 16 px (use the `-16` file at 24 px and below). The horizontal lockup is at least 56 px wide, the stacked lockup at least 40 px.
-- **Colour:** ink #1B1916 on paper, or #F3ECE3 on ink. Ocean blue is only ever the icon field, never the orca itself.
-- **Don't:** stretch, rotate, outline, recolour outside the palette, or re-set the wordmark in live text.
+- **Minimum size:** mark 16 px (use the `-16` file up to 24 px); horizontal lockup 56 px wide; stacked lockup 40 px wide.
+- **Don't:** stretch, rotate, outline, recolour beyond the two versions above, or re-set the name in live text.
+- `favicon.svg` carries its own `<style>`; never paste it inline into an HTML page, where that style would apply to the whole page.

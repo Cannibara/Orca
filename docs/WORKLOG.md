@@ -1,16 +1,19 @@
 # Worklog
 
-Last verified: 2026-11-11
+Last verified: 2026-11-14
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-14 — Logo proposal ("Lune")
+## 2026-11-14 — Official logo ("Lune", v1.1) on the site
 
 | What changed | Why | Files |
 |---|---|---|
-| New logo kit: an orca mark built from a crescent body, blade fin and lens eye patch (true arcs), a 16 px variant, horizontal and stacked lockups (outlined Instrument Sans 600), an ocean app icon, an adaptive favicon.svg, PNG icons, an OG image and a brand sheet. Three design directions (geometric orca, orca × zero line, wordmark-first) gave six finalists. Lune was chosen after each finalist was placed in the real 56 px header | Owner asked for a professional logo from the website alone, without the earlier explorations under `docs/superpowers` (chat) | `docs/brand/` (new) |
-| Not wired in: the header (`web/src/App.tsx`) and favicon (`web/index.html`) still show the placeholder until the owner approves | | |
+| Logo made official: Lune with a short, wide, swept-back fin (was a tall blade) | Owner chose Lune after a round comparing it with Surface and Zero-line O, and asked for a stubbier, more orca-like fin (chat) | `docs/brand/` |
+| Black and white is the primary logo. New colour version: body in gain blue #267CAA, eye patch in loss orange #D4561F (#F48D60 on dark), with colour lockups. App icon is now the paper mark on an ink tile, plus a colour icon on paper | Owner: a version in the site's positive/negative colours, black and white as the main logo (chat) | `docs/brand/` (README, SVGs, PNGs, brand-sheet.png) |
+| Website: the header shows the new mark (inline `-16` cut, `currentColor`, so it follows the theme) in place of the placeholder rounded square. The data-URI favicon is replaced by `/favicon.svg` (ink on light tabs, light on dark tabs), `/favicon-32.png` and `/apple-touch-icon.png`. CSP unchanged (`img-src 'self'`) | Owner: change it on the website (chat) | `web/src/App.tsx`, `web/index.html`, `web/public/` |
+| Checked: typecheck, 932 unit tests, build (icons in dist and in the pre-rendered fund pages), 44 Playwright smoke tests, icons served 200 by `vite preview` | | |
+| Not done: `og-image.png` is not wired in; `og:image` needs an absolute URL (SITE_URL) in `scripts/prerender.mjs` | | |
 
 ## 2026-11-11 — Table view: same height as the chart, renamed; selected-row shading
 
