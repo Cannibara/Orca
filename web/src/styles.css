@@ -64,13 +64,16 @@ p{margin:0}
 /* ---------- top bar: the logo and a hairline under it ---------- */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topbar{display:flex;align-items:stretch;gap:20px;min-height:56px}
-.brand{display:flex;align-items:center;gap:9px;flex:none;font:600 16px/1 var(--f-sans);letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-.brand svg{width:22px;height:22px;flex:none;display:block}
+/* brand: the outlined logo (mark + name, docs/brand), 18px tall: the name's capitals match 16px text */
+.brand{display:flex;align-items:center;flex:none;color:var(--ink);text-decoration:none}
+.brand svg{height:18px;width:auto;flex:none;display:block}
 
 /* ---------- page frame ---------- */
 main{padding-block:32px 40px}
 /* site-foot: one quiet line on every page, outside <main> so no page layout moves */
 .site-foot{border-top:1px solid var(--line);padding-block:16px 32px}
+.foot-row{display:flex;align-items:center;gap:8px}
+.foot-mark{width:16px;height:16px;flex:none;color:var(--ink3)}
 .site-foot a{color:var(--ink2);text-underline-offset:2px}
 .site-foot a:hover{color:var(--ink)}
 .view{display:flex;flex-direction:column;gap:32px;min-width:0}

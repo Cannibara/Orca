@@ -13,6 +13,8 @@
 }
 .pg-state .ic{width:36px;height:36px;border-radius:var(--r-2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--ink2);background:var(--sunken)}
 .pg-state.err .ic{color:var(--crit)}
+/* Not found shows the Orca mark in place of a line icon */
+.pg-state .brand-ic svg{width:22px;height:22px;display:block;color:var(--ink)}
 .pg-state .ico{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .pg-state h1{margin:0;font:600 clamp(20px,3vw,24px)/1.2 var(--f-sans);letter-spacing:-.02em;text-wrap:balance}
 .pg-state p{margin:0;font-size:13px;line-height:1.5;color:var(--ink2);max-width:46ch;text-wrap:pretty}
