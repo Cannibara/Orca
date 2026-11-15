@@ -162,7 +162,7 @@ describe("prerender: fund pages from demo data", () => {
 
 /** The default policy's text: what the app needs when its data comes from the site itself. */
 const csp = (connect: string) =>
-  `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`;
+  `default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect} https://cloudflareinsights.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`;
 
 const headersText = (connect: string, hsts = 15552000) => `/*
   X-Content-Type-Options: nosniff
@@ -275,7 +275,7 @@ describe("prerender: dist/_headers", () => {
     expect(names.sort()).toEqual(
       ["base-uri", "connect-src", "default-src", "font-src", "form-action", "frame-ancestors", "img-src", "object-src", "script-src", "style-src"],
     );
-    expect(policy).toContain("connect-src 'self' https://data.orcaetf.com;");
+    expect(policy).toContain("connect-src 'self' https://data.orcaetf.com https://cloudflareinsights.com;");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
   });
