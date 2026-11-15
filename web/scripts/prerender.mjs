@@ -422,7 +422,7 @@ async function main() {
     // The shared shell serves every other route: share tags without a page address.
     const desc = (template.match(DESCRIPTION)?.[0].match(/content="([^"]*)"/) ?? [])[1] ?? "";
     const site_ld = jsonLd({ "@context": "https://schema.org", "@type": "WebSite", name: "Orca", alternateName: SITE_NAMES, url: `${site}/` });
-    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags("Orca", desc, null, image)}\n    ${site_ld}`);
+    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags((template.match(TITLE)?.[0].replace(/<\/?title>/g, "") ?? "Orca"), desc, null, image)}\n    ${site_ld}`);
     await writeFile(indexFile, shell);
   }
 

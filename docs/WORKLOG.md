@@ -1,9 +1,17 @@
 # Worklog
 
-Last verified: 2026-11-14
+Last verified: 2026-11-15
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-15 — Google result: title, description, site icon
+
+| What changed | Why | Files |
+|---|---|---|
+| Home title is now "Orca: Hedge fund holdings" and the description "Hedge fund stock holdings and analysis based on SEC data."; the home og:title follows the `<title>` | Owner: Google still showed "Orca" with the old text for "orca etf" (chat) | `web/index.html`, `web/src/lib/format.ts` (`HOME_TITLE`), `web/scripts/prerender.mjs` |
+| Added `favicon.ico` (16/32/48), `favicon-48.png`, `favicon-192.png` (from `icon-512.png`) and listed them as icons. Google wants a multiple of 48 px and asks for `/favicon.ico` by default; it showed a globe | Same | `web/public/`, `docs/brand/` |
+| Search Console steps (verify, inspect, request indexing, sitemap) are the owner's; Google takes days to weeks to re-crawl | Same | none |
 
 ## 2026-11-14 — Home lists: longer fund names, steady columns across pages
 
