@@ -34,6 +34,19 @@ describe("DataTable", () => {
     expect(screen.getByRole("columnheader", { name: "Count" })).not.toHaveClass("l");
   });
 
+  it("lays out fixed only when asked: a col per column with its width, the rest sharing a floor", () => {
+    const sized: Column<Row>[] = [{ ...columns[0], width: "12em" }, columns[1], columns[2]];
+    const { container, rerender } = render(<DataTable columns={sized} rows={rows} />);
+    const table = container.querySelector("table") as HTMLTableElement;
+    expect(table).not.toHaveClass("fixed");
+    expect(table.querySelector("colgroup")).toBeNull();
+
+    rerender(<DataTable columns={sized} rows={rows} fixed />);
+    expect(table).toHaveClass("fixed");
+    expect([...table.querySelectorAll("col")].map((c) => c.style.width)).toEqual(["12em", "", ""]);
+    expect(table.getAttribute("style")).toContain("min-width: calc(12em + 2 * var(--col-min))");
+  });
+
   it("scrolls inside its own container", () => {
     const { container } = render(<DataTable columns={columns} rows={rows} />);
     const wrap = container.firstElementChild as HTMLElement;

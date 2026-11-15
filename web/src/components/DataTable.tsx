@@ -8,6 +8,8 @@ export type Column<T> = {
   /** "l" left-aligns the column and drops tabular figures (text); anything else is a number column. */
   align?: "l" | "r";
   cell: (row: T) => ReactNode;
+  /** The column's width (a CSS length) when the table is `fixed`; ignored otherwise. */
+  width?: string;
 };
 
 /** dir 1 = ascending, -1 = descending. The caller sorts `rows`; the table only shows the state. */
@@ -27,6 +29,12 @@ type Props<T> = {
   empty?: string;
   /** Accessible name of the table. */
   label?: string;
+  /**
+   * Fixed layout: columns take their `width` whatever the rows hold, so a paged list keeps the same
+   * columns from page to page. Columns without a width share what is left equally, and never get
+   * narrower than `--col-min` (the table scrolls sideways instead).
+   */
+  fixed?: boolean;
 };
 
 /** Fixed row height of every table (the `--row` of `.tbl-wrap table` in styles.css). */
@@ -55,6 +63,7 @@ export function DataTable<T>({
   rowKey,
   empty = "Nothing to show.",
   label,
+  fixed = false,
 }: Props<T>) {
   const scroller = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer<HTMLDivElement, Element>({
@@ -160,6 +169,11 @@ export function DataTable<T>({
       </tr>
     ) : null;
 
+  const widths = columns.map((c) => c.width).filter((w): w is string => w !== undefined);
+  const minWidth = fixed
+    ? `calc(${[...widths, `${columns.length - widths.length} * var(--col-min)`].join(" + ")})`
+    : undefined;
+
   return (
     // Focusable so the keyboard can scroll it sideways when the columns do not fit (a table without links has no other stop).
     <div
@@ -169,7 +183,19 @@ export function DataTable<T>({
       role="region"
       aria-label={label ? `${label}, scrollable` : undefined}
     >
-      <table aria-label={label} aria-rowcount={virtual ? rows.length + 1 : undefined}>
+      <table
+        aria-label={label}
+        aria-rowcount={virtual ? rows.length + 1 : undefined}
+        className={fixed ? "fixed" : undefined}
+        style={minWidth ? { minWidth } : undefined}
+      >
+        {fixed && (
+          <colgroup>
+            {columns.map((c, i) => (
+              <col key={i} style={c.width ? { width: c.width } : undefined} />
+            ))}
+          </colgroup>
+        )}
         <thead>
           <tr>{columns.map(header)}</tr>
         </thead>

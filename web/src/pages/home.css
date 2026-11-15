@@ -69,6 +69,12 @@
 .home .pb{padding-bottom:var(--ppad)}
 .home .pf{border-top:1px solid var(--line);padding-top:10px}
 .home .pager+.pf{border-top:0;padding-top:0}
+/* name caps: a fund name gets 19em (about 37 characters, 8 more than the 15em elsewhere), a stock its
+   usual 14em; on a phone both drop to 10em, as styles.css has them. A fixed list sizes its name
+   columns from these (Home.tsx FUND_W / STOCK_W), so change them together. */
+.home .tbl-wrap{--nm-w:19em;--stk-w:14em}
+.home .tbl-wrap a.nm,.home .tbl-wrap .stk.fund{max-width:var(--nm-w)}
+@container app (max-width:559px){.home .tbl-wrap{--nm-w:10em;--stk-w:10em}}
 /* two lists side by side (wins and losses) when the panel is wide enough, stacked otherwise */
 .home .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px var(--gap);align-items:start}
 .home .duo>div{display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -78,6 +84,7 @@
   .home .duo{padding-inline:0}
   .home .duo h3{padding-inline:var(--ppad)}
   .home .duo .tbl-wrap{--tpad:var(--ppad);border-inline:0;border-radius:0}
+  .home .duo .tbl-wrap{--nm-w:9em}
   .home .duo .stk{max-width:9em}
 }
 .home .foot{padding:0 2px}

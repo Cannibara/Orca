@@ -75,6 +75,13 @@ function change(price: number | undefined, base: number): number | null {
   return price === undefined || !(base > 0) ? null : price / base - 1;
 }
 
+/**
+ * Widths of the name columns when a list lays out fixed: the name's cap (home.css: --nm-w for funds,
+ * --stk-w for stocks) and the cell's padding, so the longest name that fits shows in full with no slack.
+ */
+const FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px)";
+const STOCK_W = "calc(var(--stk-w) + var(--tpad) + 8px)";
+
 /** A fund's name, bold, cut with an ellipsis (the full name on hover). */
 function FundLink({ id, name }: { id: number; name: string }) {
   return (
@@ -88,7 +95,7 @@ function FundLink({ id, name }: { id: number; name: string }) {
 function FundCell({ lookup, id, name }: { lookup: Lookup; id: number; name: string }) {
   const book = lookup.books.get(id);
   return (
-    <div className="stk">
+    <div className="stk fund">
       <FundLink id={id} name={name} />
       {book !== undefined && <span className="sub">{fBook(book)}</span>}
     </div>
@@ -262,7 +269,7 @@ const EMPTY: Partial<Record<Period, string>> = {
 };
 
 const TOP_COLUMNS: Col<TopRow>[] = [
-  { header: "Fund", key: "name", align: "l", by: (r) => r.name.toLowerCase(), cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
+  { header: "Fund", key: "name", align: "l", width: FUND_W, by: (r) => r.name.toLowerCase(), cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
   { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => fBook(r.book) },
   { header: "Positions", key: "positions", by: (r) => r.n_positions, cell: (r) => count(r.n_positions) },
   { header: "Return / yr", key: "ret", by: (r) => r.ann_return, cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return, 0)}</Signed> },
@@ -276,7 +283,8 @@ const PAGE_SIZE = 100;
 /**
  * A home list: every column sorts (`initial` first), and with `paged` the rows come 100 a page
  * with page buttons above and below. A new order or a new list starts again at the first page.
- * A list with no rows is the empty state instead of a table of headings.
+ * A list with no rows is the empty state instead of a table of headings. A paged list (or one with
+ * `fixed`) keeps its column widths whatever the rows, so the columns do not move from page to page.
  */
 function ListTable<R>({
   columns,
@@ -287,6 +295,7 @@ function ListTable<R>({
   rowKey,
   empty = "Nothing to show.",
   paged = false,
+  fixed = paged,
 }: {
   columns: Col<R>[];
   rows: R[];
@@ -296,6 +305,7 @@ function ListTable<R>({
   rowKey?: (r: R, i: number) => string | number;
   empty?: string;
   paged?: boolean;
+  fixed?: boolean;
 }) {
   const { sorted, sort, onSort } = useSortedRows(rows, columns, initial);
   const [page, setPage] = useState(0);
@@ -319,7 +329,7 @@ function ListTable<R>({
   return (
     <>
       {pager}
-      <DataTable label={label} columns={columns} rows={shown} rowKey={rowKey} sort={sort} onSort={onSort} />
+      <DataTable label={label} columns={columns} rows={shown} rowKey={rowKey} sort={sort} onSort={onSort} fixed={fixed} />
       {pager}
     </>
   );
@@ -360,6 +370,7 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
             rows={list.data.giants}
             initial={BEST_RETURN}
             rowKey={(r) => r.fund_id}
+            fixed // lined up with the top funds above
           />
         </Panel>
       )}
@@ -409,7 +420,7 @@ function BoughtBox({ q }: { q: number }) {
 const lower = (text: string | undefined) => (text ?? "").toLowerCase();
 
 function fundCol<R>(lookup: Lookup, id: (r: R) => number, name: (r: R) => string): Col<R> {
-  return { header: "Fund", key: "fund", align: "l", by: (r) => lower(name(r)), cell: (r) => <FundCell lookup={lookup} id={id(r)} name={name(r)} /> };
+  return { header: "Fund", key: "fund", align: "l", width: FUND_W, by: (r) => lower(name(r)), cell: (r) => <FundCell lookup={lookup} id={id(r)} name={name(r)} /> };
 }
 
 function stockCol<R>(lookup: Lookup, fund: (r: R) => number, stock: (r: R) => number): Col<R> {
@@ -417,6 +428,7 @@ function stockCol<R>(lookup: Lookup, fund: (r: R) => number, stock: (r: R) => nu
     header: "Stock",
     key: "stock",
     align: "l",
+    width: STOCK_W,
     by: (r) => lower(lookup.stocks.get(stock(r))?.ticker),
     cell: (r) => <StockLink lookup={lookup} fundId={fund(r)} stockId={stock(r)} />,
   };
