@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-14
+Last verified: 2026-11-15
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -26,7 +26,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ## Stack and hosting
 - Pipeline: Python ≥ 3.13, `uv`, Polars, httpx, brotli (`pipeline/pyproject.toml`). Runs on GitHub Actions (`.github/workflows/pipeline.yml`): monthly on the 16th at 06:23 UTC, a check on the 1st, or by hand.
 - Storage: R2 bucket `R2_LAKE_BUCKET` (private Parquet lake; holds CUSIPs, never public). R2 bucket `orca-site` (`R2_SITE_BUCKET`, public JSON) is served at `data.orcaetf.com` with a Cloudflare cache rule (edge 1 month, browser 2 h), purged after each upload.
-- Web: React 18 + Vite 5 + TypeScript, react-router 6, @tanstack/react-virtual, vitest + jsdom, Playwright (`web/package.json`). Cloudflare Pages project `orca` (`orca-88p.pages.dev`; custom domains `www.orcaetf.com`, bare `orcaetf.com` 301 → www).
+- Web: React 18 + Vite 7 + TypeScript, react-router 7 (package `react-router`), @tanstack/react-virtual, vitest 4 + jsdom, Playwright (`web/package.json`). Cloudflare Pages project `orca` (`orca-88p.pages.dev`; custom domains `www.orcaetf.com`, bare `orcaetf.com` 301 → www).
 - External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Keys live only in GitHub secrets.
 
 ## Repo map
@@ -79,4 +79,5 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 - jsdom has no IntersectionObserver/ResizeObserver. Hooks in `web/src/fund/hooks.ts` degrade, and tests stub `requestIdleCallback` (`web/tests/idle.ts`).
 - The R2 CORS policy was set in the dashboard. The Site CORS workflow fails (`AccessDenied`) until its token has Admin rights.
 - The pipeline job is named `weekly` but runs monthly.
+- `npm install` on npm 10.9 (Node 22's bundled npm) crashes with "reading 'edgesOut'" when vitest's optional peers are resolved. Change versions with `npx -y npm@11.6.2 install`; `npm ci` on npm 10 reads the resulting lockfile fine.
 - The cloud shell's cwd drifts: use absolute paths. Running 4+ heavy agents in parallel hit the 5-hour usage limit twice.

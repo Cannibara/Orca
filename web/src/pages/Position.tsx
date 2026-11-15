@@ -1,7 +1,7 @@
 // One fund's position in one stock: what it cost, what it is worth at the latest price, and every
 // trade behind it. Every figure that depends on the latest price is worked out here from latest_prices.json.
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { PriceChart } from "../charts/PriceChart";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { StepChart } from "../charts/StepChart";

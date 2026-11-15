@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Mark } from "../components/Logo";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useTitle } from "../lib/useTitle";

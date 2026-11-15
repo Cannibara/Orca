@@ -1,4 +1,4 @@
-import { Link, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Route, Routes, useLocation } from "react-router";
 import { TooltipProvider } from "./charts/Tooltip";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Logo, Mark } from "./components/Logo";

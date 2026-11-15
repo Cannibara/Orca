@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import App from "../src/App";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { clearDataCache } from "../src/data/api";
@@ -66,7 +66,7 @@ describe("ErrorBoundary", () => {
     );
     const user = userEvent.setup();
     render(
-      <MemoryRouter initialEntries={["/no-such-page"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={["/no-such-page"]}>
         <App />
       </MemoryRouter>,
     );
