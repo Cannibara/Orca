@@ -371,7 +371,7 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
   { name: "Quant & multi-strategy", about: "Quant and multi-manager firms with large, fast-trading books." },
   {
     name: "Big companies",
-    about: "Companies investing their own money in listed stocks. Stakes in private companies (like Google's in SpaceX) are not in a 13F.",
+    about: "Companies investing their own money, like Google in SpaceX. A 13F shows only listed shares, so a stake shows up once the company lists.",
   },
   { name: "Other", about: "Other well-known investors." },
 ];

@@ -5,6 +5,16 @@ Last verified: 2026-11-15
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-15 — Famous funds: one list per style, VC and Big companies
+
+| What changed | Why | Files |
+|---|---|---|
+| The tab shows 9 lists, one per style, each under its own heading and line, 10 funds a page with its own page buttons; the one period switch drives them all. Rows carry `group`; a CIK can be in two lists | Owner (chat) | `web/src/pages/Home.tsx` (`FAMOUS_GROUPS`, `FamousGroup`, `ListTable pageSize/pagerAbove`), `home.css` (`.fam`), `pipeline/orca/famous.py` (`FAMOUS_GROUPS`), `home.py`, `contract.md` |
+| New Venture capital list: 87 rows (Sequoia's US, growth, Global Equities, HongShan, Neil Shen and Peak XV filers; a16z, Kleiner, Accel, Greylock, Founders Fund, General Catalyst, NEA, Insight, Ribbit, TCV, BOND and more). Many VCs file one 13F per fund; stale ones list nothing. GV, CapitalG, Intel Capital and Qualcomm Ventures file inside their parent's 13F. Not found: Benchmark, Lux, Khosla (13F-NT only), YC, Sutter Hill | Owner asked for VC funds incl. Sequoia's offices | `pipeline/orca/famous.csv` |
+| New Big companies list: 25 companies filing their own 13F (Berkshire, Alphabet, NVIDIA, SoftBank, Loews, Uber, Amazon, Toyota, Gilead … Regeneron); only 26 were found, not 30. Research says SpaceX listed on 2026-06-12 (SPCX) and is now most of Alphabet's 13F (not checked here) | Owner asked for big companies with big 13F books (e.g. Google/SpaceX) | same |
+| Ackman (Pershing Square) moved from Activists to Value; BlueCrest (Michael Platt, CIKs 1363542 and 1610880) added under Macro, but it filed only until 2018, so it lists nothing (a famous row needs a current performance). TCI was already listed | Owner | same |
+| Possible next list (not built): sovereign funds that file 13F (Norges Bank, Swiss National Bank, Korea Investment Corp, Saudi PIF, Temasek, Mubadala, ADIC; CIKs in the session research) | | |
+
 ## 2026-11-15 — Famous funds tab
 
 | What changed | Why | Files |

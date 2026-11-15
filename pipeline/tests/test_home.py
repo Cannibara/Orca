@@ -161,7 +161,7 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
 
 def test_famous_csv_loads_with_unique_ids_and_match_words():
     famous = load_famous(FAMOUS_CSV)
-    assert famous and len({f.fund_id for f in famous}) == len(famous)
+    assert len(famous) >= 200
     assert all(f.match and f.match == f.match.upper() and f.group in FAMOUS_GROUPS for f in famous)
     assert {f.group for f in famous} == set(FAMOUS_GROUPS)
     assert len({(f.fund_id, f.group) for f in famous}) == len(famous)

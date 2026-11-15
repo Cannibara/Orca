@@ -33,7 +33,6 @@ fund_id,match,manager,group,filer_name
 1034524,POLEN CAPITAL,Dan Davidowitz,Tech & growth,Polen Capital Management LLC
 1020066,SANDS CAPITAL,Frank Sands,Tech & growth,"Sands Capital Management, LLC"
 2045724,SITUATIONAL AWARENESS,Leopold Aschenbrenner,Tech & growth,Situational Awareness LP
-1065521,SOFTBANK,Masayoshi Son,Tech & growth,SoftBank Group Corp.
 1765681,THRIVE CAPITAL,Thrive Capital (Josh Kushner),Venture capital,"Thrive Capital Management, LLC"
 1387322,WHALE ROCK,Alex Sacerdote,Tech & growth,Whale Rock Capital Management LLC
 1358706,ABRAMS CAPITAL,David Abrams,Value,"Abrams Capital Management, L.P."
@@ -190,3 +189,28 @@ fund_id,match,manager,group,filer_name
 1923934,BOND CAPITAL,BOND (Mary Meeker),Venture capital,"Bond Capital Management, LP"
 1363542,BLUECREST,Michael Platt,Macro,BlueCrest Capital Management LLP (earlier: BlueCrest Capital Management Ltd)
 1610880,BLUECREST,Michael Platt,Macro,"BlueCrest Capital Management Ltd (St Helier, Jersey)"
+1067983,BERKSHIRE HATHAWAY,Warren Buffett,Big companies,BERKSHIRE HATHAWAY INC
+1652044,ALPHABET,Google,Big companies,Alphabet Inc.
+1045810,NVIDIA,,Big companies,NVIDIA CORP
+1065521,SOFTBANK,Masayoshi Son,Big companies,SOFTBANK GROUP CORP.
+60086,LOEWS,,Big companies,LOEWS CORP
+1543151,UBER,,Big companies,"Uber Technologies, Inc"
+1018724,AMAZON,,Big companies,AMAZON COM INC
+1094517,TOYOTA,,Big companies,TOYOTA MOTOR CORP/
+882095,GILEAD,,Big companies,"GILEAD SCIENCES, INC."
+1090012,DEVON ENERGY,,Big companies,DEVON ENERGY CORP/DE
+1388325,NOVO HOLDINGS,Novo Nordisk Foundation,Big companies,Novo Holdings A/S
+104889,GRAHAM HOLDINGS,,Big companies,Graham Holdings Co
+104169,WALMART,,Big companies,Walmart Inc.
+200406,JOHNSON & JOHNSON,,Big companies,JOHNSON & JOHNSON
+50863,INTEL,,Big companies,INTEL CORP
+310158,MERCK,,Big companies,"MERCK & CO., INC."
+1577552,ALIBABA,,Big companies,Alibaba Group Holding Ltd
+858877,CISCO,,Big companies,"CISCO SYSTEMS, INC."
+27904,DELTA AIR LINES,,Big companies,"DELTA AIR LINES, INC."
+100517,UNITED AIRLINES,,Big companies,"United Airlines Holdings, Inc."
+2488,ADVANCED MICRO DEVICES,,Big companies,ADVANCED MICRO DEVICES INC
+78003,PFIZER,,Big companies,PFIZER INC
+64803,CVS HEALTH,,Big companies,CVS HEALTH Corp
+1704720,CANNAE,Bill Foley,Big companies,"Cannae Holdings, Inc."
+872589,REGENERON,,Big companies,REGENERON PHARMACEUTICALS INC
