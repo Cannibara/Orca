@@ -11,8 +11,12 @@ FAMOUS_CSV = Path(__file__).with_name("famous.csv")
 @dataclass(frozen=True, slots=True)
 class Famous:
     """One famous fund: its CIK (the site's fund id), a word of its SEC filer name that guards
-    against a mistyped CIK (`match`, upper case), the person behind it and the group it is listed
-    under in famous.csv (for whoever keeps the list; not published)."""
+    against a mistyped CIK (`match`, upper case), the person behind it ("" when the firm's name
+    says it all) and the group it is listed under in famous.csv (for whoever keeps the list; not
+    published, nor is the csv's filer_name column).
+
+    How to add one: find the CIK of the entity that files 13F-HR on EDGAR (a manager can have
+    several; a stale one simply lists nothing) and pick a match word from its filer name."""
 
     fund_id: int
     match: str

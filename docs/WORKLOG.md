@@ -5,6 +5,16 @@ Last verified: 2026-11-15
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-15 — Famous funds tab
+
+| What changed | Why | Files |
+|---|---|---|
+| New home tab "Famous funds" beside Top funds: same columns and period chips (the period is shared), each row links to the fund page, the manager's name under the fund name | Owner asked for a list of famous funds, with key attention on Tiger cubs and popular tech funds (chat) | `web/src/pages/Home.tsx`, `web/src/data/types.ts` |
+| `top_{period}.json` gains `famous` rows (Top funds' row plus `manager`) for the 105 CIKs of `famous.csv`, skipping the Top funds rules but keeping the data checks (perf for the period, ≥ 80% priced, no flag) and a match word on the filer name so a wrong CIK lists nothing | Famous funds are often small, young or concentrated; one file per period keeps it one fetch | `pipeline/orca/famous.py`, `famous.csv`, `home.py`, `publish.py`, `run/publish_step.py`, `run/sources.py`, `run/weekly.py`, `demo.py`, `contract.md` |
+| List researched by a subagent with web search (Wikipedia, Dataroma-style superinvestor lists, EDGAR 13F-HR links): 10 Tiger cubs + Tiger Management, 5 grand-cubs, 22 tech & growth, 39 value, 11 activist, 5 macro, 7 quant/multi-strategy, 6 other. Left out as unconfirmed: Valinor, Joho, Sequoia, Lux, Stripes, Long Pond. sec.gov and data.orcaetf.com were blocked from the session, so no CIK was checked against our own data | | |
+| Open: until the next pipeline run, production files have no `famous` key and the tab says the list arrives with the next data update. After it, check the tab for missing names (a CIK whose filer stopped or changed, e.g. Fundsmith 1569205 vs 1868537, Elliott, Hound, ICONIQ) | | |
+| Checked: pipeline tests, web typecheck and unit tests (3 new tests each side), screenshots at 1280 and 400 px on demo data | | |
+
 ## 2026-11-15 — Google result: title, description, site icon
 
 | What changed | Why | Files |

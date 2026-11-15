@@ -1,2 +1,106 @@
-fund_id,match,manager,group
-1067983,BERKSHIRE,Warren Buffett,Value
+fund_id,match,manager,group,filer_name
+1027451,TIGER MANAGEMENT,Julian Robertson,Tiger (parent),Tiger Management L.L.C.
+1062589,BLUE RIDGE,John Griffin,Tiger cub,"Blue Ridge Capital, L.L.C."
+1166309,BRIDGER,Roberto Mignone,Tiger cub,"Bridger Management, LLC"
+1135730,COATUE,Philippe Laffont,Tiger cub,Coatue Management LLC
+1389507,DISCOVERY CAPITAL,Rob Citrone,Tiger cub,"Discovery Capital Management, LLC"
+1569049,LIGHT STREET,Glen Kacher,Tiger cub,"Light Street Capital Management, LLC"
+1061165,LONE PINE,Stephen Mandel,Tiger cub,Lone Pine Capital LLC
+934639,MAVERICK CAPITAL,Lee Ainslie,Tiger cub,Maverick Capital Ltd
+1167483,TIGER GLOBAL,Chase Coleman,Tiger cub,Tiger Global Management LLC
+1103804,VIKING GLOBAL,Andreas Halvorsen,Tiger cub,Viking Global Investors LP
+1747057,D1 CAPITAL,Dan Sundheim,Tiger grand-cub,D1 Capital Partners L.P.
+1353316,HOUND PARTNERS,Jonathan Auerbach,Tiger grand-cub,"Hound Partners, LLC"
+1503174,SRS INVESTMENT,Karthik Sarma,Tiger grand-cub,"SRS Investment Management, LLC"
+1664492,TIGER PACIFIC,Run Ye,Tiger grand-cub,Tiger Pacific Capital LP
+1553936,TYBOURNE,Eashwar Krishnan,Tiger grand-cub,Tybourne Capital Management (HK) Ltd
+1540531,12 WEST,Joel Ramin,Tech & growth,12 West Capital Management LP
+1578684,ABDIEL,Colin Moran,Tech & growth,"Abdiel Capital Advisors, LP"
+1540358,AH CAPITAL,Andreessen Horowitz (a16z),Tech & growth,"AH Capital Management, L.L.C."
+1230239,ALKEON,Takis Sparaggis,Tech & growth,Alkeon Capital Management LLC
+1541617,ALTIMETER,Brad Gerstner,Tech & growth,"Altimeter Capital Management, LP"
+1697748,ARK INVESTMENT,Cathie Wood,Tech & growth,ARK Investment Management LLC
+1777813,ATREIDES,Gavin Baker,Tech & growth,"Atreides Management, LP"
+1088875,BAILLIE GIFFORD,Tom Slater,Tech & growth,Baillie Gifford & Co
+1017918,BAMCO,Ron Baron,Tech & growth,BAMCO Inc /NY/
+1602189,DRAGONEER,Marc Stad,Tech & growth,"Dragoneer Investment Group, LLC"
+1798849,DURABLE CAPITAL,Henry Ellenbogen,Tech & growth,Durable Capital Partners LP
+1017645,GENERAL ATLANTIC,Bill Ford,Tech & growth,"General Atlantic, L.P."
+1840735,GREENOAKS,Neil Mehta,Tech & growth,Greenoaks Capital Partners LLC
+1569709,ICONIQ,Divesh Makan,Tech & growth,"ICONIQ Capital, LLC"
+1525234,JERICHO,Josh Resnick,Tech & growth,Jericho Capital Asset Management L.P.
+1410830,MATRIX CAPITAL,David Goel,Tech & growth,"Matrix Capital Management Company, LP"
+1034524,POLEN CAPITAL,Dan Davidowitz,Tech & growth,Polen Capital Management LLC
+1020066,SANDS CAPITAL,Frank Sands,Tech & growth,"Sands Capital Management, LLC"
+2045724,SITUATIONAL AWARENESS,Leopold Aschenbrenner,Tech & growth,Situational Awareness LP
+1065521,SOFTBANK,Masayoshi Son,Tech & growth,SoftBank Group Corp.
+1765681,THRIVE CAPITAL,Josh Kushner,Tech & growth,"Thrive Capital Management, LLC"
+1387322,WHALE ROCK,Alex Sacerdote,Tech & growth,Whale Rock Capital Management LLC
+1358706,ABRAMS CAPITAL,David Abrams,Value,"Abrams Capital Management, L.P."
+1112520,AKRE,Chuck Akre,Value,Akre Capital Management LLC
+1631014,ALTAROCK,Mark Massey,Value,AltaRock Partners LLC
+1404599,AQUAMARINE,Guy Spier,Value,"Aquamarine Capital Management, LLC"
+1061768,BAUPOST,Seth Klarman,Value,Baupost Group LLC/MA
+1067983,BERKSHIRE HATHAWAY,Warren Buffett,Value,Berkshire Hathaway Inc
+1553733,BRAVE WARRIOR,Glenn Greenberg,Value,"Brave Warrior Advisors, LLC"
+783412,DAILY JOURNAL,Charlie Munger,Value,Daily Journal Corp
+1549575,DALAL STREET,Mohnish Pabrai,Value,"Dalal Street, LLC"
+1036325,DAVIS SELECTED,Chris Davis,Value,Davis Selected Advisers
+200217,DODGE,,Value,Dodge & Cox
+1671657,DORSEY ASSET,Pat Dorsey,Value,"Dorsey Asset Management, LLC"
+915191,FAIRFAX FINANCIAL,Prem Watsa,Value,Fairfax Financial Holdings Ltd/ Can
+1056831,FAIRHOLME,Bruce Berkowitz,Value,Fairholme Capital Management LLC
+1325447,FIRST EAGLE,,Value,"First Eagle Investment Management, LLC"
+1377581,FIRST PACIFIC ADVISORS,Steven Romick,Value,"First Pacific Advisors, LLC"
+1868537,FUNDSMITH,Terry Smith,Value,Fundsmith Investment Services Ltd
+1569205,FUNDSMITH,Terry Smith,Value,Fundsmith LLP
+807249,GAMCO,Mario Gabelli,Value,"GAMCO Investors, Inc. et al"
+860643,GARDNER RUSSO,Thomas Russo,Value,Gardner Russo & Quinn LLC
+1641864,GIVERNY,Francois Rochon,Value,Giverny Capital Inc.
+1510387,GOTHAM,Joel Greenblatt,Value,"Gotham Asset Management, LLC"
+1079114,GREENLIGHT,David Einhorn,Value,Greenlight Capital Inc
+813917,HARRIS ASSOCIATES,Bill Nygren,Value,Harris Associates L P
+1709323,HIMALAYA,Li Lu,Value,Himalaya Capital Management LLC
+1484150,LINDSELL TRAIN,Nick Train,Value,Lindsell Train Ltd
+1096343,MARKEL,Tom Gayner,Value,Markel Group Inc.
+1135778,MILLER VALUE,Bill Miller,Value,"Miller Value Partners, LLC"
+1657335,OAKCLIFF,Bryan Lawrence,Value,"Oakcliff Capital Partners, LP"
+949509,OAKTREE,Howard Marks,Value,Oaktree Capital Management LP
+1720792,RUANE,Sequoia Fund,Value,"Ruane, Cunniff & Goldfarb L.P."
+1649339,SCION,Michael Burry,Value,"Scion Asset Management, LLC"
+1115373,SEMPER AUGUSTUS,Christopher Bloomstran,Value,Semper Augustus Investments Group LLC
+807985,SOUTHEASTERN ASSET,Mason Hawkins,Value,Southeastern Asset Management Inc/TN/
+1099281,THIRD AVENUE,Marty Whitman,Value,Third Avenue Management LLC
+732905,TWEEDY,,Value,"Tweedy, Browne Co LLC"
+1697868,VALLEY FORGE,Dev Kantesaria,Value,"Valley Forge Capital Management, LP"
+859804,WEDGEWOOD,David Rolfe,Value,Wedgewood Partners Inc
+883965,WEITZ,Wally Weitz,Value,"Weitz Investment Management, Inc."
+1535472,CORVEX,Keith Meister,Activist,Corvex Management LP
+1791786,ELLIOTT,Paul Singer,Activist,Elliott Investment Management L.P.
+921669,ICAHN,Carl Icahn,Activist,Icahn Carl C
+1159159,JANA PARTNERS,Barry Rosenstein,Activist,JANA Partners LLC
+1336528,PERSHING SQUARE,Bill Ackman,Activist,"Pershing Square Capital Management, L.P."
+1582090,SACHEM HEAD,Scott Ferguson,Activist,Sachem Head Capital Management LP
+1517137,STARBOARD,Jeff Smith,Activist,Starboard Value LP
+1647251,TCI FUND,Christopher Hohn,Activist,TCI Fund Management Ltd
+1040273,THIRD POINT,Dan Loeb,Activist,Third Point LLC
+1345471,TRIAN,Nelson Peltz,Activist,"Trian Fund Management, L.P."
+1418814,VALUEACT,Mason Morfit,Activist,"ValueAct Holdings, L.P."
+1350694,BRIDGEWATER,Ray Dalio,Macro,"Bridgewater Associates, LP"
+1536411,DUQUESNE,Stanley Druckenmiller,Macro,Duquesne Family Office LLC
+1448574,MOORE CAPITAL,Louis Bacon,Macro,"Moore Capital Management, LP"
+1029160,SOROS FUND,George Soros,Macro,Soros Fund Management LLC
+923093,TUDOR INVESTMENT,Paul Tudor Jones,Macro,Tudor Investment Corp et al
+1167557,AQR CAPITAL,Cliff Asness,Quant & multi-strategy,AQR Capital Management LLC
+1423053,CITADEL ADVISORS,Ken Griffin,Quant & multi-strategy,Citadel Advisors LLC
+1009207,SHAW,David E. Shaw,Quant & multi-strategy,"D. E. Shaw & Co., Inc."
+1273087,MILLENNIUM MANAGEMENT,Israel Englander,Quant & multi-strategy,Millennium Management LLC
+1603466,POINT72,Steve Cohen,Quant & multi-strategy,"Point72 Asset Management, L.P."
+1037389,RENAISSANCE,Jim Simons,Quant & multi-strategy,Renaissance Technologies LLC
+1179392,TWO SIGMA,John Overdeck & David Siegel,Quant & multi-strategy,"Two Sigma Investments, LP"
+1656456,APPALOOSA,David Tepper,Other,Appaloosa LP
+1166559,GATES FOUNDATION,Bill Gates,Other,Bill & Melinda Gates Foundation Trust
+898382,COOPERMAN,Leon Cooperman,Other,Cooperman Leon G
+850529,FISHER ASSET,Ken Fisher,Other,"Fisher Asset Management, LLC"
+1138995,GLENVIEW,Larry Robbins,Other,"Glenview Capital Management, LLC"
+1035674,PAULSON,John Paulson,Other,Paulson & Co. Inc.
