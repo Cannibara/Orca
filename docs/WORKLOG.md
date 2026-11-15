@@ -11,7 +11,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | The 2px bar under the open tab (`.tabs .ind`, Home and fund page) now gets its size from `width: var(--w)` and only moves with `translateX`; before it was a 1px box stretched by `scaleX(--w)`. Its slide animates `transform` and `width` | Owner: under Top funds the bar was shorter than the tab at 100% zoom and fixed itself after zooming in and out (chat). Chrome paints a scaled layer once and stretches that picture, so the bar's ends could be off until a zoom forced a repaint. Measured in Chromium before / after (painted bar end vs the tab's right edge, 132 px): 131.3–131.5 → 132 at 1.5×–2× pixel ratios | `web/src/styles.css`, `web/src/fund/returns.css`, `web/src/components/Tabs.tsx`, `web/src/fund/FundHeader.tsx` |
 | The bar also re-measures when any tab button changes size (ResizeObserver on each tab), not only when the strip does | The strip keeps its width when the web font swaps in, but the tabs inside it grow (code) | same |
-| Checked: typecheck, 940 unit tests, 46 of 48 Playwright smoke tests. The 2 failures ("the home page's own head names 13F filings…") also fail without this change: that test still expects the home title from before #31 | | |
+| Checked: typecheck, 940 unit tests, 46 of 48 Playwright smoke tests. The 2 failures ("the home page's own head names 13F filings…") also fail without this change: that test still expects "13F" and "hedge fund holdings" in the home description, which #31 changed to "Hedge fund stock holdings and analysis based on SEC data." | | |
 
 ## 2026-11-15 — Google result: title, description, site icon
 
