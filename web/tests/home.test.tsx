@@ -269,10 +269,10 @@ describe("Home", () => {
     expect(new Set([t1, t3, t5, t10, tMax].map((t) => t.eligible[0].name)).size).toBeGreaterThan(1);
   });
 
-  it("famous funds list the curated funds with Top funds' columns, the manager under each name and links to the fund", async () => {
+  it("famous funds show one list per style, in order, with Top funds' columns, the manager and links to the fund", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const famous = t3.famous ?? [];
-    expect(famous.length).toBeGreaterThan(0);
+    expect(new Set(famous.map((f) => f.group)).size).toBeGreaterThan(1);
     // the demo lists a fund too young for Top funds, so this tab is more than a filter of that one
     const t1 = demo<TopList>("home/top_1y.json");
     expect((t1.famous ?? []).some((f) => !t1.eligible.some((e) => e.fund_id === f.fund_id))).toBe(true);
@@ -281,37 +281,69 @@ describe("Home", () => {
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
-    const table = await screen.findByRole("table", { name: "Famous funds" });
-    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
-      "Fund",
-      "AUM",
-      "Positions",
-      "Return / yr",
-      "Max Drawdown",
-      "Sharpe",
-    ]);
-    const rows = within(table).getAllByRole("row").slice(1);
-    const best = [...famous].sort((a, b) => b.ann_return - a.ann_return);
-    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(best.map((f) => f.name));
-    expect(within(rows[0]).getByText(best[0].manager ?? "")).toBeInTheDocument();
-    await user.click(within(rows[0]).getByRole("link"));
-    expect(await screen.findByText(`Fund page ${best[0].fund_id}`)).toBeInTheDocument();
+    const panel = (await screen.findByRole("heading", { level: 2, name: "Famous funds" })).closest("section")!;
+    await within(panel).findAllByRole("table");
+    const order = ["Tiger cubs", "Tech & growth", "Value"].filter((g) => famous.some((f) => f.group === g));
+    expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(order);
+    for (const group of order) {
+      const table = within(panel).getByRole("table", { name: group });
+      expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+        "Fund",
+        "AUM",
+        "Positions",
+        "Return / yr",
+        "Max Drawdown",
+        "Sharpe",
+      ]);
+      const best = famous.filter((f) => f.group === group).sort((a, b) => b.ann_return - a.ann_return);
+      const rows = within(table).getAllByRole("row").slice(1);
+      expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(best.map((f) => f.name));
+      if (best[0].manager) expect(within(rows[0]).getByText(best[0].manager)).toBeInTheDocument();
+    }
+    // Kelpwood is in two lists
+    expect(within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }).length).toBe(2);
+    const first = within(within(panel).getByRole("table", { name: order[0] })).getAllByRole("link")[0];
+    const id = famous.find((f) => f.name === first.textContent)!.fund_id;
+    await user.click(first);
+    expect(await screen.findByText(`Fund page ${id}`)).toBeInTheDocument();
   });
 
-  it("famous funds share the period with Top funds and explain a file built before the list existed", async () => {
+  it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {
+    const t3 = demo<TopList>("home/top_3y.json");
+    const row = (t3.famous ?? [])[0];
+    const many = (group: string, n: number, base: number) =>
+      Array.from({ length: n }, (_, i) => ({ ...row, group, fund_id: base + i, name: `${group} ${String(i + 1).padStart(2, "0")}`, ann_return: 0.5 - i / 100 }));
     const t1 = demo<TopList>("home/top_1y.json");
-    const old = { ...demo<TopList>("home/top_3y.json"), famous: undefined };
-    stubData({ "home/top_3y.json": old });
+    stubData({ "home/top_3y.json": { ...t3, famous: [...many("Value", 25, 1000), ...many("Macro", 12, 2000)] } });
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("table", { name: "Top funds" });
+    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
+    const value = await screen.findByRole("table", { name: "Value" });
+    const macro = screen.getByRole("table", { name: "Macro" });
+    const names = (t: HTMLElement) => within(t).getAllByRole("row").slice(1).map((r) => within(r).getByRole("link").textContent);
+    expect(names(value)).toHaveLength(10);
+    expect(screen.getByText("Showing 1–10 of 25 funds")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1–10 of 12 funds")).toBeInTheDocument();
+    const valuePager = screen.getByText("Showing 1–10 of 25 funds").closest("nav")!;
+    await user.click(within(valuePager).getByRole("button", { name: "Next" }));
+    expect(names(value)[0]).toBe("Value 11");
+    expect(names(macro)[0]).toBe("Macro 01"); // the other list stays on its page
+    await user.click(screen.getByRole("button", { name: "1 year" }));
+    await waitFor(() => expect(screen.queryByRole("table", { name: "Macro" })).toBeNull());
+    const groups = new Set((t1.famous ?? []).map((f) => f.group));
+    for (const g of groups) expect(screen.getByRole("table", { name: g })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Top funds" }));
+    expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("famous funds explain a file built before the list existed", async () => {
+    stubData({ "home/top_3y.json": { ...demo<TopList>("home/top_3y.json"), famous: undefined } });
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     expect(await screen.findByText("The famous funds list arrives with the next data update.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "1 year" }));
-    const table = await screen.findByRole("table", { name: "Famous funds" });
-    expect(within(table).getAllByRole("row")).toHaveLength((t1.famous ?? []).length + 1);
-    await user.click(screen.getByRole("tab", { name: "Top funds" }));
-    expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("the 15-year tab says why no fund qualifies yet", async () => {

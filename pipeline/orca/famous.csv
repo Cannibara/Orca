@@ -1,22 +1,22 @@
 fund_id,match,manager,group,filer_name
-1027451,TIGER MANAGEMENT,Julian Robertson,Tiger (parent),Tiger Management L.L.C.
-1062589,BLUE RIDGE,John Griffin,Tiger cub,"Blue Ridge Capital, L.L.C."
-1166309,BRIDGER,Roberto Mignone,Tiger cub,"Bridger Management, LLC"
-1135730,COATUE,Philippe Laffont,Tiger cub,Coatue Management LLC
-1389507,DISCOVERY CAPITAL,Rob Citrone,Tiger cub,"Discovery Capital Management, LLC"
-1569049,LIGHT STREET,Glen Kacher,Tiger cub,"Light Street Capital Management, LLC"
-1061165,LONE PINE,Stephen Mandel,Tiger cub,Lone Pine Capital LLC
-934639,MAVERICK CAPITAL,Lee Ainslie,Tiger cub,Maverick Capital Ltd
-1167483,TIGER GLOBAL,Chase Coleman,Tiger cub,Tiger Global Management LLC
-1103804,VIKING GLOBAL,Andreas Halvorsen,Tiger cub,Viking Global Investors LP
-1747057,D1 CAPITAL,Dan Sundheim,Tiger grand-cub,D1 Capital Partners L.P.
-1353316,HOUND PARTNERS,Jonathan Auerbach,Tiger grand-cub,"Hound Partners, LLC"
-1503174,SRS INVESTMENT,Karthik Sarma,Tiger grand-cub,"SRS Investment Management, LLC"
-1664492,TIGER PACIFIC,Run Ye,Tiger grand-cub,Tiger Pacific Capital LP
-1553936,TYBOURNE,Eashwar Krishnan,Tiger grand-cub,Tybourne Capital Management (HK) Ltd
+1027451,TIGER MANAGEMENT,Julian Robertson,Tiger cubs,Tiger Management L.L.C.
+1062589,BLUE RIDGE,John Griffin,Tiger cubs,"Blue Ridge Capital, L.L.C."
+1166309,BRIDGER,Roberto Mignone,Tiger cubs,"Bridger Management, LLC"
+1135730,COATUE,Philippe Laffont,Tiger cubs,Coatue Management LLC
+1389507,DISCOVERY CAPITAL,Rob Citrone,Tiger cubs,"Discovery Capital Management, LLC"
+1569049,LIGHT STREET,Glen Kacher,Tiger cubs,"Light Street Capital Management, LLC"
+1061165,LONE PINE,Stephen Mandel,Tiger cubs,Lone Pine Capital LLC
+934639,MAVERICK CAPITAL,Lee Ainslie,Tiger cubs,Maverick Capital Ltd
+1167483,TIGER GLOBAL,Chase Coleman,Tiger cubs,Tiger Global Management LLC
+1103804,VIKING GLOBAL,Andreas Halvorsen,Tiger cubs,Viking Global Investors LP
+1747057,D1 CAPITAL,Dan Sundheim,Tiger cubs,D1 Capital Partners L.P.
+1353316,HOUND PARTNERS,Jonathan Auerbach,Tiger cubs,"Hound Partners, LLC"
+1503174,SRS INVESTMENT,Karthik Sarma,Tiger cubs,"SRS Investment Management, LLC"
+1664492,TIGER PACIFIC,Run Ye,Tiger cubs,Tiger Pacific Capital LP
+1553936,TYBOURNE,Eashwar Krishnan,Tiger cubs,Tybourne Capital Management (HK) Ltd
 1540531,12 WEST,Joel Ramin,Tech & growth,12 West Capital Management LP
 1578684,ABDIEL,Colin Moran,Tech & growth,"Abdiel Capital Advisors, LP"
-1540358,AH CAPITAL,Andreessen Horowitz (a16z),Tech & growth,"AH Capital Management, L.L.C."
+1540358,AH CAPITAL,Andreessen Horowitz (a16z),Venture capital,"AH Capital Management, L.L.C."
 1230239,ALKEON,Takis Sparaggis,Tech & growth,Alkeon Capital Management LLC
 1541617,ALTIMETER,Brad Gerstner,Tech & growth,"Altimeter Capital Management, LP"
 1697748,ARK INVESTMENT,Cathie Wood,Tech & growth,ARK Investment Management LLC
@@ -25,7 +25,7 @@ fund_id,match,manager,group,filer_name
 1017918,BAMCO,Ron Baron,Tech & growth,BAMCO Inc /NY/
 1602189,DRAGONEER,Marc Stad,Tech & growth,"Dragoneer Investment Group, LLC"
 1798849,DURABLE CAPITAL,Henry Ellenbogen,Tech & growth,Durable Capital Partners LP
-1017645,GENERAL ATLANTIC,Bill Ford,Tech & growth,"General Atlantic, L.P."
+1017645,GENERAL ATLANTIC,Bill Ford,Venture capital,"General Atlantic, L.P."
 1840735,GREENOAKS,Neil Mehta,Tech & growth,Greenoaks Capital Partners LLC
 1569709,ICONIQ,Divesh Makan,Tech & growth,"ICONIQ Capital, LLC"
 1525234,JERICHO,Josh Resnick,Tech & growth,Jericho Capital Asset Management L.P.
@@ -34,7 +34,7 @@ fund_id,match,manager,group,filer_name
 1020066,SANDS CAPITAL,Frank Sands,Tech & growth,"Sands Capital Management, LLC"
 2045724,SITUATIONAL AWARENESS,Leopold Aschenbrenner,Tech & growth,Situational Awareness LP
 1065521,SOFTBANK,Masayoshi Son,Tech & growth,SoftBank Group Corp.
-1765681,THRIVE CAPITAL,Josh Kushner,Tech & growth,"Thrive Capital Management, LLC"
+1765681,THRIVE CAPITAL,Josh Kushner,Venture capital,"Thrive Capital Management, LLC"
 1387322,WHALE ROCK,Alex Sacerdote,Tech & growth,Whale Rock Capital Management LLC
 1358706,ABRAMS CAPITAL,David Abrams,Value,"Abrams Capital Management, L.P."
 1112520,AKRE,Chuck Akre,Value,Akre Capital Management LLC
@@ -75,17 +75,17 @@ fund_id,match,manager,group,filer_name
 1697868,VALLEY FORGE,Dev Kantesaria,Value,"Valley Forge Capital Management, LP"
 859804,WEDGEWOOD,David Rolfe,Value,Wedgewood Partners Inc
 883965,WEITZ,Wally Weitz,Value,"Weitz Investment Management, Inc."
-1535472,CORVEX,Keith Meister,Activist,Corvex Management LP
-1791786,ELLIOTT,Paul Singer,Activist,Elliott Investment Management L.P.
-921669,ICAHN,Carl Icahn,Activist,Icahn Carl C
-1159159,JANA PARTNERS,Barry Rosenstein,Activist,JANA Partners LLC
-1336528,PERSHING SQUARE,Bill Ackman,Activist,"Pershing Square Capital Management, L.P."
-1582090,SACHEM HEAD,Scott Ferguson,Activist,Sachem Head Capital Management LP
-1517137,STARBOARD,Jeff Smith,Activist,Starboard Value LP
-1647251,TCI FUND,Christopher Hohn,Activist,TCI Fund Management Ltd
-1040273,THIRD POINT,Dan Loeb,Activist,Third Point LLC
-1345471,TRIAN,Nelson Peltz,Activist,"Trian Fund Management, L.P."
-1418814,VALUEACT,Mason Morfit,Activist,"ValueAct Holdings, L.P."
+1535472,CORVEX,Keith Meister,Activists,Corvex Management LP
+1791786,ELLIOTT,Paul Singer,Activists,Elliott Investment Management L.P.
+921669,ICAHN,Carl Icahn,Activists,Icahn Carl C
+1159159,JANA PARTNERS,Barry Rosenstein,Activists,JANA Partners LLC
+1336528,PERSHING SQUARE,Bill Ackman,Value,"Pershing Square Capital Management, L.P."
+1582090,SACHEM HEAD,Scott Ferguson,Activists,Sachem Head Capital Management LP
+1517137,STARBOARD,Jeff Smith,Activists,Starboard Value LP
+1647251,TCI FUND,Christopher Hohn,Activists,TCI Fund Management Ltd
+1040273,THIRD POINT,Dan Loeb,Activists,Third Point LLC
+1345471,TRIAN,Nelson Peltz,Activists,"Trian Fund Management, L.P."
+1418814,VALUEACT,Mason Morfit,Activists,"ValueAct Holdings, L.P."
 1350694,BRIDGEWATER,Ray Dalio,Macro,"Bridgewater Associates, LP"
 1536411,DUQUESNE,Stanley Druckenmiller,Macro,Duquesne Family Office LLC
 1448574,MOORE CAPITAL,Louis Bacon,Macro,"Moore Capital Management, LP"

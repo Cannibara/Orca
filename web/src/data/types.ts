@@ -217,6 +217,8 @@ export type TopRow = {
   sharpe: number | null;
   /** Famous funds rows only: the person behind the fund. */
   manager?: string | null;
+  /** Famous funds rows only: the style list it is shown in (a fund in two lists has two rows). */
+  group?: string;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */

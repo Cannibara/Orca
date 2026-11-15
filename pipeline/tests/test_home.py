@@ -7,7 +7,7 @@ import pytest
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.config import CONVICTION_KEEP, CONVICTION_MIN_MOVE, CONVICTION_QUIET
-from orca.famous import FAMOUS_CSV, Famous, load_famous
+from orca.famous import FAMOUS_CSV, FAMOUS_GROUPS, Famous, load_famous
 from orca.home import (
     ConvictionQuarter,
     FundSnapshot,
@@ -132,15 +132,17 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
     famous = [
         Famous(1, "SCION", "Michael Burry", "Value"),
         Famous(2, "BERKSHIRE", "Warren Buffett", "Value"),
+        Famous(2, "BERKSHIRE", "Warren Buffett", "Big companies"),  # in two lists: two rows
         Famous(3, "UNPRICED", "", "Other"),
         Famous(4, "FLAGGED", "", "Other"),
         Famous(5, "YOUNG", "", "Other"),
-        Famous(6, "COATUE", "", "Tiger cub"),
+        Famous(6, "COATUE", "", "Tiger cubs"),
         Famous(7, "FIRST BANK", "", "Other"),
         Famous(99, "MISSING", "", "Other"),  # not in the data
     ]
     out = top_funds([small, big, unpriced, flagged, no_perf, wrong, bank], "3y", famous)
-    assert ids(out["famous"]) == [2, 1, 7]  # best return first
+    assert ids(out["famous"]) == [2, 2, 1, 7]  # best return first
+    assert [r["group"] for r in out["famous"]] == ["Big companies", "Value", "Value", "Other"]
     assert out["famous"][0] == {
         "fund_id": 2,
         "name": "BERKSHIRE HATHAWAY INC",
@@ -150,8 +152,9 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         "max_dd": -0.2,
         "sharpe": 0.8,
         "manager": "Warren Buffett",
+        "group": "Big companies",
     }
-    assert out["famous"][2]["manager"] is None
+    assert out["famous"][3]["manager"] is None
     assert ids(out["eligible"]) == [2, 6]  # Top funds is unchanged
     assert top_funds([big], "3y")["famous"] == []
 
@@ -159,14 +162,20 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
 def test_famous_csv_loads_with_unique_ids_and_match_words():
     famous = load_famous(FAMOUS_CSV)
     assert famous and len({f.fund_id for f in famous}) == len(famous)
-    assert all(f.match and f.match == f.match.upper() and f.group for f in famous)
-    assert len(famous) >= 100
+    assert all(f.match and f.match == f.match.upper() and f.group in FAMOUS_GROUPS for f in famous)
+    assert {f.group for f in famous} == set(FAMOUS_GROUPS)
+    assert len({(f.fund_id, f.group) for f in famous}) == len(famous)
 
 
-def test_famous_csv_rejects_a_repeated_cik(tmp_path):
+def test_famous_csv_rejects_a_cik_twice_in_a_group_and_an_unknown_group(tmp_path):
     path = tmp_path / "famous.csv"
+    path.write_text("fund_id,match,manager,group\n1,A,X,Value\n1,A,X,Big companies\n")
+    assert [f.group for f in load_famous(path)] == ["Value", "Big companies"]
     path.write_text("fund_id,match,manager,group\n1,A,X,Value\n1,B,Y,Value\n")
     with pytest.raises(ValueError, match="twice"):
+        load_famous(path)
+    path.write_text("fund_id,match,manager,group\n1,A,X,Valu\n")
+    with pytest.raises(ValueError, match="unknown group"):
         load_famous(path)
 
 

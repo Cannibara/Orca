@@ -118,7 +118,8 @@ def top_funds(
     "famous" lists the funds of `famous` (famous.csv) whatever their size, age or number of
     positions: a performance for the period, at least TOP_MIN_PRICED of the book priced (below
     that the return says little), no data-quality flag, and a filer name holding the list's match
-    word (a CIK typed wrong lists nothing rather than some other fund). Its rows add `manager`."""
+    word (a CIK typed wrong lists nothing rather than some other fund). Its rows add `manager` and
+    `group` (the style list it is shown in; a fund in two lists has a row for each)."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -137,9 +138,11 @@ def top_funds(
         p = s.perf.get(period) if s is not None else None
         if p is None or s.excluded or s.priced_pct < TOP_MIN_PRICED or f.match not in s.name.upper():
             continue
-        picked.append((s, p, f.manager))
-    picked.sort(key=lambda spm: _return_order(spm[1].ann_return) + (spm[0].fund_id,))
-    out["famous"] = [{**_top_row(s, p), "manager": m or None} for s, p, m in picked]
+        picked.append((s, p, f))
+    picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
+    out["famous"] = [
+        {**_top_row(s, p), "manager": f.manager or None, "group": f.group} for s, p, f in picked
+    ]
     return out
 
 
