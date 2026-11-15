@@ -25,7 +25,7 @@ An orca breaking the surface, built from three shapes, every curve a circular ar
 | `orca-lockup-color.svg`, `orca-lockup-stacked-color.svg` | Colour lockups: `currentColor` body and name, #A84118 eye |
 | `orca-icon.svg`, `icon-512.png`, `apple-touch-icon.png` | App icon: paper mark on an ink tile (the touch icon is full bleed; iOS rounds it) |
 | `orca-icon-color.svg` | Colour icon: ink orca with the orange eye on a paper tile |
-| `favicon.svg`, `favicon-32.png` | Browser tab; the SVG is ink on light tabs and #F3ECE3 on dark tabs (`prefers-color-scheme`). Also in `web/public/` |
+| `favicon.svg`, `favicon-32.png`, `favicon-48.png`, `favicon-192.png`, `favicon.ico` | Browser tab; the SVG is ink on light tabs and #F3ECE3 on dark tabs (`prefers-color-scheme`). Also in `web/public/` |
 | `og-image.png` | 1200×630 link-preview card; shipped as `web/public/og-default.png`, which the build links as `og:image` when `SITE_URL` is set |
 | `brand-sheet.png` | The guide: primary, colour, lockups, icons, rules |
 

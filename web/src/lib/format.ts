@@ -62,7 +62,7 @@ export function shareCount(n: number | null): string {
 }
 
 /** The home page's title (also in index.html, which cannot import this: keep the two equal). */
-export const HOME_TITLE = "Hedge fund holdings and returns from 13F filings · Orca";
+export const HOME_TITLE = "Orca: Hedge fund holdings";
 
 /** A fund page's title: the pre-rendered file and the app use this one text, so the tab does not change when the app loads. */
 export const fundTitle = (name: string): string => `${name} 13F holdings and returns · Orca`;
