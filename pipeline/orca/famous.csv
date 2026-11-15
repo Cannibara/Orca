@@ -25,7 +25,7 @@ fund_id,match,manager,group,filer_name
 1017918,BAMCO,Ron Baron,Tech & growth,BAMCO Inc /NY/
 1602189,DRAGONEER,Marc Stad,Tech & growth,"Dragoneer Investment Group, LLC"
 1798849,DURABLE CAPITAL,Henry Ellenbogen,Tech & growth,Durable Capital Partners LP
-1017645,GENERAL ATLANTIC,Bill Ford,Venture capital,"General Atlantic, L.P."
+1017645,GENERAL ATLANTIC,General Atlantic (growth equity),Venture capital,"General Atlantic, L.P."
 1840735,GREENOAKS,Neil Mehta,Tech & growth,Greenoaks Capital Partners LLC
 1569709,ICONIQ,Divesh Makan,Tech & growth,"ICONIQ Capital, LLC"
 1525234,JERICHO,Josh Resnick,Tech & growth,Jericho Capital Asset Management L.P.
@@ -34,7 +34,7 @@ fund_id,match,manager,group,filer_name
 1020066,SANDS CAPITAL,Frank Sands,Tech & growth,"Sands Capital Management, LLC"
 2045724,SITUATIONAL AWARENESS,Leopold Aschenbrenner,Tech & growth,Situational Awareness LP
 1065521,SOFTBANK,Masayoshi Son,Tech & growth,SoftBank Group Corp.
-1765681,THRIVE CAPITAL,Josh Kushner,Venture capital,"Thrive Capital Management, LLC"
+1765681,THRIVE CAPITAL,Thrive Capital (Josh Kushner),Venture capital,"Thrive Capital Management, LLC"
 1387322,WHALE ROCK,Alex Sacerdote,Tech & growth,Whale Rock Capital Management LLC
 1358706,ABRAMS CAPITAL,David Abrams,Value,"Abrams Capital Management, L.P."
 1112520,AKRE,Chuck Akre,Value,Akre Capital Management LLC
@@ -104,3 +104,89 @@ fund_id,match,manager,group,filer_name
 850529,FISHER ASSET,Ken Fisher,Other,"Fisher Asset Management, LLC"
 1138995,GLENVIEW,Larry Robbins,Other,"Glenview Capital Management, LLC"
 1035674,PAULSON,John Paulson,Other,Paulson & Co. Inc.
+1607841,TTGP,Sequoia Capital (US growth / TTGP),Venture capital,"SC US (TTGP), Ltd."
+1374246,SC XII MANAGEMENT,Sequoia Capital (US Venture XII),Venture capital,SC XII Management LLC
+1261135,SC XI MANAGEMENT,Sequoia Capital (US Venture XI),Venture capital,SC XI Management LLC
+1206787,SC X MANAGEMENT,Sequoia Capital (US Venture X),Venture capital,SC X Management LLC
+1367787,SCGF III,Sequoia Capital Growth Fund III,Venture capital,SCGF III Management LLC
+1471126,SCGF GENPAR,Sequoia Capital Growth Fund (GenPar),Venture capital,"SCGF GenPar, Ltd."
+1537530,SCGE,Sequoia Capital Global Equities,Venture capital,"SCGE Management, L.P."
+1470766,HSG HOLDING,HongShan (formerly Sequoia Capital China),Venture capital,HSG Holding Ltd (formerly SC China Holding Ltd)
+1822015,SEQUOIA CHINA EQUITY,Sequoia Capital China public equities (HongShan),Venture capital,Sequoia China Equity Partners (Hong Kong) Ltd
+1279329,SHEN NEIL NANPENG,Neil Shen (founder of HongShan / Sequoia China),Venture capital,Shen Neil Nanpeng
+1886840,PEAK XV,Peak XV Partners (formerly Sequoia Capital India),Venture capital,"Peak XV Partners Operations LLC (formerly Sequoia Capital India Operations II, LLC)"
+1500595,KPCB XIII,Kleiner Perkins (KPCB XIII),Venture capital,"KPCB XIII Associates, LLC"
+1546196,KPCB XIV,Kleiner Perkins (KPCB XIV),Venture capital,"KPCB XIV Associates, LLC"
+1547838,KPCB XV,Kleiner Perkins (KPCB XV),Venture capital,"KPCB XV Associates, LLC"
+1500599,KPCB XII ASSOCIATES,Kleiner Perkins (KPCB XII),Venture capital,"KPCB XII Associates, LLC"
+1611737,KPCB DGF II,Kleiner Perkins Digital Growth Fund II,Venture capital,"KPCB DGF II Associates, LLC"
+1535603,ACCEL XI,Accel (Accel XI),Venture capital,Accel XI Associates L.L.C.
+1923783,ACCEL LEADERS 4,Accel (Leaders 4 growth fund),Venture capital,Accel Leaders 4 Associates L.P.
+1767987,ACCEL GROWTH FUND V,Accel (Growth Fund V),Venture capital,Accel Growth Fund V Associates L.L.C.
+1494996,ACCEL X ASSOCIATES,Accel (Accel X),Venture capital,Accel X Associates L.L.C.
+1660424,GREYLOCK XIV,Greylock (XIV),Venture capital,Greylock XIV GP LLC
+1877892,GREYLOCK 15,Greylock (15),Venture capital,Greylock 15 GP LLC
+1541539,GREYLOCK XIII,Greylock (XIII),Venture capital,Greylock XIII GP LLC
+1413877,GREYLOCK XII GP,Greylock (XII),Venture capital,Greylock XII GP LLC
+1351699,GREYLOCK XI GP,Greylock (XI),Venture capital,Greylock XI GP Limited Partnership
+1846021,FOUNDERS FUND VII,Founders Fund (VII),Venture capital,"Founders Fund VII Management, LLC"
+1616081,FOUNDERS FUND IV,Founders Fund (IV),Venture capital,"Founders Fund IV Management, LLC"
+1695329,FOUNDERS FUND II MANAGEMENT,Founders Fund (II),Venture capital,"Founders Fund II Management, LLC"
+1853431,FOUNDERS FUND GROWTH,Founders Fund (Growth),Venture capital,"Founders Fund Growth Management, LLC"
+1853382,FOUNDERS FUND VI MANAGEMENT,Founders Fund (VI),Venture capital,"Founders Fund VI Management, LLC"
+1637946,GENERAL CATALYST,General Catalyst,Venture capital,"General Catalyst Group Management, LLC"
+1780948,LIGHTSPEED OPPORTUNITY,Lightspeed Venture Partners (Opportunity Fund),Venture capital,"Lightspeed Opportunity Fund, L.P."
+1611751,INDEX VENTURE ASSOCIATES V,Index Ventures (V),Venture capital,Index Venture Associates V Ltd
+1447962,INDEX VENTURE ASSOCIATES IV,Index Ventures (IV),Venture capital,Index Venture Associates IV Ltd
+1503683,INDEX VENTURE ASSOCIATES III,Index Ventures (III),Venture capital,Index Venture Associates III Ltd
+1305473,INSIGHT HOLDINGS,Insight Partners,Venture capital,"Insight Holdings Group, LLC"
+1512848,NEA MANAGEMENT,New Enterprise Associates (NEA),Venture capital,"NEA Management Company, LLC"
+1494127,DEER MANAGEMENT,Bessemer Venture Partners,Venture capital,Deer Management Co. LLC
+1548594,BATTERY MANAGEMENT,Battery Ventures,Venture capital,Battery Management Corp.
+1640275,"INSTITUTIONAL VENTURE MANAGEMENT XV,",IVP (XV),Venture capital,"Institutional Venture Management XV, LLC"
+1716997,INSTITUTIONAL VENTURE MANAGEMENT XVI,IVP (XVI),Venture capital,"Institutional Venture Management XVI, LLC"
+1550304,INSTITUTIONAL VENTURE MANAGEMENT XIV,IVP (XIV),Venture capital,"Institutional Venture Management XIV, LLC"
+1493921,INSTITUTIONAL VENTURE MANAGEMENT XIII,IVP (XIII),Venture capital,"Institutional Venture Management XIII, LLC"
+1689508,REDPOINT,Redpoint Ventures,Venture capital,"Redpoint Management, LLC"
+1829132,GGV CAPITAL,GGV Capital,Venture capital,GGV Capital LLC
+2065606,NOTABLE CAPITAL,Notable Capital (formerly GGV Capital US),Venture capital,"Notable Capital Management, L.L.C."
+1836733,RIBBIT MANAGEMENT,Ribbit Capital,Venture capital,"Ribbit Management Company, LLC"
+1912628,RIBBIT CAPITAL GP II,Ribbit Capital (GP II),Venture capital,"Ribbit Capital GP II, Ltd."
+1697452,RIBBIT CAPITAL GP IV,Ribbit Capital (GP IV),Venture capital,"Ribbit Capital GP IV, Ltd."
+1846237,VALOR MANAGEMENT,Valor Equity Partners,Venture capital,Valor Management LLC
+1667766,8VC,8VC (Joe Lonsdale),Venture capital,"8VC GP I, LLC"
+1964312,SOCIAL CAPITAL,Social Capital (Chamath Palihapitiya),Venture capital,Social Capital Group LLC
+1550172,DST GLOBAL,DST Global (Yuri Milner),Venture capital,DST Global Advisors Ltd
+1549497,DST GLOBAL,"DST Global (Yuri Milner), early entity",Venture capital,DST Global Ltd
+1740858,GALILEO,DST Global / Yuri Milner trust vehicle,Venture capital,Galileo (PTC) Ltd
+1911136,PARADIGM OPERATIONS,Paradigm (crypto VC),Venture capital,Paradigm Operations LP
+2067181,PANTERA,Pantera Capital (crypto),Venture capital,Pantera Capital Partners LP
+1677323,UNION SQUARE GP 2008,Union Square Ventures (2008 fund),Venture capital,"Union Square GP 2008, L.L.C."
+1633002,UNION SQUARE OPPORTUNITY,Union Square Ventures (Opportunity),Venture capital,"Union Square Opportunity GP, L.L.C."
+1640023,UNION SQUARE GP 2004,Union Square Ventures (2004 fund),Venture capital,"Union Square GP 2004, L.L.C."
+1731509,SB INVESTMENT ADVISERS,SoftBank Vision Fund (SB Investment Advisers),Venture capital,SB Investment Advisers (UK) Ltd
+1626282,TECHNOLOGY CROSSOVER MANAGEMENT VIII,TCV (VIII),Venture capital,"Technology Crossover Management VIII, Ltd."
+1698264,TECHNOLOGY CROSSOVER MANAGEMENT IX,TCV (IX),Venture capital,"Technology Crossover Management IX, Ltd."
+1787727,"TECHNOLOGY CROSSOVER MANAGEMENT X,",TCV (X),Venture capital,"Technology Crossover Management X, Ltd."
+1977402,TECHNOLOGY CROSSOVER MANAGEMENT XI,TCV (XI),Venture capital,"Technology Crossover Management XI, Ltd."
+830588,SUMMIT PARTNERS,Summit Partners (growth equity),Venture capital,"Summit Partners, L.P."
+1772583,NORWEST VENTURE PARTNERS XIII,Norwest Venture Partners (XIII),Venture capital,"Norwest Venture Partners XIII, LP"
+1842721,NORWEST VENTURE PARTNERS XIV,Norwest Venture Partners (XIV),Venture capital,"Norwest Venture Partners XIV, LP"
+1534522,"NORWEST VENTURE PARTNERS XI,",Norwest Venture Partners (XI),Venture capital,"Norwest Venture Partners XI, LP"
+1176230,NORWEST VENTURE PARTNERS VIII,Norwest Venture Partners (VIII),Venture capital,Norwest Venture Partners VIII LP
+1850694,CANAAN PARTNERS XI,Canaan Partners (XI),Venture capital,Canaan Partners XI LLC
+1673228,CANAAN PARTNERS X LLC,Canaan Partners (X),Venture capital,Canaan Partners X LLC
+1514133,CANAAN PARTNERS VII,Canaan Partners (VII),Venture capital,Canaan Partners VII LLC
+1404329,MAYFIELD XII,Mayfield (XII),Venture capital,"Mayfield XII Management, L.L.C."
+1911541,MENLO VENTURES,Menlo Ventures,Venture capital,"Menlo Ventures Management, L.P."
+1600025,MATRIX VIII,Matrix Partners (now Matrix),Venture capital,Matrix VIII US Management Co. LLC
+1259923,MATRIX VII MANAGEMENT,Matrix Partners (VII),Venture capital,Matrix VII Management Co LLC
+1644978,"FOUNDRY GROUP, LLC",Foundry Group,Venture capital,"Foundry Group, LLC"
+1965482,FOUNDRY GROUP NEXT,Foundry Group (Next),Venture capital,"Foundry Group Next, LLC"
+1844719,FIRST ROUND CAPITAL,First Round Capital,Venture capital,"First Round Capital Management III, LLC"
+1640445,SPARK MANAGEMENT PARTNERS III,Spark Capital (III),Venture capital,"Spark Management Partners III (AIV I), LLC"
+1600213,"SPARK MANAGEMENT PARTNERS II,",Spark Capital (II),Venture capital,"Spark Management Partners II, LLC"
+1608856,SPARK GROWTH MANAGEMENT,Spark Capital (Growth),Venture capital,Spark Growth Management Partners LLC
+1923934,BOND CAPITAL,BOND (Mary Meeker),Venture capital,"Bond Capital Management, LP"
+1363542,BLUECREST,Michael Platt,Macro,BlueCrest Capital Management LLP (earlier: BlueCrest Capital Management Ltd)
+1610880,BLUECREST,Michael Platt,Macro,"BlueCrest Capital Management Ltd (St Helier, Jersey)"
