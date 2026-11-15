@@ -5,6 +5,17 @@ Last verified: 2026-11-15
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
+
+| What changed | Why | Files |
+|---|---|---|
+| vitest 2.1.9 → 4.1.12, vite 5.4.21 → 7.3.7, @vitejs/plugin-react 4.7.0 → 5.2.0 | GitHub listed 17 Dependabot alerts (3 critical, 1 high, 12 moderate, 1 low). The critical ones (tinypool prototype-pollution RCE gadgets, Vitest UI file read) and the high one (launch-editor in vite) are all dev / test tooling, not code shipped to visitors, but they run on developer machines and in CI. Versions picked are a few weeks old rather than the newest, to limit supply-chain risk. Vite 7 rather than 8 to stay on esbuild/Rollup (smaller change) (chat) | `web/package.json`, `web/package-lock.json` |
+| react-router-dom 6.30.6 → react-router 7.18.5 (v7's own package; `react-router-dom` is only a re-export shim). Imports changed in 15 files; the `future` v7 flags on `BrowserRouter` / `MemoryRouter` and the test-setup filter for their console notices are gone (both behaviours are the v7 default, and the app already had them on) | Two moderate advisories with no v6 fix: open redirect via a backslash in `<Link>` / `useNavigate`, and an SSR-only deserialisation issue (not used here). This is the one in the shipped site | `web/src/`, `web/tests/`, `web/package.json` |
+| Trade-off: main bundle 341 → 358 kB (gzip 113.6 → 119.6 kB), from react-router 7 | | |
+| Pipeline: `pip-audit` on `uv.lock` found no known vulnerabilities | | none |
+| Checked: `npm audit` 0 vulnerabilities, `npm ci` on npm 10, typecheck, 940 unit tests, build + prerender, 48 Playwright smoke tests | | |
+| The lockfile was written with npm 11 (npm 10.9 crashes resolving vitest's optional peers); noted under Gotchas in `CLAUDE.md` | | `CLAUDE.md` |
+
 ## 2026-11-15 — Tab underline: real width instead of a scaled 1px bar
 
 | What changed | Why | Files |
