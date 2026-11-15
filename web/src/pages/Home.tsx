@@ -337,6 +337,52 @@ function ListTable<R>({
 
 const BEST_RETURN: SortState = { key: "ret", dir: -1 };
 
+/** Top funds' columns, with the person behind the fund under its name (people know "Burry", not "Scion"). */
+const FAMOUS_COLUMNS: Col<TopRow>[] = TOP_COLUMNS.map((c) =>
+  c.key !== "name"
+    ? c
+    : {
+        ...c,
+        cell: (r) => (
+          <div className="stk fund">
+            <FundLink id={r.fund_id} name={r.name} />
+            {r.manager && <span className="sub">{r.manager}</span>}
+          </div>
+        ),
+      },
+);
+
+function FamousFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
+  const list = useLoad(() => loadHome(`top_${period}`), [period]);
+  const rows = list.status === "ready" ? list.data.famous : undefined;
+  return (
+    <Panel
+      title="Famous funds"
+      subtitle="Well-known managers, from Buffett to the Tiger cubs and tech investors, whatever their size. Estimated return a year over the chosen period. Select a heading to sort."
+      controls={<Choice label="Period" options={PERIODS} value={period} onChange={onPeriod} />}
+    >
+      {list.status !== "ready" ? (
+        <Status state={list} />
+      ) : (
+        <ListTable
+          label="Famous funds"
+          noun="funds"
+          columns={FAMOUS_COLUMNS}
+          rows={rows ?? []}
+          initial={BEST_RETURN}
+          rowKey={(r) => r.fund_id}
+          empty={
+            rows === undefined
+              ? "The famous funds list arrives with the next data update."
+              : (EMPTY[period] ?? "No famous fund has a long enough record for this period yet.")
+          }
+          fixed // lined up with Top funds
+        />
+      )}
+    </Panel>
+  );
+}
+
 function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
   return (
@@ -691,9 +737,10 @@ function Calls({
 
 // ---- page ----------------------------------------------------------------------------
 
-type TabId = "top" | "conviction" | "wins" | "crowded" | "calls";
+type TabId = "top" | "famous" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
   { id: "top", label: "Top funds" },
+  { id: "famous", label: "Famous funds" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
   { id: "crowded", label: "Crowded buys" },
@@ -712,6 +759,7 @@ export default function Home() {
 
   let panel: ReactNode;
   if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
+  else if (tab === "famous") panel = <FamousFunds period={period} onPeriod={setPeriod} />;
   else if (lookup.status !== "ready") {
     // Stocks, prices and fund sizes are what these lists are made of: the panel waits for them.
     panel = (

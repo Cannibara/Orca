@@ -215,6 +215,8 @@ export type TopRow = {
   ann_return: number;
   max_dd: number | null;
   sharpe: number | null;
+  /** Famous funds rows only: the person behind the fund. */
+  manager?: string | null;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */
@@ -223,6 +225,8 @@ export type TopList = {
   period: string;
   eligible: TopRow[];
   giants: TopRow[];
+  /** Missing from files built before the Famous funds list existed. */
+  famous?: TopRow[];
 };
 
 /** conviction, just_filed, crowded, calls_q, calls_y */

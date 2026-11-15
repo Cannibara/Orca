@@ -7,6 +7,7 @@ import pytest
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.config import CONVICTION_KEEP, CONVICTION_MIN_MOVE, CONVICTION_QUIET
+from orca.famous import FAMOUS_CSV, Famous, load_famous
 from orca.home import (
     ConvictionQuarter,
     FundSnapshot,
@@ -118,6 +119,54 @@ def test_top_funds_skips_flagged_funds_and_missing_period_perf():
     ok = snap(4, "OK", perf={"1y": perf(ann_return=0.1), "3y": perf()})
     assert ids(top_funds([flagged, no_3y, no_key, ok], "3y")["eligible"]) == [4]
     assert ids(top_funds([flagged, no_3y, no_key, ok], "1y")["eligible"]) == [2, 4]
+
+
+def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
+    small = snap(1, "SCION ASSET MANAGEMENT", book=5e7, n_priced=2, quarters_filed=5)
+    big = snap(2, "BERKSHIRE HATHAWAY INC", perf={"3y": perf(ann_return=0.2)})
+    unpriced = snap(3, "UNPRICED PARTNERS", priced_pct=0.5)
+    flagged = snap(4, "FLAGGED PARTNERS", excluded=True)
+    no_perf = snap(5, "YOUNG PARTNERS", perf={"1y": perf()})
+    wrong = snap(6, "SOME OTHER FUND")  # the CIK in the list was mistyped
+    bank = snap(7, "FIRST BANK OF FAME")  # famous: the name rule does not apply
+    famous = [
+        Famous(1, "SCION", "Michael Burry", "Value"),
+        Famous(2, "BERKSHIRE", "Warren Buffett", "Value"),
+        Famous(3, "UNPRICED", "", "Other"),
+        Famous(4, "FLAGGED", "", "Other"),
+        Famous(5, "YOUNG", "", "Other"),
+        Famous(6, "COATUE", "", "Tiger cub"),
+        Famous(7, "FIRST BANK", "", "Other"),
+        Famous(99, "MISSING", "", "Other"),  # not in the data
+    ]
+    out = top_funds([small, big, unpriced, flagged, no_perf, wrong, bank], "3y", famous)
+    assert ids(out["famous"]) == [2, 1, 7]  # best return first
+    assert out["famous"][0] == {
+        "fund_id": 2,
+        "name": "BERKSHIRE HATHAWAY INC",
+        "book": 2e9,
+        "n_positions": 30,
+        "ann_return": 0.2,
+        "max_dd": -0.2,
+        "sharpe": 0.8,
+        "manager": "Warren Buffett",
+    }
+    assert out["famous"][2]["manager"] is None
+    assert ids(out["eligible"]) == [2, 6]  # Top funds is unchanged
+    assert top_funds([big], "3y")["famous"] == []
+
+
+def test_famous_csv_loads_with_unique_ids_and_match_words():
+    famous = load_famous(FAMOUS_CSV)
+    assert famous and len({f.fund_id for f in famous}) == len(famous)
+    assert all(f.match and f.match == f.match.upper() and f.manager and f.group for f in famous)
+
+
+def test_famous_csv_rejects_a_repeated_cik(tmp_path):
+    path = tmp_path / "famous.csv"
+    path.write_text("fund_id,match,manager,group\n1,A,X,Value\n1,B,Y,Value\n")
+    with pytest.raises(ValueError, match="twice"):
+        load_famous(path)
 
 
 def test_top_funds_rows_sorted_by_return_and_json_ready():

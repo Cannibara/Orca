@@ -13,6 +13,7 @@ from pathlib import Path
 
 import polars as pl
 
+from orca.famous import load_famous
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -360,6 +361,7 @@ def run_weekly(
             weekly_ids,
             today,
             compress,
+            sources.famous(),
         )
     )
 
@@ -465,7 +467,14 @@ def run_home(
     run_id = today.strftime("%Y%m%d")
     staging = new_version(out_root, run_id)
     files = publish_shared_files(
-        ctx, staging, [metas[c] for c in order], [snaps[c] for c in order], set(), today, compress
+        ctx,
+        staging,
+        [metas[c] for c in order],
+        [snaps[c] for c in order],
+        set(),
+        today,
+        compress,
+        load_famous(),
     )
     previous = load_published(lake, out_root, compress)
     changed = changed_files(files, previous)
