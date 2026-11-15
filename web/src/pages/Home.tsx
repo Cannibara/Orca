@@ -351,7 +351,11 @@ const FAMOUS_COLUMNS: Col<TopRow>[] = TOP_COLUMNS.map((c) =>
         cell: (r) => (
           <div className="stk fund">
             <FundLink id={r.fund_id} name={r.name} />
-            {r.manager && <span className="sub">{r.manager}</span>}
+            {(r.manager || r.until_q != null) && (
+              <span className="sub">
+                {[r.manager, r.until_q != null && `filed until ${qLabel(r.until_q)}`].filter(Boolean).join(" · ")}
+              </span>
+            )}
           </div>
         ),
       },
@@ -365,21 +369,24 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
   { name: "Tiger cubs", about: "Julian Robertson's Tiger Management and the funds its alumni started or it seeded (cubs and grand-cubs)." },
   { name: "Tech & growth", about: "Growth investors focused on technology." },
   { name: "Venture capital", about: "Venture firms. Their 13F shows only listed stakes, mostly companies they backed before the IPO." },
-  { name: "Value", about: "Buffett and other value and quality investors." },
+  { name: "Moat investing", about: "Concentrated owners of a few great businesses with lasting advantages, held for years." },
+  { name: "Value", about: "Buffett and other value investors: good companies bought cheap." },
   { name: "Activists", about: "Investors who buy big stakes to push companies to change." },
-  { name: "Macro", about: "Macro traders. The 13F shows only their US stocks, not their bonds, currencies or futures." },
+  { name: "Macro", about: "Macro funds. The 13F shows only their US stocks, not their bonds, currencies or futures." },
+  { name: "Family offices", about: "Star traders and billionaires investing their own fortunes, mostly in stocks." },
   { name: "Quant & multi-strategy", about: "Quant and multi-manager firms with large, fast-trading books." },
   {
     name: "Big companies",
     about: "Companies investing their own money, like Google in SpaceX. A 13F shows only listed shares, so a stake shows up once the company lists.",
   },
-  { name: "Other", about: "Other well-known investors." },
+  { name: "Sovereign & pension funds", about: "Countries' wealth funds, central banks and big pension and superannuation funds." },
 ];
 
 /** Rows a page in each famous list: short pages keep nine lists scannable. */
 const FAMOUS_PAGE = 10;
 
-/** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. */
+/** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
+ * without a group (none should come) goes to a list named "Other", last. */
 function byGroup(rows: TopRow[]): { name: string; about?: string; rows: TopRow[] }[] {
   const groups = new Map<string, TopRow[]>();
   for (const r of rows) {
@@ -398,7 +405,7 @@ function FamousFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Perio
   return (
     <Panel
       title="Famous funds"
-      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below. Select a heading to sort."
+      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Select a heading to sort."
       controls={<Choice label="Period" options={PERIODS} value={period} onChange={onPeriod} />}
     >
       {list.status !== "ready" ? (

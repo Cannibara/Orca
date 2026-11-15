@@ -219,6 +219,8 @@ export type TopRow = {
   manager?: string | null;
   /** Famous funds rows only: the style list it is shown in (a fund in two lists has two rows). */
   group?: string;
+  /** Famous funds rows only: the last quarter of a fund that stopped filing (its figures run to it); null when it still files. */
+  until_q?: number | null;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */

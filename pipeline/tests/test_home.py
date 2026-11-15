@@ -125,7 +125,7 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
     small = snap(1, "SCION ASSET MANAGEMENT", book=5e7, n_priced=2, quarters_filed=5)
     big = snap(2, "BERKSHIRE HATHAWAY INC", perf={"3y": perf(ann_return=0.2)})
     unpriced = snap(3, "UNPRICED PARTNERS", priced_pct=0.5)
-    flagged = snap(4, "FLAGGED PARTNERS", excluded=True)
+    stopped = snap(4, "STOPPED PARTNERS", excluded=True, period_q=40)  # stopped filing: listed
     no_perf = snap(5, "YOUNG PARTNERS", perf={"1y": perf()})
     wrong = snap(6, "SOME OTHER FUND")  # the CIK in the list was mistyped
     bank = snap(7, "FIRST BANK OF FAME")  # famous: the name rule does not apply
@@ -134,15 +134,16 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         Famous(2, "BERKSHIRE", "Warren Buffett", "Value"),
         Famous(2, "BERKSHIRE", "Warren Buffett", "Big companies"),  # in two lists: two rows
         Famous(3, "UNPRICED", "", "Other"),
-        Famous(4, "FLAGGED", "", "Other"),
+        Famous(4, "STOPPED", "", "Other"),
         Famous(5, "YOUNG", "", "Other"),
         Famous(6, "COATUE", "", "Tiger cubs"),
         Famous(7, "FIRST BANK", "", "Other"),
         Famous(99, "MISSING", "", "Other"),  # not in the data
     ]
-    out = top_funds([small, big, unpriced, flagged, no_perf, wrong, bank], "3y", famous)
-    assert ids(out["famous"]) == [2, 2, 1, 7]  # best return first
-    assert [r["group"] for r in out["famous"]] == ["Big companies", "Value", "Value", "Other"]
+    out = top_funds([small, big, unpriced, stopped, no_perf, wrong, bank], "3y", famous)
+    assert ids(out["famous"]) == [2, 2, 1, 4, 7]  # best return first
+    assert [r["group"] for r in out["famous"]] == ["Big companies", "Value", "Value", "Other", "Other"]
+    assert [r["until_q"] for r in out["famous"]] == [None, None, None, 40, None]
     assert out["famous"][0] == {
         "fund_id": 2,
         "name": "BERKSHIRE HATHAWAY INC",
@@ -153,8 +154,9 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         "sharpe": 0.8,
         "manager": "Warren Buffett",
         "group": "Big companies",
+        "until_q": None,
     }
-    assert out["famous"][3]["manager"] is None
+    assert out["famous"][4]["manager"] is None
     assert ids(out["eligible"]) == [2, 6]  # Top funds is unchanged
     assert top_funds([big], "3y")["famous"] == []
 

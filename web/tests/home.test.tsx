@@ -302,6 +302,8 @@ describe("Home", () => {
     }
     // Kelpwood is in two lists
     expect(within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }).length).toBe(2);
+    // a fund that stopped filing is listed, with its last quarter by its manager
+    expect(within(panel).getByText("Mara Cobble · filed until Q4 2023")).toBeInTheDocument();
     const first = within(within(panel).getByRole("table", { name: order[0] })).getAllByRole("link")[0];
     const id = famous.find((f) => f.name === first.textContent)!.fund_id;
     await user.click(first);

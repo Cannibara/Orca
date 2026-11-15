@@ -14,12 +14,14 @@ FAMOUS_GROUPS = (
     "Tiger cubs",
     "Tech & growth",
     "Venture capital",
+    "Moat investing",
     "Value",
     "Activists",
     "Macro",
+    "Family offices",
     "Quant & multi-strategy",
     "Big companies",
-    "Other",
+    "Sovereign & pension funds",
 )
 
 
@@ -28,11 +30,12 @@ class Famous:
     """One famous fund in one list: its CIK (the site's fund id), a word of its SEC filer name
     that guards against a mistyped CIK (`match`, upper case), the person or brand behind it (""
     when the firm's name says it all) and the list it is shown in (`group`, one of
-    FAMOUS_GROUPS). A fund can be in two lists (Berkshire: Value and Big companies). The csv's
+    FAMOUS_GROUPS). A fund can be in two lists. The csv's
     filer_name column is for whoever keeps the list and is not read.
 
     How to add one: find the CIK of the entity that files 13F-HR on EDGAR (a manager can have
-    several; a stale one simply lists nothing) and pick a match word from its filer name."""
+    several; one that stopped filing is listed with its figures to its last quarter) and pick a
+    match word from its filer name."""
 
     fund_id: int
     match: str

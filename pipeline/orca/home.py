@@ -51,7 +51,8 @@ class FundSnapshot:
     each stock_id with its trade in the latest quarter; `pnl_latest` is the latest quarter's P&L
     per stock; `buys_recent` holds (stock_id, q, est. price, weight after, filed) for recent new
     and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf`
-    is keyed by period (the keys of `config.PERIODS`), None when too short.
+    is keyed by period (the keys of `config.PERIODS`), None when too short. `excluded` marks a
+    fund that stopped filing (inactive): its `perf` periods end at its last quarter, `period_q`.
 
     `conviction_quarters` holds what the conviction lists need of each of the fund's last
     CONVICTION_LOOKBACK + CONVICTION_WINDOW quarters (`ConvictionQuarter`), so their rules apply at
@@ -116,10 +117,12 @@ def top_funds(
     "giants", never in "eligible".
 
     "famous" lists the funds of `famous` (famous.csv) whatever their size, age or number of
-    positions: a performance for the period, at least TOP_MIN_PRICED of the book priced (below
-    that the return says little), no data-quality flag, and a filer name holding the list's match
-    word (a CIK typed wrong lists nothing rather than some other fund). Its rows add `manager` and
-    `group` (the style list it is shown in; a fund in two lists has a row for each)."""
+    positions, and also when they stopped filing: a performance for the period, at least
+    TOP_MIN_PRICED of the book priced (below that the return says little) and a filer name holding
+    the list's match word (a CIK typed wrong lists nothing rather than some other fund). Its rows
+    add `manager`, `group` (the style list it is shown in; a fund in two lists has a row for each)
+    and `until_q`: the last quarter of a fund that stopped filing (its figures run to it), else
+    None."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -136,12 +139,18 @@ def top_funds(
     for f in famous:
         s = by_id.get(f.fund_id)
         p = s.perf.get(period) if s is not None else None
-        if p is None or s.excluded or s.priced_pct < TOP_MIN_PRICED or f.match not in s.name.upper():
+        if p is None or s.priced_pct < TOP_MIN_PRICED or f.match not in s.name.upper():
             continue
         picked.append((s, p, f))
     picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
     out["famous"] = [
-        {**_top_row(s, p), "manager": f.manager or None, "group": f.group} for s, p, f in picked
+        {
+            **_top_row(s, p),
+            "manager": f.manager or None,
+            "group": f.group,
+            "until_q": int(s.period_q) if s.excluded else None,
+        }
+        for s, p, f in picked
     ]
     return out
 

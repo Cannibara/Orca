@@ -41,3 +41,14 @@ def test_prepared_bound_for_inactive_fund(demo_run):
     prepared = batch[0][0]
     assert prepared.end_q == q_index(2023, 4)
     assert prepared.bound == demo.LAST_Q
+
+
+def test_inactive_fund_perf_runs_to_its_last_quarter(demo_run):
+    # Cobblereef stopped after Q4 2023: its periods end there (the Famous funds lists show it).
+    _, batch = demo_batch(demo_run, [9100010, demo.FUND_CIK0])
+    (_, active), (_, stopped) = batch  # in fund id order
+    assert stopped.snapshot.excluded and stopped.snapshot.period_q == q_index(2023, 4)
+    assert stopped.snapshot.perf["1y"] is not None
+    assert stopped.snapshot.perf["3y"] is not None
+    assert stopped.snapshot.perf["10y"] is None  # tracked from 2014: not 10 years by 2023
+    assert not active.snapshot.excluded and active.snapshot.perf["1y"] is not None

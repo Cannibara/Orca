@@ -128,8 +128,8 @@ FUNDS = (
     _Profile("Undertow Partners", q_index(2014, 2), q_index(2026, 2), 2.5e9, 7, 10),
 )
 # The demo's Famous funds, in three style lists: a young one (too new for Top funds, listed for 1
-# year and since start), one that stopped filing (never listed), three in Top funds as well, and
-# Kelpwood in two lists.
+# year and since start), one that stopped filing (listed with its figures to its last quarter),
+# three in Top funds as well, and Kelpwood in two lists.
 DEMO_FAMOUS = (
     Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs"),
     Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs"),

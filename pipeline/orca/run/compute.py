@@ -541,9 +541,14 @@ def _snapshot(
     ]
     conviction_quarters = _conviction_quarters(positions, end_of, weights, end_q, filed_quarters)
     until_last = [(q, r) for q, r in rets if q <= last_q]
+    # A fund that stopped filing is measured over the periods to its last quarter (only the
+    # Famous funds lists show it); every other list leaves inactive funds out.
+    anchor = min(end_q, last_q) if meta.inactive else last_q
     perf: dict[str, Performance | None] = {}
     for period, n in PERIODS.items():
-        window = until_last if n is None else [(q, r) for q, r in until_last if q > last_q - n]
+        window = (
+            until_last if n is None else [(q, r) for q, r in until_last if anchor - n < q <= anchor]
+        )
         perf[period] = performance(window, ctx.rf) if n is None or len(window) == n else None
     return FundSnapshot(
         fund_id=meta.fund_id,
