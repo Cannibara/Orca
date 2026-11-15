@@ -129,9 +129,11 @@ fund's name.
 - `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...],
   "famous": [...]}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
   "max_dd", "sharpe"}`. `famous` lists the funds of `pipeline/orca/famous.csv` (hand-kept) whatever the Top funds
-  rules say, when they have a performance for the period, ≥ 80% of the book priced, no data-quality flag and a
-  name holding the list's match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
-  `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each). Files built before
+  rules say, when they have a performance for the period, ≥ 80% of the book priced and a name holding the list's
+  match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
+  `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each) and `"until_q"`: for a fund
+  that stopped filing, its last quarter, and then its figures cover the period up to that quarter; `null` while it
+  still files. Funds that stopped filing appear in no other list. Files built before
   2026-11-15 have no `famous` key.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
