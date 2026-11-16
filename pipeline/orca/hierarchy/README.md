@@ -34,7 +34,7 @@ Result on 2026-11-16, for the 100 best funds by return since start (`home/top_ma
 | Labelled from Damodaran's list, placed by name or rule | 1,457 | 64% |
 | Labelled from Damodaran's list, group default (876 agreed with a blind model label, 1,282 unchecked) | 2,158 | 17% |
 | Model's first pass from the name (1,671 sure, 75 less sure; 224 of the sure ones replaced a group default) | 1,746 | 12% |
-| ETFs, set aside: the owner ruled them out of the stock-pick pages (2026-11-04) | 1,815 | 7.6% |
+| ETFs, not labelled yet: a fund's ETF buy is a sector pick, so each needs a node (owner, chat 2026-11-16) | 1,815 | 7.6% |
 | Funds, SPACs and unidentifiable lines, not labelled | 526 | 0.2% |
 
 Labelled stocks cover 92% of the dollars. By fund: the labelled share of each fund's current book (cost basis) has a median of 99.9%; 65 of the 100 funds are at 95% or more, and the rest are mostly ETF-heavy funds.
@@ -97,7 +97,7 @@ Nothing below is committed.
 - 188 of 244 verticals have fewer than 10 stocks above $1bn. A stock picker's peers widen to the industry in that case (rule R4).
 - 1,282 small default-labelled stocks that the top funds held (under 1% of the dollars) and the default-labelled stocks nobody holds are not checked by name; 39 small business-service stocks sit in "Other Business Services".
 - Only the stocks the 100 best funds ever held (and, from Damodaran's file, the US-listed ones) have labels. Orca prices about 22,800 stocks, so other funds' stocks are unlabelled; the same tools label them. R8 now says a model's first pass, not the SIC code.
-- ETFs are set aside, not labelled. 66 of the 100 funds have held one; 12 hold half or more of their current book in ETFs (4 hold 90% or more, such as PPSC Investment Service Corp, rank 15). How F5 counts a fund's ETF positions, and whether to drop ETF-heavy funds from a top list (the unanswered 30% rule in `docs/PRODUCT.md`), is open.
+- ETFs have no node yet. The owner says a fund's ETF buy is a sector pick (chat, 2026-11-16), so each needs one; the ETF-heavy funds stay in the list (66 of the 100 funds have held an ETF; 12 hold half or more of their current book in ETFs, 4 hold 90% or more, such as PPSC Investment Service Corp, rank 15). A model classed the biggest 400 ETFs once (90 single-sector, $29bn bought; `etf_batches.py`, commit 1fecf4b) and the tool was removed in bf901e0 on a misunderstanding: restore it from git. How sectors are compared with each other (indices built from the hierarchy, ETFs as cross-checks) is open: ROADMAP S4, F5, L5.
 - Not wired in: no `stock_id` mapping, no change to `pipeline/contract.md` (change it first), no benchmark table (ROADMAP S4), nothing published.
 
 ## Next steps
