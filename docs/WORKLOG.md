@@ -1,17 +1,102 @@
 # Worklog
 
-Last verified: 2026-11-14
+Last verified: 2026-11-16
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-14 — Popular funds: draft list of 68 names
+## 2026-11-16 — Popular funds: draft list of 68 names
 
 | What changed | Why | Files |
 |---|---|---|
 | Draft list of 68 well-known funds, grouped by lineage (Buffett/Graham, Tiger Cubs, macro, activists, quant, other), each matched to a live CIK, book and position count, and flagged if in a top-25 list | Owner asked for a list of famous funds for backlog item 2b, from Wikipedia and press lineage articles (chat) | `docs/superpowers/specs/2026-11-14-popular-funds-draft.md`, `docs/famous-funds.txt` (names, CIK and link only) |
 
 - Not approved: the owner picks names and whether the tab groups by lineage. Only 3 of 68 (Coatue, Slate Path, Appaloosa) are in a top-25 list. Seed Stapleton and Sequoia lineages were not found by search. Nothing built; the contract (`home/popular.json`) comes next.
+## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
+
+| What changed | Why | Files |
+|---|---|---|
+| New Buffett inspired list (21; Berkshire moved here from Value, with Pabrai, Li Lu, Daily Journal, Spier ×2, Markel, Fairfax, Sequoia Fund ×2, Tweedy Browne, Russo, Bloomstran, Lou Simpson, Mecham, Alleghany, Biglari ×2, Chou, Van Den Berg, Kahn Brothers). Pabrai's 2004–11 filer, Weschler's Peninsula and Combs' Castle Point left out: they stopped before 2013. Pabrai's Wagons fund files N-PORT, not 13F | Owner; "Richer, Wiser, Happier" insurer = Markel (Gayner) | `pipeline/orca/famous.csv`, `famous.py`, `web/src/pages/Home.tsx` |
+| Moat investing +31 (strong and medium fits: Nomad, Magellan, Hyperion, Veritas, Findlay Park, Seilern, Comgest, AKO, Troy, GuardCap, Cantillon, Ensemble, Jensen, WCM, SGA, Bares, Saber, FMI, GQG, Lakehouse, Montaka, Mawer, Burgundy …), Wedgewood moved from Value, Rule One Partners (Phil Town, CIK 2040263) | Owner | same |
+| New Fundamental long/short list (31 + Glenview from Value: Egerton, Lansdowne, Marshall Wace, Melvin, Eminence, Kingdon, Soroban, Steadfast, Darsana, Holocene, Woodline, Lakewood, Cat Rock …); Sculptor (OZ Management) and Farallon added to Quant & multi-strategy. Left for the owner: 18 smaller or Tiger-linked long/shorts and 11 healthcare specialists (Baker Bros, RA, Perceptive, OrbiMed, Deerfield …), in the session research | Owner: a home for famous funds no other list fits | same |
+| Owner approved the rest: Healthcare specialists list (11: Perceptive, RA, Baker Bros, Deerfield, OrbiMed, Casdin, EcoR1, Redmile, Rock Springs, Avoro, Visium); Tiger-linked long/shorts to Tiger cubs (Joho, Tiger Legatus, Valinor, Kora, Conatus); 13 smaller long/shorts to Fundamental long/short. A match may list alternatives split by `|` for a renamed filer (Brookside → Bain Capital Public Equity, venBio → Avoro) | Owner (chat) | `famous.csv`, `famous.py`, `home.py` (`_name_matches`), `Home.tsx` |
+| Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
+| Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
+
+## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
+
+| What changed | Why | Files |
+|---|---|---|
+| Cloudflare Web Analytics allowed in the CSP (`script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`). Checked against the live page with the new header: no CSP error, beacon loads | It had been switched on in the dashboard while the CSP blocked it: nothing counted, a console error on every page. Owner wants the figures (chat) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts`, DECISIONS, runbook step 8, ROADMAP U5, CLAUDE.md |
+| Vendor-ticker repair: more suffix rules (`*`, GBX, digits after a suffix), then hand-checked overrides by CUSIP, SEC name match, OpenFIGI US ticker with delisted listings (`includeUnlistedEquities`), all still limited to vendor spans that overlap the held days | Owner asked why two stocks had no `weekly.json`. Zeekr: OpenFIGI gave the Mexican "ZKN", Tiingo has "ZK". The Oracle one is a bond (no price expected). The same fault left 1,420 share-like stocks unpriced, among them Exxon's pre-2026 CUSIP ("EXMOC"; Exxon moved under ExxonMobil Holdings Corp with a new CUSIP), EA, WBD, QRVO, RTN, PX, APC: 4.03% of the 60 largest funds' holdings by cost | `pipeline/orca/vendor.py`, `securities.py` (`tickers_by_name`, `us_tickers`), `run/market.py` (`alternate_tickers`, `ticker_overrides`), `run/weekly.py`, `ticker_overrides.csv` (new), tests |
+| Measured on the published files and Tiingo's list, without the OpenFIGI step (needs the private lake): 447 of 1,420 repaired; the 60 largest funds' unpriced share 4.03% → 0.57%. Each repaired stock's history is fetched again on the next pipeline run, so that run is longer | | |
+| Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
+| Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
+
+## 2026-11-15 — Famous funds: Moat investing, Family offices, Sovereign & pension funds, stopped filers
+
+| What changed | Why | Files |
+|---|---|---|
+| New lists: Moat investing (Pershing Square, TCI, Fundsmith ×2, Akre, Lindsell Train, Dorsey), Family offices (Duquesne, Soros, Moore, BlueCrest ×2, Cooperman, Paulson, Appaloosa, Gates Foundation Trust), Sovereign & pension funds (49: 7 sovereign, 2 central banks, 40 pensions incl. Canada's big 8 + IMCO, 15 US, AustralianSuper, UniSuper, Aware Super, Cbus, Korea NPS, Malaysia EPF, Swedish AP1–4). "Other" is gone (Fisher and Glenview → Value); Berkshire is no longer under Big companies | Owner (chat). Not filing a 13F: GIC, QIA, ADIA, KIA, Future Fund, NZ Super (13D/G only), CIC (one 2009 filing), Tencent (13D/G only, CIK 1293451) | `pipeline/orca/famous.csv`, `famous.py` (`FAMOUS_GROUPS`), `web/src/pages/Home.tsx` |
+| Funds that stopped filing are listed: an inactive fund's periods now end at its last quarter (`compute._snapshot`, was the deadline quarter, so it had no period but "since start"); famous rows add `until_q` and the web prints "filed until Qn YYYY". Inactive funds stay out of every other list (`excluded`) | Owner: show them (e.g. BlueCrest, filed to 2018) | `pipeline/orca/run/compute.py`, `home.py`, `contract.md`, `Home.tsx` |
+| Open: the stored snapshots of inactive funds predate this, so they need one Pipeline run with `full` (~2.5 h) before stopped funds show for 1y/3y/5y/10y | | |
+| Answer: GV and CapitalG file no 13F of their own; they are "other included managers" on Alphabet's one 13F (CIK 1652044), so the Alphabet row holds their listed stakes | Owner asked | none |
+
+## 2026-11-15 — Famous funds: one list per style, VC and Big companies
+
+| What changed | Why | Files |
+|---|---|---|
+| The tab shows 9 lists, one per style, each under its own heading and line, 10 funds a page with its own page buttons; the one period switch drives them all. Rows carry `group`; a CIK can be in two lists | Owner (chat) | `web/src/pages/Home.tsx` (`FAMOUS_GROUPS`, `FamousGroup`, `ListTable pageSize/pagerAbove`), `home.css` (`.fam`), `pipeline/orca/famous.py` (`FAMOUS_GROUPS`), `home.py`, `contract.md` |
+| New Venture capital list: 87 rows (Sequoia's US, growth, Global Equities, HongShan, Neil Shen and Peak XV filers; a16z, Kleiner, Accel, Greylock, Founders Fund, General Catalyst, NEA, Insight, Ribbit, TCV, BOND and more). Many VCs file one 13F per fund; stale ones list nothing. GV, CapitalG, Intel Capital and Qualcomm Ventures file inside their parent's 13F. Not found: Benchmark, Lux, Khosla (13F-NT only), YC, Sutter Hill | Owner asked for VC funds incl. Sequoia's offices | `pipeline/orca/famous.csv` |
+| New Big companies list: 25 companies filing their own 13F (Berkshire, Alphabet, NVIDIA, SoftBank, Loews, Uber, Amazon, Toyota, Gilead … Regeneron); only 26 were found, not 30. Research says SpaceX listed on 2026-06-12 (SPCX) and is now most of Alphabet's 13F (not checked here) | Owner asked for big companies with big 13F books (e.g. Google/SpaceX) | same |
+| Ackman (Pershing Square) moved from Activists to Value; BlueCrest (Michael Platt, CIKs 1363542 and 1610880) added under Macro, but it filed only until 2018, so it lists nothing (a famous row needs a current performance). TCI was already listed | Owner | same |
+| Possible next list (not built): sovereign funds that file 13F (Norges Bank, Swiss National Bank, Korea Investment Corp, Saudi PIF, Temasek, Mubadala, ADIC; CIKs in the session research) | | |
+
+## 2026-11-15 — Famous funds tab
+
+| What changed | Why | Files |
+|---|---|---|
+| New home tab "Famous funds" beside Top funds: same columns and period chips (the period is shared), each row links to the fund page, the manager's name under the fund name | Owner asked for a list of famous funds, with key attention on Tiger cubs and popular tech funds (chat) | `web/src/pages/Home.tsx`, `web/src/data/types.ts` |
+| `top_{period}.json` gains `famous` rows (Top funds' row plus `manager`) for the 105 CIKs of `famous.csv`, skipping the Top funds rules but keeping the data checks (perf for the period, ≥ 80% priced, no flag) and a match word on the filer name so a wrong CIK lists nothing | Famous funds are often small, young or concentrated; one file per period keeps it one fetch | `pipeline/orca/famous.py`, `famous.csv`, `home.py`, `publish.py`, `run/publish_step.py`, `run/sources.py`, `run/weekly.py`, `demo.py`, `contract.md` |
+| List researched by a subagent with web search (Wikipedia, Dataroma-style superinvestor lists, EDGAR 13F-HR links): 10 Tiger cubs + Tiger Management, 5 grand-cubs, 22 tech & growth, 39 value, 11 activist, 5 macro, 7 quant/multi-strategy, 6 other. Left out as unconfirmed: Valinor, Joho, Sequoia, Lux, Stripes, Long Pond. sec.gov and data.orcaetf.com were blocked from the session, so no CIK was checked against our own data | | |
+| Open: until the next pipeline run, production files have no `famous` key and the tab says the list arrives with the next data update. After it, check the tab for missing names (a CIK whose filer stopped or changed, e.g. Fundsmith 1569205 vs 1868537, Elliott, Hound, ICONIQ) | | |
+| Checked: pipeline tests, web typecheck and unit tests (3 new tests each side), screenshots at 1280 and 400 px on demo data | | |
+## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
+
+| What changed | Why | Files |
+|---|---|---|
+| vitest 2.1.9 → 4.1.12, vite 5.4.21 → 7.3.7, @vitejs/plugin-react 4.7.0 → 5.2.0 | GitHub listed 17 Dependabot alerts (3 critical, 1 high, 12 moderate, 1 low). The critical ones (tinypool prototype-pollution RCE gadgets, Vitest UI file read) and the high one (launch-editor in vite) are all dev / test tooling, not code shipped to visitors, but they run on developer machines and in CI. Versions picked are a few weeks old rather than the newest, to limit supply-chain risk. Vite 7 rather than 8 to stay on esbuild/Rollup (smaller change) (chat) | `web/package.json`, `web/package-lock.json` |
+| react-router-dom 6.30.6 → react-router 7.18.5 (v7's own package; `react-router-dom` is only a re-export shim). Imports changed in 15 files; the `future` v7 flags on `BrowserRouter` / `MemoryRouter` and the test-setup filter for their console notices are gone (both behaviours are the v7 default, and the app already had them on) | Two moderate advisories with no v6 fix: open redirect via a backslash in `<Link>` / `useNavigate`, and an SSR-only deserialisation issue (not used here). This is the one in the shipped site | `web/src/`, `web/tests/`, `web/package.json` |
+| Trade-off: main bundle 341 → 358 kB (gzip 113.6 → 119.6 kB), from react-router 7 | | |
+| Pipeline: `pip-audit` on `uv.lock` found no known vulnerabilities | | none |
+| Checked: `npm audit` 0 vulnerabilities, `npm ci` on npm 10, typecheck, 940 unit tests, build + prerender, 48 Playwright smoke tests | | |
+| The lockfile was written with npm 11 (npm 10.9 crashes resolving vitest's optional peers); noted under Gotchas in `CLAUDE.md` | | `CLAUDE.md` |
+
+## 2026-11-15 — Tab underline: real width instead of a scaled 1px bar
+
+| What changed | Why | Files |
+|---|---|---|
+| The 2px bar under the open tab (`.tabs .ind`, Home and fund page) now gets its size from `width: var(--w)` and only moves with `translateX`; before it was a 1px box stretched by `scaleX(--w)`. Its slide animates `transform` and `width` | Owner: under Top funds the bar was shorter than the tab at 100% zoom and fixed itself after zooming in and out (chat). Chrome paints a scaled layer once and stretches that picture, so the bar's ends could be off until a zoom forced a repaint. Measured in Chromium before / after (painted bar end vs the tab's right edge, 132 px): 131.3–131.5 → 132 at 1.5×–2× pixel ratios | `web/src/styles.css`, `web/src/fund/returns.css`, `web/src/components/Tabs.tsx`, `web/src/fund/FundHeader.tsx` |
+| The bar also re-measures when any tab button changes size (ResizeObserver on each tab), not only when the strip does | The strip keeps its width when the web font swaps in, but the tabs inside it grow (code) | same |
+| Smoke test for the home head now checks the description names hedge fund holdings and SEC, not "13F" | It failed on `main` since #31 changed the description to "Hedge fund stock holdings and analysis based on SEC data." (owner wording kept) | `web/e2e/smoke.spec.ts` |
+| Checked: typecheck, 940 unit tests, 48 Playwright smoke tests | | |
+
+## 2026-11-15 — Google result: title, description, site icon
+
+| What changed | Why | Files |
+|---|---|---|
+| Home title is now "Orca: Hedge fund holdings" and the description "Hedge fund stock holdings and analysis based on SEC data."; the home og:title follows the `<title>` | Owner: Google still showed "Orca" with the old text for "orca etf" (chat) | `web/index.html`, `web/src/lib/format.ts` (`HOME_TITLE`), `web/scripts/prerender.mjs` |
+| Added `favicon.ico` (16/32/48), `favicon-48.png`, `favicon-192.png` (from `icon-512.png`) and listed them as icons. Google wants a multiple of 48 px and asks for `/favicon.ico` by default; it showed a globe | Same | `web/public/`, `docs/brand/` |
+| Search Console steps (verify, inspect, request indexing, sitemap) are the owner's; Google takes days to weeks to re-crawl | Same | none |
+
+## 2026-11-14 — Home lists: longer fund names, steady columns across pages
+
+| What changed | Why | Files |
+|---|---|---|
+| Fund names on the home lists show about 8 more characters before the "…": the cap is 19em (was 15em for Top funds, 14em for the fund cell in the other tabs), about 37 characters of Instrument Sans 600 at 13 px (≈ 6.6 px a character). Phones keep 10em; the Big wins & losses pair keeps 9em on phones | Owner: names were cut off while the column had room to spare (chat) | `web/src/pages/home.css` (`--nm-w`, `--stk-w`), `Home.tsx` (`stk fund`) |
+| Paged home lists (Top funds, Conviction moves) and Index giants lay out fixed: the Fund column is the name cap plus padding (275 px at 1280, was ~440 px of mostly empty space), Stock is its 14em cap plus padding, and the other columns share the rest equally, never under `--col-min` (8.5em, the "Max Drawdown" heading with its chevron) | Owner: the columns changed width from page to page (auto layout sized them to each page's rows: Fund went 440 → 200 → 446 px on a test list) | `web/src/components/DataTable.tsx` (`fixed`, `Column.width`), `styles.css`, `Home.tsx` (`FUND_W`, `STOCK_W`, `ListTable fixed`) |
+| Trade-off: on a 400 px phone the Top funds table is now 703 px wide (was ~520) because every number column gets the same floor; it still scrolls sideways with the Fund column pinned | | |
+| Checked: typecheck, 940 unit tests (1 new, 1 extended), 48 Playwright smoke tests; measured with a 250-row list in Chromium at 1280 and 400 px: identical column widths on pages 1–3 | | |
 
 ## 2026-11-14 — Official logo ("Lune", v1.1) on the site
 

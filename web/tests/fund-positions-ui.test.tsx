@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { NotFoundError, loadWeekly, priceMap, stockMap } from "../src/data/api";
 import type { LatestPrices, PositionRow, Positions, Securities, Summary, Weekly } from "../src/data/types";
 import { positionRows } from "../src/lib/live";

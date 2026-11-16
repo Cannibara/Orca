@@ -6,8 +6,9 @@ Xilinx: OpenFIGI lists no US line once a stock delists), and skip stocks whose s
 already reaches the vendor's last date (a delisted stock is then never asked again)."""
 
 import io
+import re
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 
 import polars as pl
@@ -19,8 +20,12 @@ VENDOR_TABLE = "vendor_tickers"  # lake table: each stock's ticker at the vendor
 UNIVERSE_URL = "https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip"
 UNIVERSE_SCHEMA = pl.Schema({"ticker": pl.String, "start": pl.Date, "end": pl.Date})
 VENDOR_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "end": pl.Date})
-# A ticker from a non-US listing carries its currency: "XLNXEUR", "TWTRUSD".
-CURRENCY_SUFFIXES = ("USD", "EUR", "GBP", "CHF", "CAD", "JPY", "AUD", "HKD", "SEK", "NOK", "DKK")
+# A ticker from a non-US listing carries its currency: "XLNXEUR", "TWTRUSD", "PXGBX" (pence).
+CURRENCY_SUFFIXES = (
+    "USD", "EUR", "GBP", "GBX", "CHF", "CAD", "JPY", "AUD", "HKD", "SEK", "NOK", "DKK",
+)
+# A Mexican listing of a US stock ends in "*" ("EA*" for Electronic Arts).
+LISTING_MARK = "*"
 
 
 def load_universe(client: Client) -> pl.DataFrame:
@@ -49,34 +54,46 @@ def parse_universe(csv_bytes: bytes) -> pl.DataFrame:
     )
 
 
-def candidates(ticker: str | None) -> list[str]:
-    """The tickers a security may trade under at the vendor: its own, then without a currency
-    suffix."""
-    if not ticker:
-        return []
-    found = [ticker]
-    for suffix in CURRENCY_SUFFIXES:
-        if ticker.endswith(suffix) and len(ticker) > len(suffix):
-            found.append(ticker[: -len(suffix)])
-    return found
+def candidates(ticker: str | None, alternates: Sequence[str] = ()) -> list[str]:
+    """The tickers a security may trade under at the vendor, most likely first: its own; without
+    a currency suffix or a trailing "*" (OpenFIGI's foreign listings of a delisted US stock);
+    either of those without trailing digits ("RTN1USD", "APC3EUR", "LEG1*"); then `alternates`
+    (other tickers found for the same security). Each appears once."""
+    found = [ticker] if ticker else []
+    if ticker:
+        stripped = [
+            ticker[: -len(suffix)]
+            for suffix in CURRENCY_SUFFIXES
+            if ticker.endswith(suffix) and len(ticker) > len(suffix)
+        ]
+        if ticker.endswith(LISTING_MARK) and len(ticker) > 1:
+            stripped.append(ticker[:-1])
+        found += stripped
+        # Digits only go together with a suffix or mark: a plain "HN9" is not cut to "HN".
+        found += [base for t in stripped if (base := re.sub(r"\d+$", "", t)) and base != t]
+    found += [t for t in alternates if t]
+    return list(dict.fromkeys(found))
 
 
 def resolve(
     tickers: Mapping[int, str | None],
     held: Mapping[int, tuple[date, date]],
     universe: pl.DataFrame,
+    alternates: Mapping[int, Sequence[str]] | None = None,
 ) -> pl.DataFrame:
     """VENDOR_SCHEMA rows: for each stock of `tickers` (stock_id -> ticker), the first of its
-    `candidates` the vendor lists over a span that overlaps the stock's held span (`held`:
-    stock_id -> first, last day; a stock without one takes any span), and the last day of the
-    vendor's prices for it. A stock with no such candidate is left out: the vendor has nothing."""
+    `candidates` (with its `alternates`, stock_id -> other tickers) the vendor lists over a span
+    that overlaps the stock's held span (`held`: stock_id -> first, last day; a stock without one
+    takes any span), and the last day of the vendor's prices for it. A stock with no such
+    candidate is left out: the vendor has nothing."""
+    alternates = alternates or {}
     spans: dict[str, list[tuple[date, date]]] = {}
     for ticker, start, end in universe.iter_rows():
         spans.setdefault(ticker, []).append((start, end))
     rows = []
     for stock_id, ticker in tickers.items():
         first, last = held.get(stock_id, (date.min, date.max))
-        for name in candidates(ticker):
+        for name in candidates(ticker, alternates.get(stock_id, ())):
             ends = [end for start, end in spans.get(name, []) if start <= last and end >= first]
             if ends:
                 rows.append((stock_id, name, max(ends)))

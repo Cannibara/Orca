@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import App from "../src/App";
 import { StepChart } from "../src/charts/StepChart";
 import { clearDataCache } from "../src/data/api";
@@ -101,7 +101,7 @@ const soloFund = (trades: TradeTuple[], close: number | null, over: Partial<Reco
 /** Render the whole app at `path`, as main.tsx mounts it. */
 function renderApp(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );

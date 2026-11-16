@@ -110,12 +110,13 @@ test("the pre-rendered fund file holds its own text: heading, summary, largest p
   expect(html).toMatch(/<meta name="description" content="[^"]*13F holdings/);
 });
 
-test("the home page's own head names 13F filings and hedge fund holdings", async ({ page }) => {
+// The owner's wording (#31): "Hedge fund stock holdings and analysis based on SEC data."
+test("the home page's own head names hedge fund holdings and SEC data", async ({ page }) => {
   await open(page, "/");
   await expect(page).toHaveTitle(HOME_TITLE);
   const description = await page.locator('meta[name="description"]').getAttribute("content");
-  expect(description).toMatch(/13F/);
-  expect(description).toMatch(/hedge fund holdings/i);
+  expect(description).toMatch(/hedge fund .*holdings/i);
+  expect(description).toMatch(/SEC/);
 });
 
 // The pre-rendered title names the fund; moving around inside the app must not leave it behind.

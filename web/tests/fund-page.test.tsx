@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
-import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import { clearDataCache, priceMap } from "../src/data/api";
 import type { FundsIndex, LatestPrices, Positions, Summary } from "../src/data/types";
@@ -101,7 +101,7 @@ const noYears = (s: Summary) => {
 /** The page as App.tsx mounts it: under the one TooltipProvider, at /fund/:id. `extra` renders above the routes. */
 function renderFund(id: string | number = FUND, extra: ReactNode = null) {
   return render(
-    <MemoryRouter initialEntries={[`/fund/${id}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[`/fund/${id}`]}>
       <TooltipProvider>
         {extra}
         <Routes>

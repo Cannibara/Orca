@@ -1,9 +1,11 @@
 """Market data of a run: the security master (CUSIPs mapped, new securities enriched), daily prices
 of the stocks that matter, and the T-bill table."""
 
+import csv
 import zipfile
 from collections.abc import Iterable
 from datetime import date, timedelta
+from pathlib import Path
 
 import polars as pl
 
@@ -40,6 +42,8 @@ from orca.securities import (
     normalise_name,
     normalise_ticker,
     sector_for_sic,
+    tickers_by_name,
+    us_tickers,
 )
 from orca.storage import Lake
 from orca.vendor import VENDOR_SCHEMA, VENDOR_TABLE, resolve
@@ -51,6 +55,20 @@ COMPACT_AT_PARTS = 64  # ... or this many run parts (a long backfill flushes man
 UNMAPPED_RETRY_DAYS = 28  # an unmapped CUSIP is asked about again after four weeks
 REMAP_DAYS = 28  # a held CUSIP OpenFIGI mapped is asked about again after four weeks ...
 REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
+# Stocks the vendor has under none of their tickers: their US ticker, delisted ones included, is
+# asked of OpenFIGI once (lake table US_TICKERS_TABLE), at most this many a run.
+US_TICKERS_TABLE = "figi_us_tickers"
+US_TICKERS_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "tried": pl.Date})
+US_TICKERS_PER_RUN = 1000
+# Hand-checked vendor tickers for big holdings no rule finds (a company renamed or moved under a
+# new parent): cusip -> ticker. Tried first among the alternates, and still only over the days
+# the vendor lists the ticker.
+TICKER_OVERRIDES_CSV = Path(__file__).parent.parent / "ticker_overrides.csv"
+
+
+def ticker_overrides() -> dict[str, str]:
+    with TICKER_OVERRIDES_CSV.open(newline="") as f:
+        return {row["cusip"]: normalise_ticker(row["ticker"]) for row in csv.DictReader(f)}
 # Prices of stocks sold out this recently are still refreshed: an exit's `one_y` needs the close
 # four quarters after the sale, so the sale's quarter, four more and one to spare.
 EXIT_REFRESH_QUARTERS = 6
@@ -440,13 +458,17 @@ def held_spans(lake: Lake, stocks: dict[str, int]) -> dict[int, tuple[date, date
     return {sid: (q_start(first), q_end(last)) for sid, (first, last) in spans.items()}
 
 
-def resolve_vendor_tickers(lake: Lake, sources: Sources, state: State, flags: list) -> dict | None:
-    """Rewrite VENDOR_TABLE from the vendor's universe: each stock's ticker there (its own, or
-    without a currency suffix) if the vendor lists it over the days the stock was held, and the
-    vendor's last day. A stock missing from the table is not asked for. A stock whose vendor
-    ticker differs from the one its prices were fetched under has its history fetched again
-    (`state.price_refetch`). Without a universe (none configured, or the download failed:
-    flagged) the stored table stays as it is."""
+def resolve_vendor_tickers(
+    lake: Lake, sources: Sources, state: State, today: date, flags: list, budget: Budget
+) -> dict | None:
+    """Rewrite VENDOR_TABLE from the vendor's universe: each stock's ticker there if the vendor
+    lists it over the days the stock was held, and the vendor's last day. Tried in order: the
+    security's own ticker and its repairs (`vendor.candidates`), then, for a stock still without
+    one, the SEC ticker of the same company name and the US ticker OpenFIGI gives its CUSIP
+    with delisted listings included (`alternate_tickers`). A stock missing from the table is not
+    asked for. A stock whose vendor ticker differs from the one its prices were fetched under has
+    its history fetched again (`state.price_refetch`). Without a universe (none configured, or
+    the download failed: flagged) the stored table stays as it is."""
     if sources.price_universe is None:
         return None
     try:
@@ -463,9 +485,17 @@ def resolve_vendor_tickers(lake: Lake, sources: Sources, state: State, flags: li
         flags.append({"type": "price_universe_failed", "detail": "the universe is empty"})
         return None
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
-    stocks = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
+    cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
+    stocks = stock_of(cusip_map)
     tickers = dict(securities.select("stock_id", "ticker").iter_rows())
-    resolved = resolve(tickers, held_spans(lake, stocks), universe)
+    spans = held_spans(lake, stocks)
+    resolved = resolve(tickers, spans, universe)
+    missing = set(tickers) - set(resolved["stock_id"].to_list())
+    alternates, counts = alternate_tickers(
+        lake, sources, securities, cusip_map, missing, today, flags, budget
+    )
+    if alternates:
+        resolved = resolve(tickers, spans, universe, alternates)
     # The ticker each stock's stored prices were fetched under: its vendor ticker of the last
     # run, else (a stock new to the table, or the first run with one) the security's own.
     stored = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)
@@ -483,7 +513,90 @@ def resolve_vendor_tickers(lake: Lake, sources: Sources, state: State, flags: li
         "vendor_tickers": resolved.height,
         "no_vendor": len(tickers) - resolved.height,
         "vendor_ticker_changed": len(moved),
+        **counts,
     }
+
+
+def _plain(ticker: str | None) -> bool:
+    """A share's ticker; OpenFIGI names a bond or an option with spaces ("ORCL 6-5 01-15-29 D"),
+    and those must never borrow a share's prices."""
+    return bool(ticker) and " " not in ticker
+
+
+def alternate_tickers(
+    lake: Lake,
+    sources: Sources,
+    securities: pl.DataFrame,
+    cusip_map: pl.DataFrame,
+    missing: set[int],
+    today: date,
+    flags: list,
+    budget: Budget,
+) -> tuple[dict[int, list[str]], dict]:
+    """Other tickers for the `missing` stocks (no vendor ticker from their own): the hand-checked
+    `ticker_overrides`, then, for those that look like shares: stock_id -> [SEC ticker of the same normalised name (exactly one SEC row; not for
+    a ticker with "-"), OpenFIGI US ticker]. OpenFIGI is asked (`securities.us_tickers`) only about a stock it has not been
+    asked about, by the first of its CUSIPs, at most US_TICKERS_PER_RUN a run, and the answer
+    (a ticker, or none) is kept in US_TICKERS_TABLE. A failed SEC or OpenFIGI call is flagged and
+    leaves that source out this run. Returns the alternates and counts to log."""
+    rows = securities.filter(pl.col("stock_id").is_in(list(missing)))
+    tickers_of = {
+        sid: ticker
+        for sid, ticker in rows.select("stock_id", "ticker").iter_rows()
+        if _plain(ticker)
+    }
+    shares = {
+        sid: name
+        for sid, name in rows.select("stock_id", "name").iter_rows()
+        if sid in tickers_of
+    }
+    alternates: dict[int, list[str]] = {}
+    counts = {"alt_by_name": 0, "alt_us_asked": 0}
+    stock_of_cusip = stock_of(cusip_map)
+    for cusip, ticker in ticker_overrides().items():
+        if (sid := stock_of_cusip.get(cusip)) in missing:
+            alternates.setdefault(sid, []).append(ticker)
+    if not shares:
+        return alternates, counts
+    # By name only for a plain common share: a warrant, unit or preferred ("XYZ-WS", "XYZ-PA")
+    # carries its company's name too, and would take the common stock's prices.
+    named = {sid: name for sid, name in shares.items() if "-" not in tickers_of[sid]}
+    try:
+        by_name = tickers_by_name(named, sources.sec_tickers()) if named else {}
+    except FetchError as err:
+        flags.append({"type": "sec_tickers_failed", "url": strip_query(err.url), "status": err.status})
+        by_name = {}
+    for sid, ticker in by_name.items():
+        alternates.setdefault(sid, []).append(ticker)
+    counts["alt_by_name"] = len(by_name)
+
+    asked = read_table(lake, US_TICKERS_TABLE, US_TICKERS_SCHEMA)
+    known = set(asked["stock_id"].to_list())
+    cusip_of: dict[int, str] = {}
+    for cusip, sid, method in cusip_map.sort("cusip").select("cusip", "stock_id", "method").iter_rows():
+        if sid is not None and method == OPENFIGI:
+            cusip_of.setdefault(sid, cusip)
+    due = sorted(sid for sid in shares if sid not in known and sid in cusip_of)[:US_TICKERS_PER_RUN]
+    if due and not budget.spent():
+        try:
+            answers = us_tickers(sources.figi, [cusip_of[sid] for sid in due])
+        except FetchError as err:
+            flags.append({"type": "us_tickers_failed", "url": strip_query(err.url), "status": err.status})
+            answers = None
+        except ValueError as err:
+            flags.append({"type": "us_tickers_failed", "detail": str(err)[:200]})
+            answers = None
+        if answers is not None:
+            new = [(sid, answers[cusip_of[sid]], today) for sid in due if cusip_of[sid] in answers]
+            asked = pl.concat(
+                [asked, pl.DataFrame(new, schema=US_TICKERS_SCHEMA, orient="row")]
+            ).cast(US_TICKERS_SCHEMA)
+            lake.write(US_TICKERS_TABLE, asked.sort("stock_id"))
+            counts["alt_us_asked"] = len(new)
+    for sid, ticker in asked.select("stock_id", "ticker").iter_rows():
+        if sid in shares and ticker:
+            alternates.setdefault(sid, []).append(ticker)
+    return alternates, counts
 
 
 def refresh_prices(

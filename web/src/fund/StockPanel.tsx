@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { niceTicks } from "./geometry";
 import { midQuarterMs, tradeMove } from "../lib/live";
 import { qLabelFull, fM, MINUS } from "./fmt";

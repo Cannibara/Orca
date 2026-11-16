@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-14 (workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-16 (vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -49,7 +49,8 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `rf.py` | FRED DTB3 yearly average (`fetch_tbill`) |
 | `storage.py` | `Lake` (zstd Parquet, atomic writes), `Manifest` |
 | `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
-| `home.py` | home lists (`top_funds`, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
+| `famous.py`, `famous.csv` | the hand-kept Famous funds list (CIK, match word, manager, group); `Sources.famous` (the demo injects its own) |
+| `home.py` | home lists (`top_funds` with its `famous` rows, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
 | `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
@@ -89,7 +90,7 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 | Notice filings | 13F-NT / 13F-NT/A carry no holdings and are skipped (`sec/bulk.KEPT_FORMS`); a fund that only filed a notice shows its previous quarter (Pershing Square Q2 2026) (code)(chat) |
 | Value in thousands after 2023 | some filers kept reporting thousands; ~1,000 `price_mismatch` flags, often exactly 1000× (chat) |
 | Invalid CUSIPs | ~29,000 filing CUSIPs (often a dropped leading zero) get an OpenFIGI error → method "error", no name match, left out (`securities.py`) (code)(chat) |
-| Delisted stocks | OpenFIGI drops the US ticker and returns a foreign listing (`XLNXEUR`, `TWTRUSD`); repaired by stripping `vendor.CURRENCY_SUFFIXES` (code) |
+| Delisted stocks | OpenFIGI drops the US ticker and returns a foreign listing (`XLNXEUR`, `TWTRUSD`, `EA*`, `RTN1USD`, `ZKN`). `vendor.candidates` strips a currency suffix (GBX included) or a trailing `*`, then trailing digits after one. A stock still without a vendor ticker tries, in order: `pipeline/orca/ticker_overrides.csv` (hand-checked, by CUSIP: Exxon's pre-2026 CUSIP → XOM, CenturyLink → LUMN, …), the SEC ticker of the same normalised name (exactly one SEC row; not for tickers with `-` or spaces), and OpenFIGI's US ticker with `includeUnlistedEquities` (asked once per stock, kept in lake table `figi_us_tickers`, ≤ 1000 a run). Bonds and options (tickers with spaces) only get overrides (`run/market.alternate_tickers`) (code) |
 | Reused tickers | a vendor ticker counts only over dates overlapping the stock's held span (`vendor.resolve`; `FB` today is not Facebook) (code) |
 | Holding companies and corporates | single-stock vehicles jump 0 → 96%+; filers like Alphabet Inc. report huge new stakes; book jumps from newly priced holdings or restructurings (Woodbridge $737M → $25.2bn). Conviction skips largest holding > 33% and AUM change outside ½–2× (code `home._conviction_quarter`)(chat) |
 | Share-count errors | some BRK-A share counts were off 15–28× (chat) |

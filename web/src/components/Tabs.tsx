@@ -46,7 +46,7 @@ export function Tabs<T extends string>({
     const er = el!.getBoundingClientRect();
     const br = b.getBoundingClientRect();
     ind.style.setProperty("--x", br.left - er.left + el!.scrollLeft + "px");
-    ind.style.setProperty("--w", String(br.width));
+    ind.style.setProperty("--w", br.width + "px");
   }, []);
   useLayoutEffect(place, [place, value, tabs]);
   useEffect(() => {
@@ -61,6 +61,8 @@ export function Tabs<T extends string>({
     if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(place);
       ro.observe(el);
+      // The strip keeps its size when the web font swaps in, but each tab gets wider.
+      el.querySelectorAll('[role="tab"]').forEach((t) => ro!.observe(t));
     }
     window.addEventListener("resize", place);
     void document.fonts?.ready.then(place);

@@ -316,6 +316,9 @@ function shareTags(title, description, page, image) {
 /** A JSON-LD block. "<" is escaped so a fund name can never close the script tag. */
 const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj).replace(/</g, "\\u003c")}</script>`;
 
+const CF_INSIGHTS_SCRIPT = "https://static.cloudflareinsights.com";
+const CF_INSIGHTS_REPORT = "https://cloudflareinsights.com";
+
 /**
  * The text of dist/_headers. `origin` is the data site's origin when the app loads its data from
  * another one (it is added to connect-src, the only directive that lets the page fetch from it),
@@ -328,13 +331,16 @@ const jsonLd = (obj) => `<script type="application/ld+json">${JSON.stringify(obj
  * can match the custom domain.
  */
 function renderHeaders(origin, hsts) {
+  // Cloudflare Web Analytics (switched on in the Pages project, which injects its beacon into
+  // every page): the script comes from static.cloudflareinsights.com and reports to
+  // cloudflareinsights.com. No cookies, no personal data.
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src 'self' ${CF_INSIGHTS_SCRIPT}`,
     "style-src 'self'",
     "img-src 'self' data:",
     "font-src 'self'",
-    `connect-src 'self'${origin === null ? "" : ` ${origin}`}`,
+    `connect-src 'self'${origin === null ? "" : ` ${origin}`} ${CF_INSIGHTS_REPORT}`,
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -422,7 +428,7 @@ async function main() {
     // The shared shell serves every other route: share tags without a page address.
     const desc = (template.match(DESCRIPTION)?.[0].match(/content="([^"]*)"/) ?? [])[1] ?? "";
     const site_ld = jsonLd({ "@context": "https://schema.org", "@type": "WebSite", name: "Orca", alternateName: SITE_NAMES, url: `${site}/` });
-    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags("Orca", desc, null, image)}\n    ${site_ld}`);
+    const shell = template.replace(DESCRIPTION, (d) => `${d}${shareTags((template.match(TITLE)?.[0].replace(/<\/?title>/g, "") ?? "Orca"), desc, null, image)}\n    ${site_ld}`);
     await writeFile(indexFile, shell);
   }
 
