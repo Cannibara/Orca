@@ -51,6 +51,8 @@ def rules(data: dict) -> list[dict[str, str]]:
     listed = sum(1 for x in stocks if len(x) < 12 or x[11] == 0)
     by_model = sum(1 for x in stocks if len(x) > 11 and x[11] == 2)
     etfs = [x for x in data.get("nl", []) if x[5] == "etf"]
+    classes = data.get("etf", {})
+    etf_text = ("Classified so far (biggest 400, by dollars): " + "; ".join(f"{k} {n} (${round(m / 1000):,}bn)" for k, (n, m) in sorted(classes.items(), key=lambda kv: -kv[1][1])) + ".") if classes else "They are not classified yet."
     return [
         dict(id="R2", q="Every stock has one main label (used for scoring) and any number of extra labels (used for comparisons).",
              rec="Yes. A fund's sector and industry weights must add to 100%, so each stock needs exactly one main label. Extra labels never change a score. They let you choose the peer set for one holding: Micron against all Semiconductors or just Memory; Vistra against Nuclear Power Producers, Natural Gas Power Producers, or both.",
@@ -74,8 +76,8 @@ def rules(data: dict) -> list[dict[str, str]]:
              rec="Yes, for now: tagged, with a confidence, and open to your review. It replaces my earlier plan (the label most common for the stock's SEC SIC code), which needs a company id Orca does not hold and is too coarse for verticals. The model agrees with your hand placements 97% of the time on a blind test.",
              ev=f"His file gives {listed:,} stocks on this page; {by_model:,} came from the model's first pass. Orca prices about 22,800 stocks since 2013."),
         dict(id="R12", q="ETFs the funds hold: leave them unlabelled, or count a single-sector ETF as a bet on its sector?",
-             rec="Count sector and industry ETFs (SOXX, XLF, XLK) as a bet on that sector or industry for allocation, because a fund that buys SOXX is making a semiconductor call. Leave broad-market, bond, commodity and international ETFs unlabelled. An ETF never counts as a stock pick.",
-             ev=f"{len(etfs):,} ETFs, {round(sum(x[3] for x in etfs) / 1000):,}bn of the dollars the top funds bought. They are not labelled yet; see the Not labelled tab."),
+             rec="Count single-sector and single-industry ETFs (SOXX, XLF, XLK, XBI) as a bet on that sector or industry for allocation, because a fund that buys SOXX is making a semiconductor call. Leave broad-market, international, bond, commodity and mixed ETFs unlabelled. An ETF never counts as a stock pick. The Not labelled tab already shows what a model made of each big ETF.",
+             ev=f"{len(etfs):,} ETFs, ${round(sum(x[3] for x in etfs) / 1000):,}bn of the dollars the top funds bought. " + etf_text),
         dict(id="R9", q='Which level counts as "sector picking"?',
              rec=f"Allocation between industries ({n_industries} buckets), with a toggle to sector ({len(data['sec'])}) or industry vertical. Stock picking is scored against the peer set you choose, widened to the industry when the vertical has fewer than 10 peers.",
              ev="Your fund A (GPU) vs fund B (memory) example is an industry-vertical toggle inside Semiconductors."),
@@ -106,11 +108,16 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
     held: dict[int, set[int]] = {}
     taken = {row[0].upper() for row in data["st"]}
     nl = []
+    etf_stats: dict[str, list] = {}
     for r in final:
         u = universe[r["stock_id"]]
         millions = u["invested"] / 1e6
         if r["main"] is None:
-            nl.append([r["stock_id"], r["ticker"], r["name"], round(millions, 1), u["n_funds"], r["kind"], r["conf"] or 0, r["note"]])
+            nl.append([r["stock_id"], r["ticker"], r["name"], round(millions, 1), u["n_funds"], r["kind"], r["conf"] or 0, etf_note(r.get("etf")) or r["note"]])
+            if r.get("etf"):
+                counts = etf_stats.setdefault(r["etf"]["label"], [0, 0.0])
+                counts[0] += 1
+                counts[1] = round(counts[1] + millions, 1)
             continue
         ref = r.get("ref")
         listed = ref and ref["exchange"] in US_EXCHANGES and (r["src"] == "hierarchy" or "was" in r)
@@ -137,10 +144,23 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
         data["st"][at][10] = len(ids)
     nl.sort(key=lambda x: -x[3])
     data["nl"] = nl
+    data["etf"] = etf_stats
     data["top"] = {
         "funds": [[f["fund_id"], f["name"], f["ann_return"], f["book"], f["n_positions"]] for f in funds["eligible"][: len(universe_funds(universe))]],
         "period": PERIODS.get(funds["period"], funds["period"]),
     }
+
+
+def etf_note(etf: dict | None) -> str:
+    """What a model made of an ETF, in a few words: "sector ETF → Technology › Semiconductors (industry), 3x"."""
+    if not etf:
+        return ""
+    text = etf["label"]
+    if etf["k"] == "sector":
+        text += f" → {' › '.join(etf['path'].split(' > '))} ({etf['lv']})"
+    if etf.get("lev"):
+        text += f", {etf['lev']}"
+    return text
 
 
 def universe_funds(universe: dict) -> set[int]:
