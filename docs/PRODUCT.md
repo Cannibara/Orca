@@ -1,6 +1,6 @@
 # Product
 
-Last verified: 2026-11-14
+Last verified: 2026-11-15
 
 Tags: (chat) session conversation, (code) checked in code, (git) commit history, (spec) `docs/superpowers/specs/2026-10-30-orca-fund-pnl-design.md`.
 
@@ -21,7 +21,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 ## Features
 | Status | Feature | Where |
 |---|---|---|
-| Shipped | Home: fund search (`/` focuses it) and 5 tabs (Top funds 1y/3y/5y/10y/15y/since start + Index giants, Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
+| Shipped | Home: fund search (`/` focuses it) and 6 tabs (Top funds 1y/3y/5y/10y/15y/since start + Index giants, Famous funds (one list per style, 10 a page each, the period shared with Top funds), Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
 | Shipped | Fund page panels (below) | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code) |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
 | Shipped | Not found page (the How it works page was removed 2026-11-11: users need no 13F education) | `web/src/pages/NotFound.tsx` (chat)(code) |
@@ -49,6 +49,7 @@ Thresholds in `pipeline/orca/config.py`, applied in `pipeline/orca/home.py` (cod
 | List | Who and what qualifies |
 |---|---|
 | Top funds (1y/3y/5y/10y/15y/max) | book ≥ $1B, ≥ 12 quarters filed, ≥ 4 positions (owner lowered it from 10), ≥ 80% of book priced; names starting a word with BANK, BANCORP, TRUST CO, INSURANCE, ASSURANCE, SECURITIES LLC or BROKERAGE excluded; ≥ 1,000 priced positions → Index giants tab. Pensions and retirement systems count (owner, 2026-11-04) |
+| Famous funds | the 365 rows of `pipeline/orca/famous.csv` in 14 style lists, in this order: Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare specialists, Tech & growth, Venture capital, Activists, Macro, Family offices, Quant & multi-strategy, Big companies, Sovereign & pension funds (owner, 2026-11-15/16; no "Other" list). Shown whatever their size, age or position count, and also after they stopped filing (owner): then the periods end at the last 13F and the row says "filed until Qn YYYY". A fund can be in two lists. Ackman and Hohn are under Moat investing, Berkshire under Buffett inspired (owner). A row needs a performance for the period, ≥ 80% of book priced, and a filer name holding the row's match word (or one of its `|` alternatives, for a renamed filer). The manager's name shows under the fund name. Data appears after the next pipeline run; funds that stopped filing need one `full` rebuild |
 | Conviction moves | quarter filed with the one before, end AUM ≥ $500M, AUM change within ½–2×, < 1,000 positions, largest holding at the start 0–33%; move ≥ 3% of AUM, ≥ 2× the usual move (floor 1%), ≥ ½ the largest holding; ETFs neither listed nor counted; 200 rows per view; ranked by a hidden score |
 | Best & worst calls | top funds (not giants) or concentrated funds (4–60 positions, ≥ $500M); new or add ≥ 1% of book; market cap ≥ $300M; price ≥ $1; 50 best + 50 worst cut at build time, re-ranked live (R7) |
 | Crowded buys | new or add by ≥ 3 distinct concentrated active funds (4–60 positions, ≥ $500M) in the latest quarter |

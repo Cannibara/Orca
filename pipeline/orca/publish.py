@@ -429,6 +429,7 @@ def publish_shared(
             "period": period,
             "eligible": top["eligible"],
             "giants": top["giants"],
+            "famous": top.get("famous", []),
         }
     docs["home/wins_losses.json"] = {
         "latest_q": latest_q,

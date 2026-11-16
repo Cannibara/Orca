@@ -3,7 +3,7 @@ calls. Every list is a plain function of the per-fund snapshots and returns JSON
 (dicts of int, float, str and None; dates as ISO strings), identified by stock_id and fund_id."""
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -35,6 +35,7 @@ from orca.config import (
 )
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
+from orca.famous import Famous
 
 _BUYS = ("new", "add")
 CALLS_EACH_END = 50  # the calls lists keep this many best and this many worst rows
@@ -50,7 +51,8 @@ class FundSnapshot:
     each stock_id with its trade in the latest quarter; `pnl_latest` is the latest quarter's P&L
     per stock; `buys_recent` holds (stock_id, q, est. price, weight after, filed) for recent new
     and add trades. Both leave out entry trades (`Trade.entry`: a first report is no move). `perf`
-    is keyed by period (the keys of `config.PERIODS`), None when too short.
+    is keyed by period (the keys of `config.PERIODS`), None when too short. `excluded` marks a
+    fund that stopped filing (inactive): its `perf` periods end at its last quarter, `period_q`.
 
     `conviction_quarters` holds what the conviction lists need of each of the fund's last
     CONVICTION_LOOKBACK + CONVICTION_WINDOW quarters (`ConvictionQuarter`), so their rules apply at
@@ -104,13 +106,23 @@ def is_excluded_name(name: str) -> bool:
     return _EXCLUDED.search(name.upper()) is not None
 
 
-def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
+def top_funds(
+    snaps: list[FundSnapshot], period: str, famous: Sequence[Famous] = ()
+) -> dict[str, list[dict]]:
     """The funds worth ranking over `period` (a key of `config.PERIODS`), by return per year.
 
     A fund needs the top-fund basics (book, quarters filed, priced positions, priced share of
     the book, not a bank or similar) and a performance for the period. Funds holding
     GIANT_MIN_POSITIONS or more priced positions are index giants and are listed apart, in
-    "giants", never in "eligible"."""
+    "giants", never in "eligible".
+
+    "famous" lists the funds of `famous` (famous.csv) whatever their size, age or number of
+    positions, and also when they stopped filing: a performance for the period, at least
+    TOP_MIN_PRICED of the book priced (below that the return says little) and a filer name holding
+    the list's match word (a CIK typed wrong lists nothing rather than some other fund). Its rows
+    add `manager`, `group` (the style list it is shown in; a fund in two lists has a row for each)
+    and `until_q`: the last quarter of a fund that stopped filing (its figures run to it), else
+    None."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -119,20 +131,50 @@ def top_funds(snaps: list[FundSnapshot], period: str) -> dict[str, list[dict]]:
         if p is None or not _top_base(s):
             continue
         ranked.append((s, p))
-    ranked.sort(key=lambda sp: _return_order(sp[1].ann_return) + (sp[0].fund_id,))
-    out: dict[str, list[dict]] = {"eligible": [], "giants": []}
-    for s, p in ranked:
-        row = {
-            "fund_id": s.fund_id,
-            "name": s.name,
-            "book": float(s.book),
-            "n_positions": int(s.n_priced),
-            "ann_return": _num(p.ann_return),
-            "max_dd": _num(p.max_dd),
-            "sharpe": _num(p.sharpe),
+    out: dict[str, list[dict]] = {"eligible": [], "giants": [], "famous": []}
+    for s, p in _by_return(ranked):
+        out["giants" if s.n_priced >= GIANT_MIN_POSITIONS else "eligible"].append(_top_row(s, p))
+    by_id = {s.fund_id: s for s in snaps}
+    picked = []
+    for f in famous:
+        s = by_id.get(f.fund_id)
+        p = s.perf.get(period) if s is not None else None
+        if p is None or s.priced_pct < TOP_MIN_PRICED or not _name_matches(s.name, f.match):
+            continue
+        picked.append((s, p, f))
+    picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
+    out["famous"] = [
+        {
+            **_top_row(s, p),
+            "manager": f.manager or None,
+            "group": f.group,
+            "until_q": int(s.period_q) if s.excluded else None,
         }
-        out["giants" if s.n_priced >= GIANT_MIN_POSITIONS else "eligible"].append(row)
+        for s, p, f in picked
+    ]
     return out
+
+
+def _name_matches(name: str, match: str) -> bool:
+    """Whether a filer name holds the famous list's match word, or one of its "|" alternatives."""
+    return any(m.strip() and m.strip() in name.upper() for m in match.split("|"))
+
+
+def _by_return(ranked: list[tuple[FundSnapshot, Performance]]) -> list:
+    """Best return per year first, then by fund id."""
+    return sorted(ranked, key=lambda sp: _return_order(sp[1].ann_return) + (sp[0].fund_id,))
+
+
+def _top_row(s: FundSnapshot, p: Performance) -> dict:
+    return {
+        "fund_id": s.fund_id,
+        "name": s.name,
+        "book": float(s.book),
+        "n_positions": int(s.n_priced),
+        "ann_return": _num(p.ann_return),
+        "max_dd": _num(p.max_dd),
+        "sharpe": _num(p.sharpe),
+    }
 
 
 def conviction_moves(
