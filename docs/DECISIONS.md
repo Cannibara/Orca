@@ -10,7 +10,7 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Decision (chat): classify every stock the 100 best funds ever held in the hierarchy. The window (since start) is my choice; the owner has not said which ranking they meant.
 - Decision (mine, open for the owner): match Orca's names to Damodaran's global company file by words, not by ticker, because Orca's tickers are often garbled and his file also holds ADRs and foreign lines. For stocks it does not cover, a model reads the name and picks a vertical, tagged and with a confidence (R8 changed from "SEC SIC code" to this). A model that knows a company replaces a Damodaran group default, because a blind audit found the defaults wrong on 27% of verticals and 6% of sectors while the model matched the owner's hand placements 97% of the time.
 - Rejected: SEC SIC codes for the rest (needs a CIK per stock, which Orca's public data does not carry; too coarse for verticals); trusting group defaults unchecked.
-- Not decided: ETFs (R12). I recommend counting a single-sector ETF as a bet on that sector and leaving broad, bond, commodity and international ETFs unlabelled.
+- Not decided: ETFs (R12). I recommend counting a single-sector ETF as a bet on that sector and leaving broad, bond, commodity and international ETFs unlabelled. A model has classed the biggest 400 ETFs (90 are single-sector, $29bn bought) so the owner can see what it would add; nothing scores them.
 - Consequences: the labelled outputs stay out of the repo while it is public and Damodaran's licence is unclear (R10). A fund page cannot show a label until the owner reviews it and the contract changes.
 
 ## 2026-11-16 — Sector hierarchy for the sector-picker / stock-picker metric (owner)
