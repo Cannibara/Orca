@@ -13,6 +13,7 @@ from orca.prices import (
     FixtureSource,
     TiingoSource,
     compact_prices,
+    drop_stocks,
     part_stocks,
     price_runs,
     read_prices,
@@ -990,3 +991,27 @@ def test_a_new_split_day_in_the_open_quarter_is_a_change(tmp_path):
     )
 
     assert changed == [1]
+
+
+def test_drop_stocks_removes_every_bar_of_those_stocks_in_every_file(tmp_path):
+    lake = Lake(tmp_path)
+    update_prices(
+        lake, FixtureSource({"AAA": daily(*WEEK1), "BBB": daily(*WEEK1)}), {1: "AAA", 2: "BBB"},
+        today=D(2024, 5, 10),
+    )
+    update_prices(
+        lake, FixtureSource({"AAA": daily(*WEEK1, *WEEK2), "BBB": daily(*WEEK1, *WEEK2)}),
+        {1: "AAA", 2: "BBB"}, today=D(2024, 5, 17),
+    )
+    compact_prices(lake)  # yearly parts too
+    update_prices(lake, FixtureSource({"AAA": daily(*WEEK2)}), {1: "AAA"}, today=D(2024, 5, 17), run_id="later")
+    before = read_prices(lake)
+
+    dropped = drop_stocks(lake, [1, 99])
+
+    after = read_prices(lake)
+    assert dropped > 0
+    assert after["stock_id"].unique().to_list() == [2]
+    assert after.equals(before.filter(pl.col("stock_id") == 2))
+    assert drop_stocks(lake, [1]) == 0  # nothing left to drop
+    assert drop_stocks(lake, []) == 0

@@ -16,6 +16,14 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
 | Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
 
+## 2026-11-16 — Reused tickers: current vendor line only, wrong prices dropped
+
+| What changed | Why | Files |
+|---|---|---|
+| `vendor.resolve` accepts a ticker only on its current line at Tiingo (the one ending last; a tie goes to the longer line), still only when it overlaps the held days | Tiingo answers a ticker with today's company: Anadarko got today's APC from 2026-02, Macquarie got a 2026 ETF's MIC. About 67 stocks from the repair above, and about 509 from before it, were priced this way (code)(chat) | `pipeline/orca/vendor.py`, `tests/test_vendor.py` (the old "OLD" case now gets no ticker) |
+| A stock whose vendor ticker changes or is lost has every stored bar dropped (`prices.drop_stocks`, one file at a time), is fetched again if it still has a ticker, and is owed to its funds and its weekly file. Over 2000 lost in one run: nothing changes, flag `vendor_tickers_lost` | Refetching on a ticker change kept the old ticker's bars on days the new one lacks; a lost stock kept another company's bars | `pipeline/orca/prices.py`, `run/market.py` |
+| Published `stock/<id>/weekly.json` of a stock left with no priced day is deleted: the run writes `out/deleted.txt`, the upload step checks every line is `stock/<digits>/weekly.json` and deletes them before the manifest | The contract says such a stock has no file, and the upload never deleted anything, so the wrong chart would have stayed | `run/weekly.py` (`stale_weekly`, `write_deletions`), `.github/workflows/pipeline.yml` |
+
 ## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
 
 | What changed | Why | Files |
