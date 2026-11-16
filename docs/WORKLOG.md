@@ -5,6 +5,16 @@ Last verified: 2026-11-15
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
+
+| What changed | Why | Files |
+|---|---|---|
+| New Buffett inspired list (21; Berkshire moved here from Value, with Pabrai, Li Lu, Daily Journal, Spier ×2, Markel, Fairfax, Sequoia Fund ×2, Tweedy Browne, Russo, Bloomstran, Lou Simpson, Mecham, Alleghany, Biglari ×2, Chou, Van Den Berg, Kahn Brothers). Pabrai's 2004–11 filer, Weschler's Peninsula and Combs' Castle Point left out: they stopped before 2013. Pabrai's Wagons fund files N-PORT, not 13F | Owner; "Richer, Wiser, Happier" insurer = Markel (Gayner) | `pipeline/orca/famous.csv`, `famous.py`, `web/src/pages/Home.tsx` |
+| Moat investing +31 (strong and medium fits: Nomad, Magellan, Hyperion, Veritas, Findlay Park, Seilern, Comgest, AKO, Troy, GuardCap, Cantillon, Ensemble, Jensen, WCM, SGA, Bares, Saber, FMI, GQG, Lakehouse, Montaka, Mawer, Burgundy …), Wedgewood moved from Value, Rule One Partners (Phil Town, CIK 2040263) | Owner | same |
+| New Fundamental long/short list (31 + Glenview from Value: Egerton, Lansdowne, Marshall Wace, Melvin, Eminence, Kingdon, Soroban, Steadfast, Darsana, Holocene, Woodline, Lakewood, Cat Rock …); Sculptor (OZ Management) and Farallon added to Quant & multi-strategy. Left for the owner: 18 smaller or Tiger-linked long/shorts and 11 healthcare specialists (Baker Bros, RA, Perceptive, OrbiMed, Deerfield …), in the session research | Owner: a home for famous funds no other list fits | same |
+| Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
+| Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
+
 ## 2026-11-15 — Famous funds: Moat investing, Family offices, Sovereign & pension funds, stopped filers
 
 | What changed | Why | Files |
