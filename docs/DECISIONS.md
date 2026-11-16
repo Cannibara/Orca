@@ -1,10 +1,19 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-11
+Last verified: 2026-11-16
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-16 — Sector hierarchy for the sector-picker / stock-picker metric (owner)
+- Decision (chat): classify every stock in three levels, Sector → Industry → Industry vertical ("industry vertical" is the owner's name for the third level; "sub-industry" was recommended and "specialty" suggested, neither chosen). Start from Damodaran's 94 US industry groups, cross-check with Fama-French 48, hand-place the stocks that matter, and give every group a default for the rest. Sectors: Technology, Communication, Consumer, Healthcare, Financials, Business Services, Industrials, Defence, Materials, Energy, Utilities, Property.
+- Decision (chat): a stock has one main label (scoring) and any number of extra labels (comparisons), so one pick can be compared with different peer sets: Micron against all Semiconductors or only Memory; Vistra as a nuclear play against nuclear stocks and against gas power producers. Alphabet carries five labels: Search & Advertising (main); Cloud Infrastructure Provider, Consumer Services and Entertainment under Software; Streaming & Studios.
+- Decision (chat): Defence is its own sector (Leidos: Defence › Technology › Autonomous Systems; Palantir: Technology › Software › Defence Systems Software; "Government IT services" scrapped because those firms serve many customers). Pharmacies sit in Consumer › Retail. Vistra and NRG carry Natural Gas and Nuclear "Power Producers". Every oil producer is labelled Production. Autos are Industrials › Manufacturing, with carmakers and auto parts as separate main labels and Automotive as an umbrella extra label; no fourth level. Visa, Mastercard, Amex and Uber are technology.
+- Context: ROADMAP D7 and F5. GICS is licensed. SIC is too coarse: Micron, Nvidia and AMD are all SIC 3674, and Uber, Visa and Mastercard are filed as transport and business services. Damodaran's file (S&P Capital IQ and Bloomberg data) gives 94 groups for free; 25% of US firms differ from the group's usual Fama-French group, which is why named stocks override the default.
+- Rejected (chat): GICS (licensed); RBICS and BICS (no public price, display rights unknown); classifying from 10-K text with an LLM (owner expects too many manual edits; parked); merging thin groups (the owner rejected 5 merges, so thin verticals stay and benchmarks widen to the industry instead); an Exploration vertical (no stock left in it once all producers are Production); a fourth level for Automotive.
+- Open: the rules on the review page are recommendations until the owner answers (R4: a comparison needs at least 10 peers above $1bn, else widen to the industry; R5: cap each stock at 10% of a peer index; R9: allocation is judged between industries, with a toggle to sector or vertical). Damodaran's file has no formal licence: publish only our own labels, and ask him first (R10).
+- Consequences: `pipeline/orca/hierarchy/` holds the source, tools and tests (draft, not wired into the pipeline). Changing a published JSON file needs `pipeline/contract.md` first. F5 uses these labels for peer groups and for the allocation effect, so R23 and the "luck vs skill" conflict listed below still need the owner's answer.
 
 ## 2026-11-10 — Planned features conflict with earlier positions
 Planned features F1–F5 (`docs/ROADMAP.md`, proposals until the owner approves) cut across earlier decisions. Resolve each with the owner before building:

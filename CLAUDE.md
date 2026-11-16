@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-15
+Last verified: 2026-11-16
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -20,6 +20,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | Domain, DNS, cache, CORS, secrets/variables, rollback | `docs/domain-and-data-hosting.md` (owner runbook) |
 | What happened recently, open issues | `docs/WORKLOG.md` |
 | The logo, favicon or app icons | `docs/brand/README.md` (files, colours, rules; `brand-sheet.png` is the guide) |
+| The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
@@ -33,6 +34,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ```
 pipeline/            Python package `orca` (ingest → lake → engine → publish), tests/, contract.md
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
+pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
 web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css

@@ -1,9 +1,20 @@
 # Worklog
 
-Last verified: 2026-11-15
+Last verified: 2026-11-16
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-16 — Sector hierarchy source committed (`pipeline/orca/hierarchy/`)
+
+| What changed | Why | Files |
+|---|---|---|
+| New `labels.txt`: a three-level hierarchy (12 sectors, 71 industries, 244 industry verticals). 1,292 stocks placed by name, 11 name rules, a default for each of Damodaran's 94 industry groups, extra labels for multi-business companies (Alphabet 5, Amazon 3, CVS 3, Vistra 2), one umbrella (Automotive) | The owner wants funds scored as sector allocators vs stock pickers (ROADMAP F5, D7), and SIC and GICS are too coarse or licensed (Micron, Nvidia and AMD are all SIC 3674). Built and reviewed in a private Claude artifact over 2026-11-15/16 (chat); committed so it is not lost with the session | `pipeline/orca/hierarchy/labels.txt` |
+| `model.py`: parser and labeller (standard library only), reports every problem in `labels.txt` at once | The file is the source of truth, so CI should reject a bad edit | `pipeline/orca/hierarchy/model.py`, `__init__.py` |
+| `tools/`: fetch the three public inputs, label the 4,014 listed stocks, build the review page. Rebuilding gives byte-for-byte the data the owner reviewed | The review page is how the owner edits the hierarchy; the tools make it reproducible | `pipeline/orca/hierarchy/tools/` |
+| 20 tests: every Damodaran group has a default, no unused vertical, the owner's examples hold (Micron, Vistra, Alphabet, Palantir, Leidos, CVS, Tesla, Berkshire) | Decisions made in chat should fail a test if a later edit breaks them | `pipeline/tests/test_hierarchy.py` |
+| DECISIONS entry; ROADMAP D7 and S4 and F5 point at the hierarchy; backlog item 7; ARCHITECTURE module table; CLAUDE.md read-X table and repo map | The change made the old D7 text stale ("SIC → sub-sector → ETF table") | `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md`, `CLAUDE.md` |
+| Not done: nothing reads the hierarchy yet. No `stock_id` mapping, no `pipeline/contract.md` change, no benchmark table. Rules R2–R10 on the review page are recommendations the owner has not confirmed. 188 of 244 verticals have under 10 stocks above $1bn, and 2,620 stocks carry only their Damodaran group default | Listed so the next session starts from the open items, not from the chat | `pipeline/orca/hierarchy/README.md` |
 
 ## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
 

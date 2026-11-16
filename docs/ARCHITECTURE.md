@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-14 (workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-14 (the `hierarchy/` row from the code on 2026-11-16; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -52,6 +52,7 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `home.py` | home lists (`top_funds`, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
+| `hierarchy/` | sector → industry → industry vertical labels for the stock-picker / sector-picker metric: `labels.txt` (source of truth), `model.py` (parser and labeller), `tools/` (review page). Draft, not read by the pipeline yet; see its `README.md` |
 | `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
 | `demo.py` | synthetic offline dataset for `web/public/demo-data` |
 
