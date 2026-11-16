@@ -72,7 +72,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 ## Gotchas
 - Merging to `main` deploys production (Web workflow). PR #3 was squash-merged as a2a1554 on 2026-11-09.
 - After a squash merge, merge `main` into the working branch; force-push is blocked in cloud sessions.
-- The CSP is strict (`web/scripts/prerender.mjs`). A new external script, font or fetch host must be added there, and Cloudflare Web Analytics must stay off.
+- The CSP is strict (`web/scripts/prerender.mjs`). A new external script, font or fetch host must be added there. Cloudflare Web Analytics is on and allowed there (`static.cloudflareinsights.com`, `cloudflareinsights.com`).
 - `VITE_DATA_URL` must be a bare origin (no trailing slash or space); a bad value fails the build. `SITE_URL` likewise.
 - The demo fund IDs (9100001–9100012) do not exist in production. Test production with e.g. `/fund/1067983` (Berkshire Hathaway).
 - Part years are derived from quarter counts, not labels (the demo labels a part year "2014").

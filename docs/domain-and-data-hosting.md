@@ -162,9 +162,9 @@ Write down any change you make to these here.
 7. **E-mail records (DNS)**, if the domain sends no mail: a TXT record on `orcaetf.com` with
    `v=spf1 -all`, and a TXT record on `_dmarc` with `v=DMARC1; p=reject; adkim=s; aspf=s`. If you use
    e-mail on the domain, set SPF and DMARC for that provider instead.
-8. **Pages project `orca` > Metrics > Web Analytics**: leave it off (no automatic script). The security rules only allow the
-   site's own scripts, so Cloudflare's injected analytics script would be blocked (and show an error in
-   the browser console).
+8. **Pages project `orca` > Metrics > Web Analytics**: on (automatic script). The security rules allow Cloudflare's
+   analytics script (`static.cloudflareinsights.com`) and its reports (`cloudflareinsights.com`); see
+   `renderHeaders` in `web/scripts/prerender.mjs`. Figures appear under Analytics & Logs > Web Analytics.
 
 9. **Response header rule for the data site (optional, not needed today)**: R2 answers with `Vary: Origin`, and
    Cloudflare keeps a separate cached copy per site address (checked 9 Nov 2026 with `curl -H 'Origin: ...'`

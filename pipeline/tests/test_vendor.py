@@ -79,3 +79,36 @@ def test_resolve_picks_the_listed_ticker_over_the_held_days():
 def test_resolve_takes_any_span_for_a_stock_never_held():
     u = universe(("SPY", date(1993, 1, 29), date(2026, 10, 30)))
     assert resolve({9: "SPY"}, {}, u).rows() == [(9, "SPY", date(2026, 10, 30))]
+
+
+def test_candidates_repair_foreign_listings_of_a_delisted_us_stock():
+    assert candidates("EA*") == ["EA*", "EA"]  # a Mexican listing
+    assert candidates("PXGBX") == ["PXGBX", "PX"]  # pence
+    assert candidates("RTN1USD") == ["RTN1USD", "RTN1", "RTN"]
+    assert candidates("LEG1*") == ["LEG1*", "LEG1", "LEG"]
+    assert candidates("18322EUR") == ["18322EUR", "18322"]  # no empty ticker
+    assert candidates("HN9") == ["HN9"]  # digits alone are never cut
+    assert candidates("*") == ["*"]
+
+
+def test_candidates_end_with_the_alternates_once():
+    assert candidates("EXMOC", ["XOM", "XOM", ""]) == ["EXMOC", "XOM"]
+    assert candidates(None, ["ZK"]) == ["ZK"]
+    assert candidates("AAPL", ["AAPL"]) == ["AAPL"]
+
+
+def test_resolve_tries_the_alternates_after_the_own_ticker():
+    u = universe(
+        ("XOM", date(1970, 1, 2), date(2026, 11, 13)),
+        ("ZK", date(2024, 5, 10), date(2025, 12, 19)),
+        ("OLDCO", date(2000, 1, 3), date(2005, 6, 30)),
+    )
+    held = {
+        1: (date(2013, 1, 1), date(2026, 9, 30)),
+        2: (date(2024, 7, 1), date(2025, 9, 30)),
+        3: (date(2013, 1, 1), date(2020, 12, 31)),  # the alternate traded before it was held
+    }
+    out = resolve(
+        {1: "EXMOC", 2: "ZKN", 3: "OLDC"}, held, u, {1: ["XOM"], 2: ["ZK"], 3: ["OLDCO"]}
+    )
+    assert out.rows() == [(1, "XOM", date(2026, 11, 13)), (2, "ZK", date(2025, 12, 19))]
