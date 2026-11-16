@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
@@ -295,6 +295,8 @@ function ListTable<R>({
   rowKey,
   empty = "Nothing to show.",
   paged = false,
+  pageSize = PAGE_SIZE,
+  pagerAbove = true,
   fixed = paged,
 }: {
   columns: Col<R>[];
@@ -305,6 +307,9 @@ function ListTable<R>({
   rowKey?: (r: R, i: number) => string | number;
   empty?: string;
   paged?: boolean;
+  pageSize?: number;
+  /** Page buttons above the table as well as below (short pages need them only below). */
+  pagerAbove?: boolean;
   fixed?: boolean;
 }) {
   const { sorted, sort, onSort } = useSortedRows(rows, columns, initial);
@@ -315,8 +320,8 @@ function ListTable<R>({
     setPage(0);
   }
   const shown = useMemo(
-    () => (paged ? sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : sorted),
-    [paged, sorted, page],
+    () => (paged ? sorted.slice(page * pageSize, (page + 1) * pageSize) : sorted),
+    [paged, sorted, page, pageSize],
   );
   if (rows.length === 0) {
     return (
@@ -325,10 +330,10 @@ function ListTable<R>({
       </div>
     );
   }
-  const pager = paged ? <Pager page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={setPage} noun={noun} /> : null;
+  const pager = paged ? <Pager page={page} pageSize={pageSize} total={sorted.length} onPage={setPage} noun={noun} /> : null;
   return (
     <>
-      {pager}
+      {pagerAbove && pager}
       <DataTable label={label} columns={columns} rows={shown} rowKey={rowKey} sort={sort} onSort={onSort} fixed={fixed} />
       {pager}
     </>
@@ -336,6 +341,122 @@ function ListTable<R>({
 }
 
 const BEST_RETURN: SortState = { key: "ret", dir: -1 };
+
+/** Top funds' columns, with the person behind the fund under its name (people know "Burry", not "Scion"). */
+const FAMOUS_COLUMNS: Col<TopRow>[] = TOP_COLUMNS.map((c) =>
+  c.key !== "name"
+    ? c
+    : {
+        ...c,
+        cell: (r) => (
+          <div className="stk fund">
+            <FundLink id={r.fund_id} name={r.name} />
+            {(r.manager || r.until_q != null) && (
+              <span className="sub">
+                {[r.manager, r.until_q != null && `filed until ${qLabel(r.until_q)}`].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </div>
+        ),
+      },
+);
+
+/**
+ * The famous funds' styles, in page order (pipeline/orca/famous.py FAMOUS_GROUPS), each with a line about it.
+ * A group the pipeline publishes that is not here is listed last, without a line.
+ */
+const FAMOUS_GROUPS: { name: string; about: string }[] = [
+  { name: "Buffett inspired", about: "Berkshire Hathaway and the investors closest to Buffett: friends, partners, disciples and \"baby Berkshires\"." },
+  { name: "Moat investing", about: "Concentrated owners of a few great businesses with lasting advantages, held for years." },
+  { name: "Value", about: "Value investors: good companies bought cheap." },
+  { name: "Tiger cubs", about: "Julian Robertson's Tiger Management and the funds its alumni started or it seeded (cubs and grand-cubs)." },
+  {
+    name: "Fundamental long/short",
+    about: "Stock pickers who also bet against stocks. The 13F shows only what they own, not their bets against.",
+  },
+  {
+    name: "Healthcare specialists",
+    about: "Funds that invest only in healthcare and biotech, often backing drug makers before and after their trial results.",
+  },
+  { name: "Tech & growth", about: "Growth investors focused on technology." },
+  { name: "Venture capital", about: "Venture firms. Their 13F shows only listed stakes, mostly companies they backed before the IPO." },
+  { name: "Activists", about: "Investors who buy big stakes to push companies to change." },
+  { name: "Macro", about: "Macro funds. The 13F shows only their US stocks, not their bonds, currencies or futures." },
+  { name: "Family offices", about: "Star traders and billionaires investing their own fortunes, mostly in stocks." },
+  { name: "Quant & multi-strategy", about: "Quant and multi-manager firms with large, fast-trading books." },
+  {
+    name: "Big companies",
+    about: "Companies investing their own money, like Google in SpaceX. A 13F shows only listed shares, so a stake shows up once the company lists.",
+  },
+  { name: "Sovereign & pension funds", about: "Countries' wealth funds, central banks and big pension and superannuation funds." },
+];
+
+/** Rows a page in each famous list: short pages keep nine lists scannable. */
+const FAMOUS_PAGE = 10;
+
+/** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
+ * without a group (none should come) goes to a list named "Other", last. */
+function byGroup(rows: TopRow[]): { name: string; about?: string; rows: TopRow[] }[] {
+  const groups = new Map<string, TopRow[]>();
+  for (const r of rows) {
+    const g = r.group ?? "Other";
+    groups.set(g, [...(groups.get(g) ?? []), r]);
+  }
+  const known = FAMOUS_GROUPS.filter((g) => groups.has(g.name)).map((g) => ({ ...g, rows: groups.get(g.name)! }));
+  const rest = [...groups.keys()].filter((g) => !FAMOUS_GROUPS.some((k) => k.name === g)).sort();
+  return [...known, ...rest.map((name) => ({ name, rows: groups.get(name)! }))];
+}
+
+function FamousFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
+  const list = useLoad(() => loadHome(`top_${period}`), [period]);
+  const rows = list.status === "ready" ? list.data.famous : undefined;
+  const groups = useMemo(() => byGroup(rows ?? []), [rows]);
+  return (
+    <Panel
+      title="Famous funds"
+      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Select a heading to sort."
+      controls={<Choice label="Period" options={PERIODS} value={period} onChange={onPeriod} />}
+    >
+      {list.status !== "ready" ? (
+        <Status state={list} />
+      ) : groups.length === 0 ? (
+        <div className="pb">
+          <State>
+            {rows === undefined
+              ? "The famous funds list arrives with the next data update."
+              : (EMPTY[period] ?? "No famous fund has a long enough record for this period yet.")}
+          </State>
+        </div>
+      ) : (
+        groups.map((g) => <FamousGroup key={g.name} {...g} />)
+      )}
+    </Panel>
+  );
+}
+
+/** One style's list: its heading and line, then its table with its own page buttons. */
+function FamousGroup({ name, about, rows }: { name: string; about?: string; rows: TopRow[] }) {
+  const id = useId();
+  return (
+    <section className="fam" aria-labelledby={id}>
+      <div className="fam-h">
+        <h3 id={id}>{name}</h3>
+        {about && <p>{about}</p>}
+      </div>
+      <ListTable
+        label={name}
+        noun="funds"
+        columns={FAMOUS_COLUMNS}
+        rows={rows}
+        initial={BEST_RETURN}
+        rowKey={(r) => r.fund_id}
+        paged
+        pageSize={FAMOUS_PAGE}
+        pagerAbove={false}
+      />
+    </section>
+  );
+}
 
 function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
@@ -691,9 +812,10 @@ function Calls({
 
 // ---- page ----------------------------------------------------------------------------
 
-type TabId = "top" | "conviction" | "wins" | "crowded" | "calls";
+type TabId = "top" | "famous" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
   { id: "top", label: "Top funds" },
+  { id: "famous", label: "Famous funds" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
   { id: "crowded", label: "Crowded buys" },
@@ -712,6 +834,7 @@ export default function Home() {
 
   let panel: ReactNode;
   if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
+  else if (tab === "famous") panel = <FamousFunds period={period} onPeriod={setPeriod} />;
   else if (lookup.status !== "ready") {
     // Stocks, prices and fund sizes are what these lists are made of: the panel waits for them.
     panel = (

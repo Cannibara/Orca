@@ -28,6 +28,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 
+from orca.famous import Famous
 from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
@@ -125,6 +126,18 @@ FUNDS = (
     _Profile("Cobblereef Holdings", q_index(2014, 1), q_index(2023, 4), 9.0e8, 6, 9),
     _Profile("Orcinus Lane Capital", q_index(2015, 3), q_index(2026, 3), 2.2e9, 6, 9),
     _Profile("Undertow Partners", q_index(2014, 2), q_index(2026, 2), 2.5e9, 7, 10),
+)
+# The demo's Famous funds, in three style lists: a young one (too new for Top funds, listed for 1
+# year and since start), one that stopped filing (listed with its figures to its last quarter),
+# three in Top funds as well, and Kelpwood in two lists.
+DEMO_FAMOUS = (
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs"),
+    Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs"),
+    Famous(FUND_CIK0 + 6, "DRIFTWOOD", "Theo Drift", "Tech & growth"),
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tech & growth"),
+    Famous(FUND_CIK0 + 4, "SALTGLASS", "Ada Brine", "Value"),
+    Famous(FUND_CIK0 + 1, "HALYARD", "", "Value"),
+    Famous(FUND_CIK0 + 9, "COBBLEREEF", "Mara Cobble", "Value"),
 )
 LAST_Q = q_index(2026, 2)  # the deadline quarter as of DEMO_TODAY
 CROWDED = (
@@ -342,6 +355,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
         shares_outstanding=lambda cik: fx.shares_out.get(cik),
         prices=FixtureSource(fx.prices),
         tbill=lambda: dict(fx.tbill),
+        famous=lambda: DEMO_FAMOUS,
     )
 
 
