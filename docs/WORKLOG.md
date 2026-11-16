@@ -1,9 +1,19 @@
 # Worklog
 
-Last verified: 2026-11-15
+Last verified: 2026-11-16
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
+
+| What changed | Why | Files |
+|---|---|---|
+| Cloudflare Web Analytics allowed in the CSP (`script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`). Checked against the live page with the new header: no CSP error, beacon loads | It had been switched on in the dashboard while the CSP blocked it: nothing counted, a console error on every page. Owner wants the figures (chat) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts`, DECISIONS, runbook step 8, ROADMAP U5, CLAUDE.md |
+| Vendor-ticker repair: more suffix rules (`*`, GBX, digits after a suffix), then hand-checked overrides by CUSIP, SEC name match, OpenFIGI US ticker with delisted listings (`includeUnlistedEquities`), all still limited to vendor spans that overlap the held days | Owner asked why two stocks had no `weekly.json`. Zeekr: OpenFIGI gave the Mexican "ZKN", Tiingo has "ZK". The Oracle one is a bond (no price expected). The same fault left 1,420 share-like stocks unpriced, among them Exxon's pre-2026 CUSIP ("EXMOC"; Exxon moved under ExxonMobil Holdings Corp with a new CUSIP), EA, WBD, QRVO, RTN, PX, APC: 4.03% of the 60 largest funds' holdings by cost | `pipeline/orca/vendor.py`, `securities.py` (`tickers_by_name`, `us_tickers`), `run/market.py` (`alternate_tickers`, `ticker_overrides`), `run/weekly.py`, `ticker_overrides.csv` (new), tests |
+| Measured on the published files and Tiingo's list, without the OpenFIGI step (needs the private lake): 447 of 1,420 repaired; the 60 largest funds' unpriced share 4.03% → 0.57%. Each repaired stock's history is fetched again on the next pipeline run, so that run is longer | | |
+| Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
+| Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
 
 ## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
 

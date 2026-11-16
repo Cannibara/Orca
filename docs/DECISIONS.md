@@ -1,6 +1,6 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-11
+Last verified: 2026-11-16
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
