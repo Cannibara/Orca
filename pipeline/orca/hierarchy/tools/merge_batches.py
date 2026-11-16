@@ -4,11 +4,14 @@ Reads `labelled.json` (from `label_securities.py`) and `out_NN.jsonl` files (fro
 
 How each stock ends up:
   etf                      kind etf, no label
-  tier auto                the hierarchy's label (placed, rule or default) from the matched company
+  tier auto                the hierarchy's label (placed, rule or default) from the matched company; a default
+                           (Damodaran group, not checked by name) gives way to the model's own label when the
+                           model also labelled the stock blind and knows the company (confidence 3)
   tier verify, m = 1       the same label, now checked: the model agrees the match is the same company
   tier verify, m = 0       the model's own vertical
   tier none                the model's own vertical; kind spac, fund, bond or other when it says so
-The model's answer for a stock that already has a label (the blind audit) is compared with it and never replaces it.
+The model's answer for a stock that already has a label (the blind audit) is compared with it. It replaces a
+group default only (`--keep-defaults` turns that off); a label placed by name or by a rule always stays.
 
 Run from `pipeline/`:
   uv run python orca/hierarchy/tools/merge_batches.py --labelled labelled.json --batches DIR \
@@ -49,7 +52,14 @@ def read_answers(folder: Path) -> tuple[dict[int, dict], list[str]]:
     return answers, problems
 
 
-def fold(rows: list[dict], answers: dict[int, dict], nodes: dict[int, Node], invested: dict[int, float]) -> tuple[list[dict], dict, list[str]]:
+def fold(
+    rows: list[dict],
+    answers: dict[int, dict],
+    nodes: dict[int, Node],
+    invested: dict[int, float],
+    umbrellas: tuple = (),
+    override_defaults: bool = True,
+) -> tuple[list[dict], dict, list[str]]:
     """The final rows, the audit agreement counts (by how the hierarchy found the label) and the problems found."""
     final: list[dict] = []
     problems: list[str] = []
@@ -71,6 +81,10 @@ def fold(rows: list[dict], answers: dict[int, dict], nodes: dict[int, Node], inv
                 counts["vertical"] += mine.path == row["main"]
                 counts["industry"] += [mine.sector, mine.industry] == theirs[:2]
                 counts["sector"] += mine.sector == theirs[0]
+                if override_defaults and row["how"] == "default" and a.get("c") == 3 and mine.path != row["main"]:
+                    kids = [parent.path for parent, children in umbrellas if mine in children]
+                    extras = [nodes[x].path for x in a.get("x", []) if x in nodes] + kids
+                    out.update(main=mine.path, extras=list(dict.fromkeys(extras)), src="model", how="model", was=row["main"])
         elif a is None:
             problems.append(f"no answer for {row['stock_id']} {row['ticker']} {row['name']}")
         else:
@@ -98,13 +112,15 @@ def main() -> None:
     parser.add_argument("--batches", type=Path, required=True)
     parser.add_argument("--universe", type=Path, required=True)
     parser.add_argument("--labels", type=Path, default=LABELS_FILE)
+    parser.add_argument("--keep-defaults", action="store_true", help="never replace a group default with the model's label")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
     h = load(args.labels)
     universe = {r["stock_id"]: r["invested"] for r in json.loads(args.universe.read_text())["rows"]}
     answers, problems = read_answers(args.batches)
-    final, agree, more = fold(json.loads(args.labelled.read_text()), answers, dict(enumerate(h.nodes, 1)), universe)
+    final, agree, more = fold(json.loads(args.labelled.read_text()), answers, dict(enumerate(h.nodes, 1)), universe,
+                              tuple(h.umbrellas), not args.keep_defaults)  # fmt: skip
     problems += more
     args.out.write_text(json.dumps(final, separators=(",", ":")))
 
@@ -119,7 +135,8 @@ def main() -> None:
         weight[key] += r["invested"]
     for key in sorted(by, key=lambda k: -weight[k]):
         print(f"{key:24s} {by[key]:5d} stocks  {weight[key] / total:6.1%} of dollars bought")
-    print("\nblind audit: model vs hierarchy label")
+    print(f"\ngroup defaults replaced by the model's label: {sum('was' in r for r in final)}")
+    print("blind audit: model vs hierarchy label")
     for how, c in sorted(agree.items()):
         print(f"  label by {how:8s} n={c['n']:3d}  same vertical {c['vertical'] / c['n']:5.1%}  same industry {c['industry'] / c['n']:5.1%}  same sector {c['sector'] / c['n']:5.1%}")
     print(f"wrote {args.out}")

@@ -204,7 +204,7 @@ function callHtml(si){
 function rowHtml(si,rank){
   const st=D.st[si],id=sid(st[0]),v=vOf(id);
   const src=st[11]===2?'first pass by a model':st[11]===1?'matched to a company listed elsewhere':'';
-  const sub=[D.groups[st[3]]||'no Damodaran group',st[4]?'SIC '+st[4]:'',st[5]?'FF '+st[5]:'',src,st[13]?'Orca also lists '+st[13]:''].filter(Boolean).join(' · ');
+  const sub=[D.groups[st[3]]||'no Damodaran group',st[4]?'SIC '+st[4]:'',st[5]?'FF '+st[5]:'',src,st[14]?'group default was '+st[14]:'',st[13]?'Orca also lists '+st[13]:''].filter(Boolean).join(' · ');
   const held=D.top?`<td class="num held">${st[9]?st[9].toLocaleString('en-US',{maximumFractionDigits:st[9]<10?1:0}):'–'}</td><td class="num">${st[10]||'–'}</td>`:'';
   return `<tr class="s-${v||'none'}"><td class="n">${rank}</td><td class="tk"><a href="#t-${esc(normT(st[0]))}">${esc(st[0])}</a></td><td class="nm">${esc(st[1])}<small>${esc(sub)}</small></td><td class="num">${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:st[2]<10?1:0}):'–'}</td>${held}<td>${chipsHtml(si,true)}</td><td class="call">${callHtml(si)}</td></tr>`;
 }

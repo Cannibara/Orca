@@ -86,9 +86,9 @@ def rules(data: dict) -> list[dict[str, str]]:
 def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
     """Add the stocks that the top funds held (labelled by `merge_batches.py`) to the page's data.
 
-    Every row of data["st"] gains five fields: [9] dollars the top funds bought, in millions, [10] how many of them
+    Every row of data["st"] gains six fields: [9] dollars the top funds bought, in millions, [10] how many of them
     held it, [11] source (0 Damodaran's US list, 1 matched to a company listed elsewhere, 2 a model's first pass),
-    [12] confidence 0-3, [13] other Orca names for the same company. A labelled stock whose company is not in
+    [12] confidence 0-3, [13] other Orca names for the same company, [14] the group default a model replaced. A labelled stock whose company is not in
     data["st"] is appended with a market cap of 0. Stocks with no label go to data["nl"].
     """
     nodes = {}
@@ -97,7 +97,7 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
         nodes[f"{sector} > {industry} > {name}"] = k
     by_ticker = {row[0]: i for i, row in enumerate(data["st"])}
     for row in data["st"]:
-        row.extend([0, 0, 0, 3, ""])
+        row.extend([0, 0, 0, 3, "", ""])
     held: dict[int, set[int]] = {}
     taken = {row[0].upper() for row in data["st"]}
     nl = []
@@ -108,7 +108,9 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
             nl.append([r["stock_id"], r["ticker"], r["name"], round(millions, 1), u["n_funds"], r["kind"], r["conf"] or 0, r["note"]])
             continue
         ref = r.get("ref")
-        at = by_ticker.get(ref["ticker"]) if ref and r["src"] == "hierarchy" and ref["exchange"] in US_EXCHANGES else None
+        listed = ref and ref["exchange"] in US_EXCHANGES and (r["src"] == "hierarchy" or "was" in r)
+        at = by_ticker.get(ref["ticker"]) if listed else None
+        was = " › ".join(r["was"].split(" > ")[1:]) if "was" in r else ""
         if at is None:  # a company the Damodaran US list does not hold: ADRs, cross-listings, delisted names
             key = r["ticker"] if r["ticker"].upper() not in taken else f"{r['ticker']}~{r['stock_id']}"
             taken.add(key.upper())
@@ -116,10 +118,12 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
             group = data["groups"].index(ref["group"]) if ref and ref["group"] in data["groups"] else -1
             how = 3 if model else {"default": 0, "rule": 1, "placed": 2}[r["how"]]
             data["st"].append([key, r["name"], 0, group, "", "", nodes[r["main"]], [nodes[x] for x in r["extras"] if x in nodes], how,
-                               0, 0, 2 if model else 1, r["conf"] if model else 3, ""])  # fmt: skip
+                               0, 0, 2 if model else 1, r["conf"] if model else 3, "", was])  # fmt: skip
             at = len(data["st"]) - 1
             by_ticker[key] = at
         row = data["st"][at]
+        if was and row[14] == "":  # a model replaced this listed stock's group default
+            row[6], row[7], row[8], row[12], row[14] = nodes[r["main"]], [nodes[x] for x in r["extras"] if x in nodes], 3, r["conf"], was
         row[9] = round(row[9] + millions, 1)
         held.setdefault(at, set()).update(u["funds"])
         if r["ticker"] != row[0] and r["ticker"] not in row[13]:

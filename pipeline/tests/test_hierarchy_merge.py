@@ -33,14 +33,31 @@ def test_an_etf_keeps_no_label_and_needs_no_answer():
     assert final[0]["main"] is None and final[0]["kind"] == "etf" and not problems
 
 
-def test_an_auto_stock_keeps_its_label_and_the_blind_audit_only_measures_agreement():
+def test_with_overriding_off_the_blind_audit_only_measures_agreement():
     rows = [row(1, "auto", **labelled(MEMORY, "default")), row(2, "auto", **labelled(OIL, "placed"))]
     answers = {1: {"id": 1, "k": "stock", "v": 2, "c": 3}, 2: {"id": 2, "k": "stock", "v": 3, "c": 3}}
-    final, agree, problems = fold(rows, answers)
+    final, agree, problems = merge_batches.fold(rows, answers, NODES, {1: 1, 2: 1}, override_defaults=False)
     assert [r["main"] for r in final] == [MEMORY.path, OIL.path] and not problems  # never replaced
     assert all(r["src"] == "hierarchy" for r in final)
     assert dict(agree["default"]) == {"n": 1, "vertical": 0, "industry": 1, "sector": 1}  # same industry, other vertical
     assert dict(agree["placed"]) == {"n": 1, "vertical": 1, "industry": 1, "sector": 1}
+
+
+def test_a_model_that_knows_the_company_replaces_a_group_default_but_never_a_placed_label():
+    umbrella = ((OTHER, (MEMORY,)),)  # stocks labelled Memory also carry Other Semiconductors
+    rows = [
+        row(1, "auto", **labelled(OIL, "default")),  # default, model confident: replaced
+        row(2, "auto", **labelled(OIL, "default")),  # default, model unsure: kept
+        row(3, "auto", **labelled(OIL, "placed")),  # placed by name: kept
+    ]
+    answers = {i: {"id": i, "k": "stock", "v": 1, "c": 3} for i in (1, 3)} | {2: {"id": 2, "k": "stock", "v": 1, "c": 2}}
+    final, agree, _ = merge_batches.fold(rows, answers, NODES, {1: 1, 2: 1, 3: 1}, umbrella)
+    assert (final[0]["main"], final[0]["src"], final[0]["was"], final[0]["extras"]) == (MEMORY.path, "model", OIL.path, [OTHER.path])
+    assert (final[1]["main"], final[1]["src"]) == (OIL.path, "hierarchy") and "was" not in final[1]
+    assert (final[2]["main"], final[2]["src"]) == (OIL.path, "hierarchy")
+    assert agree["default"]["n"] == 2 and agree["placed"]["n"] == 1
+    kept, _, _ = merge_batches.fold(rows, answers, NODES, {1: 1}, umbrella, override_defaults=False)
+    assert kept[0]["main"] == OIL.path
 
 
 def test_a_verified_match_keeps_the_hierarchy_label_and_a_rejected_one_takes_the_models():

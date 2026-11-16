@@ -9,6 +9,10 @@ without their label, so the model labels them blind and `merge_batches.py` can r
 Run from `pipeline/`:
   uv run python orca/hierarchy/tools/make_batches.py --labelled labelled.json --universe universe.json --out DIR
 Writes DIR/menu.txt, DIR/prompt.md, DIR/in_01.txt ... and DIR/index.json.
+
+Afterwards, if the audit shows the group defaults are weak, the biggest default-labelled stocks can be labelled
+blind as well (`--recheck 600 --first 10` adds batches from in_10.txt on, leaving the others alone); `merge_batches.py`
+then lets a model that knows the company override a default.
 """
 
 from __future__ import annotations
@@ -50,6 +54,8 @@ def main() -> None:
     parser.add_argument("--caps", type=Path, help="hierarchy.json from build_hierarchy.py (orders the menu's examples)")
     parser.add_argument("--labels", type=Path, default=LABELS_FILE)
     parser.add_argument("--seed", type=int, default=20261116)
+    parser.add_argument("--recheck", type=int, metavar="N", help="only add batches for the N biggest default-labelled stocks")
+    parser.add_argument("--first", type=int, default=10, help="number of the first recheck batch")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -58,6 +64,21 @@ def main() -> None:
     caps = {s[0]: s[2] for s in json.loads(args.caps.read_text())["st"]} if args.caps else {}
     labelled = json.loads(args.labelled.read_text())
     universe = {r["stock_id"]: r for r in json.loads(args.universe.read_text())["rows"]}
+
+    if args.recheck:
+        index = json.loads((args.out / "index.json").read_text())
+        taken = set(index["audit"]) | {i for b in index["batches"] for i in b}
+        rows = [r for r in labelled if r["kind"] == "stock" and r["tier"] == "auto" and r["how"] == "default" and r["stock_id"] not in taken]
+        rows = sorted(rows, key=lambda r: -universe[r["stock_id"]]["invested"])[: args.recheck]
+        n = max(1, round(len(rows) / PER_BATCH))
+        extra = [rows[i::n] for i in range(n)]
+        for b, part in enumerate(extra, args.first):
+            lines = [f"{r['stock_id']}|{r['ticker']}|{r['name']}|{round(universe[r['stock_id']]['invested'] / 1e6)}|{universe[r['stock_id']]['n_funds']}" for r in part]
+            (args.out / f"in_{b:02d}.txt").write_text("\n".join(lines) + "\n")
+        index["recheck"] = [[r["stock_id"] for r in part] for part in extra]
+        (args.out / "index.json").write_text(json.dumps(index))
+        print(f"{len(rows)} default-labelled stocks in {n} recheck batches from in_{args.first:02d}.txt")
+        return
 
     need = [r for r in labelled if r["kind"] != "etf" and r["tier"] in ("verify", "none")]
     auto = [r for r in labelled if r["kind"] == "stock" and r["tier"] == "auto"]
