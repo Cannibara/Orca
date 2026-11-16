@@ -6,8 +6,10 @@ no CUSIPs) and writes `universe.json` for `label_securities.py --stocks` and `ma
 `positions.json` covers a fund's current tracking segment only, so a fund that stopped filing and came back
 has its earlier holdings missing.
 
+`--exclude FUND_ID` leaves a fund out and takes the next one in its place, so the list stays at `--top` funds.
+
 Run from `pipeline/`:
-  uv run python orca/hierarchy/tools/top_funds_universe.py --period max --top 100 --out DIR
+  uv run python orca/hierarchy/tools/top_funds_universe.py --period max --top 100 --out DIR [--exclude 1818604]
 Writes DIR/raw/ (the downloads) and DIR/universe.json.
 """
 
@@ -22,6 +24,11 @@ from pathlib import Path
 import httpx
 
 BASE = "https://data.orcaetf.com"
+
+
+def pick_funds(eligible: list[dict], top: int, exclude: list[int]) -> list[dict]:
+    """The first `top` funds of the ranking, skipping the excluded ones."""
+    return [f for f in eligible if f["fund_id"] not in set(exclude)][:top]
 
 
 def build_universe(fund_ids: list[int], positions: dict[int, dict], securities: dict) -> list[dict]:
@@ -53,6 +60,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--period", default="max", choices=["1y", "3y", "5y", "10y", "15y", "max"])
     parser.add_argument("--top", type=int, default=100)
+    parser.add_argument("--exclude", type=int, action="append", default=[], metavar="FUND_ID")
     parser.add_argument("--base", default=BASE)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -75,13 +83,13 @@ def main() -> None:
         return json.loads(target.read_text())
 
     top = fetch(f"home/top_{args.period}.json")
-    funds = top["eligible"][: args.top]
+    funds = pick_funds(top["eligible"], args.top, args.exclude)
     ids = [f["fund_id"] for f in funds]
     securities = fetch("securities.json")
     with ThreadPoolExecutor(8) as pool:
         positions = dict(zip(ids, pool.map(lambda i: fetch(f"fund/{i}/positions.json"), ids)))
     rows = build_universe(ids, positions, securities)
-    out = {"period": args.period, "n_funds": len(ids), "fund_ids": ids, "rows": rows}
+    out = {"period": args.period, "n_funds": len(ids), "fund_ids": ids, "excluded": args.exclude, "rows": rows}
     (args.out / "universe.json").write_text(json.dumps(out))
     print(f"{len(ids)} funds ({args.period}), {len(rows)} securities, ${sum(r['invested'] for r in rows) / 1e9:,.0f}bn bought in total")
 

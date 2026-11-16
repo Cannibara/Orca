@@ -301,8 +301,9 @@ const KIND={etf:'ETF',fund:'Fund',bond:'Bond',spac:'SPAC',other:'Other',stock:'B
 function notLabelledTab(){
   const by={};D.nl.forEach(r=>{const c=by[r[5]]||(by[r[5]]={n:0,m:0});c.n++;c.m+=r[3]});
   const sum=Object.keys(by).sort((a,b)=>by[b].m-by[a].m).map(k=>`<b>${esc(KIND[k]||k)}</b> ${by[k].n.toLocaleString('en-US')} (${Math.round(by[k].m).toLocaleString('en-US')}m)`).join(' · ');
+  const ec=D.etf&&Object.keys(D.etf).length?`<br><b>What the ETFs are</b> (the biggest ${Object.keys(D.etf).reduce((a,k)=>a+D.etf[k][0],0)}, by a model): `+Object.keys(D.etf).sort((a,b)=>D.etf[b][1]-D.etf[a][1]).map(k=>`${esc(k)} ${D.etf[k][0]} (${Math.round(D.etf[k][1]/1000).toLocaleString('en-US')}bn)`).join(' · ')+'.':'';
   const lim=100+nlMore,rows=D.nl.slice(0,lim);
-  return `<div class="intro"><b>Held by the top funds, but with no label.</b> An ETF is a sector pick, not a stock pick, so each needs a node of the hierarchy (not done yet). Funds, bonds, SPACs and unidentifiable lines have no business to score. Biggest first, in dollars bought since 2013. ${sum}.</div>
+  return `<div class="intro"><b>Held by the top funds, but with no label.</b> An ETF is a sector pick, not a stock pick. A single-sector ETF counts as a bet on its sector, industry or vertical; any other ETF has no sector and counts as neutral (rule R12, decided). Funds, bonds, SPACs and unidentifiable lines have no business to score. Biggest first, in dollars bought since 2013. ${sum}.${ec}</div>
   <div class="tbl"><table><thead><tr><th>Ticker</th><th>Name</th><th style="text-align:right">Bought $m</th><th style="text-align:right">Funds</th><th>What it is</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="tk">${esc(r[1])}</td><td class="nm">${esc(r[2])}</td><td class="num">${r[3].toLocaleString('en-US',{maximumFractionDigits:r[3]<10?1:0})}</td><td class="num">${r[4]}</td><td>${esc(KIND[r[5]]||r[5])}</td><td>${esc(r[7]||'')}</td></tr>`).join('')}</tbody></table></div>
   ${D.nl.length>lim?`<p><button type="button" class="btn" data-act="nlmore">Show 100 more (${D.nl.length-lim} left)</button></p>`:''}`;
 }

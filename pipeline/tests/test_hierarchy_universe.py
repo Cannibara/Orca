@@ -29,3 +29,10 @@ def test_a_stock_no_fund_held_is_not_listed_and_ties_break_on_the_stock_id():
     fund = positions([3, 1], [10.0, 10.0], [[], []])
     rows = universe.build_universe([7], {7: fund}, SECURITIES)
     assert [r["stock_id"] for r in rows] == [1, 3]
+
+
+def test_an_excluded_fund_is_replaced_by_the_next_one_so_the_list_keeps_its_length():
+    ranking = [{"fund_id": i} for i in range(1, 8)]
+    assert [f["fund_id"] for f in universe.pick_funds(ranking, 3, [])] == [1, 2, 3]
+    assert [f["fund_id"] for f in universe.pick_funds(ranking, 3, [2])] == [1, 3, 4]
+    assert [f["fund_id"] for f in universe.pick_funds(ranking, 3, [9])] == [1, 2, 3]  # not in the ranking: nothing changes

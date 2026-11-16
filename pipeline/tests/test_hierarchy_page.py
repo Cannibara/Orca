@@ -81,18 +81,31 @@ def test_a_ticker_that_is_already_taken_gets_the_stock_id_added():
     assert d["st"][-1][0] == "MU~5" and d["st"][0][9] == 0
 
 
+def test_etfs_show_what_a_model_made_of_them_and_are_counted_by_class():
+    d = data()
+    etf = {"k": "sector", "label": "sector ETF", "c": 3, "note": "", "lv": "industry", "path": "Technology > Semiconductors", "lev": "3x"}
+    final = [row(1, "SOXL", kind="etf", tier="etf", etf=etf), row(2, "SPY", kind="etf", tier="etf", etf={"k": "broad", "label": "US stocks, broad", "c": 3, "note": ""}), row(3, "ZZZ", kind="etf", tier="etf")]
+    page.add_top(d, final, UNIVERSE, FUNDS)
+    notes = {r[1]: r[7] for r in d["nl"]}
+    assert notes == {"SOXL": "sector ETF → Technology › Semiconductors (industry), 3x", "SPY": "US stocks, broad", "ZZZ": ""}
+    assert d["etf"] == {"sector ETF": [1, 5.0], "US stocks, broad": [1, 5.0]}  # an unclassified ETF is in neither count
+    rule = next(r for r in page.rules(d | {"L3": "x"}) if r["id"] == "R12")
+    assert "Classified so far" in rule["ev"] and "sector ETF 1" in rule["ev"]
+
+
 def test_the_csv_has_one_row_per_stock_in_the_column_order():
     spec = importlib.util.spec_from_file_location("export_labels", Path(__file__).parents[1] / "orca" / "hierarchy" / "tools" / "export_labels.py")
     export = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(export)
+    etf = {"k": "sector", "label": "sector ETF", "lv": "industry", "path": "Technology > Semiconductors", "lev": "3x"}
     final = [
         row(1, "MU", main=MEMORY, extras=[OTHER], src="hierarchy", how="placed", conf=3, ref=ref("MU")),
-        row(2, "SOXX", kind="etf", tier="etf", invested=9_000_000),
+        row(2, "SOXL", kind="etf", tier="etf", etf=etf, invested=9_000_000),
     ]
     rows = export.csv_rows(final, UNIVERSE)
-    assert [r[1] for r in rows] == ["SOXX", "MU"]  # biggest dollars first
+    assert [r[1] for r in rows] == ["SOXL", "MU"]  # biggest dollars first
     by = dict(zip(export.COLUMNS, rows[1]))
     assert (by["sector"], by["industry"], by["industry_vertical"], by["extra_labels"], by["source"], by["n_top_funds"]) == ("Technology", "Semiconductors", "Memory", OTHER, "hierarchy", 2)
     etf_row_ = dict(zip(export.COLUMNS, rows[0]))
-    assert (etf_row_["source"], etf_row_["kind"], etf_row_["sector"]) == ("ETF", "etf", "")
+    assert (etf_row_["source"], etf_row_["etf_label"], etf_row_["etf_level"], etf_row_["etf_leverage"], etf_row_["sector"]) == ("ETF", "Technology › Semiconductors", "industry", "3x", "")
     assert all(len(r) == len(export.COLUMNS) for r in rows)

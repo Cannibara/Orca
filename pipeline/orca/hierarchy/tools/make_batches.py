@@ -10,6 +10,10 @@ Run from `pipeline/`:
   uv run python orca/hierarchy/tools/make_batches.py --labelled labelled.json --universe universe.json --out DIR
 Writes DIR/menu.txt, DIR/prompt.md, DIR/in_01.txt ... and DIR/index.json.
 
+When the stock list changes (a new monthly run, a fund added or dropped), `--missing --first 12` writes batches for only
+the stocks no earlier batch answered: the ones the match could not settle, and with `--recheck-min 80` the default-labelled
+ones that fund at least $80m. The earlier answers stay valid because they are keyed by stock id.
+
 Afterwards, if the audit shows the group defaults are weak, the biggest default-labelled stocks can be labelled
 blind as well (`--recheck 600 --first 10` adds batches from in_10.txt on, leaving the others alone); `merge_batches.py`
 then lets a model that knows the company override a default.
@@ -55,7 +59,9 @@ def main() -> None:
     parser.add_argument("--labels", type=Path, default=LABELS_FILE)
     parser.add_argument("--seed", type=int, default=20261116)
     parser.add_argument("--recheck", type=int, metavar="N", help="only add batches for the N biggest default-labelled stocks")
-    parser.add_argument("--first", type=int, default=10, help="number of the first recheck batch")
+    parser.add_argument("--first", type=int, default=10, help="number of the first recheck or missing batch")
+    parser.add_argument("--missing", action="store_true", help="only stocks no existing out_NN.jsonl in --out has answered")
+    parser.add_argument("--recheck-min", type=float, default=0, metavar="USD_M", help="with --missing: also default-labelled stocks bought for at least this many $m")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -64,6 +70,27 @@ def main() -> None:
     caps = {s[0]: s[2] for s in json.loads(args.caps.read_text())["st"]} if args.caps else {}
     labelled = json.loads(args.labelled.read_text())
     universe = {r["stock_id"]: r for r in json.loads(args.universe.read_text())["rows"]}
+
+    if args.missing:
+        answered = {json.loads(line)["id"] for f in args.out.glob("out_*.jsonl") for line in f.read_text().splitlines() if line.strip()}
+        rows = [r for r in labelled if r["stock_id"] not in answered and r["kind"] != "etf" and r["tier"] in ("verify", "none")]
+        if args.recheck_min:
+            rows += [r for r in labelled if r["stock_id"] not in answered and r["kind"] == "stock" and r["tier"] == "auto" and r["how"] == "default"
+                     and universe[r["stock_id"]]["invested"] >= args.recheck_min * 1e6]  # fmt: skip
+        rows = sorted(rows, key=lambda r: -universe[r["stock_id"]]["invested"])
+        n = max(1, -(-len(rows) // PER_BATCH))
+        for b, part in enumerate([rows[i::n] for i in range(n)], args.first):
+            lines = []
+            for r in part:
+                u = universe[r["stock_id"]]
+                line = f"{r['stock_id']}|{r['ticker']}|{r['name']}|{round(u['invested'] / 1e6)}|{u['n_funds']}"
+                if r["tier"] == "verify" and "ref" in r:
+                    f = r["ref"]
+                    line += f"|MATCH? {f['name']} ({f['exchange']}:{f['ticker']}, {f['country']}) [{f['group']}] => {vertical_id[r['main']]}"
+                lines.append(line)
+            (args.out / f"in_{b:02d}.txt").write_text("\n".join(lines) + "\n")
+        print(f"{len(rows)} stocks without an answer, in {n} batches from in_{args.first:02d}.txt")
+        return
 
     if args.recheck:
         index = json.loads((args.out / "index.json").read_text())
