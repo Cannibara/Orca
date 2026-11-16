@@ -34,7 +34,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ```
 pipeline/            Python package `orca` (ingest → lake → engine → publish), tests/, contract.md
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
-pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, review-page tools; draft, not in the pipeline yet)
+pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
 web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css

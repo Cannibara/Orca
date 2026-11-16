@@ -6,6 +6,13 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-16 — Labelling the stocks funds hold: name match, then a model (proposed, owner to confirm R8 and R12)
+- Decision (chat): classify every stock the 100 best funds ever held in the hierarchy. The window (since start) is my choice; the owner has not said which ranking they meant.
+- Decision (mine, open for the owner): match Orca's names to Damodaran's global company file by words, not by ticker, because Orca's tickers are often garbled and his file also holds ADRs and foreign lines. For stocks it does not cover, a model reads the name and picks a vertical, tagged and with a confidence (R8 changed from "SEC SIC code" to this). A model that knows a company replaces a Damodaran group default, because a blind audit found the defaults wrong on 27% of verticals and 6% of sectors while the model matched the owner's hand placements 97% of the time.
+- Rejected: SEC SIC codes for the rest (needs a CIK per stock, which Orca's public data does not carry; too coarse for verticals); trusting group defaults unchecked.
+- Not decided: ETFs (R12). I recommend counting a single-sector ETF as a bet on that sector and leaving broad, bond, commodity and international ETFs unlabelled.
+- Consequences: the labelled outputs stay out of the repo while it is public and Damodaran's licence is unclear (R10). A fund page cannot show a label until the owner reviews it and the contract changes.
+
 ## 2026-11-16 — Sector hierarchy for the sector-picker / stock-picker metric (owner)
 - Decision (chat): classify every stock in three levels, Sector → Industry → Industry vertical ("industry vertical" is the owner's name for the third level; "sub-industry" was recommended and "specialty" suggested, neither chosen). Start from Damodaran's 94 US industry groups, cross-check with Fama-French 48, hand-place the stocks that matter, and give every group a default for the rest. Sectors: Technology, Communication, Consumer, Healthcare, Financials, Business Services, Industrials, Defence, Materials, Energy, Utilities, Property.
 - Decision (chat): a stock has one main label (scoring) and any number of extra labels (comparisons), so one pick can be compared with different peer sets: Micron against all Semiconductors or only Memory; Vistra as a nuclear play against nuclear stocks and against gas power producers. Alphabet carries five labels: Search & Advertising (main); Cloud Infrastructure Provider, Consumer Services and Entertainment under Software; Streaming & Studios.

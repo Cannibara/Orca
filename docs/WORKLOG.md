@@ -5,6 +5,18 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-16 — The stocks the 100 best funds ever held, found and labelled
+
+| What changed | Why | Files |
+|---|---|---|
+| The 100 best funds by return since start (`home/top_max.json`) ever held 7,702 securities. 5,361 are labelled (92% of the $2.2tn they bought); 1,815 ETFs and 526 funds, SPACs and unidentifiable lines are not | The owner asked for every stock the top 100 funds ever owned, classified in the hierarchy (chat). Period chosen by me: since start, the one window that covers "ever"; 1y, 3y, 5y and 10y give different funds (any two of the five top-100 lists share only 21 to 58 funds) | `pipeline/orca/hierarchy/tools/top_funds_universe.py` |
+| `matching.py`: matches Orca's names (Bloomberg style, cut at 28 characters, garbled tickers such as EXMOC, 8QR) to Damodaran's global 48,000-company file by distinctive words. 3,433 stocks matched strongly to a US listing, 741 partly or to a foreign line, 1,359 not at all | The 4,014-stock US list reached only 9% of Orca's 41,113 securities. His global file also covers ADRs (Nestlé, Novo, Toyota), so names carry the match, not tickers | `pipeline/orca/hierarchy/matching.py`, `tools/label_securities.py` |
+| A model (11 Claude agents, 295 stocks each, about 200,000 tokens each) gave a first-pass vertical to what the match could not settle, confirmed or rejected the partial matches, and labelled 840 default-labelled stocks blind as an audit | Stocks outside Damodaran's list (delisted, ADRs, new) have no group. SIC codes need a company id Orca does not hold and are too coarse for verticals | `tools/make_batches.py`, `tools/model_prompt.md`, `tools/merge_batches.py` |
+| Audit result: the model agrees with labels placed by name 97% of the time but with Damodaran's group default on only 73% of verticals (94% of sectors). A model that knows the company now replaces a default (224 stocks) | Group defaults are the weakest part of the hierarchy. 1,282 small default-labelled stocks (under 1% of the dollars) are still unchecked | `merge_batches.py` |
+| Review page: top-fund columns (dollars bought, funds), sort by them, dotted orange for a model's label, "group default was ...", a Not labelled tab, rules R8 (changed) and R12 (ETFs) | The owner reviews in the artifact; the new stocks and sources must be visible | `tools/make_review_page.py`, `tools/review_page.html` |
+| 15 more tests (name matching, merge, universe, page data). Data outputs are not committed: the repo is public and Damodaran's file has no licence (R10) | A public repo would publish his derived labels | `pipeline/tests/test_hierarchy_{matching,merge,universe,page}.py` |
+| Not done: ETFs unlabelled (R12). One top-100 fund, International Assets Investment Management (rank 66, $1.7bn book), shows $718bn bought and 4,122 stocks ever, and $458bn of Berkshire A alone; it looks like trading-desk flow, not picks, and may not belong in a top list. `positions.json` covers a fund's current tracking segment only | Listed so the next session does not rediscover them | `pipeline/orca/hierarchy/README.md` |
+
 ## 2026-11-16 — Sector hierarchy source committed (`pipeline/orca/hierarchy/`)
 
 | What changed | Why | Files |

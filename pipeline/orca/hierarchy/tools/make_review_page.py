@@ -25,13 +25,12 @@ PERIODS = {"1y": "by 1-year return", "3y": "by 3-year return", "5y": "by 5-year 
 
 # Shown at the top of the Hierarchy tab. Replace it each round with what changed since the last one.
 CHANGES = [
-    '"Industry vertical" is now the name of the third level.',
-    "Oil: every producer is labelled Production. Exploration is removed (no stock was left in it).",
-    "Alphabet carries all five labels: Search & Advertising (main); Cloud Infrastructure Provider, Consumer Services and Entertainment under Software; and Communication › Entertainment › Streaming & Studios, which compares YouTube with Netflix.",
-    "Consumer and Industrials rebuilt around your examples: Clothing › Sportswear, Household goods › Appliances, Manufacturing › Shipbuilding and Automotive. Every industry in those two sectors has a one-line description.",
-    "Automotive is an umbrella label: carmakers and auto parts keep separate main labels, and every one also carries Automotive. Decided: no fourth level.",
-    "Autos moved from Consumer into Industrials › Manufacturing. RVs, boats and motorcycles moved into Consumer › Leisure. Shipping operators (Kirby, Matson) are Transportation & Logistics; Shipbuilding has only Huntington Ingalls and General Dynamics, as extra labels, because their main label is Defence.",
-    "Apparel & Footwear became Clothing. Appliances, furniture, housewares, cleaning products and consumer electronics are Household goods. Beauty and personal care is its own industry.",
+    "New: the stocks the 100 best funds (by return since start) ever held, 7,702 securities. 5,361 now carry a label and cover 92% of the dollars those funds bought; the Not labelled tab holds the rest (ETFs, funds, SPACs, bonds).",
+    "Browse stocks has two new columns, the dollars the top funds bought and how many of the 100 held the stock, and sorts by them first. Use Sort to go back to market cap.",
+    "Where each label came from: solid blue = placed by name (yours and mine), dashed blue = Damodaran's group default, not checked, dotted orange = a model's first pass from the company name. Confidence is in the hover text.",
+    "Check on the group defaults: a model labelled 840 default-labelled stocks blind and agreed with the default on only 73% of verticals (88% of industries, 94% of sectors), against 97% for labels placed by name. Where it knew the company it replaced the default (224 stocks, shown as \"group default was ...\"). Tankers were under Pipelines, Qorvo under Other Semiconductors, battery makers under Automation.",
+    "1,282 small default-labelled stocks (under 1% of the dollars) have not been checked yet.",
+    "Rule R8 changed (a model's first pass instead of SEC SIC) and R12 is new (ETFs).",
 ]
 
 
@@ -49,6 +48,9 @@ def rules(data: dict) -> list[dict[str, str]]:
     dominated = sorted(((total[k], k) for k in range(len(sub)) if total[k] >= 200 and top[k][1] / total[k] >= 0.5), reverse=True)[:8]
     dominated_text = "; ".join(f"{sub[k][1]}: {top[k][0]} {round(100 * top[k][1] / total[k])}%" for _, k in dominated)
     n_industries = len(data["ind"])
+    listed = sum(1 for x in stocks if len(x) < 12 or x[11] == 0)
+    by_model = sum(1 for x in stocks if len(x) > 11 and x[11] == 2)
+    etfs = [x for x in data.get("nl", []) if x[5] == "etf"]
     return [
         dict(id="R2", q="Every stock has one main label (used for scoring) and any number of extra labels (used for comparisons).",
              rec="Yes. A fund's sector and industry weights must add to 100%, so each stock needs exactly one main label. Extra labels never change a score. They let you choose the peer set for one holding: Micron against all Semiconductors or just Memory; Vistra against Nuclear Power Producers, Natural Gas Power Producers, or both.",
@@ -68,9 +70,12 @@ def rules(data: dict) -> list[dict[str, str]]:
         dict(id="R7", q="Use today's labels for every year, not the label at the time.",
              rec="Yes. Simple and consistent. It only matters for firms that changed business, and most stay inside one industry (Nvidia gaming → AI is still Semiconductors).",
              ev=""),
-        dict(id="R8", q="Stocks outside Damodaran's list (delisted, small, new) get the label most common for their SEC SIC code.",
-             rec='Yes, tagged "inferred", and reviewed only when a fund holds a lot of one.',
-             ev=f"His file gives {len(stocks):,} US exchange-listed stocks; Orca prices about 22,800 since 2013."),
+        dict(id="R8", q="Stocks outside Damodaran's US list (ADRs, foreign, delisted, small, new) get a first-pass label from a model reading the company name.",
+             rec="Yes, for now: tagged, with a confidence, and open to your review. It replaces my earlier plan (the label most common for the stock's SEC SIC code), which needs a company id Orca does not hold and is too coarse for verticals. The model agrees with your hand placements 97% of the time on a blind test.",
+             ev=f"His file gives {listed:,} stocks on this page; {by_model:,} came from the model's first pass. Orca prices about 22,800 stocks since 2013."),
+        dict(id="R12", q="ETFs the funds hold: leave them unlabelled, or count a single-sector ETF as a bet on its sector?",
+             rec="Count sector and industry ETFs (SOXX, XLF, XLK) as a bet on that sector or industry for allocation, because a fund that buys SOXX is making a semiconductor call. Leave broad-market, bond, commodity and international ETFs unlabelled. An ETF never counts as a stock pick.",
+             ev=f"{len(etfs):,} ETFs, {round(sum(x[3] for x in etfs) / 1000):,}bn of the dollars the top funds bought. They are not labelled yet; see the Not labelled tab."),
         dict(id="R9", q='Which level counts as "sector picking"?',
              rec=f"Allocation between industries ({n_industries} buckets), with a toggle to sector ({len(data['sec'])}) or industry vertical. Stock picking is scored against the peer set you choose, widened to the industry when the vertical has fewer than 10 peers.",
              ev="Your fund A (GPU) vs fund B (memory) example is an industry-vertical toggle inside Semiconductors."),
@@ -115,7 +120,7 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
             key = r["ticker"] if r["ticker"].upper() not in taken else f"{r['ticker']}~{r['stock_id']}"
             taken.add(key.upper())
             model = r["src"] == "model"
-            group = data["groups"].index(ref["group"]) if ref and ref["group"] in data["groups"] else -1
+            group = data["groups"].index(ref["group"]) if ref and not model and ref["group"] in data["groups"] else -1
             how = 3 if model else {"default": 0, "rule": 1, "placed": 2}[r["how"]]
             data["st"].append([key, r["name"], 0, group, "", "", nodes[r["main"]], [nodes[x] for x in r["extras"] if x in nodes], how,
                                0, 0, 2 if model else 1, r["conf"] if model else 3, "", was])  # fmt: skip
