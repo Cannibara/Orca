@@ -16,6 +16,7 @@ FAMOUS_GROUPS = (
     "Value",
     "Tiger cubs",
     "Fundamental long/short",
+    "Healthcare specialists",
     "Tech & growth",
     "Venture capital",
     "Activists",
@@ -37,7 +38,8 @@ class Famous:
 
     How to add one: find the CIK of the entity that files 13F-HR on EDGAR (a manager can have
     several; one that stopped filing is listed with its figures to its last quarter) and pick a
-    match word from its filer name."""
+    match word from its filer name. A filer that changed its name can take alternatives split
+    by "|" ("BROOKSIDE CAPITAL|BAIN CAPITAL PUBLIC EQUITY"): any one of them matches."""
 
     fund_id: int
     match: str

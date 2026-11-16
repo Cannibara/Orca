@@ -139,7 +139,7 @@ def top_funds(
     for f in famous:
         s = by_id.get(f.fund_id)
         p = s.perf.get(period) if s is not None else None
-        if p is None or s.priced_pct < TOP_MIN_PRICED or f.match not in s.name.upper():
+        if p is None or s.priced_pct < TOP_MIN_PRICED or not _name_matches(s.name, f.match):
             continue
         picked.append((s, p, f))
     picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
@@ -153,6 +153,11 @@ def top_funds(
         for s, p, f in picked
     ]
     return out
+
+
+def _name_matches(name: str, match: str) -> bool:
+    """Whether a filer name holds the famous list's match word, or one of its "|" alternatives."""
+    return any(m.strip() and m.strip() in name.upper() for m in match.split("|"))
 
 
 def _by_return(ranked: list[tuple[FundSnapshot, Performance]]) -> list:

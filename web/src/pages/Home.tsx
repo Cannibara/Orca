@@ -374,6 +374,10 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
     name: "Fundamental long/short",
     about: "Stock pickers who also bet against stocks. The 13F shows only what they own, not their bets against.",
   },
+  {
+    name: "Healthcare specialists",
+    about: "Funds that invest only in healthcare and biotech, often backing drug makers before and after their trial results.",
+  },
   { name: "Tech & growth", about: "Growth investors focused on technology." },
   { name: "Venture capital", about: "Venture firms. Their 13F shows only listed stakes, mostly companies they backed before the IPO." },
   { name: "Activists", about: "Investors who buy big stakes to push companies to change." },

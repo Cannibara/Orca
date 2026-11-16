@@ -129,6 +129,7 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
     no_perf = snap(5, "YOUNG PARTNERS", perf={"1y": perf()})
     wrong = snap(6, "SOME OTHER FUND")  # the CIK in the list was mistyped
     bank = snap(7, "FIRST BANK OF FAME")  # famous: the name rule does not apply
+    renamed = snap(8, "BAIN CAPITAL PUBLIC EQUITY MANAGEMENT LLC", perf={"3y": perf(ann_return=-0.5)})
     famous = [
         Famous(1, "SCION", "Michael Burry", "Value"),
         Famous(2, "BERKSHIRE", "Warren Buffett", "Value"),
@@ -138,12 +139,13 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         Famous(5, "YOUNG", "", "Other"),
         Famous(6, "COATUE", "", "Tiger cubs"),
         Famous(7, "FIRST BANK", "", "Other"),
+        Famous(8, "BROOKSIDE|BAIN CAPITAL PUBLIC", "", "Other"),  # either name matches
         Famous(99, "MISSING", "", "Other"),  # not in the data
     ]
-    out = top_funds([small, big, unpriced, stopped, no_perf, wrong, bank], "3y", famous)
-    assert ids(out["famous"]) == [2, 2, 1, 4, 7]  # best return first
-    assert [r["group"] for r in out["famous"]] == ["Big companies", "Value", "Value", "Other", "Other"]
-    assert [r["until_q"] for r in out["famous"]] == [None, None, None, 40, None]
+    out = top_funds([small, big, unpriced, stopped, no_perf, wrong, bank, renamed], "3y", famous)
+    assert ids(out["famous"]) == [2, 2, 1, 4, 7, 8]  # best return first
+    assert [r["group"] for r in out["famous"]] == ["Big companies", "Value", "Value", "Other", "Other", "Other"]
+    assert [r["until_q"] for r in out["famous"]] == [None, None, None, 40, None, None]
     assert out["famous"][0] == {
         "fund_id": 2,
         "name": "BERKSHIRE HATHAWAY INC",
@@ -157,7 +159,7 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         "until_q": None,
     }
     assert out["famous"][4]["manager"] is None
-    assert ids(out["eligible"]) == [2, 6]  # Top funds is unchanged
+    assert ids(out["eligible"]) == [2, 6, 8]  # Top funds is unchanged
     assert top_funds([big], "3y")["famous"] == []
 
 
