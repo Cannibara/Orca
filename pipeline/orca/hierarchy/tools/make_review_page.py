@@ -2,6 +2,8 @@
 
 Run from `pipeline/`:
   uv run python orca/hierarchy/tools/make_review_page.py hierarchy.json --out review.html
+  uv run python orca/hierarchy/tools/make_review_page.py hierarchy.json --out review.html \
+      --final final.json --universe universe.json --funds top_max.json     # also the stocks top funds held
 
 Publish the file as a Claude artifact with the `db` capability: the page saves the owner's calls and
 comments in the collection `review`, and the session reads them back. The file embeds Nasdaq market
@@ -18,6 +20,8 @@ from pathlib import Path
 LEVEL3 = "Industry vertical"  # the owner's name for the third level (chat, 2026-11-16)
 LEVEL3_PLURAL = "Industry verticals"
 TEMPLATE = Path(__file__).with_name("review_page.html")
+US_EXCHANGES = {"NYSE", "NasdaqGS", "NasdaqGM", "NasdaqCM", "NYSEAM", "NYSEArca"}
+PERIODS = {"1y": "by 1-year return", "3y": "by 3-year return", "5y": "by 5-year return", "10y": "by 10-year return", "15y": "by 15-year return", "max": "by return since start"}
 
 # Shown at the top of the Hierarchy tab. Replace it each round with what changed since the last one.
 CHANGES = [
@@ -79,12 +83,73 @@ def rules(data: dict) -> list[dict[str, str]]:
     ]
 
 
+def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
+    """Add the stocks that the top funds held (labelled by `merge_batches.py`) to the page's data.
+
+    Every row of data["st"] gains five fields: [9] dollars the top funds bought, in millions, [10] how many of them
+    held it, [11] source (0 Damodaran's US list, 1 matched to a company listed elsewhere, 2 a model's first pass),
+    [12] confidence 0-3, [13] other Orca names for the same company. A labelled stock whose company is not in
+    data["st"] is appended with a market cap of 0. Stocks with no label go to data["nl"].
+    """
+    nodes = {}
+    for k, (ii, name, *_rest) in enumerate(data["sub"]):
+        sector, industry = data["sec"][data["ind"][ii][0]], data["ind"][ii][1]
+        nodes[f"{sector} > {industry} > {name}"] = k
+    by_ticker = {row[0]: i for i, row in enumerate(data["st"])}
+    for row in data["st"]:
+        row.extend([0, 0, 0, 3, ""])
+    held: dict[int, set[int]] = {}
+    taken = {row[0].upper() for row in data["st"]}
+    nl = []
+    for r in final:
+        u = universe[r["stock_id"]]
+        millions = u["invested"] / 1e6
+        if r["main"] is None:
+            nl.append([r["stock_id"], r["ticker"], r["name"], round(millions, 1), u["n_funds"], r["kind"], r["conf"] or 0, r["note"]])
+            continue
+        ref = r.get("ref")
+        at = by_ticker.get(ref["ticker"]) if ref and r["src"] == "hierarchy" and ref["exchange"] in US_EXCHANGES else None
+        if at is None:  # a company the Damodaran US list does not hold: ADRs, cross-listings, delisted names
+            key = r["ticker"] if r["ticker"].upper() not in taken else f"{r['ticker']}~{r['stock_id']}"
+            taken.add(key.upper())
+            model = r["src"] == "model"
+            group = data["groups"].index(ref["group"]) if ref and ref["group"] in data["groups"] else -1
+            how = 3 if model else {"default": 0, "rule": 1, "placed": 2}[r["how"]]
+            data["st"].append([key, r["name"], 0, group, "", "", nodes[r["main"]], [nodes[x] for x in r["extras"] if x in nodes], how,
+                               0, 0, 2 if model else 1, r["conf"] if model else 3, ""])  # fmt: skip
+            at = len(data["st"]) - 1
+            by_ticker[key] = at
+        row = data["st"][at]
+        row[9] = round(row[9] + millions, 1)
+        held.setdefault(at, set()).update(u["funds"])
+        if r["ticker"] != row[0] and r["ticker"] not in row[13]:
+            row[13] = (row[13] + ", " if row[13] else "") + r["ticker"]
+    for at, ids in held.items():
+        data["st"][at][10] = len(ids)
+    nl.sort(key=lambda x: -x[3])
+    data["nl"] = nl
+    data["top"] = {
+        "funds": [[f["fund_id"], f["name"], f["ann_return"], f["book"], f["n_positions"]] for f in funds["eligible"][: len(universe_funds(universe))]],
+        "period": PERIODS.get(funds["period"], funds["period"]),
+    }
+
+
+def universe_funds(universe: dict) -> set[int]:
+    return {f for u in universe.values() for f in u["funds"]}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("data", type=Path, help="hierarchy.json from build_hierarchy.py")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--final", type=Path, help="final.json from merge_batches.py")
+    parser.add_argument("--universe", type=Path, help="the universe file with funds and dollars per stock")
+    parser.add_argument("--funds", type=Path, help="home/top_<period>.json the universe was built from")
     args = parser.parse_args()
     data = json.loads(args.data.read_text())
+    if args.final:
+        uni = json.loads(args.universe.read_text())
+        add_top(data, json.loads(args.final.read_text()), {r["stock_id"]: r for r in uni["rows"]}, json.loads(args.funds.read_text()))
     data.update(L3=LEVEL3, L3p=LEVEL3_PLURAL, rules=rules(data), changes=CHANGES)
     payload = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")  # safe inside <script>
     args.out.write_text(TEMPLATE.read_text().replace("__DATA__", payload))

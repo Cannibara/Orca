@@ -18,8 +18,11 @@ The starting point is Damodaran's 94 US industry groups. Each group has a defaul
 | `model.py` | `parse` and `load` check `labels.txt` and report every problem at once; `Hierarchy.label(ticker, group, name)` returns the main label, the extra labels and how the main label was found. Standard library only. |
 | `tools/fetch_inputs.sh` | Downloads the three public inputs below. |
 | `tools/build_hierarchy.py` | Labels every listed stock and writes the JSON the review page reads. Needs `openpyxl` (a dev dependency). |
-| `tools/make_review_page.py`, `tools/review_page.html` | Builds the review page (one HTML file). |
-| `../../tests/test_hierarchy.py` | Guards `labels.txt`: every Damodaran group has a default, no unused vertical, the owner's examples hold. |
+| `matching.py` | Matches Orca's security names (Bloomberg style, cut at 28 characters, garbled tickers) to Damodaran's global company list by distinctive words, not by ticker. Standard library only. |
+| `tools/label_securities.py` | Labels Orca's `securities.json`, or a list of stock ids, through that match. Tier `auto` = strong match to a US-listed company or a same-ticker cross-listing; `verify` = an ADR under another ticker or a partial match; `none` = nothing close. |
+| `tools/make_batches.py`, `tools/model_prompt.md`, `tools/merge_batches.py` | The stocks the match cannot settle go to a model in batches, with a blind audit sample of already-labelled stocks mixed in; the answers are merged back and the audit reports how often the model agrees. |
+| `tools/make_review_page.py`, `tools/review_page.html` | Builds the review page (one HTML file). With `--final` it also shows the stocks a set of funds owned: held dollars, a sort by them, and a tab for what has no label (ETFs, funds, bonds). |
+| `../../tests/test_hierarchy.py`, `../../tests/test_hierarchy_matching.py` | Guard `labels.txt` (every Damodaran group has a default, no unused vertical, the owner's examples hold) and the name matching. |
 
 ## `labels.txt` format
 ```

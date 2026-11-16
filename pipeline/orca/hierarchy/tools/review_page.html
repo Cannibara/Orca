@@ -45,7 +45,7 @@ tr.s-ok td:first-child{box-shadow:inset 3px 0 var(--ok)}tr.s-move td:first-child
 .n,.num{font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}.num{color:var(--ink)}.thin{color:var(--warn)!important;font-weight:600}
 .tk{font-family:var(--mono);font-weight:600;white-space:nowrap}.nm{min-width:170px}.nm small{display:block;color:var(--muted);font-size:11px}
 .lab{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:600;margin:2px 4px 2px 0}
-.lab.m{background:var(--accent-weak);color:var(--accent);border:1px solid var(--accent-weak)}.lab.m.inf{border:1px dashed var(--accent)}
+.lab.m{background:var(--accent-weak);color:var(--accent);border:1px solid var(--accent-weak)}.lab.m.inf{border:1px dashed var(--accent)}.lab.m.mod{border:1px dotted var(--warn);background:var(--warn-weak);color:var(--warn)}.num.held{font-variant-numeric:tabular-nums}
 .lab.x{background:transparent;border:1px solid var(--line);color:var(--ink)}.lab.ghost{opacity:.55;text-decoration:line-through}
 .lab button.lx{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
 .call{min-width:230px}.call>*{margin-bottom:5px}.call input,.call select{display:block;width:100%;max-width:250px}
@@ -87,7 +87,7 @@ const D=JSON.parse(document.getElementById('data').textContent);
 const L3=D.L3,L3l=L3.toLowerCase(),L3P=D.L3p,L3p=L3P.toLowerCase();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=s=>document.querySelector(s);
-let S={},tab='h',view={s:null,i:null,n:null,more:0},findQ='',findT=null,db=null,col=null,loaded=false,ctx=null,T,EFF,CNT,OPTS;
+let S={},tab='h',sortBy=D.top?'held':'cap',nlMore=0,view={s:null,i:null,n:null,more:0},findQ='',findT=null,db=null,col=null,loaded=false,ctx=null,T,EFF,CNT,OPTS;
 const timers={};
 const sid=t=>'s_'+t.replace(/[^A-Za-z0-9]/g,'_');
 const slug=p=>'h_'+p.replace(/[^A-Za-z0-9]+/g,'_').slice(0,150);
@@ -173,7 +173,7 @@ function nodeSubs(){
 /* ---------- chrome ---------- */
 function chrome(){
   const yours=Object.keys(S).filter(k=>(k.indexOf('s_')===0&&(S[k].v==='move'||(S[k].x||[]).length||(S[k].rx||[]).length))||(k.indexOf('n_')===0&&S[k].k==='node')).length;
-  const tabs=[['h','Hierarchy','hierarchy'],['v','Browse stocks','v-'+(view.s==null?'x':view.s)+'-'+(view.i==null?'x':view.i)+'-'+(view.n==null?'x':view.n)],['f','Find a stock','find'],['r','Rules to confirm','rules'],['y','Your changes'+(yours?` (${yours})`:''),'yours']];
+  const tabs=[['h','Hierarchy','hierarchy'],['v','Browse stocks','v-'+(view.s==null?'x':view.s)+'-'+(view.i==null?'x':view.i)+'-'+(view.n==null?'x':view.n)],['f','Find a stock','find'],['r','Rules to confirm','rules'],...(D.nl?[['n',`Not labelled (${D.nl.length.toLocaleString('en-US')})`,'notlabelled']]:[]),['y','Your changes'+(yours?` (${yours})`:''),'yours']];
   $('#tabs').innerHTML=tabs.map(([k,l,h])=>`<a href="#${h}" class="${tab===k?'on':''}">${l}</a>`).join('')+`<button type="button" class="btn sm newbtn" data-act="newnode">＋ New label</button>`;
   const stock=Object.keys(S).filter(k=>k.indexOf('s_')===0&&S[k].v).length;
   const subDone=T.sub.filter((x,k)=>vOf(slug(pathOf(k)))).length;
@@ -185,7 +185,8 @@ function seg(id,opts){const v=vOf(id);return `<div class="seg" role="group">${op
 /* ---------- stock rows ---------- */
 function chipsHtml(si,withX){
   const st=D.st[si],e=EFF[si],id=sid(st[0]);
-  let h=`<span class="lab m ${st[8]===0&&e.m===st[6]?'inf':''}" title="${esc(pathOf(e.m))}${st[8]===0&&e.m===st[6]?' (default from the Damodaran group, not checked by name)':''}">${esc(short(e.m))}</span>`;
+  const mod=st[8]===3,inf=st[8]===0&&e.m===st[6];
+  let h=`<span class="lab m ${mod?'mod':inf?'inf':''}" title="${esc(pathOf(e.m))}${mod?' (first pass by a model from the company name, confidence '+st[12]+' of 3)':inf?' (default from the Damodaran group, not checked by name)':''}">${esc(short(e.m))}</span>`;
   e.ex.forEach(k=>{h+=`<span class="lab x" title="${esc(pathOf(k))}">${esc(short(k))}${withX?`<button type="button" class="lx" data-act="rmx" data-id="${id}" data-p="${esc(pathOf(k))}" aria-label="Remove label ${esc(T.sub[k][1])}">✕</button>`:''}</span>`});
   const s=S[id]||{};(s.rx||[]).forEach(p=>{if(T.by[p]!=null)h+=`<span class="lab x ghost" title="You removed this label">${esc(short(T.by[p]))}</span>`});
   if(e.m!==st[6])h+=`<div class="dl">was ${esc(short(st[6]))}</div>`;
@@ -202,9 +203,12 @@ function callHtml(si){
 }
 function rowHtml(si,rank){
   const st=D.st[si],id=sid(st[0]),v=vOf(id);
-  return `<tr class="s-${v||'none'}"><td class="n">${rank}</td><td class="tk"><a href="#t-${esc(st[0].replace(/[^A-Za-z0-9]/g,'-'))}">${esc(st[0])}</a></td><td class="nm">${esc(st[1])}<small>${esc(D.groups[st[3]])} · SIC ${esc(st[4])} · FF ${esc(st[5])}</small></td><td class="num">${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:st[2]<10?1:0}):'–'}</td><td>${chipsHtml(si,true)}</td><td class="call">${callHtml(si)}</td></tr>`;
+  const src=st[11]===2?'first pass by a model':st[11]===1?'matched to a company listed elsewhere':'';
+  const sub=[D.groups[st[3]]||'no Damodaran group',st[4]?'SIC '+st[4]:'',st[5]?'FF '+st[5]:'',src,st[13]?'Orca also lists '+st[13]:''].filter(Boolean).join(' · ');
+  const held=D.top?`<td class="num held">${st[9]?st[9].toLocaleString('en-US',{maximumFractionDigits:st[9]<10?1:0}):'–'}</td><td class="num">${st[10]||'–'}</td>`:'';
+  return `<tr class="s-${v||'none'}"><td class="n">${rank}</td><td class="tk"><a href="#t-${esc(normT(st[0]))}">${esc(st[0])}</a></td><td class="nm">${esc(st[1])}<small>${esc(sub)}</small></td><td class="num">${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:st[2]<10?1:0}):'–'}</td>${held}<td>${chipsHtml(si,true)}</td><td class="call">${callHtml(si)}</td></tr>`;
 }
-const THEAD='<thead><tr><th>#</th><th>Ticker</th><th>Company</th><th style="text-align:right">Cap $bn</th><th>Labels (main first)</th><th>Your call</th></tr></thead>';
+const THEAD=()=>`<thead><tr><th>#</th><th>Ticker</th><th>Company</th><th style="text-align:right">Cap $bn</th>${D.top?'<th style="text-align:right" title="Dollars the top 100 funds bought of it, since 2013">Top funds bought $m</th><th style="text-align:right" title="How many of the 100 funds ever held it">Funds</th>':''}<th>Labels (main first)</th><th>Your call</th></tr></thead>`;
 
 /* ---------- browse tab ---------- */
 function nodeLevel(){return view.n!=null?'n':view.i!=null?'i':view.s!=null?'s':'a'}
@@ -213,6 +217,7 @@ function siblings(){const l=nodeLevel();return l==='n'?T.sub.map((x,k)=>['v-'+T.
 function browseTab(){
   const sel=nodeSubs();
   const base=D.st.map((st,si)=>si).filter(si=>{const st=D.st[si],e=EFF[si];if(sel.has(e.m)||e.ex.some(k=>sel.has(k)))return true;return sel.has(st[6])||st[7].some(k=>sel.has(k))});
+  if(D.top&&sortBy==='held')base.sort((a,b)=>D.st[b][9]-D.st[a][9]||D.st[b][2]-D.st[a][2]);
   const lim=20+view.more,rows=base.slice(0,lim);
   const so=['<option value="x">All sectors</option>'].concat(T.sec.map((s,i)=>`<option value="${i}" ${view.s===i?'selected':''}>${esc(s)}</option>`)).join('');
   const inds=T.ind.map((x,i)=>[x,i]).filter(([x])=>view.s==null||x[0]===view.s);
@@ -231,13 +236,13 @@ function browseTab(){
   const sibs=siblings().map(x=>x[0]),cur='v-'+(view.s==null?'x':view.s)+'-'+(view.i==null?'x':view.i)+'-'+(view.n==null?'x':view.n);
   const at=sibs.indexOf(cur),prev=at>0?sibs[at-1]:null,next=at>=0&&at<sibs.length-1?sibs[at+1]:null;
   const nav=sibs.length?`<a class="btn sm" href="${prev?'#'+prev:'#'+cur}" ${prev?'':'aria-disabled="true"'}>← Previous</a> <a class="btn sm" href="${next?'#'+next:'#'+cur}" ${next?'':'aria-disabled="true"'}>Next →</a>`:'';
-  return `<div class="navrow"><select id="selS" aria-label="Sector">${so}</select><select id="selI" aria-label="Industry">${io}</select><select id="selN" aria-label="${L3}" ${view.i==null?'disabled':''}>${no}</select>${nav}</div>
-  <h2>${esc(key.replace(/ > /g,' › '))}</h2><div class="meta"><b>${cc.n}</b> stocks with a label here${lv==='n'?` (<b>${cc.m}</b> main, <b>${cc.x}</b> extra)`:''} · <b>${cc.big}</b> above $1bn · showing the biggest ${rows.length}</div>
+  return `<div class="navrow"><select id="selS" aria-label="Sector">${so}</select><select id="selI" aria-label="Industry">${io}</select><select id="selN" aria-label="${L3}" ${view.i==null?'disabled':''}>${no}</select>${D.top?`<select id="selSort" aria-label="Sort"><option value="held" ${sortBy==='held'?'selected':''}>Sort: bought by top funds</option><option value="cap" ${sortBy==='cap'?'selected':''}>Sort: market cap</option></select>`:''}${nav}</div>
+  <h2>${esc(key.replace(/ > /g,' › '))}</h2><div class="meta"><b>${cc.n}</b> stocks with a label here${lv==='n'?` (<b>${cc.m}</b> main, <b>${cc.x}</b> extra)`:''} · <b>${cc.big}</b> above $1bn · showing the ${sortBy==='held'&&D.top?'most bought by top funds':'biggest'} ${rows.length}</div>
   ${indD?`<div class="meta">${esc(indD)}</div>`:''}${thin}${noSec}${umNote}
   ${lv==='a'?'':`<div class="box"><h4>Your call on this ${lv==='n'?L3l:lv==='i'?'industry':'sector'}</h4>${seg(hid,[['ok','✓ Looks right'],['change','Change','neu'],['unsure','?','neg']])}<textarea data-id="${hid}" data-f="t" placeholder="Rename it, split it, merge it, move it…" aria-label="Note on ${esc(key)}">${esc(tOf(hid))}</textarea></div>`}
-  <div class="tbl"><table>${THEAD}<tbody>${rows.map((si,i)=>rowHtml(si,i+1)).join('')}</tbody></table></div>
+  <div class="tbl"><table>${THEAD()}<tbody>${rows.map((si,i)=>rowHtml(si,i+1)).join('')}</tbody></table></div>
   ${base.length>lim?`<p><button type="button" class="btn" data-act="more">Show 30 more (${base.length-lim} left)</button></p>`:''}
-  <p class="dl">Caps: Nasdaq screener (Nov 2026). Group, SIC: Damodaran (Jan 2026); FF = Fama-French 48 label from SIC. Dashed main label = default from the Damodaran group, not checked by name.</p>`;
+  <p class="dl">Caps: Nasdaq screener (Nov 2026). Group, SIC: Damodaran (Jan 2026); FF = Fama-French 48 label from SIC. Dashed main label = default from the Damodaran group, not checked by name. Dotted orange = a model's first pass from the company name (confidence in the hover text). "Top funds bought" is dollars bought since 2013 by the top 100 funds: a size guide, not a market value.</p>`;
 }
 
 /* ---------- hierarchy tab ---------- */
@@ -252,7 +257,7 @@ function hierTab(){
   }).join('');
   const jump=T.sec.map((s,i)=>`<a class="btn sm" href="#sec-${i}">${esc(s)}</a>`).join(' ');
   const changes=D.changes&&D.changes.length?`<b>What changed this round:</b><ul>${D.changes.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:'';
-  return `<div class="intro"><b>The hierarchy so far:</b> ${T.sec.length} sectors → ${T.ind.length} industries → ${T.sub.length} ${L3p}, with every one of the ${D.st.length.toLocaleString('en-US')} US-listed stocks labelled. Click any name to see its stocks. Orange counts: fewer than 10 stocks above $1bn, so a stock picker's peers widen to the industry (R4). "Largest" shows the biggest stocks carrying each label. ${changes}<div style="margin-top:8px"><b>Jump to:</b> ${jump}</div></div>${body}`;
+  return `<div class="intro"><b>The hierarchy so far:</b> ${T.sec.length} sectors → ${T.ind.length} industries → ${T.sub.length} ${L3p}, with every one of the ${D.st.filter(x=>!x[11]).length.toLocaleString('en-US')} US-listed stocks labelled. ${D.top?`It also holds the stocks the top ${D.top.funds.length} funds (ranked ${esc(D.top.period)}) ever owned: ${D.st.filter(x=>x[9]>0).length.toLocaleString('en-US')} labelled here (${D.st.filter(x=>x[11]).length.toLocaleString('en-US')} of them not on Damodaran's US list), ${D.nl.length.toLocaleString('en-US')} on the Not labelled tab. <details><summary>The ${D.top.funds.length} funds</summary><div class="dl">${D.top.funds.map(f=>esc(f[1])+' '+(f[2]*100).toFixed(1)+'%').join(' · ')}</div></details> `:''}Click any name to see its stocks. Orange counts: fewer than 10 stocks above $1bn, so a stock picker's peers widen to the industry (R4). "Largest" shows the biggest stocks carrying each label. ${changes}<div style="margin-top:8px"><b>Jump to:</b> ${jump}</div></div>${body}`;
 }
 
 /* ---------- find a stock ---------- */
@@ -283,12 +288,23 @@ function hitsHtml(){
 function cardHtml(){
   if(findT==null)return '';
   const st=D.st[findT],ps=peerSets(findT);
-  return `<div class="box"><h2>${esc(st[0])} <span class="dl">${esc(st[1])}</span></h2><div class="meta">$${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:1}):'–'}bn · ${esc(D.groups[st[3]])} · SIC ${esc(st[4])} · FF ${esc(st[5])}</div>
+  return `<div class="box"><h2>${esc(st[0])} <span class="dl">${esc(st[1])}</span></h2><div class="meta">$${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:1}):'–'}bn · ${esc(D.groups[st[3]]||'no Damodaran group')}${st[4]?' · SIC '+esc(st[4]):''}${st[5]?' · FF '+esc(st[5]):''}</div>
   <div class="call" style="min-width:0"><div>${chipsHtml(findT,true)}</div><div style="margin-top:8px">${callHtml(findT)}</div></div></div>
   <div class="cards peers">${ps.map((p,i)=>`<div class="card"><header><h3>${i===0?'Main label: ':'Extra label: '}${esc(pathOf(p.k).replace(/ > /g,' › '))}</h3></header>
     <div class="lvl"><b>${esc(L3)} (${esc(T.sub[p.k][1])})</b> <span class="dl ${CNT.sub[p.k]&&CNT.sub[p.k].big<10?'thin':''}">${p.a.length} peers</span><div>${peerChips(p.a,14)||'<span class="dl">none</span>'}</div></div>
     <div class="lvl"><b>Industry (${esc(T.ind[p.ii][1])})</b> <span class="dl">${p.b.length} peers</span><div>${peerChips(p.b,14)}</div></div>
     <div class="lvl"><b>Sector (${esc(T.sec[p.s])})</b> <span class="dl">${p.c.length} peers</span><div>${peerChips(p.c,10)}</div></div></div>`).join('')}</div>`;
+}
+
+/* ---------- stocks without a label ---------- */
+const KIND={etf:'ETF',fund:'Fund',bond:'Bond',spac:'SPAC',other:'Other',stock:'Business unclear'};
+function notLabelledTab(){
+  const by={};D.nl.forEach(r=>{const c=by[r[5]]||(by[r[5]]={n:0,m:0});c.n++;c.m+=r[3]});
+  const sum=Object.keys(by).sort((a,b)=>by[b].m-by[a].m).map(k=>`<b>${esc(KIND[k]||k)}</b> ${by[k].n.toLocaleString('en-US')} (${Math.round(by[k].m).toLocaleString('en-US')}m)`).join(' · ');
+  const lim=100+nlMore,rows=D.nl.slice(0,lim);
+  return `<div class="intro"><b>Held by the top funds, but with no label.</b> ETFs and funds are not stock picks; bonds, SPACs and unidentifiable lines have no business to score. Biggest first, in dollars bought since 2013. ${sum}.<br>If an ETF should count as a sector bet (SOXX as semiconductors, XLF as financials), say so in a comment on the Rules tab.</div>
+  <div class="tbl"><table><thead><tr><th>Ticker</th><th>Name</th><th style="text-align:right">Bought $m</th><th style="text-align:right">Funds</th><th>What it is</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="tk">${esc(r[1])}</td><td class="nm">${esc(r[2])}</td><td class="num">${r[3].toLocaleString('en-US',{maximumFractionDigits:r[3]<10?1:0})}</td><td class="num">${r[4]}</td><td>${esc(KIND[r[5]]||r[5])}</td><td>${esc(r[7]||'')}</td></tr>`).join('')}</tbody></table></div>
+  ${D.nl.length>lim?`<p><button type="button" class="btn" data-act="nlmore">Show 100 more (${D.nl.length-lim} left)</button></p>`:''}`;
 }
 
 /* ---------- rules + your changes ---------- */
@@ -350,13 +366,13 @@ function removeExtra(id,p){const s=S[id]||{};if((s.x||[]).indexOf(p)>=0)put(id,{
 /* ---------- routing + events ---------- */
 function main(){
   const y=window.scrollY;
-  $('#main').innerHTML=tab==='h'?hierTab():tab==='v'?browseTab():tab==='f'?findTab():tab==='r'?rulesTab():yoursTab();
+  $('#main').innerHTML=tab==='h'?hierTab():tab==='v'?browseTab():tab==='f'?findTab():tab==='r'?rulesTab():tab==='n'?notLabelledTab():yoursTab();
   window.scrollTo(0,y);
 }
 function refresh(){rebuild();chrome();main()}
 function route(){
   const h=location.hash.slice(1);let m;
-  if(h==='rules')tab='r';else if(h==='yours')tab='y';else if(h==='find'){tab='f';findT=null}
+  if(h==='rules')tab='r';else if(h==='yours')tab='y';else if(h==='notlabelled'&&D.nl)tab='n';else if(h==='find'){tab='f';findT=null}
   else if((m=/^t-(.+)$/.exec(h))){tab='f';const i=D.st.findIndex(s=>normT(s[0])===m[1]);findT=i>=0?i:null;if(i>=0)findQ=D.st[i][0]}
   else if((m=/^v-(x|\d+)-(x|\d+)-(x|\d+)$/.exec(h))){tab='v';const f=v=>v==='x'?null:+v;view={s:f(m[1]),i:f(m[2]),n:f(m[3]),more:0}}
   else tab='h';
@@ -371,6 +387,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='fq'){const a=$('#hits a');if(a)location.hash=a.getAttribute('href').slice(1)}});
 document.addEventListener('change',e=>{
   const el=e.target,f=el.dataset&&el.dataset.f;
+  if(el.id==='selSort'){sortBy=el.value;main();return}
   if(el.id==='selS'){location.hash=`v-${el.value}-x-x`;return}
   if(el.id==='selI'){location.hash=`v-${view.s==null?(el.value==='x'?'x':T.ind[+el.value][0]):view.s}-${el.value}-x`;return}
   if(el.id==='selN'){location.hash=`v-${view.s}-${view.i}-${el.value}`;return}
@@ -384,6 +401,7 @@ document.addEventListener('click',e=>{
   else if(act==='rv'){const v=b.dataset.v;put(id,vOf(id)===v?{v:''}:{v});refresh()}
   else if(act==='rmx'){removeExtra(id,b.dataset.p);refresh()}
   else if(act==='more'){view.more+=30;main()}
+  else if(act==='nlmore'){nlMore+=100;main()}
   else if(act==='newnode')openDlg(null);
   else if(act==='delnode'){delNode(id).then(refresh)}
 });
