@@ -13,8 +13,7 @@ from pathlib import Path
 
 COLUMNS = [
     "stock_id", "ticker", "name", "kind", "sector", "industry", "industry_vertical", "extra_labels", "source", "how",
-    "confidence", "was_group_default", "etf_class", "etf_label", "etf_level", "etf_leverage", "top_funds_bought_usd_m",
-    "n_top_funds", "matched_company",
+    "confidence", "was_group_default", "top_funds_bought_usd_m", "n_top_funds", "matched_company",
 ]  # fmt: skip
 
 
@@ -25,11 +24,9 @@ def csv_rows(final: list[dict], universe: dict[int, dict]) -> list[list]:
         main = (r["main"] or "").split(" > ")
         main += [""] * (3 - len(main))
         ref = r.get("ref") or {}
-        etf = r.get("etf") or {}
         out.append([
             r["stock_id"], r["ticker"], r["name"], r["kind"], *main, "; ".join(r["extras"]),
             "ETF" if r["kind"] == "etf" else (r["src"] or ""), r["how"] or "", "" if r["conf"] is None else r["conf"], r.get("was", ""),
-            etf.get("label", ""), etf.get("path", "").replace(" > ", " › "), etf.get("lv", ""), etf.get("lev", ""),
             round(r["invested"] / 1e6, 1), universe.get(r["stock_id"], {}).get("n_funds", ""),
             f"{ref['name']} ({ref['exchange']}:{ref['ticker']})" if ref else "",
         ])  # fmt: skip
