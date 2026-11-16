@@ -22,7 +22,7 @@ import collections
 import json
 from pathlib import Path
 
-from orca.hierarchy import LABELS_FILE, load
+from orca.hierarchy import LABELS_FILE, Node, load
 
 KINDS = {"stock", "spac", "fund", "bond", "other"}
 
@@ -49,6 +49,49 @@ def read_answers(folder: Path) -> tuple[dict[int, dict], list[str]]:
     return answers, problems
 
 
+def fold(rows: list[dict], answers: dict[int, dict], nodes: dict[int, Node], invested: dict[int, float]) -> tuple[list[dict], dict, list[str]]:
+    """The final rows, the audit agreement counts (by how the hierarchy found the label) and the problems found."""
+    final: list[dict] = []
+    problems: list[str] = []
+    agree: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    for row in rows:
+        a = answers.get(row["stock_id"])
+        out = {k: row[k] for k in ("stock_id", "ticker", "name", "kind", "tier")}
+        out.update(main=None, extras=[], src=None, how=None, conf=None, note="")
+        if "ref" in row:
+            out["ref"] = row["ref"]
+        if row["kind"] == "etf":
+            pass
+        elif row["tier"] == "auto":
+            out.update(main=row["main"], extras=row["extras"], src="hierarchy", how=row["how"], conf=3)
+            if a is not None and a.get("k") == "stock" and a.get("v") in nodes:  # the blind audit
+                mine, theirs = nodes[a["v"]], row["main"].split(" > ")
+                counts = agree[row["how"]]
+                counts["n"] += 1
+                counts["vertical"] += mine.path == row["main"]
+                counts["industry"] += [mine.sector, mine.industry] == theirs[:2]
+                counts["sector"] += mine.sector == theirs[0]
+        elif a is None:
+            problems.append(f"no answer for {row['stock_id']} {row['ticker']} {row['name']}")
+        else:
+            out["note"] = a.get("n", "")
+            kind = a.get("k")
+            if kind not in KINDS:
+                problems.append(f"{row['stock_id']}: kind {kind!r}")
+            elif kind != "stock":
+                out["kind"] = kind
+            elif a.get("v") not in nodes:
+                out.update(src="model", conf=0)  # the model could not tell what the business is
+            elif row["tier"] == "verify" and a.get("m") == 1:
+                out.update(main=row["main"], extras=row["extras"], src="hierarchy", how=row["how"], conf=a.get("c", 2), checked=True)
+            else:
+                out.update(main=nodes[a["v"]].path, src="model", how="model", conf=a.get("c", 1))
+                out["extras"] = [nodes[x].path for x in a.get("x", []) if x in nodes]
+        out["invested"] = invested.get(row["stock_id"], 0)
+        final.append(out)
+    return final, agree, problems
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--labelled", type=Path, required=True)
@@ -59,53 +102,17 @@ def main() -> None:
     args = parser.parse_args()
 
     h = load(args.labels)
-    node = {i: n for i, n in enumerate(h.nodes, 1)}
-    universe = {r["stock_id"]: r for r in json.loads(args.universe.read_text())["rows"]}
+    universe = {r["stock_id"]: r["invested"] for r in json.loads(args.universe.read_text())["rows"]}
     answers, problems = read_answers(args.batches)
-    final, agree = [], collections.defaultdict(collections.Counter)
-    for row in json.loads(args.labelled.read_text()):
-        a = answers.get(row["stock_id"])
-        out = {k: row[k] for k in ("stock_id", "ticker", "name", "kind", "tier")}
-        out.update(main=None, extras=[], src=None, how=None, conf=None, note="")
-        if "ref" in row:
-            out["ref"] = row["ref"]
-        if row["kind"] == "etf":
-            pass
-        elif row["tier"] == "auto":
-            out.update(main=row["main"], extras=row["extras"], src="hierarchy", how=row["how"], conf=3)
-            if a is not None and a.get("k") == "stock" and a.get("v") in node:  # the blind audit
-                mine, theirs = node[a["v"]], row["main"]
-                agree[row["how"]]["n"] += 1
-                agree[row["how"]]["vertical"] += mine.path == theirs
-                agree[row["how"]]["industry"] += " > ".join(mine.path.split(" > ")[:2]) == " > ".join(theirs.split(" > ")[:2])
-                agree[row["how"]]["sector"] += mine.sector == theirs.split(" > ")[0]
-        elif a is None:
-            problems.append(f"no answer for {row['stock_id']} {row['ticker']} {row['name']}")
-        else:
-            out["note"] = a.get("n", "")
-            kind = a.get("k")
-            if kind not in KINDS:
-                problems.append(f"{row['stock_id']}: kind {kind!r}")
-            elif kind != "stock":
-                out["kind"] = kind
-            elif a.get("v") not in node:
-                out.update(src="model", conf=0)  # the model could not tell what the business is
-            elif row["tier"] == "verify" and a.get("m") == 1:
-                out.update(main=row["main"], extras=row["extras"], src="hierarchy", how=row["how"], conf=a.get("c", 2))
-                out["checked"] = True
-            else:
-                out.update(main=node[a["v"]].path, src="model", how="model", conf=a.get("c", 1))
-                out["extras"] = [node[x].path for x in a.get("x", []) if x in node]
-        out["invested"] = universe[row["stock_id"]]["invested"] if row["stock_id"] in universe else 0
-        final.append(out)
+    final, agree, more = fold(json.loads(args.labelled.read_text()), answers, dict(enumerate(h.nodes, 1)), universe)
+    problems += more
     args.out.write_text(json.dumps(final, separators=(",", ":")))
 
     total = sum(r["invested"] for r in final) or 1
     print("problems:", len(problems))
     for p in problems[:20]:
         print("  ", p)
-    by = collections.Counter()
-    weight = collections.Counter()
+    by, weight = collections.Counter(), collections.Counter()
     for r in final:
         key = "etf" if r["kind"] == "etf" else r["src"] if r["main"] else f"no label ({r['kind']})"
         by[key] += 1
