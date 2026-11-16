@@ -11,11 +11,13 @@ FAMOUS_CSV = Path(__file__).with_name("famous.csv")
 # The styles, in the order the home page lists them (the web keeps the same order and adds a
 # line about each; a group it does not know goes last).
 FAMOUS_GROUPS = (
-    "Tiger cubs",
-    "Tech & growth",
-    "Venture capital",
+    "Buffett inspired",
     "Moat investing",
     "Value",
+    "Tiger cubs",
+    "Fundamental long/short",
+    "Tech & growth",
+    "Venture capital",
     "Activists",
     "Macro",
     "Family offices",

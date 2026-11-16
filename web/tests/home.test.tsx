@@ -283,7 +283,7 @@ describe("Home", () => {
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     const panel = (await screen.findByRole("heading", { level: 2, name: "Famous funds" })).closest("section")!;
     await within(panel).findAllByRole("table");
-    const order = ["Tiger cubs", "Tech & growth", "Value"].filter((g) => famous.some((f) => f.group === g));
+    const order = ["Value", "Tiger cubs", "Tech & growth"].filter((g) => famous.some((f) => f.group === g));
     expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(order);
     for (const group of order) {
       const table = within(panel).getByRole("table", { name: group });
