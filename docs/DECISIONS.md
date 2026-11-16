@@ -6,11 +6,21 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-16 — How a fund's sector picks are scored (owner)
+- Decision (chat): a fund's ETF buy is a sector pick. A single-sector or single-industry ETF is placed on its node of the hierarchy (SOXX → Technology › Semiconductors); broad-market, international, bond, commodity, leveraged and cross-sector theme ETFs have no sector and count as neutral (R12). ETF-heavy funds stay in the top 100.
+- Decision (chat): the sector score is about IRR (R13). Each buy and sell is replayed through every other sector's return series (total return, with dividends) and the IRRs are compared. It needs one return series per sector and no benchmark weights.
+- Decision (chat): allocation is judged at industry level (71) by default, with a toggle to sector (12) or industry vertical (244) (R9).
+- Decision (chat): International Assets Investment Management (rank 66, $718bn bought on a $1.7bn book) is dropped from the top 100.
+- Accepted (chat): 13F is quarterly with a 45-day lag, so a buy and a sell inside one quarter are invisible and trades are priced at the quarter's average.
+- Deferred (chat): licensing (Tiingo L1, Damodaran R10) can wait until something is commercial. Revisit before anything is shown on the site.
+- Context: the return series come from indices built from the hierarchy (ROADMAP S4), computed where the daily dividends are (the public weekly price files have none), with ETFs as labelled cross-checks (L5). The 30 biggest funds outside the top 100 hold 93.9% labelled stocks, 5.7% ETFs and 0.4% unlabelled stocks by value, so no large labelling job is needed first.
+- Open: nothing is built. Next is a prototype of the 12 sector indices against the Select Sector ETFs.
+
 ## 2026-11-16 — Labelling the stocks funds hold: name match, then a model (proposed, owner to confirm R8)
 - Decision (chat): classify every stock the 100 best funds ever held in the hierarchy. The window (since start) is my choice; the owner has not said which ranking they meant.
 - Decision (mine, open for the owner): match Orca's names to Damodaran's global company file by words, not by ticker, because Orca's tickers are often garbled and his file also holds ADRs and foreign lines. For stocks it does not cover, a model reads the name and picks a vertical, tagged and with a confidence (R8 changed from "SEC SIC code" to this). A model that knows a company replaces a Damodaran group default, because a blind audit found the defaults wrong on 27% of verticals and 6% of sectors while the model matched the owner's hand placements 97% of the time.
 - Rejected: SEC SIC codes for the rest (needs a CIK per stock, which Orca's public data does not carry; too coarse for verticals); trusting group defaults unchecked.
-- Decision (chat): a fund's ETF buy is a sector pick, so ETF-heavy funds stay in the top 100 (12 of the 100 hold half or more of their book in ETFs). Each ETF needs a node of the hierarchy; a single-sector ETF maps to its sector, industry or vertical, a broad or bond ETF to none. Not built: the mapping was classed once for the biggest 400 and removed in bf901e0 by mistake. Open: how sectors are compared with each other (indices built from the hierarchy, ETFs as labelled cross-checks), ROADMAP S4, F5 and L5.
+- Decision (chat): a fund's ETF buy is a sector pick, so ETF-heavy funds stay in the top 100 (12 of the 100 hold half or more of their book in ETFs). Each ETF needs a node of the hierarchy; a single-sector ETF maps to its sector, industry or vertical, a broad or bond ETF to none. Built: a model classed the biggest ETFs (`etf_batches.py`; removed in bf901e0 by mistake, restored in e192f74). Open: how sectors are compared with each other (indices built from the hierarchy, ETFs as labelled cross-checks), ROADMAP S4, F5 and L5.
 - Consequences: the labelled outputs stay out of the repo while it is public and Damodaran's licence is unclear (R10). A fund page cannot show a label until the owner reviews it and the contract changes.
 
 ## 2026-11-16 — Sector hierarchy for the sector-picker / stock-picker metric (owner)

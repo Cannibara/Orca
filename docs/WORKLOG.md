@@ -5,6 +5,18 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-16 — ETF mapping restored, fund 66 dropped, data refreshed to quarter 54, rules decided
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner's answers recorded as decided rules: R9 (industry level by default, toggle to sector or vertical), R12 (a single-sector ETF counts as a bet on its node, every other ETF has no sector), R13 (the sector score is the IRR of each call replayed through every other sector). Accepted: 13F is quarterly with a 45-day lag, so trades inside a quarter are invisible. Licensing can wait until something is commercial | Chat, 2026-11-16, after a diagram page ("Scoring Sector Picks", private artifact) explained the ETF mapping and the dividend catch | `make_review_page.py`, `docs/DECISIONS.md` |
+| ETF classification restored (it was removed in bf901e0 on a misreading) and applied to the new list: a model classed the 462 biggest ETFs; 98 are single-sector ($17bn bought, 0.8% of all dollars), 364 get no sector | The owner: a fund's ETF buy is a sector pick, so ETF-heavy funds stay in | `tools/etf_batches.py`, `tools/etf_prompt.md` |
+| International Assets Investment Management (rank 66) excluded with `top_funds_universe.py --exclude 1818604` | Owner: drop it ($718bn bought on a $1.7bn book, desk flow) | `tools/top_funds_universe.py` |
+| The monthly run published new data while we worked (latest quarter 53 → 54; 41,407 securities; 328 garbled tickers fixed, e.g. EXMOC → XOM), so everything was re-downloaded and 15 of the 100 funds changed. 7,025 securities; 437 were new: a model labelled 226 stocks (batch 12) and 81 ETFs (ETF batch 3). Earlier answers were reused by stock id (`make_batches.py --missing`, `etf_batches.py make --missing`) | One snapshot must be one vintage; answers keyed by stock id stay valid | `tools/make_batches.py`, `tools/etf_batches.py` |
+| Result: 5,111 stocks labelled, 95% of the $2.1tn bought. ETFs 4.6%, funds, SPACs and unidentified lines 0.1%. Blind audit of 880 default-labelled stocks: the model agrees with the group default on 73% of verticals (97% with labels placed by name); it replaced 234 defaults. 1,034 small defaults (0.8% of dollars) unchecked | The numbers the owner reviews on the page (v11) | `pipeline/orca/hierarchy/README.md` |
+| Check for sector indices: the 30 biggest funds outside the top 100 (Vanguard, BlackRock, State Street, FMR) hold 93.9% labelled stocks, 5.7% ETFs and 0.4% stocks we have not labelled, by value | Answers whether every stock needs a tag before a sector index can be built: a size-weighted index is already about 99.6% covered | README |
+| Not done: no sector return table (ROADMAP S4) exists yet. Next: prototype the 12 sector indices from our labels and compare them with the Select Sector ETFs (XLK, XLF and the rest) | The test of whether hierarchy-built indices track real sector ETFs | `docs/ROADMAP.md` |
+
 ## 2026-11-16 — The stocks the 100 best funds ever held, found and labelled
 
 | What changed | Why | Files |

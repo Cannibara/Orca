@@ -25,12 +25,11 @@ PERIODS = {"1y": "by 1-year return", "3y": "by 3-year return", "5y": "by 5-year 
 
 # Shown at the top of the Hierarchy tab. Replace it each round with what changed since the last one.
 CHANGES = [
-    "New: the stocks the 100 best funds (by return since start) ever held, 7,702 securities. 5,361 now carry a label and cover 92% of the dollars those funds bought; the Not labelled tab holds the rest (ETFs, funds, SPACs, bonds).",
-    "Browse stocks has two new columns, the dollars the top funds bought and how many of the 100 held the stock, and sorts by them first. Use Sort to go back to market cap.",
-    "Where each label came from: solid blue = placed by name (yours and mine), dashed blue = Damodaran's group default, not checked, dotted orange = a model's first pass from the company name. Confidence is in the hover text.",
-    "Check on the group defaults: a model labelled 840 default-labelled stocks blind and agreed with the default on only 73% of verticals (88% of industries, 94% of sectors), against 97% for labels placed by name. Where it knew the company it replaced the default (224 stocks, shown as \"group default was ...\"). Tankers were under Pipelines, Qorvo under Other Semiconductors, battery makers under Automation.",
-    "1,282 small default-labelled stocks (under 1% of the dollars) have not been checked yet.",
-    "Rule R8 changed (a model's first pass instead of SEC SIC) and R12 is new (ETFs).",
+    "Decided from your answers: a fund's ETF buy is a sector pick (R12), the sector score is the IRR of each call replayed through every other sector (R13), and allocation is judged at industry level with a toggle to sector or vertical (R9).",
+    "The 100 funds changed: International Assets Investment Management (rank 66, desk flow) is dropped, and today's monthly refresh (latest quarter Q3 2026) moved the ranking. They ever held 7,025 securities. 5,111 stocks carry a label and cover 95% of the dollars the funds bought. ETFs are 4.6%; funds, SPACs and unidentified lines 0.1%.",
+    "ETFs: a model classed the 462 biggest. 98 are single-sector ETFs (SOXX, XLF, XBI, GDX) and count as a bet on that node, $17bn bought. Broad, international, bond, commodity, leveraged and theme ETFs have no sector. See the Not labelled tab.",
+    "Where each label came from: solid blue = placed by name, dashed blue = Damodaran's group default, not checked, dotted orange = a model's first pass from the company name. A blind check of 880 default-labelled stocks: the model agreed with the default on 73% of verticals (89% of industries, 94% of sectors) and with names placed by hand on 97%. Where it knew the company it replaced the default (234 stocks, shown as \"group default was ...\").",
+    "Browse stocks shows the dollars the top funds bought and how many of the 100 held each stock, and sorts by them first. Use Sort to go back to market cap.",
 ]
 
 
@@ -149,7 +148,7 @@ def add_top(data: dict, final: list[dict], universe: dict, funds: dict) -> None:
     data["nl"] = nl
     data["etf"] = etf_stats
     data["top"] = {
-        "funds": [[f["fund_id"], f["name"], f["ann_return"], f["book"], f["n_positions"]] for f in funds["eligible"][: len(universe_funds(universe))]],
+        "funds": [[f["fund_id"], f["name"], f["ann_return"], f["book"], f["n_positions"]] for f in funds["eligible"] if f["fund_id"] in universe_funds(universe)],
         "period": PERIODS.get(funds["period"], funds["period"]),
     }
 

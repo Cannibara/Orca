@@ -21,39 +21,46 @@ The starting point is Damodaran's 94 US industry groups. Each group has a defaul
 | `matching.py` | Matches Orca's security names (Bloomberg style, cut at 28 characters, garbled tickers) to Damodaran's global company list by distinctive words, not by ticker. Standard library only. |
 | `tools/label_securities.py` | Labels Orca's `securities.json`, or a list of stock ids, through that match. Tier `auto` = strong match to a US-listed company or a same-ticker cross-listing; `verify` = an ADR under another ticker or a partial match; `none` = nothing close. |
 | `tools/top_funds_universe.py` | Lists every security the best funds ever held (the public `top_<period>.json`, `securities.json` and each fund's `positions.json`), with dollars bought and which funds held it. |
+| `tools/etf_batches.py`, `tools/etf_prompt.md` | The same for ETFs: a model says what each big ETF holds (broad, international, bond, cash, commodity, crypto, theme, mixed) or, for a single-sector ETF, which node of the hierarchy and at what level. |
 | `tools/export_labels.py` | Writes the labelled stocks as a private CSV for the owner. |
 | `tools/make_batches.py`, `tools/model_prompt.md`, `tools/merge_batches.py` | The stocks the match cannot settle go to a model in batches, with a blind audit sample of already-labelled stocks mixed in; the answers are merged back and the audit reports how often the model agrees. |
 | `tools/make_review_page.py`, `tools/review_page.html` | Builds the review page (one HTML file). With `--final` it also shows the stocks a set of funds owned: held dollars, a sort by them, and a tab for what has no label (ETFs, funds, bonds). |
 | `../../tests/test_hierarchy*.py` | Guard `labels.txt` (every Damodaran group has a default, no unused vertical, the owner's examples hold), the name matching, the merge of model answers, the universe and the page data. |
 
 ## Label the stocks the top funds held
-Result on 2026-11-16, for the 100 best funds by return since start (`home/top_max.json`): they ever held 7,702 securities and bought $2.2tn of them.
+Result on 2026-11-16 (the published data's latest quarter is 54, Q3 2026), for the 100 best funds by return since start (`home/top_max.json`), with International Assets Investment Management left out (rank 66; $718bn bought on a $1.7bn book, desk flow; owner's call). They ever held 7,025 securities and bought $2.1tn of them.
 
 | Outcome | Stocks | Share of dollars bought |
 |---|---|---|
-| Labelled from Damodaran's list, placed by name or rule | 1,457 | 64% |
-| Labelled from Damodaran's list, group default (876 agreed with a blind model label, 1,282 unchecked) | 2,158 | 17% |
-| Model's first pass from the name (1,671 sure, 75 less sure; 224 of the sure ones replaced a group default) | 1,746 | 12% |
-| ETFs, not labelled yet: a fund's ETF buy is a sector pick, so each needs a node (owner, chat 2026-11-16) | 1,815 | 7.6% |
-| Funds, SPACs and unidentifiable lines, not labelled | 526 | 0.2% |
+| Labelled from Damodaran's list, placed by name or rule | 1,480 | 58% |
+| Labelled from Damodaran's list, group default (910 agreed with a blind model label, 1,034 unchecked) | 1,944 | 22% |
+| Model's first pass from the name (1,606 sure, 81 less sure; 234 of the sure ones replaced a group default) | 1,687 | 15.7% |
+| ETFs (below) | 1,481 | 4.6% |
+| Funds, SPACs and unidentifiable lines, not labelled | 433 | 0.1% |
 
-Labelled stocks cover 92% of the dollars. By fund: the labelled share of each fund's current book (cost basis) has a median of 99.9%; 65 of the 100 funds are at 95% or more, and the rest are mostly ETF-heavy funds.
+Labelled stocks cover 95% of the dollars. By fund, the share of the current book (cost basis) in labelled stocks plus single-sector ETFs has a median of 100%; 65 of the 100 funds are at 95% or more.
 
-Blind audit: the model labelled 840 default-labelled stocks without seeing their label. It agreed with the group default on 73% of verticals (88% of industries, 94% of sectors), and with the labels placed by name on 97% (58 stocks). Where it disagreed it was usually right (tankers under Pipelines, Qorvo under Other Semiconductors, battery makers under Automation), so a model that knows the company now replaces a default.
+ETFs: a fund's ETF buy is a sector pick (owner, chat 2026-11-16). A model classed the 462 biggest. 98 single-sector ETFs ($17bn bought, 0.8% of all dollars: SOXX, XLF, XBI, GDX, KRE) go on their sector, industry or vertical. Broad US (131), international (77), bond (87), cash (15), commodity (19), crypto (4), leveraged or mixed (16) and cross-sector theme (15) ETFs get no sector and count as neutral. The other 1,019 ETFs are small and unclassed.
+
+Blind audit: the model labelled 880 default-labelled stocks without seeing their label. It agreed with the group default on 73% of verticals (89% of industries, 94% of sectors), and with the labels placed by name on 97% (57 stocks). Where it disagreed it was usually right (tankers under Pipelines, Qorvo under Other Semiconductors, battery makers under Automation), so a model that knows the company now replaces a default.
+
+Is this enough to build sector indices? A sector index needs every stock in the sector tagged. The 30 biggest funds outside the top 100 (Vanguard, BlackRock, State Street, FMR and others) hold 93.9% labelled stocks, 5.7% ETFs and only 0.4% stocks we have not labelled, by value (2026-11-16). So a size-weighted index is already about 99.6% covered; equal-weighted or thin industries, and delisted names in earlier years, need more.
 
 From `pipeline/`, with the three inputs from `tools/fetch_inputs.sh` in `/tmp/hier-inputs`:
 ```bash
 T=/tmp/top
-uv run python orca/hierarchy/tools/top_funds_universe.py --period max --top 100 --out $T
+uv run python orca/hierarchy/tools/top_funds_universe.py --period max --top 100 --exclude 1818604 --out $T
 uv run python orca/hierarchy/tools/label_securities.py --securities $T/raw/securities.json --refs /tmp/hier-inputs/indname.xlsx --stocks $T/universe.json --out $T/labelled.json
 uv run python orca/hierarchy/tools/make_batches.py --labelled $T/labelled.json --universe $T/universe.json --caps /tmp/hier-inputs/hierarchy.json --out $T/batches
 # one Claude agent per batch (3 at a time): "Read $T/batches/prompt.md and follow it exactly for batch number NN"
 uv run python orca/hierarchy/tools/make_batches.py --labelled $T/labelled.json --universe $T/universe.json --out $T/batches --recheck 600 --first 10   # then agents for the new batches
 uv run python orca/hierarchy/tools/merge_batches.py --labelled $T/labelled.json --batches $T/batches --universe $T/universe.json --out $T/final.json
-uv run python orca/hierarchy/tools/make_review_page.py /tmp/hier-inputs/hierarchy.json --out $T/review.html --final $T/final.json --universe $T/universe.json --funds $T/raw/home/top_max.json
-uv run python orca/hierarchy/tools/export_labels.py --final $T/final.json --universe $T/universe.json --out $T/labels.csv
+uv run python orca/hierarchy/tools/etf_batches.py make --final $T/final.json --out $T/batches --top 400   # then agents with etf_prompt.md
+uv run python orca/hierarchy/tools/etf_batches.py merge --final $T/final.json --batches $T/batches --out $T/final_etf.json
+uv run python orca/hierarchy/tools/make_review_page.py /tmp/hier-inputs/hierarchy.json --out $T/review.html --final $T/final_etf.json --universe $T/universe.json --funds $T/raw/home/top_max.json
+uv run python orca/hierarchy/tools/export_labels.py --final $T/final_etf.json --universe $T/universe.json --out $T/labels.csv
 ```
-A model run costs about 200,000 tokens per batch of 295 stocks (11 batches here). The outputs (`labelled.json`, `final.json`, the review page) hold Damodaran-derived labels: the repo is public, so they are not committed (rule R10).
+When a monthly run changes the published data, re-run the first two commands, then `make_batches.py ... --missing --first 12 --recheck-min 80` and `etf_batches.py make ... --missing --first 3` write batches for only what no earlier batch answered (answers are keyed by stock id and stay valid). A model run costs about 200,000 tokens per batch of 295 stocks (12 stock batches and 3 ETF batches here). The outputs (`labelled.json`, `final.json`, the review page) hold Damodaran-derived labels: the repo is public, so they are not committed (rule R10).
 
 ## `labels.txt` format
 ```
@@ -93,14 +100,14 @@ Nothing below is committed.
 - **Fama-French 48** SIC ranges, from the WRDS macro page: a cross-check label shown beside each stock. Copyright Kenneth French.
 
 ## What is not done
-- Rules R2–R10 on the review page are recommendations, not decisions. Only R11 (Automotive umbrella, no fourth level) is decided.
+- Decided by the owner: R9 (industry level by default, toggle to sector or vertical), R11 (Automotive umbrella), R12 (a single-sector ETF counts as a bet on its node, other ETFs have no sector) and R13 (the sector score is the IRR of each call replayed through every other sector). R2–R8 and R10 are recommendations; the owner said licensing can wait until something is commercial.
 - 188 of 244 verticals have fewer than 10 stocks above $1bn. A stock picker's peers widen to the industry in that case (rule R4).
-- 1,282 small default-labelled stocks that the top funds held (under 1% of the dollars) and the default-labelled stocks nobody holds are not checked by name; 39 small business-service stocks sit in "Other Business Services".
-- Only the stocks the 100 best funds ever held (and, from Damodaran's file, the US-listed ones) have labels. Orca prices about 22,800 stocks, so other funds' stocks are unlabelled; the same tools label them. R8 now says a model's first pass, not the SIC code.
-- ETFs have no node yet. The owner says a fund's ETF buy is a sector pick (chat, 2026-11-16), so each needs one; the ETF-heavy funds stay in the list (66 of the 100 funds have held an ETF; 12 hold half or more of their current book in ETFs, 4 hold 90% or more, such as PPSC Investment Service Corp, rank 15). A model classed the biggest 400 ETFs once (90 single-sector, $29bn bought; `etf_batches.py`, commit 1fecf4b) and the tool was removed in bf901e0 on a misunderstanding: restore it from git. How sectors are compared with each other (indices built from the hierarchy, ETFs as cross-checks) is open: ROADMAP S4, F5, L5.
+- 1,034 small default-labelled stocks that the top funds held (0.8% of the dollars) and the default-labelled stocks nobody holds are not checked by name; 39 small business-service stocks sit in "Other Business Services".
+- Only the stocks the 100 best funds ever held (and, from Damodaran's file, the US-listed ones) have labels. Orca prices about 22,800 stocks. The 30 biggest funds outside the top 100 already have 99.6% of their value (stocks and ETFs) covered, so the long tail is small; the same tools label more. R8 says a model's first pass, not the SIC code.
+- ETFs: the 1,019 small ETFs are unclassed. Nothing scores ETFs yet.
 - Not wired in: no `stock_id` mapping, no change to `pipeline/contract.md` (change it first), no benchmark table (ROADMAP S4), nothing published.
 
 ## Next steps
-1. The owner reviews stocks per industry vertical on the Browse tab (now sorted by what the top funds bought), the Not labelled tab, and answers the Rules tab (R8 changed).
-2. Settle the licence question (R10), then export `ticker → main label, extra labels` as a CSV next to `labels.txt`.
+1. The owner reviews stocks per industry vertical on the Browse tab (sorted by what the top funds bought) and the Not labelled tab, and answers R2–R8.
+2. Prototype the sector indices (hierarchy node → total-return series, with dividends from the lake) for the 12 sectors and compare them with the Select Sector ETFs (XLK, XLF and the rest) to see how closely they track. Then settle the licence question (R10) before anything is shown on the site.
 3. Change `pipeline/contract.md` (`securities.json` has one `sector` string from SIC today), then the pipeline, then the benchmark table (ROADMAP S4) that F4 and F5 share.

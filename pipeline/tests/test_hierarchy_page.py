@@ -71,7 +71,8 @@ def test_unlabelled_stocks_go_to_the_not_labelled_list_biggest_first_and_the_fun
     page.add_top(d, final, uni, FUNDS)
     assert [r[1] for r in d["nl"]] == ["BND", "SPY"] and d["nl"][0][5] == "fund" and d["nl"][0][3] == 9.0
     assert len(d["st"]) == 2  # the unlabelled ones never become rows
-    assert d["top"]["period"] == "by return since start" and [f[0] for f in d["top"]["funds"]] == [99, 98][: len({f for u in uni.values() for f in u["funds"]})]
+    assert d["top"]["period"] == "by return since start"
+    assert [f[0] for f in d["top"]["funds"]] == [99]  # fund 98 is in the ranking but holds nothing in the universe: an excluded fund drops out
 
 
 def test_a_ticker_that_is_already_taken_gets_the_stock_id_added():
