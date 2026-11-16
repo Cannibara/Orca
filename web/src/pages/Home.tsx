@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
 import { Pager } from "../components/Pager";

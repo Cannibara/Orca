@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ComponentProps } from "react";
-import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { loadWeekly, priceMap, stockMap } from "../src/data/api";
 import type { Exits, LatestPrices, Positions, Securities, Summary, Weekly } from "../src/data/types";
 import { missed, positionRows } from "../src/lib/live";
@@ -65,7 +65,7 @@ function renderWhatIf(props: Partial<Props> = {}) {
     ...props,
   };
   return render(
-    <MemoryRouter initialEntries={[`/fund/${FUND}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[`/fund/${FUND}`]}>
       <Routes>
         <Route path="/fund/:id" element={<WhatIfPanel {...all} />} />
         <Route path="/fund/:id/stock/:stockId" element={<Landed />} />

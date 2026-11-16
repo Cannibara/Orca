@@ -99,7 +99,7 @@
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion:no-preference){
-  :root:not([data-motion="reduce"]) .fp .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out)}
+  :root:not([data-motion="reduce"]) .fp .tabs.ready .ind{transition:transform var(--d-base) var(--ease-out),width var(--d-base) var(--ease-out)}
   :root:not([data-motion="reduce"]) .fp .dot.live::after{animation:fp-ping 2.6s var(--ease-out) infinite}
 }
 @keyframes fp-ping{0%{transform:scale(.5);opacity:.7}80%,100%{transform:scale(1.5);opacity:0}}

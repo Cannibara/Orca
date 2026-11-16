@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import App from "../src/App";
 import { clearDataCache } from "../src/data/api";
 import { fundTitle, HOME_TITLE } from "../src/lib/format";
@@ -24,7 +24,7 @@ function stubData() {
 
 function renderApp(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );

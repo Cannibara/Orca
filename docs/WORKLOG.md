@@ -1,6 +1,6 @@
 # Worklog
 
-Last verified: 2026-11-15
+Last verified: 2026-11-16
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
@@ -15,6 +15,16 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Owner approved the rest: Healthcare specialists list (11: Perceptive, RA, Baker Bros, Deerfield, OrbiMed, Casdin, EcoR1, Redmile, Rock Springs, Avoro, Visium); Tiger-linked long/shorts to Tiger cubs (Joho, Tiger Legatus, Valinor, Kora, Conatus); 13 smaller long/shorts to Fundamental long/short. A match may list alternatives split by `|` for a renamed filer (Brookside → Bain Capital Public Equity, venBio → Avoro) | Owner (chat) | `famous.csv`, `famous.py`, `home.py` (`_name_matches`), `Home.tsx` |
 | Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
 | Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
+
+## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
+
+| What changed | Why | Files |
+|---|---|---|
+| Cloudflare Web Analytics allowed in the CSP (`script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`). Checked against the live page with the new header: no CSP error, beacon loads | It had been switched on in the dashboard while the CSP blocked it: nothing counted, a console error on every page. Owner wants the figures (chat) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts`, DECISIONS, runbook step 8, ROADMAP U5, CLAUDE.md |
+| Vendor-ticker repair: more suffix rules (`*`, GBX, digits after a suffix), then hand-checked overrides by CUSIP, SEC name match, OpenFIGI US ticker with delisted listings (`includeUnlistedEquities`), all still limited to vendor spans that overlap the held days | Owner asked why two stocks had no `weekly.json`. Zeekr: OpenFIGI gave the Mexican "ZKN", Tiingo has "ZK". The Oracle one is a bond (no price expected). The same fault left 1,420 share-like stocks unpriced, among them Exxon's pre-2026 CUSIP ("EXMOC"; Exxon moved under ExxonMobil Holdings Corp with a new CUSIP), EA, WBD, QRVO, RTN, PX, APC: 4.03% of the 60 largest funds' holdings by cost | `pipeline/orca/vendor.py`, `securities.py` (`tickers_by_name`, `us_tickers`), `run/market.py` (`alternate_tickers`, `ticker_overrides`), `run/weekly.py`, `ticker_overrides.csv` (new), tests |
+| Measured on the published files and Tiingo's list, without the OpenFIGI step (needs the private lake): 447 of 1,420 repaired; the 60 largest funds' unpriced share 4.03% → 0.57%. Each repaired stock's history is fetched again on the next pipeline run, so that run is longer | | |
+| Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
+| Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
 
 ## 2026-11-15 — Famous funds: Moat investing, Family offices, Sovereign & pension funds, stopped filers
 
@@ -44,6 +54,25 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | List researched by a subagent with web search (Wikipedia, Dataroma-style superinvestor lists, EDGAR 13F-HR links): 10 Tiger cubs + Tiger Management, 5 grand-cubs, 22 tech & growth, 39 value, 11 activist, 5 macro, 7 quant/multi-strategy, 6 other. Left out as unconfirmed: Valinor, Joho, Sequoia, Lux, Stripes, Long Pond. sec.gov and data.orcaetf.com were blocked from the session, so no CIK was checked against our own data | | |
 | Open: until the next pipeline run, production files have no `famous` key and the tab says the list arrives with the next data update. After it, check the tab for missing names (a CIK whose filer stopped or changed, e.g. Fundsmith 1569205 vs 1868537, Elliott, Hound, ICONIQ) | | |
 | Checked: pipeline tests, web typecheck and unit tests (3 new tests each side), screenshots at 1280 and 400 px on demo data | | |
+## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
+
+| What changed | Why | Files |
+|---|---|---|
+| vitest 2.1.9 → 4.1.12, vite 5.4.21 → 7.3.7, @vitejs/plugin-react 4.7.0 → 5.2.0 | GitHub listed 17 Dependabot alerts (3 critical, 1 high, 12 moderate, 1 low). The critical ones (tinypool prototype-pollution RCE gadgets, Vitest UI file read) and the high one (launch-editor in vite) are all dev / test tooling, not code shipped to visitors, but they run on developer machines and in CI. Versions picked are a few weeks old rather than the newest, to limit supply-chain risk. Vite 7 rather than 8 to stay on esbuild/Rollup (smaller change) (chat) | `web/package.json`, `web/package-lock.json` |
+| react-router-dom 6.30.6 → react-router 7.18.5 (v7's own package; `react-router-dom` is only a re-export shim). Imports changed in 15 files; the `future` v7 flags on `BrowserRouter` / `MemoryRouter` and the test-setup filter for their console notices are gone (both behaviours are the v7 default, and the app already had them on) | Two moderate advisories with no v6 fix: open redirect via a backslash in `<Link>` / `useNavigate`, and an SSR-only deserialisation issue (not used here). This is the one in the shipped site | `web/src/`, `web/tests/`, `web/package.json` |
+| Trade-off: main bundle 341 → 358 kB (gzip 113.6 → 119.6 kB), from react-router 7 | | |
+| Pipeline: `pip-audit` on `uv.lock` found no known vulnerabilities | | none |
+| Checked: `npm audit` 0 vulnerabilities, `npm ci` on npm 10, typecheck, 940 unit tests, build + prerender, 48 Playwright smoke tests | | |
+| The lockfile was written with npm 11 (npm 10.9 crashes resolving vitest's optional peers); noted under Gotchas in `CLAUDE.md` | | `CLAUDE.md` |
+
+## 2026-11-15 — Tab underline: real width instead of a scaled 1px bar
+
+| What changed | Why | Files |
+|---|---|---|
+| The 2px bar under the open tab (`.tabs .ind`, Home and fund page) now gets its size from `width: var(--w)` and only moves with `translateX`; before it was a 1px box stretched by `scaleX(--w)`. Its slide animates `transform` and `width` | Owner: under Top funds the bar was shorter than the tab at 100% zoom and fixed itself after zooming in and out (chat). Chrome paints a scaled layer once and stretches that picture, so the bar's ends could be off until a zoom forced a repaint. Measured in Chromium before / after (painted bar end vs the tab's right edge, 132 px): 131.3–131.5 → 132 at 1.5×–2× pixel ratios | `web/src/styles.css`, `web/src/fund/returns.css`, `web/src/components/Tabs.tsx`, `web/src/fund/FundHeader.tsx` |
+| The bar also re-measures when any tab button changes size (ResizeObserver on each tab), not only when the strip does | The strip keeps its width when the web font swaps in, but the tabs inside it grow (code) | same |
+| Smoke test for the home head now checks the description names hedge fund holdings and SEC, not "13F" | It failed on `main` since #31 changed the description to "Hedge fund stock holdings and analysis based on SEC data." (owner wording kept) | `web/e2e/smoke.spec.ts` |
+| Checked: typecheck, 940 unit tests, 48 Playwright smoke tests | | |
 
 ## 2026-11-15 — Google result: title, description, site icon
 
