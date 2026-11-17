@@ -20,21 +20,29 @@ import { fBook } from "../src/pages/homeFmt";
 // ---- fixtures: the demo JSON under public/demo-data, served through a mocked fetch ----
 
 // (not `new URL(..., import.meta.url)`: Vite rewrites that into an asset URL)
-const DEMO = join(dirname(fileURLToPath(import.meta.url)), "../public/demo-data");
-const demo = <T,>(path: string): T => JSON.parse(readFileSync(join(DEMO, path), "utf8")) as T;
+const DEMO = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../public/demo-data",
+);
+const demo = <T,>(path: string): T =>
+  JSON.parse(readFileSync(join(DEMO, path), "utf8")) as T;
 
 /**
  * Stub fetch with the demo files. `overrides` replaces a file's body (keyed by the path under
  * demo-data); `failing` makes those paths answer HTTP 500. Returns every URL requested, in order.
  */
-function stubData(overrides: Record<string, unknown> = {}, failing: string[] = []): string[] {
+function stubData(
+  overrides: Record<string, unknown> = {},
+  failing: string[] = [],
+): string[] {
   const urls: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       urls.push(url);
       const path = url.replace(/^\/demo-data\//, "");
-      if (failing.includes(path)) return { ok: false, status: 500, json: async () => ({}) };
+      if (failing.includes(path))
+        return { ok: false, status: 500, json: async () => ({}) };
       const body = path in overrides ? overrides[path] : demo<unknown>(path);
       return { ok: true, status: 200, json: async () => body };
     }),
@@ -53,7 +61,13 @@ function pricesWith(changes: Record<number, number | null>): LatestPrices {
   return lp;
 }
 
-const call = (stock_id: number, fund_id: number, name: string, est_price: number, price_on_filed: number): CallRow => ({
+const call = (
+  stock_id: number,
+  fund_id: number,
+  name: string,
+  est_price: number,
+  price_on_filed: number,
+): CallRow => ({
   stock_id,
   fund_id,
   name,
@@ -98,15 +112,20 @@ const TAB_NAMES = [
 ];
 
 /** Name in the first body row of the (only) table on screen. */
-const firstFund = () => within(screen.getAllByRole("row")[1]).getAllByRole("link")[0].textContent;
+const firstFund = () =>
+  within(screen.getAllByRole("row")[1]).getAllByRole("link")[0].textContent;
 /** Fund names down the first column of the calls table, in order. */
-const fundOrder = () => screen.getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("link")[1].textContent);
+const fundOrder = () =>
+  screen
+    .getAllByRole("row")
+    .slice(1)
+    .map((r) => within(r).getAllByRole("link")[1].textContent);
 
 beforeEach(() => clearDataCache());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Home", () => {
-  it("\"/\" jumps to the search, except while typing in a text field", async () => {
+  it('"/" jumps to the search, except while typing in a text field', async () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
@@ -126,7 +145,9 @@ describe("Home", () => {
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(TAB_NAMES);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs.slice(1).every((t) => t.getAttribute("aria-selected") === "false")).toBe(true);
+    expect(
+      tabs.slice(1).every((t) => t.getAttribute("aria-selected") === "false"),
+    ).toBe(true);
   });
 
   it("search filters and navigates", async () => {
@@ -135,12 +156,19 @@ describe("Home", () => {
     const funds = demo<FundsIndex>("funds.json");
     const word = funds.name[0].split(" ")[0]; // a first word only one demo fund has
     renderHome();
-    await user.type(screen.getByRole("searchbox", { name: /search a fund/i }), word.toLowerCase());
+    await user.type(
+      screen.getByRole("searchbox", { name: /search a fund/i }),
+      word.toLowerCase(),
+    );
     const list = await screen.findByRole("list", { name: "Matching funds" });
-    expect(within(list).getByRole("link", { name: new RegExp(funds.name[0]) })).toBeInTheDocument();
+    expect(
+      within(list).getByRole("link", { name: new RegExp(funds.name[0]) }),
+    ).toBeInTheDocument();
     expect(within(list).getAllByRole("link")).toHaveLength(1);
     await user.keyboard("{Enter}");
-    expect(await screen.findByText(`Fund page ${funds.id[0]}`)).toBeInTheDocument();
+    expect(
+      await screen.findByText(`Fund page ${funds.id[0]}`),
+    ).toBeInTheDocument();
   });
 
   it("search opens a clicked match, caps the list and says when nothing matches", async () => {
@@ -152,7 +180,9 @@ describe("Home", () => {
 
     await user.type(box, "zzzz");
     expect(await screen.findByText(/No fund matches/)).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Matching funds" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Matching funds" }),
+    ).not.toBeInTheDocument();
 
     // "a" is in every demo name: the list is capped at 8 of the 12 funds
     await user.clear(box);
@@ -163,7 +193,11 @@ describe("Home", () => {
     await user.clear(box);
     await user.type(box, "Tern");
     const tern = funds.id[funds.name.indexOf("Tern Harbor Equity")];
-    await user.click(await within(await screen.findByRole("list", { name: "Matching funds" })).findByRole("link", { name: /Tern Harbor Equity/ }));
+    await user.click(
+      await within(
+        await screen.findByRole("list", { name: "Matching funds" }),
+      ).findByRole("link", { name: /Tern Harbor Equity/ }),
+    );
     expect(await screen.findByText(`Fund page ${tern}`)).toBeInTheDocument();
   });
 
@@ -172,10 +206,13 @@ describe("Home", () => {
     const user = userEvent.setup();
     renderHome();
     const box = screen.getByRole("searchbox", { name: /search a fund/i });
-    const results = () => screen.queryByRole("list", { name: "Matching funds" });
+    const results = () =>
+      screen.queryByRole("list", { name: "Matching funds" });
 
     await user.type(box, "Ter");
-    expect(await screen.findByRole("list", { name: "Matching funds" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Matching funds" }),
+    ).toBeInTheDocument();
 
     // Escape closes the list but keeps the text and the focus; typing opens it again
     await user.keyboard("{Escape}");
@@ -183,7 +220,9 @@ describe("Home", () => {
     expect(box).toHaveValue("Ter");
     expect(box).toHaveFocus();
     await user.keyboard("n");
-    expect(await screen.findByRole("list", { name: "Matching funds" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Matching funds" }),
+    ).toBeInTheDocument();
 
     // clicking elsewhere closes it; focusing the box again opens it
     await user.click(document.body);
@@ -197,7 +236,9 @@ describe("Home", () => {
     expect(screen.getByRole("button", { name: "Open fund" })).toHaveFocus();
     expect(results()).not.toBeNull();
     await user.tab();
-    const link = within(results()!).getByRole("link", { name: /Tern Harbor Equity/ });
+    const link = within(results()!).getByRole("link", {
+      name: /Tern Harbor Equity/,
+    });
     expect(link).toHaveFocus();
     expect(results()).not.toBeNull();
     await user.tab(); // the second result
@@ -237,7 +278,9 @@ describe("Home", () => {
     await user.clear(box);
     await user.type(box, "Tern H");
     expect(await screen.findByText(/· 1 position$/)).toBeInTheDocument();
-    const cells = within(await screen.findByRole("table", { name: "Top funds" })).getAllByRole("row")[1];
+    const cells = within(
+      await screen.findByRole("table", { name: "Top funds" }),
+    ).getAllByRole("row")[1];
     expect(within(cells).getByText("16,000")).toBeInTheDocument();
   });
 
@@ -261,12 +304,17 @@ describe("Home", () => {
       ["3 years", "top_3y", t3],
     ] as const) {
       await user.click(screen.getByRole("button", { name: chip }));
-      expect(screen.getByRole("button", { name: chip })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: chip })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
       await waitFor(() => expect(firstFund()).toBe(list.eligible[0].name));
       expect(urls).toContain(`/demo-data/home/${file}.json`);
     }
     // the demo lists lead with different funds, so the checks above could not pass by accident
-    expect(new Set([t1, t3, t5, t10, tMax].map((t) => t.eligible[0].name)).size).toBeGreaterThan(1);
+    expect(
+      new Set([t1, t3, t5, t10, tMax].map((t) => t.eligible[0].name)).size,
+    ).toBeGreaterThan(1);
   });
 
   it("famous funds show one list per style, in order, with Top funds' columns, the manager and links to the fund", async () => {
@@ -275,46 +323,118 @@ describe("Home", () => {
     expect(new Set(famous.map((f) => f.group)).size).toBeGreaterThan(1);
     // the demo lists a fund too young for Top funds, so this tab is more than a filter of that one
     const t1 = demo<TopList>("home/top_1y.json");
-    expect((t1.famous ?? []).some((f) => !t1.eligible.some((e) => e.fund_id === f.fund_id))).toBe(true);
+    expect(
+      (t1.famous ?? []).some(
+        (f) => !t1.eligible.some((e) => e.fund_id === f.fund_id),
+      ),
+    ).toBe(true);
     stubData();
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
-    const panel = (await screen.findByRole("heading", { level: 2, name: "Famous funds" })).closest("section")!;
+    const panel = (
+      await screen.findByRole("heading", { level: 2, name: "Famous funds" })
+    ).closest("section")!;
     await within(panel).findAllByRole("table");
-    const order = ["Value", "Tiger cubs", "Tech & growth"].filter((g) => famous.some((f) => f.group === g));
-    expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Most searched", ...order]);
+    const order = ["Value", "Tiger cubs", "Tech & growth"].filter((g) =>
+      famous.some((f) => f.group === g),
+    );
+    expect(
+      within(panel)
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual(["Most searched", ...order]);
     for (const group of order) {
       const table = within(panel).getByRole("table", { name: group });
-      expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
-        "Fund",
+      expect(
+        within(table)
+          .getAllByRole("columnheader")
+          .map((h) => h.textContent),
+      ).toEqual([
+        "Fund most popular",
         "AUM",
         "Positions",
         "Return / yr",
         "Max Drawdown",
         "Sharpe",
       ]);
-      const best = famous.filter((f) => f.group === group).sort((a, b) => b.ann_return - a.ann_return);
+      // a list opens with its most popular fund first: Google Trends score, then size
+      const best = famous
+        .filter((f) => f.group === group)
+        .sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book);
       const rows = within(table).getAllByRole("row").slice(1);
-      expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(best.map((f) => f.name));
-      if (best[0].manager) expect(within(rows[0]).getByText(best[0].manager)).toBeInTheDocument();
+      expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
+        best.map((f) => f.name),
+      );
+      if (best[0].manager)
+        expect(
+          within(rows[0]).getByText(new RegExp(`^${best[0].manager}`)),
+        ).toBeInTheDocument();
     }
     // Kelpwood is in two lists, and in Most searched
-    expect(within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }).length).toBe(3);
+    expect(
+      within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" })
+        .length,
+    ).toBe(3);
     // a fund that stopped filing is listed, with its last quarter by its manager
-    expect(within(within(panel).getByRole("table", { name: "Value" })).getByText("Mara Cobble · filed until Q4 2023")).toBeInTheDocument();
-    const first = within(within(panel).getByRole("table", { name: order[0] })).getAllByRole("link")[0];
+    expect(
+      within(within(panel).getByRole("table", { name: "Value" })).getByText(
+        "Mara Cobble · filed until Q4 2023",
+      ),
+    ).toBeInTheDocument();
+    const first = within(
+      within(panel).getByRole("table", { name: order[0] }),
+    ).getAllByRole("link")[0];
     const id = famous.find((f) => f.name === first.textContent)!.fund_id;
     await user.click(first);
     expect(await screen.findByText(`Fund page ${id}`)).toBeInTheDocument();
   });
 
+  it("the Fund heading cycles A to Z, Z to A and most popular, in every list", async () => {
+    const t3 = demo<TopList>("home/top_3y.json");
+    const value = (t3.famous ?? []).filter((f) => f.group === "Value");
+    expect(value.length).toBeGreaterThan(2);
+    const byName = value
+      .map((f) => f.name)
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const popular = value
+      .slice()
+      .sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book)
+      .map((f) => f.name);
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("table", { name: "Top funds" });
+    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
+    const table = await screen.findByRole("table", { name: "Value" });
+    const names = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getByRole("link").textContent);
+    const fund = () => within(table).getByRole("button", { name: /^Fund/ });
+    expect(names()).toEqual(popular);
+    await user.click(
+      within(table).getByRole("button", { name: "Return / yr" }),
+    );
+    expect(names()).not.toEqual(popular);
+    await user.click(fund()); // from another column: A to Z first
+    expect(names()).toEqual(byName);
+    await user.click(fund());
+    expect(names()).toEqual([...byName].reverse());
+    await user.click(fund());
+    expect(names()).toEqual(popular);
+    expect(fund()).toHaveTextContent("most popular");
+  });
+
   it("Most searched comes first: the most searched famous funds, once each, with their Google Trends score", async () => {
     const t1 = demo<TopList>("home/top_1y.json");
-    const read = [...new Map((t1.famous ?? []).filter((r) => r.search).map((r) => [r.fund_id, r])).values()].sort(
-      (a, b) => b.search! - a.search!,
-    );
+    const read = [
+      ...new Map(
+        (t1.famous ?? []).filter((r) => r.search).map((r) => [r.fund_id, r]),
+      ).values(),
+    ].sort((a, b) => b.search! - a.search!);
     expect(read.length).toBeGreaterThan(2);
     stubData();
     const user = userEvent.setup();
@@ -322,9 +442,17 @@ describe("Home", () => {
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     await user.click(screen.getByRole("button", { name: "1 year" }));
-    await waitFor(() => expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("Most searched"));
+    await waitFor(() =>
+      expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent(
+        "Most searched",
+      ),
+    );
     const table = screen.getByRole("table", { name: "Most searched" });
-    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual([
       "Fund",
       "Search interest",
       "AUM",
@@ -334,48 +462,86 @@ describe("Home", () => {
       "Sharpe",
     ]);
     const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(read.map((r) => r.name));
+    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
+      read.map((r) => r.name),
+    );
     expect(within(rows[0]).getByText("32")).toBeInTheDocument(); // Driftwood: 31.5 (Buffett = 100)
     expect(within(rows[rows.length - 1]).getByText("<1")).toBeInTheDocument(); // Halyard: 0.4
-    expect(screen.getByText(/Google Trends interest in the manager or founder .* the 12 months to 30 Oct 2026/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Google Trends interest in the manager or founder .* the 12 months to 30 Oct 2026/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const row = (t3.famous ?? [])[0];
     const many = (group: string, n: number, base: number) =>
-      Array.from({ length: n }, (_, i) => ({ ...row, group, fund_id: base + i, name: `${group} ${String(i + 1).padStart(2, "0")}`, ann_return: 0.5 - i / 100 }));
+      Array.from({ length: n }, (_, i) => ({
+        ...row,
+        group,
+        fund_id: base + i,
+        name: `${group} ${String(i + 1).padStart(2, "0")}`,
+        ann_return: 0.5 - i / 100,
+      }));
     const t1 = demo<TopList>("home/top_1y.json");
-    stubData({ "home/top_3y.json": { ...t3, famous: [...many("Value", 25, 1000), ...many("Macro", 12, 2000)] } });
+    stubData({
+      "home/top_3y.json": {
+        ...t3,
+        famous: [...many("Value", 25, 1000), ...many("Macro", 12, 2000)],
+      },
+    });
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     const value = await screen.findByRole("table", { name: "Value" });
     const macro = screen.getByRole("table", { name: "Macro" });
-    const names = (t: HTMLElement) => within(t).getAllByRole("row").slice(1).map((r) => within(r).getByRole("link").textContent);
+    const names = (t: HTMLElement) =>
+      within(t)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getByRole("link").textContent);
     expect(names(value)).toHaveLength(10);
     expect(screen.getByText("Showing 1–10 of 25 funds")).toBeInTheDocument();
     expect(screen.getByText("Showing 1–10 of 12 funds")).toBeInTheDocument();
-    const valuePager = screen.getByText("Showing 1–10 of 25 funds").closest("nav")!;
+    const valuePager = screen
+      .getByText("Showing 1–10 of 25 funds")
+      .closest("nav")!;
     await user.click(within(valuePager).getByRole("button", { name: "Next" }));
     expect(names(value)[0]).toBe("Value 11");
     expect(names(macro)[0]).toBe("Macro 01"); // the other list stays on its page
     await user.click(screen.getByRole("button", { name: "1 year" }));
-    await waitFor(() => expect(screen.queryByRole("table", { name: "Macro" })).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("table", { name: "Macro" })).toBeNull(),
+    );
     const groups = new Set((t1.famous ?? []).map((f) => f.group));
-    for (const g of groups) expect(screen.getByRole("table", { name: g })).toBeInTheDocument();
+    for (const g of groups)
+      expect(screen.getByRole("table", { name: g })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Top funds" }));
-    expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("famous funds explain a file built before the list existed", async () => {
-    stubData({ "home/top_3y.json": { ...demo<TopList>("home/top_3y.json"), famous: undefined } });
+    stubData({
+      "home/top_3y.json": {
+        ...demo<TopList>("home/top_3y.json"),
+        famous: undefined,
+      },
+    });
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("tab", { name: "Famous funds" }));
-    expect(await screen.findByText("The famous funds list arrives with the next data update.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "The famous funds list arrives with the next data update.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("the 15-year tab says why no fund qualifies yet", async () => {
@@ -384,17 +550,27 @@ describe("Home", () => {
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("button", { name: "15 years" }));
-    expect(await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "No fund has 15 years of 13F data yet: the SEC's data starts in 2013.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("opens with the research heading and no rules line or subtitle", async () => {
     stubData();
     renderHome();
-    expect(screen.getByRole("heading", { level: 1, name: "Fund Manager Research" })).toBeInTheDocument();
-    expect(screen.getByText("Quarterly 13F Data from SEC.gov")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Fund Manager Research" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Quarterly 13F Data from SEC.gov"),
+    ).toBeInTheDocument();
     await screen.findByRole("table", { name: "Top funds" });
     expect(screen.queryByText(/Who qualifies/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Orca estimates what they paid/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Orca estimates what they paid/),
+    ).not.toBeInTheDocument();
   });
 
   it("top funds sort by any column, largest first, and back on a second click", async () => {
@@ -403,15 +579,27 @@ describe("Home", () => {
     const user = userEvent.setup();
     renderHome();
     const table = await screen.findByRole("table", { name: "Top funds" });
-    const names = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("link")[0].textContent);
-    const byBook = [...t3.eligible].sort((a, b) => b.book - a.book).map((r) => r.name);
+    const names = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getAllByRole("link")[0].textContent);
+    const byBook = [...t3.eligible]
+      .sort((a, b) => b.book - a.book)
+      .map((r) => r.name);
     await user.click(within(table).getByRole("button", { name: "AUM" }));
     expect(names()).toEqual(byBook);
-    expect(within(table).getByRole("columnheader", { name: "AUM" })).toHaveAttribute("aria-sort", "descending");
+    expect(
+      within(table).getByRole("columnheader", { name: "AUM" }),
+    ).toHaveAttribute("aria-sort", "descending");
     await user.click(within(table).getByRole("button", { name: "AUM" }));
     expect(names()).toEqual([...byBook].reverse());
     await user.click(within(table).getByRole("button", { name: "Fund" }));
-    expect(names()).toEqual([...t3.eligible].map((r) => r.name).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
+    expect(names()).toEqual(
+      [...t3.eligible]
+        .map((r) => r.name)
+        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
+    );
   });
 
   it("top funds show 100 funds a page, with page buttons above and below the table", async () => {
@@ -428,36 +616,60 @@ describe("Home", () => {
     const table = await screen.findByRole("table", { name: "Top funds" });
     const rows = () => within(table).getAllByRole("row").slice(1);
     expect(rows()).toHaveLength(100);
-    const pagers = screen.getAllByRole("navigation", { name: "Pages of funds" });
+    const pagers = screen.getAllByRole("navigation", {
+      name: "Pages of funds",
+    });
     expect(pagers).toHaveLength(2);
     expect(pagers[0]).toHaveTextContent("Showing 1–100 of 250 funds");
-    expect(within(pagers[0]).getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(
+      within(pagers[0]).getByRole("button", { name: "Previous" }),
+    ).toBeDisabled();
 
     // fixed layout with a sized Fund column, so the columns keep their widths from page to page
     expect(table).toHaveClass("fixed");
     expect(table.querySelector("col")?.style.width).toContain("var(--nm-w)");
 
     await user.click(within(pagers[1]).getByRole("button", { name: "Next" }));
-    expect(screen.getAllByRole("navigation", { name: "Pages of funds" })[0]).toHaveTextContent("Showing 101–200 of 250 funds");
-    expect(within(rows()[0]).getAllByRole("link")[0]).toHaveTextContent("Fund 101");
+    expect(
+      screen.getAllByRole("navigation", { name: "Pages of funds" })[0],
+    ).toHaveTextContent("Showing 101–200 of 250 funds");
+    expect(within(rows()[0]).getAllByRole("link")[0]).toHaveTextContent(
+      "Fund 101",
+    );
 
     await user.click(within(pagers[0]).getByRole("button", { name: "Next" }));
     expect(rows()).toHaveLength(50);
-    expect(within(screen.getAllByRole("navigation", { name: "Pages of funds" })[1]).getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(
+      within(
+        screen.getAllByRole("navigation", { name: "Pages of funds" })[1],
+      ).getByRole("button", { name: "Next" }),
+    ).toBeDisabled();
 
     // a new order starts again at the first page
     await user.click(within(table).getByRole("button", { name: "Fund" }));
-    expect(screen.getAllByRole("navigation", { name: "Pages of funds" })[0]).toHaveTextContent("Showing 1–100 of 250 funds");
+    expect(
+      screen.getAllByRole("navigation", { name: "Pages of funds" })[0],
+    ).toHaveTextContent("Showing 1–100 of 250 funds");
   });
 
   it("top funds lists index giants under their own heading and uses the right columns", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
-    const giant: TopRow = { ...t3.eligible[0], fund_id: 7, name: "Vanguard-like Giant", sharpe: null, max_dd: null };
+    const giant: TopRow = {
+      ...t3.eligible[0],
+      fund_id: 7,
+      name: "Vanguard-like Giant",
+      sharpe: null,
+      max_dd: null,
+    };
     stubData({ "home/top_3y.json": { ...t3, giants: [giant] } });
     renderHome();
     await screen.findByRole("heading", { name: "Index giants" });
     const [main, giants] = screen.getAllByRole("table");
-    expect(within(main).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+    expect(
+      within(main)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual([
       "Fund",
       "AUM",
       "Positions",
@@ -466,7 +678,9 @@ describe("Home", () => {
       "Sharpe",
     ]);
     const row = within(giants).getAllByRole("row")[1];
-    expect(within(row).getByRole("link", { name: "Vanguard-like Giant" })).toHaveAttribute("href", "/fund/7");
+    expect(
+      within(row).getByRole("link", { name: "Vanguard-like Giant" }),
+    ).toHaveAttribute("href", "/fund/7");
     expect(within(row).getAllByText("—")).toHaveLength(2); // missing max drawdown and Sharpe
   });
 
@@ -474,7 +688,9 @@ describe("Home", () => {
     stubData();
     renderHome();
     await screen.findByRole("table");
-    expect(screen.queryByRole("heading", { name: "Index giants" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Index giants" }),
+    ).not.toBeInTheDocument();
   });
 
   it("each tab states its rule and shows its list", async () => {
@@ -487,21 +703,60 @@ describe("Home", () => {
       [
         "Conviction moves",
         /Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before/,
-        ["Fund", "Stock", "Weight", "$ bought / sold", "Est. price", "Price now", "Since"],
+        [
+          "Fund",
+          "Stock",
+          "Weight",
+          "$ bought / sold",
+          "Est. price",
+          "Price now",
+          "Since",
+        ],
       ],
-      ["Big wins & losses", /Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds\./, ["Fund", "Stock", "Quarter P&L"]],
-      ["Crowded buys", /Stocks bought by several concentrated active funds in the same quarter \(Q2 2026\)\./, ["Stock", "Funds buying", "Total bought", "Avg weight after"]],
-      ["Best & worst calls", /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds\./, ["Stock", "Fund", "Bought", "Est. buy price", "Price now", "Since fund's buy", "Since 13F went public"]],
+      [
+        "Big wins & losses",
+        /Largest single-position gains and losses in Q2 2026, among funds that qualify for Top funds\./,
+        ["Fund", "Stock", "Quarter P&L"],
+      ],
+      [
+        "Crowded buys",
+        /Stocks bought by several concentrated active funds in the same quarter \(Q2 2026\)\./,
+        ["Stock", "Funds buying", "Total bought", "Avg weight after"],
+      ],
+      [
+        "Best & worst calls",
+        /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds\./,
+        [
+          "Stock",
+          "Fund",
+          "Bought",
+          "Est. buy price",
+          "Price now",
+          "Since fund's buy",
+          "Since 13F went public",
+        ],
+      ],
     ];
     for (const [tab, rule, headers] of rules) {
       await user.click(screen.getByRole("tab", { name: tab }));
-      expect(screen.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: tab })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
       expect(await screen.findByText(rule)).toBeInTheDocument();
       const table = (await screen.findAllByRole("table"))[0];
-      expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(headers);
+      expect(
+        within(table)
+          .getAllByRole("columnheader")
+          .map((h) => h.textContent),
+      ).toEqual(headers);
       // no SPY benchmark column or rule anywhere on Home
-      expect(screen.queryAllByRole("columnheader", { name: /spy|s&p/i })).toHaveLength(0);
-      expect(document.querySelector(".home .ps")?.textContent).not.toMatch(/spy|s&p/i);
+      expect(
+        screen.queryAllByRole("columnheader", { name: /spy|s&p/i }),
+      ).toHaveLength(0);
+      expect(document.querySelector(".home .ps")?.textContent).not.toMatch(
+        /spy|s&p/i,
+      );
     }
   });
 
@@ -515,33 +770,79 @@ describe("Home", () => {
     expect(within(wins).getAllByRole("row")).toHaveLength(26); // header + 25 demo wins
     const loss = within(losses).getAllByRole("row")[1];
     expect(within(loss).getAllByRole("cell")[2].textContent).toMatch(/^−\$/); // a loss reads as a negative amount
-    expect(within(loss).getByRole("link", { name: /^Seastack/ })).toHaveAttribute("href", "/fund/9100009");
+    expect(
+      within(loss).getByRole("link", { name: /^Seastack/ }),
+    ).toHaveAttribute("href", "/fund/9100009");
   });
 
   it("conviction lists the moves most unusual for their fund first, in dollars, with the price now and the move since", async () => {
     const rows: ConvictionRow[] = [
-      { fund_id: 9100006, name: "Brinestone Value Partners", stock_id: 5, q: 53, move: "new", usd: 60e6, weight_after: 0.0924, change_pts: 9.24, est_price: 50, score: 6 },
-      { fund_id: 9100006, name: "Brinestone Value Partners", stock_id: 7, q: 53, move: "trim", usd: -50e6, weight_after: 0.03, change_pts: -5.0, est_price: 20, score: 3 },
-      { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q: 53, move: "exit", usd: -45e6, weight_after: 0, change_pts: -9.6, est_price: 100, score: 2.2 },
+      {
+        fund_id: 9100006,
+        name: "Brinestone Value Partners",
+        stock_id: 5,
+        q: 53,
+        move: "new",
+        usd: 60e6,
+        weight_after: 0.0924,
+        change_pts: 9.24,
+        est_price: 50,
+        score: 6,
+      },
+      {
+        fund_id: 9100006,
+        name: "Brinestone Value Partners",
+        stock_id: 7,
+        q: 53,
+        move: "trim",
+        usd: -50e6,
+        weight_after: 0.03,
+        change_pts: -5.0,
+        est_price: 20,
+        score: 3,
+      },
+      {
+        fund_id: 9100003,
+        name: "Lanternfish Capital Management",
+        stock_id: 13,
+        q: 53,
+        move: "exit",
+        usd: -45e6,
+        weight_after: 0,
+        change_pts: -9.6,
+        est_price: 100,
+        score: 2.2,
+      },
     ];
     const file: RowsFile<ConvictionRow> = { latest_q: 53, rows };
-    const urls = stubData({ "home/conviction_q.json": file, "latest_prices.json": pricesWith({ 13: 80, 5: null }) });
+    const urls = stubData({
+      "home/conviction_q.json": file,
+      "latest_prices.json": pricesWith({ 13: 80, 5: null }),
+    });
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     await screen.findByText(/Q2 2026 filings/);
     expect(urls).toContain("/demo-data/home/conviction_q.json");
     const table = screen.getByRole("table", { name: "Conviction moves" });
-    expect(within(table).queryByRole("columnheader", { name: /vs|score|quarter/i })).toBeNull();
+    expect(
+      within(table).queryByRole("columnheader", { name: /vs|score|quarter/i }),
+    ).toBeNull();
     const [added, trimmed, exit] = within(table).getAllByRole("row").slice(1); // the file's order
     expect(within(exit).getByText("10% → 0%")).toBeInTheDocument(); // 9.6 points given up: all striped orange
     expect(exit.querySelector(".mb.mbx")).toHaveClass("dn");
-    expect(exit.querySelector(".wcell")).toHaveAttribute("title", expect.stringContaining("−9.6% of the fund's AUM"));
+    expect(exit.querySelector(".wcell")).toHaveAttribute(
+      "title",
+      expect.stringContaining("−9.6% of the fund's AUM"),
+    );
     expect(within(exit).getByText("−$45m")).toBeInTheDocument();
     expect(within(exit).getByText("$100")).toBeInTheDocument();
     expect(within(exit).getByText("$80.00")).toBeInTheDocument(); // the price now
     expect(within(exit).getByText("−20%")).toBeInTheDocument(); // 80 / 100 - 1
-    expect(within(exit).getByRole("link", { name: /UNH/ })).toHaveAttribute("href", "/fund/9100003/stock/13");
+    expect(within(exit).getByRole("link", { name: /UNH/ })).toHaveAttribute(
+      "href",
+      "/fund/9100003/stock/13",
+    );
     expect(within(added).getByText("0% → 9%")).toBeInTheDocument();
     expect(added.querySelector(".mb.mbx")).toHaveClass("up"); // blue stripes for weight added
     expect(added.querySelector(".mb:not(.mbx)")).toBeNull(); // nothing held before: no solid part
@@ -555,14 +856,27 @@ describe("Home", () => {
     const funds = demo<FundsIndex>("funds.json");
     const lantern = funds.book[funds.id.indexOf(9100003)];
     const rows: ConvictionRow[] = [
-      { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q: 53, move: "new", usd: 60e6, weight_after: 0.06, change_pts: 6, est_price: 10, score: 3 },
+      {
+        fund_id: 9100003,
+        name: "Lanternfish Capital Management",
+        stock_id: 13,
+        q: 53,
+        move: "new",
+        usd: 60e6,
+        weight_after: 0.06,
+        change_pts: 6,
+        est_price: 10,
+        score: 3,
+      },
     ];
     stubData({ "home/conviction_q.json": { latest_q: 53, rows } });
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     const row = (await screen.findAllByRole("row"))[1];
-    const link = within(row).getByRole("link", { name: "Lanternfish Capital Management" });
+    const link = within(row).getByRole("link", {
+      name: "Lanternfish Capital Management",
+    });
     expect(link.parentElement).toHaveClass("stk");
     expect(link.nextElementSibling).toHaveTextContent(fBook(lantern)); // the muted line, outside the link
   });
@@ -592,7 +906,9 @@ describe("Home", () => {
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("button", { name: "15 years" }));
-    const msg = await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.");
+    const msg = await screen.findByText(
+      "No fund has 15 years of 13F data yet: the SEC's data starts in 2013.",
+    );
     expect(msg.closest(".state")).not.toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
   });
@@ -605,16 +921,29 @@ describe("Home", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveClass("state", "err");
     expect(alert).toHaveTextContent("Couldn't load this list.");
-    expect(alert).toHaveTextContent("Check your connection and reload the page.");
+    expect(alert).toHaveTextContent(
+      "Check your connection and reload the page.",
+    );
   });
 
   it("conviction shows the same page bar in both views, even on a single page", async () => {
     const row = (q: number): ConvictionRow => ({
-      fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q, move: "new",
-      usd: 60e6, weight_after: 0.06, change_pts: 6, est_price: 10, score: 3,
+      fund_id: 9100003,
+      name: "Lanternfish Capital Management",
+      stock_id: 13,
+      q,
+      move: "new",
+      usd: 60e6,
+      weight_after: 0.06,
+      change_pts: 6,
+      est_price: 10,
+      score: 3,
     });
     stubData({
-      "home/conviction_q.json": { latest_q: 53, rows: [row(53), { ...row(53), stock_id: 5 }] },
+      "home/conviction_q.json": {
+        latest_q: 53,
+        rows: [row(53), { ...row(53), stock_id: 5 }],
+      },
       "home/conviction_y.json": { latest_q: 53, rows: [row(51)] },
     });
     const user = userEvent.setup();
@@ -625,8 +954,12 @@ describe("Home", () => {
     expect(bars).toHaveLength(2); // above and below the table
     expect(bars[0]).toHaveTextContent("Showing 1–2 of 2 moves");
     expect(bars[0]).toHaveTextContent("Page 1 of 1");
-    expect(within(bars[0]).getByRole("button", { name: "Previous" })).toBeDisabled();
-    expect(within(bars[0]).getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(
+      within(bars[0]).getByRole("button", { name: "Previous" }),
+    ).toBeDisabled();
+    expect(
+      within(bars[0]).getByRole("button", { name: "Next" }),
+    ).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Last 4 quarters" }));
     await screen.findByText(/The 4 quarters to Q2 2026/);
     bars = screen.getAllByRole("navigation", { name: "Pages of moves" });
@@ -635,24 +968,53 @@ describe("Home", () => {
   });
 
   it("conviction sorts by any column", async () => {
-    const row = (stock_id: number, usd: number, score: number): ConvictionRow => ({
-      fund_id: 9100003, name: "Lanternfish Capital Management", stock_id, q: 53, move: usd < 0 ? "exit" : "new",
-      usd, weight_after: 0.05, change_pts: usd < 0 ? -8 : usd / 1e7, est_price: 10, score,
+    const row = (
+      stock_id: number,
+      usd: number,
+      score: number,
+    ): ConvictionRow => ({
+      fund_id: 9100003,
+      name: "Lanternfish Capital Management",
+      stock_id,
+      q: 53,
+      move: usd < 0 ? "exit" : "new",
+      usd,
+      weight_after: 0.05,
+      change_pts: usd < 0 ? -8 : usd / 1e7,
+      est_price: 10,
+      score,
     });
-    const file: RowsFile<ConvictionRow> = { latest_q: 53, rows: [row(13, 40e6, 9), row(5, -80e6, 7), row(7, 60e6, 8)] };
+    const file: RowsFile<ConvictionRow> = {
+      latest_q: 53,
+      rows: [row(13, 40e6, 9), row(5, -80e6, 7), row(7, 60e6, 8)],
+    };
     stubData({ "home/conviction_q.json": file });
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
-    const table = await screen.findByRole("table", { name: "Conviction moves" });
-    const dollars = () => within(table).getAllByRole("row").slice(1).map((r) => within(r).getByText(/\$\d+m/).textContent);
+    const table = await screen.findByRole("table", {
+      name: "Conviction moves",
+    });
+    const dollars = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getByText(/\$\d+m/).textContent);
     expect(dollars()).toEqual(["+$40m", "−$80m", "+$60m"]); // the file's order
-    await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
+    await user.click(
+      within(table).getByRole("button", { name: "$ bought / sold" }),
+    );
     expect(dollars()).toEqual(["+$60m", "+$40m", "−$80m"]);
-    await user.click(within(table).getByRole("button", { name: "$ bought / sold" }));
+    await user.click(
+      within(table).getByRole("button", { name: "$ bought / sold" }),
+    );
     expect(dollars()).toEqual(["−$80m", "+$40m", "+$60m"]);
     // the Weight column sorts by the signed change in the fund's AUM: the biggest buy first, a sale last, and back again
-    const moves = () => within(table).getAllByRole("row").slice(1).map((r) => r.querySelector(".wn")?.textContent);
+    const moves = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => r.querySelector(".wn")?.textContent);
     await user.click(within(table).getByRole("button", { name: "Weight" }));
     expect(moves()).toEqual(["0% → 5%", "1% → 5%", "13% → 0%"]);
     await user.click(within(table).getByRole("button", { name: "Weight" }));
@@ -663,7 +1025,18 @@ describe("Home", () => {
     const year: RowsFile<ConvictionRow> = {
       latest_q: 53,
       rows: [
-        { fund_id: 9100003, name: "Lanternfish Capital Management", stock_id: 13, q: 51, move: "new", usd: 70e6, weight_after: 0.07, change_pts: 7, est_price: 90, score: 5 },
+        {
+          fund_id: 9100003,
+          name: "Lanternfish Capital Management",
+          stock_id: 13,
+          q: 51,
+          move: "new",
+          usd: 70e6,
+          weight_after: 0.07,
+          change_pts: 7,
+          est_price: 90,
+          score: 5,
+        },
       ],
     };
     const urls = stubData({ "home/conviction_y.json": year });
@@ -672,13 +1045,21 @@ describe("Home", () => {
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     await screen.findByRole("table", { name: "Conviction moves" });
     await user.click(screen.getByRole("button", { name: "Last 4 quarters" }));
-    expect(screen.getByRole("button", { name: "Last 4 quarters" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Last 4 quarters" }),
+    ).toHaveAttribute("aria-pressed", "true");
     await screen.findByText(/The 4 quarters to Q2 2026/);
     expect(urls).toContain("/demo-data/home/conviction_y.json");
     const table = screen.getByRole("table", { name: "Conviction moves" });
-    expect(within(table).getByRole("columnheader", { name: "Quarter" })).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "Weight" })).toBeInTheDocument();
-    expect(within(within(table).getAllByRole("row")[1]).getByText("Q4 2025")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("columnheader", { name: "Quarter" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole("columnheader", { name: "Weight" }),
+    ).toBeInTheDocument();
+    expect(
+      within(within(table).getAllByRole("row")[1]).getByText("Q4 2025"),
+    ).toBeInTheDocument();
   });
 
   it("crowded buys lists funds buying, total bought and average weight", async () => {
@@ -696,15 +1077,23 @@ describe("Home", () => {
 
   it("calls computes since-buy from latest price", async () => {
     stubData({
-      "home/calls_q.json": { latest_q: 53, rows: [call(16, 9100001, "Kelpwood Capital LP", 10, 11)] },
+      "home/calls_q.json": {
+        latest_q: 53,
+        rows: [call(16, 9100001, "Kelpwood Capital LP", 10, 11)],
+      },
       "latest_prices.json": pricesWith({ 16: 12 }),
     });
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Best & worst calls" }));
     const row = (await screen.findAllByRole("row"))[1];
-    expect(within(row).getByRole("link", { name: /Visa/ })).toHaveAttribute("href", "/fund/9100001/stock/16"); // the name tidied, as on the fund page
-    expect(within(row).getByRole("link", { name: "Kelpwood Capital LP" })).toHaveAttribute("href", "/fund/9100001");
+    expect(within(row).getByRole("link", { name: /Visa/ })).toHaveAttribute(
+      "href",
+      "/fund/9100001/stock/16",
+    ); // the name tidied, as on the fund page
+    expect(
+      within(row).getByRole("link", { name: "Kelpwood Capital LP" }),
+    ).toHaveAttribute("href", "/fund/9100001");
     // the quarter of the buy sits in a purchase box: the word "Bought" and "Q2 ’26"
     const bought = within(row).getByRole("img", { name: "Bought in Q2 2026" });
     expect(bought).toHaveClass("lc", "add");
@@ -718,7 +1107,10 @@ describe("Home", () => {
 
   it("calls shows a dash where the latest price is missing", async () => {
     stubData({
-      "home/calls_q.json": { latest_q: 53, rows: [call(16, 9100001, "Kelpwood Capital LP", 10, 11)] },
+      "home/calls_q.json": {
+        latest_q: 53,
+        rows: [call(16, 9100001, "Kelpwood Capital LP", 10, 11)],
+      },
       "latest_prices.json": pricesWith({ 16: null }),
     });
     const user = userEvent.setup();
@@ -747,10 +1139,18 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Best & worst calls" }));
     await screen.findByRole("table");
-    expect(screen.getByRole("button", { name: "Best calls" })).toHaveAttribute("aria-pressed", "true");
-    await waitFor(() => expect(fundOrder()).toEqual(["Fund A", "Fund C", "Fund B", "Fund Gone"]));
+    expect(screen.getByRole("button", { name: "Best calls" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await waitFor(() =>
+      expect(fundOrder()).toEqual(["Fund A", "Fund C", "Fund B", "Fund Gone"]),
+    );
     await user.click(screen.getByRole("button", { name: "Worst calls" }));
-    expect(screen.getByRole("button", { name: "Worst calls" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Worst calls" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(fundOrder()).toEqual(["Fund B", "Fund C", "Fund A", "Fund Gone"]);
   });
 
@@ -762,10 +1162,18 @@ describe("Home", () => {
     await screen.findByRole("table");
     expect(urls).toContain("/demo-data/home/calls_q.json");
     expect(urls).not.toContain("/demo-data/home/calls_y.json");
-    expect(screen.getByRole("button", { name: "Last quarter's buys" })).toHaveAttribute("aria-pressed", "true");
-    await user.click(screen.getByRole("button", { name: "Last 4 quarters' buys" }));
+    expect(
+      screen.getByRole("button", { name: "Last quarter's buys" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(
+      screen.getByRole("button", { name: "Last 4 quarters' buys" }),
+    );
     await waitFor(() => expect(urls).toContain("/demo-data/home/calls_y.json"));
-    await waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(demo<RowsFile<CallRow>>("home/calls_y.json").rows.length + 1));
+    await waitFor(() =>
+      expect(screen.getAllByRole("row")).toHaveLength(
+        demo<RowsFile<CallRow>>("home/calls_y.json").rows.length + 1,
+      ),
+    );
   });
 
   it("a list that fails to load shows one error line, not a blank page", async () => {
@@ -773,7 +1181,9 @@ describe("Home", () => {
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn.t load/i,
+    );
     expect(screen.getAllByRole("tab")).toHaveLength(6); // the page is still there
     await user.click(screen.getByRole("tab", { name: "Top funds" })); // and the other lists still work
     expect(await screen.findByRole("table")).toBeInTheDocument();
@@ -782,7 +1192,9 @@ describe("Home", () => {
   it("search says so when the fund index fails to load", async () => {
     stubData({}, ["funds.json"]);
     renderHome();
-    expect(await screen.findByText(/search isn.t available/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/search isn.t available/i),
+    ).toBeInTheDocument();
     await screen.findByRole("table"); // lists unaffected
   });
 });
