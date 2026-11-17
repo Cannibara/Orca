@@ -2,18 +2,21 @@
 
 Status: plan, reviewed 2026-11-17 by an architecture review and a code check. Nothing is built yet. Owner decisions are in `docs/DECISIONS.md` (2026-11-16, 2026-11-17).
 
+## Terms
+- Hierarchy label: any one sector, industry or industry vertical (12 + 71 + 244 = 327). A stock's main label is its vertical; it also sits in that vertical's industry and sector. The code calls these `Node`.
+
 ## Goal
 For each 13F fund, split its result into two parts by IRR:
-- picking = fund IRR − IRR of the same flows put into each stock's own node index;
-- allocation = node-shadow IRR − IRR of the same flows put into the market index.
-The default comparison level is industry (tier 2, 71 nodes). The user can flick to sector (tier 1, 12 nodes) or industry vertical (tier 3, 244 nodes). Example: Micron vs Memory/DRAM (tier 3), vs Semiconductors/SOXX (tier 2), vs Technology (tier 1).
+- picking = fund IRR − IRR of the same flows put into each stock's own hierarchy label index;
+- allocation = hierarchy label-shadow IRR − IRR of the same flows put into the market index.
+The default comparison level is industry (tier 2, 71 hierarchy labels). The user can flick to sector (tier 1, 12 hierarchy labels) or industry vertical (tier 3, 244 hierarchy labels). Example: Micron vs Memory/DRAM (tier 3), vs Semiconductors/SOXX (tier 2), vs Technology (tier 1).
 
 ## Fixed decisions (owner)
-- Hierarchy is `pipeline/orca/hierarchy/labels.txt`. Each stock has one main label (a vertical). A node's index holds every stock whose main label sits under it, so each tier partitions the market. Extra labels only choose comparisons.
+- Hierarchy is `pipeline/orca/hierarchy/labels.txt`. Each stock has one main label (a vertical). A hierarchy label's index holds every stock whose main label sits under it, so each tier partitions the market. Extra labels only choose comparisons.
 - Indices are market-cap weighted, with no cap on any stock, rebalanced each quarter, and measured as total return with dividends.
 - Accuracy of about 90% is enough. Shortcuts are fine.
-- A good existing cap-weighted ETF stands in for a node, at any tier. We build our own index for the 12 broad sectors, for nodes with no ETF, and to back-fill an ETF's history before launch.
-- A fund buying a single-sector ETF is a sector pick at that ETF's node and level. Broad, bond, international, leveraged and theme ETFs are neutral. So ETFs must be labelled at the right tier: SOXX is the Semiconductors industry, DRAM is the Memory vertical, XLK is the Technology sector.
+- A good existing cap-weighted ETF stands in for a hierarchy label, at any tier. We build our own index for the 12 broad sectors, for hierarchy labels with no ETF, and to back-fill an ETF's history before launch.
+- A fund buying a single-sector ETF is a sector pick at that ETF's hierarchy label and level. Broad, bond, international, leveraged and theme ETFs are neutral. So ETFs must be labelled at the right tier: SOXX is the Semiconductors industry, DRAM is the Memory vertical, XLK is the Technology sector.
 - The labels may be committed to the public repo. They derive from Damodaran's public file; licensing is parked.
 - The 13F quarterly data and its 45-day lag are accepted.
 
@@ -46,7 +49,7 @@ The default comparison level is industry (tier 2, 71 nodes). The user can flick 
    - Check the ~300 biggest names against a reference market cap.
    - One-off fetch: ~15k CIKs at 8/s ≈ 30–40 min.
 2. Sells in the replay. Matching sell dollars can drive a shadow position negative. Instead, buys put the same dollars into the index, and a sell sells the same fraction of the shadow's units as of the position's shares.
-3. Timing. Fund trades are priced at the quarter VWAP and dated mid-quarter. Each node therefore needs a quarter-average level (`level_avg`) as well as a quarter-end level (`level_end`). Weekly data adds nothing.
+3. Timing. Fund trades are priced at the quarter VWAP and dated mid-quarter. Each hierarchy label therefore needs a quarter-average level (`level_avg`) as well as a quarter-end level (`level_end`). Weekly data adds nothing.
 4. Stale prices. Only held stocks are refreshed. Use a stock's close only if it falls within ~5 trading days of the quarter end.
    - Stock has a later price: leave it out of that quarter.
    - Stock has no later price: treat it as delisted; it earns its return up to its last close, then cash.
@@ -72,10 +75,10 @@ prices_daily → quarter_px┘        │                           │
 web: shows the numbers, tier toggle (sector | industry | vertical)
 ```
 - `engine/sectors.py` makes one pass over stocks and adds them up to all three tiers plus the market.
-  - Per node and quarter: `ret_q` = Σ wᵢ (closeᵢ,q + divᵢ,q) / closeᵢ,q−1 − 1, with weights fixed at the quarter's start.
+  - Per hierarchy label and quarter: `ret_q` = Σ wᵢ (closeᵢ,q + divᵢ,q) / closeᵢ,q−1 − 1, with weights fixed at the quarter's start.
   - It also gives `level_end`, `level_avg`, `n` and coverage.
-  - It builds an own series for every node.
-  - A committed `preferred` table picks own, ETF, or splice for each node.
+  - It builds an own series for every hierarchy label.
+  - A committed `preferred` table picks own, ETF, or splice for each hierarchy label.
 - Fund scoring runs inside the fund compute, next to `compute_position`.
   - Per tier: IRR_fund, IRR_node, IRR_mkt, picking, allocation, a KS-PME ratio (stable when an IRR has no root), coverage and number of picks.
   - Raw figures go in snapshots; thresholds are applied at publish.
@@ -84,7 +87,7 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 ## Phases
 1. Mapping, in the repo.
    - Load the CSVs. Every vertical must resolve in `labels.txt`. Test the ticker guard against a `securities.json` snapshot.
-   - Review the 98 sector ETFs' levels and nodes, and list the candidate ETF for each node (31 of 327 nodes have one today).
+   - Review the 98 sector ETFs' levels and hierarchy labels, and list the candidate ETF for each hierarchy label (31 of 327 hierarchy labels have one today).
    - Add the SIC fallback table.
 2. `shares_hist` and its fetch step: a one-off backfill under the time budget. Test offline with fixture JSON (share classes, a split, the ADR override).
 3. `engine/sectors.py`. Test with hand-computed indices: two stocks, a dividend, a mid-quarter delisting, a stale price, an IPO, the splice, and children adding up to the parent. Add demo output.
@@ -92,7 +95,7 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
    - Write the series to the lake and a private CSV comparing our indices with XLK, XLF, SOXX and SPY.
    - Pass: quarterly-return correlation above 0.95 and drift under ~2% a year for sectors.
    - Then fill the `preferred` table.
-5. Shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its node's whole index scores picking = 0.
+5. Shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its hierarchy label's whole index scores picking = 0.
 6. Contract change, publish step, then the web view, shown only when the file exists. Owner run 2 gives the first real numbers.
 
 ## Decided after review (owner, 2026-11-17)
@@ -100,7 +103,7 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 - Share counts: build `shares_hist` as designed.
 
 ## Open owner decisions
-- Which ETFs count as "good" stand-ins. Proposal: cap-weighted, at least $500m in assets, tracking our node's definition, and passing the correlation test in phase 4.
+- Which ETFs count as "good" stand-ins. Proposal: cap-weighted, at least $500m in assets, tracking our hierarchy label's definition, and passing the correlation test in phase 4.
 - Thin verticals: 188 of 244 have fewer than 10 stocks above $1bn. Widen to the industry (R4)?
 - Fallback for unlabelled stocks. Proposal: SIC → industry "Other", tagged.
 
@@ -114,4 +117,4 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 Phases 1–3 ≈ 1 fresh chat (~2–3M tokens); phases 5–6 ≈ another. Owner runs: 2 Actions runs (~80 min each, plus ~40 min one-off for the share backfill).
 
 ## Paste-ready prompt for a fresh chat
-> Read CLAUDE.md, then docs/superpowers/plans/2026-11-17-sector-indices.md and follow it. Start with phase 1 (load and test the committed mappings in pipeline/orca/hierarchy/data/, review the 98 sector ETFs' levels/nodes against labels.txt, add the SIC fallback), then phases 2–3 with TDD. Keep to ~90% accuracy, take shortcuts, stop before phase 4 and tell me what Actions run to start. Ask me the open owner decisions listed in the plan before you hard-code any of them.
+> Read CLAUDE.md, then docs/superpowers/plans/2026-11-17-sector-indices.md and follow it. Start with phase 1 (load and test the committed mappings in pipeline/orca/hierarchy/data/, review the 98 sector ETFs' levels/hierarchy labels against labels.txt, add the SIC fallback), then phases 2–3 with TDD. Keep to ~90% accuracy, take shortcuts, stop before phase 4 and tell me what Actions run to start. Ask me the open owner decisions listed in the plan before you hard-code any of them.
