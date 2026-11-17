@@ -133,7 +133,7 @@ _CUSIP_GLUED = re.compile(
 )
 # Longest first: "Table Entry Total" must not be taken as "Table Entry" (filers also drop "Total").
 _TOTAL_LABEL = re.compile(
-    r"(TABLE\s+ENTRY\s+TOTAL|TABLE\s+VALUE\s+TOTAL|VALUE\s+TOTAL|TOTAL\s+VALUE|ENTRY\s+TOTAL"
+    r"(TABLE\s+ENTRY\s+TOTAL|TABLE\s+VALUES?\s+TOTAL|VALUES?\s+TOTAL|TOTAL\s+VALUE|ENTRY\s+TOTAL"
     r"|TABLE\s+ENTRY|TABLE\s+VALUE)",
     re.IGNORECASE,
 )
@@ -368,6 +368,7 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
     orphans = 0
     for lines in _lines(texts):
         above: Row | None = None  # the row a continuation line repeats
+        above_invalid = False  # the row above had no valid CUSIP: its repeats are invalid too
         columns: tuple[int, int] | None = None  # where the last row's two numbers end
         since_total = 0.0  # values since the text began or its last total line
         text_total = 0.0  # values since the text began
@@ -390,7 +391,7 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
                     words += more_words
                 if len(numbers) < 2:
                     orphans += 1
-                    above = None
+                    above, above_invalid = None, False
                     i += 1
                     continue
                 value, shares = numbers[0][0], numbers[1][0]
@@ -406,6 +407,7 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
                 since_total += row.value
                 text_total += row.value
                 above = row if j == i else None
+                above_invalid = False
                 columns = (numbers[0][2], numbers[1][2]) if j == i else columns
                 i = j + 1
                 continue
@@ -416,7 +418,8 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
                 totals += [value for value, _, _ in _all_numbers(line)]
             numbers = _aligned_numbers(line, columns) if columns else None
             if numbers is None:
-                above = None if _SEPARATOR.match(line) or not _numbers(line)[0] else above
+                if _SEPARATOR.match(line) or not _numbers(line)[0]:
+                    above, above_invalid = None, False
                 i += 1
                 continue
             (first, first_start, _), (second, _, _) = numbers
@@ -428,16 +431,19 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
                 or _adds_up(value, text_total)
             ):
                 since_total = 0.0  # a total or page subtotal of the rows above
-                above = None
-            elif above is not None and not lead.replace("$", "").strip():
-                rows.append(
-                    Row(above.cusip, value, shares, above.sh_type, above.put_call, above.issuer)
-                )
-                since_total += value
-                text_total += value
-            elif lead.strip():  # a row without a valid CUSIP: a typo, a SEDOL, no code at all
+                above, above_invalid = None, False
+            elif not lead.replace("$", "").strip():
+                if above is not None:
+                    rows.append(
+                        Row(above.cusip, value, shares, above.sh_type, above.put_call, above.issuer)
+                    )
+                    since_total += value
+                    text_total += value
+                elif above_invalid:
+                    invalid.append(value)
+            else:  # a row without a valid CUSIP: a typo, a SEDOL, no code at all
                 invalid.append(value)
-                above = None
+                above, above_invalid = None, True
             i += 1
     return Table(rows, invalid, orphans, totals)
 

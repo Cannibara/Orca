@@ -171,6 +171,13 @@ def test_amendment_of_unknown_type_is_ignored():
     assert rows_of(build_holdings(filings, raws), "cusip") == [("AAA",)]
 
 
+def test_a_lone_amendment_of_unknown_type_is_the_quarters_report():
+    filings = filings_frame(filing(B, date(2024, 3, 1), form="13F-HR/A", amendment_type=None))
+    raws = raw_frame(raw(B, "BBB", 2))
+
+    assert rows_of(build_holdings(filings, raws), "cusip") == [("BBB",)]
+
+
 @pytest.mark.parametrize("reverse", [False, True])
 def test_latest_original_wins_when_refiled(reverse):
     rows = [filing(A, date(2024, 2, 10)), filing(B, date(2024, 2, 20))]
