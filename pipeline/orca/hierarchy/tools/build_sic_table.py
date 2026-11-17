@@ -14,10 +14,10 @@ import argparse
 import csv
 from pathlib import Path
 
+from label_securities import read_refs  # same folder
+
 from orca.hierarchy import LABELS_FILE, load
 from orca.hierarchy.assign import SIC_FILE, build_sic_table
-
-from label_securities import read_refs  # same folder
 
 
 def main() -> None:

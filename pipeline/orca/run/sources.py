@@ -31,6 +31,7 @@ class Sources:
     prices: PriceSource
     tbill: Callable[[], dict[int, float]]
     price_universe: Callable[[], pl.DataFrame] | None = None
+    shares_history: Callable[[int], list] | None = None  # None: the share-count history is not kept
 
 
 def production_sources() -> Sources:
@@ -41,7 +42,12 @@ def production_sources() -> Sources:
     from orca.rf import fetch_tbill
     from orca.sec.bulk import list_bulk_zips
     from orca.sec.live import fetch_new_filings
-    from orca.securities import fetch_shares_outstanding, fetch_sic, load_sec_tickers
+    from orca.securities import (
+        fetch_shares_history,
+        fetch_shares_outstanding,
+        fetch_sic,
+        load_sec_tickers,
+    )
     from orca.vendor import load_universe
 
     sec, fred = sec_client(), fred_client()
@@ -57,6 +63,7 @@ def production_sources() -> Sources:
         sec_tickers=lambda: load_sec_tickers(sec),
         sic=lambda cik: fetch_sic(sec, cik),
         shares_outstanding=lambda cik: fetch_shares_outstanding(sec, cik),
+        shares_history=lambda cik: fetch_shares_history(sec, cik),
         prices=TiingoSource(tiingo_client()),
         tbill=lambda: fetch_tbill(fred),
         price_universe=lambda: load_universe(Client(1.0, {})),  # a public file: no key

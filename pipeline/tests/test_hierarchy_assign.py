@@ -5,8 +5,7 @@ import io
 
 import pytest
 
-from orca.hierarchy import HierarchyError, load, parse
-from orca.hierarchy import assign
+from orca.hierarchy import HierarchyError, assign, load, parse
 
 TEXT = """## Tech > Chips
 Memory: MU

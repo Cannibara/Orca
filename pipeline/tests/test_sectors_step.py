@@ -1,0 +1,38 @@
+"""The run step that builds the sector indices from the lake (`orca/run/sectors_step.build_sector_returns`)."""
+
+from datetime import date
+
+import polars as pl
+
+from orca.hierarchy import parse
+from orca.hierarchy.assign import SicTable, StockLabel
+from orca.prices import PRICES_SCHEMA
+from orca.run.sectors_step import build_sector_returns
+from orca.run.state import SECURITIES_TABLE_SCHEMA
+from orca.shares_hist import SCHEMA as SHARES_SCHEMA
+from orca.storage import Lake
+
+H = parse("## Tech > Chips\nMemory: MU\nLogic: INTC\n@default Semis => Tech > Chips > Logic\n")
+MEMORY, LOGIC = H.nodes
+
+
+def test_the_step_writes_one_series_per_label_from_stocks_only(tmp_path):
+    lake = Lake(tmp_path / "lake")
+    sec = {"stock_id": [1, 2, 3, 4], "ticker": ["MU", "INTC", "SOXX", "MU 1 01-01-30"], "cik": [10, 20, None, 10],
+           "sic": [3674, 3674, None, None], "sector": ["Tech", "Tech", "ETF/Fund", "Tech"], "shares_out": [100.0, 100.0, None, None]}  # fmt: skip
+    lake.write("securities", pl.DataFrame(sec).cast({k: v for k, v in SECURITIES_TABLE_SCHEMA.items() if k in sec}), part=None)
+    days = [date(2015, 9, 30), date(2015, 12, 31)]
+    bars = [(sid, d, close) for sid, c0, c1 in ((1, 10.0, 11.0), (2, 10.0, 10.0), (3, 10.0, 20.0), (4, 10.0, 20.0)) for d, close in zip(days, (c0, c1))]
+    prices = pl.DataFrame({"stock_id": [b[0] for b in bars], "date": [b[1] for b in bars], "open": [b[2] for b in bars], "high": [b[2] for b in bars],
+                           "low": [b[2] for b in bars], "close": [b[2] for b in bars], "volume": [1.0] * len(bars),
+                           "split_factor": [1.0] * len(bars), "dividend": [0.0] * len(bars)}, schema=PRICES_SCHEMA)  # fmt: skip
+    lake.write("prices_daily", prices, part="000")
+    lake.write("shares_hist", pl.DataFrame(schema=SHARES_SCHEMA))
+    labels = {1: StockLabel("MU", "stock", MEMORY, "placed")}  # INTC is labelled by its SIC code
+    flags: list = []
+    stats = build_sector_returns(lake, last_q=11, flags=flags, labels=labels, sic=SicTable({"3674": LOGIC}), adr={})
+    out = lake.read("sector_returns")
+    ret = {(r["label"], r["q"]): r["ret"] for r in out.iter_rows(named=True)}
+    assert abs(ret[(MEMORY.path, 11)] - 0.1) < 1e-12 and ret[(LOGIC.path, 11)] == 0.0
+    assert abs(ret[("Market", 11)] - 0.05) < 1e-12  # the ETF and the bond doubled and are left out
+    assert stats["stocks"] == 2 and stats["by_how"] == {"placed": 1, "sic": 1} and stats["fallback_caps"] == 2

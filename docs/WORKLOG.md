@@ -5,6 +5,17 @@ Last verified: 2026-11-17
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-17 — Sector indices built (plan phases 1–3), waiting on the owner's run
+
+| What changed | Why | Files |
+|---|---|---|
+| Phase 1: the pipeline reads each stock's hierarchy label from `data/stock_nodes.csv` (`how=owner` wins; rows placed by name follow `labels.txt`), then a SIC fallback table (870 codes and prefixes, built from Damodaran's SIC codes). ETFs give a tier and a label, or neutral (leveraged ETFs too). The name match over all 41,407 securities added 2,441 stocks (7,552 rows). `relabel_check.py` shows what an edit moves | One CSV to edit; relabel = edit + re-run | `pipeline/orca/hierarchy/assign.py`, `data/`, `tools/` |
+| `labels.txt` overrides only rows placed by name: Orca keeps delisted tickers, so 12 rows share a ticker with a placed company but are another company (stock 611 "AMT" is TD Ameritrade, 14232 "APH" is Aphria) | A ticker-wide override would have mislabelled them | `assign.py` |
+| ETF review: 96 of 98 single-sector ETFs at the right tier; FAS and SOXL are leveraged, so neutral (R12) | Phase 1 | `assign.read_etf_labels` |
+| Phase 2: lake table `shares_hist` (every cover-page count, one SEC call per company, missing first, at most 19,000 calls a run, refreshed after 100 days) and `data/share_overrides.csv` (ordinary shares per ADR for 26 big ADRs, from memory: check in phase 4) | Today's single count misweights the past | `orca/shares_hist.py`, `run/sectors_step.py`, `run/sources.py`, `securities.fetch_shares_history` |
+| Phase 3: `engine/sectors.py` builds every hierarchy label's index (cap weights at the quarter's start, dividends, a quarter-end and a quarter-average level, stale-price and delisting rules, one count per company). The run builds `sector_returns` in the lake after the price stages; a failure is flagged and never stops the run. Nothing is published | Indices first, scores next (phase 5) | `engine/sectors.py`, `run/weekly.py` |
+| Not done: no demo output; `shares_hist` is not in the lake backups (it rebuilds in ~40 min); the ADR ratios are unchecked | | |
+
 ## 2026-11-17 — Sector indices: plan reviewed, labels committed, handoff written
 
 | What changed | Why | Files |

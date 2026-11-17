@@ -984,7 +984,7 @@ def test_budget_spent_in_bulk_ingest_publishes_nothing_and_the_next_run_goes_on(
     assert {
         "type": "time_budget",
         "minutes": 1.0,
-        "stages": ["bulk", "live", "securities", "prices", "rf", "compute"],
+        "stages": ["bulk", "live", "securities", "prices", "rf", "sectors", "compute"],
     } in stats.flags
     assert len(downloads) == 2
     assert len(json.loads((tmp_path / "lake" / "ingested.json").read_text())) == 2

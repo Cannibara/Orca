@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import csv
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Iterable
+from typing import IO
 
 from orca.hierarchy.model import SEP, Hierarchy, HierarchyError, Node, load
 

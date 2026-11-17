@@ -1,6 +1,6 @@
 # Sector indices and the allocator vs picker score: full plan and handoff
 
-Status: plan, approved by the owner on 2026-11-17 after an architecture review and a code check. Nothing is built yet. Work continues on branch `claude/gifted-cannon-e5ihyh`, which is not merged to `main`. The decision log is in `docs/DECISIONS.md` (entries dated 2026-11-16 and 2026-11-17).
+Status: phases 1–3 built on 2026-11-17 (`hierarchy/assign.py`, `shares_hist.py`, `engine/sectors.py`, `run/sectors_step.py`); phase 4 waits on the owner's Actions run. Work continues on branch `claude/gifted-cannon-e5ihyh`, which is not merged to `main`. The decision log is in `docs/DECISIONS.md` (entries dated 2026-11-16 and 2026-11-17).
 
 ## 1. Terms
 - Hierarchy label: any one sector, industry or industry vertical: 12 + 71 + 244 = 327 in all. The owner also calls a vertical a "sub-industry". In the code it is `Node` (`pipeline/orca/hierarchy/model.py`).
@@ -146,6 +146,12 @@ web: shows the numbers; tier toggle sector | industry | vertical; thin-vertical 
 6. Contract change, publish step, then the web view.
    - The view appears only when the file exists, has the tier toggle and shows the thin warning.
    - Owner run 2 gives the first real numbers.
+
+## 9a. Built differently from the plan (2026-11-17)
+- The SIC fallback gives the most common vertical for the code (not an industry's "Other" vertical): more accurate and no new verticals.
+- `labels.txt` overrides only rows with `how=placed`, because Orca reuses delisted tickers. To move any other stock, edit the CSV.
+- The index build runs as a stage of the monthly run (`sectors`, after `rf`) and writes only the lake. The `orca.run sectors` recompute mode comes with phase 5.
+- Leveraged sector ETFs are neutral.
 
 ## 10. Defaults chosen (the owner can override)
 - Unlabelled stocks: a SIC → industry "Other" vertical, tagged `sic`.
