@@ -284,7 +284,7 @@ describe("Home", () => {
     const panel = (await screen.findByRole("heading", { level: 2, name: "Famous funds" })).closest("section")!;
     await within(panel).findAllByRole("table");
     const order = ["Value", "Tiger cubs", "Tech & growth"].filter((g) => famous.some((f) => f.group === g));
-    expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(order);
+    expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Most searched", ...order]);
     for (const group of order) {
       const table = within(panel).getByRole("table", { name: group });
       expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
@@ -300,14 +300,44 @@ describe("Home", () => {
       expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(best.map((f) => f.name));
       if (best[0].manager) expect(within(rows[0]).getByText(best[0].manager)).toBeInTheDocument();
     }
-    // Kelpwood is in two lists
-    expect(within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }).length).toBe(2);
+    // Kelpwood is in two lists, and in Most searched
+    expect(within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }).length).toBe(3);
     // a fund that stopped filing is listed, with its last quarter by its manager
-    expect(within(panel).getByText("Mara Cobble · filed until Q4 2023")).toBeInTheDocument();
+    expect(within(within(panel).getByRole("table", { name: "Value" })).getByText("Mara Cobble · filed until Q4 2023")).toBeInTheDocument();
     const first = within(within(panel).getByRole("table", { name: order[0] })).getAllByRole("link")[0];
     const id = famous.find((f) => f.name === first.textContent)!.fund_id;
     await user.click(first);
     expect(await screen.findByText(`Fund page ${id}`)).toBeInTheDocument();
+  });
+
+  it("Most searched comes first: the most searched famous funds, once each, with their Google Trends score", async () => {
+    const t1 = demo<TopList>("home/top_1y.json");
+    const read = [...new Map((t1.famous ?? []).filter((r) => r.search).map((r) => [r.fund_id, r])).values()].sort(
+      (a, b) => b.search! - a.search!,
+    );
+    expect(read.length).toBeGreaterThan(2);
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("table", { name: "Top funds" });
+    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
+    await user.click(screen.getByRole("button", { name: "1 year" }));
+    await waitFor(() => expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("Most searched"));
+    const table = screen.getByRole("table", { name: "Most searched" });
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Fund",
+      "Search interest",
+      "AUM",
+      "Positions",
+      "Return / yr",
+      "Max Drawdown",
+      "Sharpe",
+    ]);
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(read.map((r) => r.name));
+    expect(within(rows[0]).getByText("32")).toBeInTheDocument(); // Driftwood: 31.5 (Buffett = 100)
+    expect(within(rows[rows.length - 1]).getByText("<1")).toBeInTheDocument(); // Halyard: 0.4
+    expect(screen.getByText(/Google Trends interest in the manager or founder .* the 12 months to 30 Oct 2026/)).toBeInTheDocument();
   });
 
   it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {

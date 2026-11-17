@@ -28,7 +28,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 
-from orca.famous import Famous
+from orca.famous import Famous, SearchScores
 from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
@@ -131,13 +131,18 @@ FUNDS = (
 # year and since start), one that stopped filing (listed with its figures to its last quarter),
 # three in Top funds as well, and Kelpwood in two lists.
 DEMO_FAMOUS = (
-    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs"),
-    Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs"),
-    Famous(FUND_CIK0 + 6, "DRIFTWOOD", "Theo Drift", "Tech & growth"),
-    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tech & growth"),
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs", "Iris Kelp"),
+    Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs", "Wren Orcinus"),
+    Famous(FUND_CIK0 + 6, "DRIFTWOOD", "Theo Drift", "Tech & growth", "Theo Drift"),
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tech & growth", "Iris Kelp"),
     Famous(FUND_CIK0 + 4, "SALTGLASS", "Ada Brine", "Value"),
-    Famous(FUND_CIK0 + 1, "HALYARD", "", "Value"),
-    Famous(FUND_CIK0 + 9, "COBBLEREEF", "Mara Cobble", "Value"),
+    Famous(FUND_CIK0 + 1, "HALYARD", "", "Value", "Halyard Point Partners"),
+    Famous(FUND_CIK0 + 9, "COBBLEREEF", "Mara Cobble", "Value", "Mara Cobble"),
+)
+# Google Trends scores of the demo's keywords (Most searched). Wren Orcinus has none.
+DEMO_SEARCH = SearchScores(
+    "2026-10-30",
+    {"Iris Kelp": 12.0, "Theo Drift": 31.5, "Halyard Point Partners": 0.4, "Mara Cobble": 2.6},
 )
 LAST_Q = q_index(2026, 2)  # the deadline quarter as of DEMO_TODAY
 CROWDED = (
@@ -356,6 +361,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
         prices=FixtureSource(fx.prices),
         tbill=lambda: dict(fx.tbill),
         famous=lambda: DEMO_FAMOUS,
+        search=lambda: DEMO_SEARCH,
     )
 
 

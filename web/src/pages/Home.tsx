@@ -18,12 +18,12 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { count, DASH, HOME_TITLE, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
+import { count, DASH, fmtDate, HOME_TITLE, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
 import { qShort } from "../fund/fmt";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
-import { fAum, fBook, fPrice, fWeight } from "./homeFmt";
+import { fAum, fBook, fPrice, fSearch, fWeight } from "./homeFmt";
 import "./home.css";
 
 // ---- loading ----------------------------------------------------------------
@@ -361,6 +361,38 @@ const FAMOUS_COLUMNS: Col<TopRow>[] = TOP_COLUMNS.map((c) =>
       },
 );
 
+/** Most searched: Famous funds' columns with the search score after the name, most searched first. */
+function searchedColumns(asof: string | null | undefined): Col<TopRow>[] {
+  const tip = `Google Trends, worldwide, the 12 months to ${asof ? fmtDate(asof) : "the last snapshot"}; Warren Buffett = 100`;
+  return [
+    FAMOUS_COLUMNS[0],
+    {
+      header: "Search interest",
+      key: "search",
+      by: (r) => r.search ?? null,
+      cell: (r) => <span title={tip}>{fSearch(r.search)}</span>,
+    },
+    ...FAMOUS_COLUMNS.slice(1),
+  ];
+}
+const MOST_SEARCHED_ORDER: SortState = { key: "search", dir: -1 };
+/** Funds in Most searched: the head of the ranking, as a list of what people look up should be. */
+const MOST_SEARCHED_MAX = 50;
+function mostSearchedAbout(asof: string | null | undefined): string {
+  const when = asof ? ` over the 12 months to ${fmtDate(asof)}` : "";
+  return `The famous funds people search Google for most: Google Trends interest in the manager or founder (or the firm, for venture firms), worldwide${when}. Warren Buffett = 100.`;
+}
+
+/** The most searched famous funds, once each (a fund in two lists has its score on both rows). */
+function mostSearched(rows: TopRow[]): TopRow[] {
+  const seen = new Set<number>();
+  return rows
+    .filter((r) => r.search != null && r.search > 0)
+    .sort((a, b) => b.search! - a.search! || a.fund_id - b.fund_id)
+    .filter((r) => !seen.has(r.fund_id) && !!seen.add(r.fund_id))
+    .slice(0, MOST_SEARCHED_MAX);
+}
+
 /**
  * The famous funds' styles, in page order (pipeline/orca/famous.py FAMOUS_GROUPS), each with a line about it.
  * A group the pipeline publishes that is not here is listed last, without a line.
@@ -411,6 +443,8 @@ function FamousFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Perio
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
   const rows = list.status === "ready" ? list.data.famous : undefined;
   const groups = useMemo(() => byGroup(rows ?? []), [rows]);
+  const searched = useMemo(() => mostSearched(rows ?? []), [rows]);
+  const asof = list.status === "ready" ? list.data.search_asof : undefined;
   return (
     <Panel
       title="Famous funds"
@@ -428,14 +462,39 @@ function FamousFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Perio
           </State>
         </div>
       ) : (
-        groups.map((g) => <FamousGroup key={g.name} {...g} />)
+        <>
+          {searched.length > 0 && (
+            <FamousGroup
+              name="Most searched"
+              about={mostSearchedAbout(asof)}
+              rows={searched}
+              columns={searchedColumns(asof)}
+              initial={MOST_SEARCHED_ORDER}
+            />
+          )}
+          {groups.map((g) => (
+            <FamousGroup key={g.name} {...g} />
+          ))}
+        </>
       )}
     </Panel>
   );
 }
 
 /** One style's list: its heading and line, then its table with its own page buttons. */
-function FamousGroup({ name, about, rows }: { name: string; about?: string; rows: TopRow[] }) {
+function FamousGroup({
+  name,
+  about,
+  rows,
+  columns = FAMOUS_COLUMNS,
+  initial = BEST_RETURN,
+}: {
+  name: string;
+  about?: string;
+  rows: TopRow[];
+  columns?: Col<TopRow>[];
+  initial?: SortState;
+}) {
   const id = useId();
   return (
     <section className="fam" aria-labelledby={id}>
@@ -446,9 +505,9 @@ function FamousGroup({ name, about, rows }: { name: string; about?: string; rows
       <ListTable
         label={name}
         noun="funds"
-        columns={FAMOUS_COLUMNS}
+        columns={columns}
         rows={rows}
-        initial={BEST_RETURN}
+        initial={initial}
         rowKey={(r) => r.fund_id}
         paged
         pageSize={FAMOUS_PAGE}

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
-from orca.famous import load_famous
+from orca.famous import load_famous, load_search
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -375,6 +375,7 @@ def run_weekly(
         metas[cik], snaps[cik] = undump(meta), undump(snap)
     del stored
     order = sorted(metas)
+    famous = sources.famous()
     weekly_ids = None if full else state.pending_weekly
     files.update(
         publish_shared_files(
@@ -385,7 +386,8 @@ def run_weekly(
             weekly_ids,
             today,
             compress,
-            sources.famous(),
+            famous,
+            sources.search(),
         )
     )
 
@@ -495,6 +497,7 @@ def run_home(
     order = sorted(metas)
     run_id = today.strftime("%Y%m%d")
     staging = new_version(out_root, run_id)
+    famous = load_famous()
     files = publish_shared_files(
         ctx,
         staging,
@@ -503,7 +506,8 @@ def run_home(
         set(),
         today,
         compress,
-        load_famous(),
+        famous,
+        load_search(),
     )
     previous = load_published(lake, out_root, compress)
     changed = changed_files(files, previous)
@@ -564,3 +568,4 @@ def verify(
                 rebuilt.update(publish_fund(Path(tmp), result.output, compress))
     expected = {p: sha for p, sha in published.items() if is_fund_path(p, set(chosen))}
     return sorted(p for p in expected.keys() | rebuilt.keys() if expected.get(p) != rebuilt.get(p))
+

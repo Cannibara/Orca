@@ -127,14 +127,18 @@ Each file is an object with `latest_q`, the quarter the lists are about. `name` 
 fund's name.
 
 - `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...],
-  "famous": [...]}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
+  "famous": [...], "search_asof"}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
   "max_dd", "sharpe"}`. `famous` lists the funds of `pipeline/orca/famous.csv` (hand-kept) whatever the Top funds
   rules say, when they have a performance for the period, ≥ 80% of the book priced and a name holding the list's
   match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
   `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each) and `"until_q"`: for a fund
   that stopped filing, its last quarter, and then its figures cover the period up to that quarter; `null` while it
-  still files. Funds that stopped filing appear in no other list. Files built before
-  2026-11-15 have no `famous` key.
+  still files, and `"search"`: the Google Trends score of the fund's search keyword (its manager or founder, or the
+  firm for venture firms; famous.csv `search`), Warren Buffett = 100, worldwide over the 12 months to `search_asof`; set on
+  one fund per keyword (the filer still filing with the biggest book) and on each of its rows, `null` on every
+  other row. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
+  Google Trends snapshot (`pipeline/orca/famous_search.csv`), `null` without one. Files built before 2026-11-15
+  have no `famous` key; before 2026-11-17 no `search` or `search_asof`.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`

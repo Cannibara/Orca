@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FAMOUS_CSV = Path(__file__).with_name("famous.csv")
+SEARCH_CSV = Path(__file__).with_name("famous_search.csv")
 
 # The styles, in the order the home page lists them (the web keeps the same order and adds a
 # line about each; a group it does not know goes last).
@@ -45,6 +46,12 @@ class Famous:
     match: str
     manager: str
     group: str
+    # What people search Google for to find this fund: its manager or founder, or the firm for
+    # venture firms (whose partners are searched for other things). Sovereign and pension funds
+    # have none: their names are searched by members, citizens and markets, not investors. Its Google
+    # Trends score (famous_search.csv) ranks the Most searched list; rows sharing a keyword
+    # (Sequoia's filers) share one place in it. "" = not ranked.
+    search: str = ""
 
 
 def load_famous(path: Path = FAMOUS_CSV) -> tuple[Famous, ...]:
@@ -62,5 +69,26 @@ def load_famous(path: Path = FAMOUS_CSV) -> tuple[Famous, ...]:
         if group not in FAMOUS_GROUPS:
             raise ValueError(f"famous.csv: CIK {fund_id} has unknown group {group!r}")
         seen.add((fund_id, group))
-        out.append(Famous(fund_id, match, r["manager"].strip(), group))
+        search = (r.get("search") or "").strip()
+        out.append(Famous(fund_id, match, r["manager"].strip(), group, search))
     return tuple(out)
+
+
+@dataclass(frozen=True, slots=True)
+class SearchScores:
+    """Google Trends search interest of the famous funds' keywords, Warren Buffett = 100, over the
+    12 months to `asof` (an ISO date), worldwide. A snapshot kept in famous_search.csv: Google has
+    no Trends API, so scripts/google_trends.py refreshes it by hand."""
+
+    asof: str | None
+    scores: dict[str, float]
+
+
+def load_search(path: Path = SEARCH_CSV) -> SearchScores:
+    """famous_search.csv as keyword -> score; empty when the file is missing."""
+    if not path.exists():
+        return SearchScores(None, {})
+    with open(path, newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    asof = max((r["asof"] for r in rows if r.get("asof")), default=None)
+    return SearchScores(asof, {r["keyword"]: float(r["score"]) for r in rows if r.get("score")})
