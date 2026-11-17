@@ -5,6 +5,15 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-17 — Famous funds: Most searched list
+
+| What changed | Why | Files |
+|---|---|---|
+| New first list, Most searched: the 50 famous funds whose Wikipedia pages (fund + manager) are read most, from monthly page views over the last 60 days, with a "Wiki views / mo" column. One fund per set of pages (Sequoia's 7 filers count once). Big companies are not ranked (their pages are read for the company); the Gates trust uses the foundation's page; Thrive uses only its firm page (Joshua Kushner's is read for his celebrity) | Owner: "the most searched funds" first, e.g. Situational Awareness. Google Trends has no API and blocks automated use; Wikipedia's page views are free and documented | `pipeline/orca/wiki.py`, `famous.csv` (`wiki`), `home.py` (`_searched`), `run/weekly.py`, `run/cli.py`, `web/src/pages/Home.tsx` |
+| 185 of 365 rows have pages: picked from name variants with a description check against namesakes, then fixed by hand for the best-known names | | `famous.csv` |
+| Preview on 2026-11-17 (60 days): Berkshire/Buffett 274k a month, Temasek 158k (steady daily, not a spike), Soros 156k, Citadel/Griffin 102k, Pershing/Ackman 63k, Scion/Burry 52k … Situational Awareness/Aschenbrenner 32k (#14 of 151) | | none |
+| Runs fetch the views (also `home_only`); if Wikipedia fails, the last good views (lake table `famous_views`) are used. The live list appears after the next pipeline run | | |
+
 ## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
 
 | What changed | Why | Files |
