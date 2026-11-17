@@ -116,3 +116,19 @@ def test_resolve_tries_the_alternates_after_the_own_ticker():
         {1: "EXMOC", 2: "ZKN", 3: "OLDC"}, held, u, {1: ["XOM"], 2: ["ZK"], 3: ["OLDCO"]}
     )
     assert out.rows() == [(1, "XOM", date(2026, 11, 13)), (2, "ZK", date(2025, 12, 19))]
+
+
+def test_resolve_refuses_a_ticker_reused_after_the_stock_was_held():
+    u = universe(
+        ("APC", date(1986, 9, 9), date(2019, 8, 8)),  # Anadarko
+        ("APC", date(2026, 2, 12), date(2026, 11, 13)),  # another company
+        ("WOLF", date(1993, 2, 9), date(2025, 9, 26)),
+        ("WOLF", date(2025, 9, 29), date(2026, 11, 13)),  # the same listing after 3 days
+    )
+    held = {
+        1: (date(2013, 1, 1), date(2026, 6, 30)),  # a filer still reports Anadarko in 2026
+        2: (date(2026, 4, 1), date(2026, 9, 30)),  # the new company, held only after its listing
+        3: (date(2013, 1, 1), date(2026, 9, 30)),
+    }
+    out = resolve({1: "APC", 2: "APC", 3: "WOLF"}, held, u)
+    assert out.rows() == [(2, "APC", date(2026, 11, 13)), (3, "WOLF", date(2026, 11, 13))]
