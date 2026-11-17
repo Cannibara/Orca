@@ -14,6 +14,7 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Decision (chat, later the same day): an index is needed at every tier, and the toggle compares a stock with its vertical, industry or sector index (Micron vs Memory, vs Semiconductors/SOXX, vs Technology). ETFs must be labelled at the tier they track (SOXX industry, DRAM vertical, XLK sector).
 - Decision (chat): committing the stock → node and ETF → node mapping to the public repo is fine (Damodaran's file is public). Committed in `pipeline/orca/hierarchy/data/`.
 - Reviewed (architecture review, 2026-11-17): share counts need a history (`shares_hist` from the SEC data the code already downloads), sells replay as a fraction of the position, nodes need a quarter-average and a quarter-end level, and scoring runs in the pipeline. Plan and open questions: `docs/superpowers/plans/2026-11-17-sector-indices.md`.
+- Decision (chat): conglomerates (`@nosector`) score against SPY; share counts get a history table (`shares_hist`).
 - Open: not built. Dividends and share counts live in the private lake, so the first real numbers come from a pipeline run.
 
 ## 2026-11-16 — How a fund's sector picks are scored (owner)

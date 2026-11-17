@@ -95,12 +95,14 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 5. Shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its node's whole index scores picking = 0.
 6. Contract change, publish step, then the web view, shown only when the file exists. Owner run 2 gives the first real numbers.
 
+## Decided after review (owner, 2026-11-17)
+- `@nosector` (conglomerates) picks score against SPY (total return, from its lake bars with dividends).
+- Share counts: build `shares_hist` as designed.
+
 ## Open owner decisions
 - Which ETFs count as "good" stand-ins. Proposal: cap-weighted, at least $500m in assets, tracking our node's definition, and passing the correlation test in phase 4.
 - Thin verticals: 188 of 244 have fewer than 10 stocks above $1bn. Widen to the industry (R4)?
-- How `@nosector` picks score. Proposal: against the market.
 - Fallback for unlabelled stocks. Proposal: SIC → industry "Other", tagged.
-- Share history as designed (`shares_hist`), or accept today's count with its known drift? The review recommends history.
 
 ## Risks
 - With no cap, Technology's top five are 58% of it, so a Technology picking score largely says whether a fund owned NVIDIA.
