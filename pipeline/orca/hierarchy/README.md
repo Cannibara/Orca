@@ -15,7 +15,12 @@ The starting point is Damodaran's 94 US industry groups. Each group has a defaul
 | File | What |
 |---|---|
 | `labels.txt` | The source of truth. Edit this, nothing else. |
-| `data/stock_nodes.csv`, `data/etf_nodes.csv` | The labels for what the top 100 funds held (5,111 securities, 462 ETFs), keyed by stock id with the ticker as a guard. `data/batches/` holds the model's inputs and answers, so `--missing` runs only ask about new names. |
+| `assign.py` | What the pipeline reads: each stock's label from `data/stock_nodes.csv` (a `how=placed` row follows a move in `labels.txt`; set `how=owner` to keep a manual edit), then the SIC table; each ETF's class, tier and label. Labels are read fresh each run. |
+| `data/stock_nodes.csv` | Stock → vertical, one row per stock_id (7,552 rows: the top 100 funds' holdings plus every stock the name match settles). Edit the `vertical` cell to move a stock. Orca reuses delisted tickers (stock 611 "AMT" is TD Ameritrade), so rows are keyed by id, and the ticker is only a guard. |
+| `data/etf_nodes.csv` | ETF → class, tier and hierarchy label (462 ETFs; a leveraged ETF counts as neutral). |
+| `data/sic_nodes.csv` | SIC code (4, 3 or 2 digits) → the vertical most of Damodaran's companies with that code have; the fallback for stocks the CSV does not cover. Built by `tools/build_sic_table.py`. |
+| `data/batches/` | The model's batch inputs and answers, keyed by stock id, so `--missing` runs only ask about new names. |
+| `tools/extend_labels.py`, `tools/relabel_check.py` | Add the stocks the name match settles to the CSV; show what an edit moves (stocks, hierarchy labels) against git HEAD before a run. |
 | `model.py` | `parse` and `load` check `labels.txt` and report every problem at once; `Hierarchy.label(ticker, group, name)` returns the main label, the extra labels and how the main label was found. Standard library only. |
 | `tools/fetch_inputs.sh` | Downloads the three public inputs below. |
 | `tools/build_hierarchy.py` | Labels every listed stock and writes the JSON the review page reads. Needs `openpyxl` (a dev dependency). |
