@@ -136,8 +136,14 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     )
 
 
+MAX_BRIDGED = 2  # unreadable filings in a row carried over before a fund's history is cut
+
+
 def fill_gaps(
-    holdings: pl.DataFrame, last_q: int, filed_quarters: pl.DataFrame | None = None
+    holdings: pl.DataFrame,
+    last_q: int,
+    filed_quarters: pl.DataFrame | None = None,
+    unreadable: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """(filled holdings, fund_status): carry a single missing quarter, split tracking at longer gaps.
 
@@ -151,14 +157,21 @@ def fill_gaps(
     `holdings`. Pass the chosen reports of select_reports (period as q) so that a filed report
     with no usable rows (a liquidated fund, all shares <= 0) counts as filed, not as a gap.
 
+    `unreadable` (cik, q) lists fund-quarters the fund did file but whose table could not be read
+    (pre-2013 text filings, `sec.legacy`). Between two readable quarters, up to MAX_BRIDGED of
+    them in a row are carried like a single gap (copied from the last readable quarter) instead
+    of ending the segment: the fund kept filing, so its history goes on.
+
     fund_status has one row per cik: first_q, last_filed_q, inactive (last_filed_q < last_q - 1,
     i.e. nothing filed in the latest two quarters) and segments, the (start, end) of each run of
     filed quarters, ends included, carried quarters inside.
     """
     filed = holdings if filed_quarters is None else filed_quarters
-    quarters = (
+    readable = (
         filed.select(pl.col("cik").cast(pl.Int64), pl.col("q").cast(pl.Int16)).unique().sort("cik", "q")
     )
+    bridged = _bridged(readable, unreadable)
+    quarters = pl.concat([readable, bridged]).unique().sort("cik", "q")
     # One unfiled quarter in a row is carried forward (not tunable); two or more end a segment.
     missing_before = pl.col("q") - pl.col("q").shift(1).over("cik") - 1  # null for a fund's first quarter
     starts_segment = missing_before.is_null() | (missing_before > 1)
@@ -179,14 +192,28 @@ def fill_gaps(
         .sort("cik")
     )
 
-    # Quarters to copy forward: (cik, source q, target q). A source without rows copies nothing.
+    # Quarters to copy forward: (cik, target q), each from the last readable quarter before it.
+    # A source without rows copies nothing.
     missing_after = pl.col("q").shift(-1).over("cik") - pl.col("q") - 1
-    interior = quarters.filter(missing_after == 1).select("cik", source_q="q", q=pl.col("q") + 1)
+    interior = quarters.filter(missing_after == 1).select("cik", q=pl.col("q") + 1)
     tail = status.filter(pl.col("last_filed_q") == last_q - 1).select(
-        "cik", source_q="last_filed_q", q=pl.lit(last_q, dtype=pl.Int16)
+        "cik", q=pl.lit(last_q, dtype=pl.Int16)
+    )
+    targets = pl.concat([interior, tail, bridged]).unique().sort("cik", "q")
+    sources = (
+        targets.join_asof(
+            readable.with_columns(source_q=pl.col("q")).sort("cik", "q"),
+            on="q",
+            by="cik",
+            strategy="backward",
+            allow_exact_matches=False,
+            check_sortedness=False,
+        )
+        .filter(pl.col("source_q").is_not_null())
+        .select("cik", "source_q", "q")
     )
     carried = (
-        holdings.join(pl.concat([interior, tail]), left_on=["cik", "q"], right_on=["cik", "source_q"])
+        holdings.join(sources, left_on=["cik", "q"], right_on=["cik", "source_q"])
         .drop("q")
         .rename({"q_right": "q"})
         .select(holdings.columns)
@@ -196,3 +223,26 @@ def fill_gaps(
     )
     filled = filled.select(*(pl.col(name).cast(dtype) for name, dtype in FILLED_SCHEMA.items()))
     return filled.sort("cik", "q", "cusip", "kind"), status
+
+
+def _bridged(readable: pl.DataFrame, unreadable: pl.DataFrame | None) -> pl.DataFrame:
+    """The unreadable fund-quarters that are carried: between two readable quarters of the fund,
+    in runs of at most MAX_BRIDGED."""
+    if unreadable is None or unreadable.is_empty():
+        return readable.clear()
+    span = readable.group_by("cik").agg(lo=pl.col("q").min(), hi=pl.col("q").max())
+    inside = (
+        unreadable.select(pl.col("cik").cast(pl.Int64), pl.col("q").cast(pl.Int16))
+        .unique()
+        .join(readable, on=["cik", "q"], how="anti")
+        .join(span, on="cik")
+        .filter((pl.col("q") > pl.col("lo")) & (pl.col("q") < pl.col("hi")))
+        .sort("cik", "q")
+    )
+    run = (pl.col("q") - pl.col("q").shift(1).over("cik") != 1).fill_null(True).cum_sum().over("cik")
+    return (
+        inside.with_columns(run=run)
+        .with_columns(length=pl.len().over("cik", "run"))
+        .filter(pl.col("length") <= MAX_BRIDGED)
+        .select("cik", "q")
+    )

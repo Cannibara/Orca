@@ -338,3 +338,25 @@ def test_a_failed_download_is_tried_once_more_by_the_next_backfill(tmp_path):
     checks = lake.read("legacy_checks", part="2013Q1")
     assert checks["status"].to_list() == ["ok"]
     assert lake.read("filings", part=f"q{q_index(2012, 4):03d}")["accession"].to_list() == [failing]
+
+
+def test_an_unreadable_filing_does_not_cut_the_funds_history(tmp_path):
+    asked: list = []
+    fetch = legacy_quarter(asked)
+
+    def two_unreadable(key, skip, stats):  # Q4 2012 and Q1 2013: filed, not readable
+        filings, raw, checks = fetch(key, skip, stats)
+        if key in ("2013Q1", "2013Q2"):
+            return filings.clear(), raw.clear(), checks.with_columns(status=pl.lit("mismatch"))
+        return filings, raw, checks
+
+    src = replace(sources([], []), legacy_quarter=two_unreadable)
+    lake = Lake(tmp_path / "lake")
+    run_backfill(lake, src, TODAY)
+    assert lake.read("filings", part=f"q{q_index(2012, 4):03d}").is_empty()
+    stats = run_weekly(lake, tmp_path / "out", src, TODAY)
+    summary = read_json(stats.staging / "fund" / str(FUND) / "summary.json")
+    # Two missing quarters in a row would start a new history in Q2 2013; filed but unreadable,
+    # they are carried from Q3 2012.
+    assert summary["tracked_since_q"] == -2
+    assert summary["quarters"]["q"] == [-2, -1, 0, 1, 2]

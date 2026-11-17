@@ -386,3 +386,14 @@ ABB LTD                      SPONSORED ADR    000375204    11225  596100 SH     
 """
     filing, rows, check = read_submission(submission(text), ENTRY)
     assert check["status"] == MISMATCH and rows == []
+
+
+def test_a_row_with_numbers_run_together_is_not_stored():
+    text = """
+APPLE INC         COM     037833100   1,000      10,000  SH
+AT&T WIRELESS     COM     00209A106   24528916596000 SH      DEFINED   01   16596000
+MICROSOFT CORP    COM     594918104     300       5,000  SH
+"""
+    _, rows, check = read_submission(submission(text), ENTRY)
+    assert [r["cusip"] for r in rows] == ["037833100", "594918104"]
+    assert check["invalid_rows"] == 1

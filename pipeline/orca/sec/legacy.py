@@ -102,6 +102,10 @@ DOLLARS_ABOVE = (
     1.0  # median value per share above this: the table is in dollars, not thousands
 )
 MIN_ROWS_FOR_UNITS = 3
+# A row worth more than this a share, or in all, was misread (numbers run together:
+# "24528916596000"). Berkshire's A share was under $200,000 before 2013.
+MAX_PRICE = 2e6  # dollars a share
+MAX_VALUE = 1e12  # dollars
 
 _DOCUMENT = re.compile(r"<DOCUMENT>(.*?)</DOCUMENT>", re.DOTALL | re.IGNORECASE)
 _TYPE = re.compile(r"<TYPE>[ \t]*([^\r\n<]+)", re.IGNORECASE)
@@ -536,6 +540,13 @@ def read_holdings(texts: list[str]) -> tuple[Table, str, float | None, int | Non
     return table, status, value, entries
 
 
+def _plausible(row: Row, unit: float) -> bool:
+    value = row.value * unit
+    if value > MAX_VALUE:
+        return False
+    return row.sh_type != "SH" or row.shares <= 0 or value / row.shares <= MAX_PRICE
+
+
 def unit_multiplier(rows: list[Row], filed: date) -> float:
     """Dollars per table unit: thousands as the form asks (until 2023, `value_to_usd`), unless
     the table's median value per share is above DOLLARS_ABOVE, i.e. over $1,000 a share in
@@ -638,6 +649,8 @@ def read_submission(
         "source": SOURCE,
     }
     unit = unit_multiplier(table.rows, entry.filed)
+    sane = [r for r in table.rows if _plausible(r, unit)]
+    check["invalid_rows"] += len(table.rows) - len(sane)
     rows = [
         {
             "accession": accession,
@@ -649,7 +662,7 @@ def read_submission(
             "put_call": r.put_call,
             "value_usd": r.value * unit,
         }
-        for r in table.rows
+        for r in sane
     ]
     return filing, rows, check
 
