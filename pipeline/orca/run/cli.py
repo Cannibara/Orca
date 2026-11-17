@@ -1,4 +1,4 @@
-"""Command line: `python -m orca.run weekly | rebuild | verify | workbook | demo`."""
+"""Command line: `python -m orca.run weekly | rebuild | home | sectors | verify | workbook | demo`."""
 
 import argparse
 import json
@@ -23,6 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("rebuild", help="recompute and republish every fund")
     commands.add_parser(
         "home", help="republish the home lists from the stored fund state (no fetch, no recompute)"
+    )
+    commands.add_parser(
+        "sectors", help="rebuild the sector indices and fund scores from the lake (after a relabel; no fetch)"
     )
     commands.add_parser(
         "check-keys", help="one test request to OpenFIGI, Tiingo and FRED with the keys set"
@@ -59,6 +62,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::error::{problem}")
         print(f"check-keys: {len(problems)} problem(s)")
         return 1 if problems else 0
+    if args.command == "sectors":
+        from orca.run.sectors_step import recompute
+
+        stats = recompute(Lake(config.LAKE_DIR))
+        print(f"sectors: {json.dumps(stats['sectors'], sort_keys=True)}")
+        print(f"skill: {json.dumps(stats['skill'], sort_keys=True)}")
+        return 0
     if args.command == "home":
         stats = run_home(Lake(config.LAKE_DIR), config.OUT_DIR, date.today())
         print(f"staging: {stats.staging}")

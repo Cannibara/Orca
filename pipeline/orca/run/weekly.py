@@ -49,13 +49,17 @@ from orca.run.publish_step import (
     prune_staging,
     publish_shared_files,
 )
+from orca.run.sectors_step import build_sector_returns, score_funds, update_share_history
 from orca.run.sources import Sources
 from orca.run.state import (
     CUSIP_MAP_SCHEMA,
+    FUND_FLOWS_RUN,
+    FUND_FLOWS_SCHEMA,
     FUND_STATE_RUN,
     FUND_STATE_SCHEMA,
     RAW_SCHEMA,
     REPORTS_SCHEMA,
+    SECURITIES_TABLE_SCHEMA,
     State,
     chunks,
     drop_parts,
@@ -179,6 +183,16 @@ def _stage(name: str, budget: Budget, work: Callable[[], dict | None]) -> None:
     _log_stage(name, started, work())
 
 
+def _guarded(name: str, flags: list, work: Callable[[], dict | None]) -> dict | None:
+    """A draft step (sector indices, scores; lake only): a failure is flagged and never stops the run."""
+    try:
+        return work()
+    except Exception as err:  # noqa: BLE001 - a draft feature must not cost the month's run
+        log.exception("%s: failed", name)
+        flags.append({"type": f"{name}_failed", "error": type(err).__name__})
+        return None
+
+
 def _log_stage(name: str, started: float, counts: dict | None) -> None:
     """One INFO line per stage: its time and counts (numbers, never a URL)."""
     shown = "".join(f" {key}={value}" for key, value in (counts or {}).items())
@@ -209,6 +223,7 @@ def _publish_funds(
     once the time budget is spent."""
     lake = ctx.lake
     drop_parts(lake, FUND_STATE_RUN)
+    drop_parts(lake, FUND_FLOWS_RUN)
     done = _Funds()
     for number, batch in enumerate(chunks(sorted(ciks), FUND_BATCH)):
         if number and budget.spent():
@@ -223,8 +238,9 @@ def _publish_funds(
         reports = scan(lake, "reports", REPORTS_SCHEMA, where)
         if reports.height:
             done.with_reports |= set(reports["cik"].to_list())
-            rows = _publish_batch(ctx, holdings, reports, staging, compress, done)
+            rows, flows = _publish_batch(ctx, holdings, reports, staging, compress, done)
             lake.write(FUND_STATE_RUN, rows, part=f"b{number:05d}")
+            lake.write(FUND_FLOWS_RUN, flows, part=f"b{number:05d}")
     return done
 
 
@@ -235,16 +251,17 @@ def _publish_batch(
     staging: Path,
     compress: bool,
     done: _Funds,
-) -> pl.DataFrame:
-    """One batch of `_publish_funds`; its fund state rows."""
-    rows = []
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """One batch of `_publish_funds`; its fund state rows and its funds' trades (`fund_flows`)."""
+    rows, flows = [], []
     for result in compute_batch(ctx, holdings, reports):
         meta = result.output.meta
         done.files.update(publish_fund(staging, result.output, compress))
         done.flags += result.flags
         done.metas[meta.fund_id], done.snaps[meta.fund_id] = meta, result.snapshot
         rows.append((meta.fund_id, dump(meta), dump(result.snapshot)))
-    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row")
+        flows += [(meta.fund_id, p.stock_id, t.q, t.delta, t.px, t.shares_after) for p in result.output.positions for t in p.trades]
+    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row")
 
 
 def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
@@ -255,6 +272,11 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     fresh = scan(lake, FUND_STATE_RUN, FUND_STATE_SCHEMA)
     lake.write("fund_state", pl.concat([stored, fresh]).sort("cik"))
     drop_parts(lake, FUND_STATE_RUN)
+    # The same for each fund's trades, which the sector scores replay (`run/sectors_step.score_funds`).
+    stored = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
+    stored = stored.clear() if clear else stored.filter(~pl.col("cik").is_in(sorted(replaced)))
+    lake.write("fund_flows", pl.concat([stored, scan(lake, FUND_FLOWS_RUN, FUND_FLOWS_SCHEMA)]).sort("cik", "stock_id", "q"))
+    drop_parts(lake, FUND_FLOWS_RUN)
 
 
 _WEEKLY_PATH = re.compile(r"^stock/(\d+)/weekly\.json$")
@@ -332,12 +354,21 @@ def run_weekly(
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))
     _stage("live", budget, lambda: ingest_live(lake, sources, state, today, flags, counts))
     _stage("securities", budget, securities)
+    if sources.shares_history is not None:
+        _stage(
+            "shares",
+            budget,
+            lambda: update_share_history(
+                lake, sources.shares_history, read_table(lake, "securities", SECURITIES_TABLE_SCHEMA), flags, budget, today
+            ),
+        )
     _stage(
         "prices",
         budget,
         lambda: refresh_prices(lake, sources, state, today, last_q, run_id, flags, budget),
     )
     _stage("rf", budget, lambda: update_rf(lake, sources, state, last_q, full, flags))
+    _stage("sectors", budget, lambda: _guarded("sectors", flags, lambda: build_sector_returns(lake, last_q, flags)))
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
         flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
@@ -445,6 +476,7 @@ def run_weekly(
 
     # Recomputed funds replaced, dropped ones gone.
     _merge_fund_state(lake, funds.attempted, clear=rebuild)
+    _stage("skill", budget, lambda: _guarded("skill", flags, lambda: score_funds(lake, last_q, flags)))
     write_json_atomic(published_path(lake), merged)
     state.pending_funds = remaining  # what the price and filing changes still owe
     state.pending_stocks.clear()

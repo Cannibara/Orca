@@ -19,7 +19,7 @@ Reads with: `docs/ROADMAP.md` (F1–F5, risks) and `docs/DECISIONS.md`.
 | 4 | Excel workbook formatting | S–M | low until sold | `pipeline/orca/workbook/`, isolated |
 | 5 | Fund types: super, sovereign wealth, corporates | M | high | 13F has no type field. SIC code of the filer + name rules + a hand-checked list of the top ~300; new field in `funds.json`; home filters |
 | 6 | Sector rotation charts | M | high | Quarterly 13F flows by sector first; price momentum needs the weekly price job (ROADMAP S6) |
-| 7 | Sector allocator vs stock picker; funds by sub-sector | L | highest | Brinson-style split (ROADMAP F5). Needs: sector map, one benchmark table, survivorship fix, faster rebuilds. Rank on a shrunk score with error bars (13,000 funds, top of a raw ranking is mostly luck) |
+| 7 | Sector allocator vs stock picker; funds by sub-sector | L | highest | Brinson-style split (ROADMAP F5). Needs: sector map (draft built 2026-11-16, `pipeline/orca/hierarchy/`), one benchmark table, survivorship fix, faster rebuilds. Rank on a shrunk score with error bars (13,000 funds, top of a raw ranking is mostly luck) |
 | 8a | Insider buys and sells (Form 4) | M | high | SEC quarterly data sets, free, same SEC client |
 | 8b | Congress trades | L | medium | No clean free source (House PDFs, Senate web form). Pick a licensed source first |
 | 9 | Other public data | S–M each | medium | 13D/13G (5%+ stakes), N-PORT (fund and ETF holdings), Form D, XBRL fundamentals: all SEC. FRED macro is cheap but low value. Commodities do not fit |

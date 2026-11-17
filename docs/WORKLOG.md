@@ -1,6 +1,6 @@
 # Worklog
 
-Last verified: 2026-11-16
+Last verified: 2026-11-18
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
@@ -24,6 +24,44 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | A first version ranked by Wikipedia page views (fetched each run); replaced before merge at the owner's request | | PR #39 |
 | Cross-checked against `docs/famous-funds.txt` (PR #37, CIKs matched to live funds.json): 61 of its 68 CIKs are the same as famous.csv's; the other 7 are added (Slate Path → Tiger cubs; Samlyn, Alpha Wave, Encompass, Woodson, Sylebra's older filer → Fundamental long/short; GMO → Value). The Famous funds tab covers that file's Popular funds idea | Validation from live data this session cannot reach | `famous.csv` |
 
+## 2026-11-17 — Fund scores built (plan phase 5), waiting on the owner's run
+
+| What changed | Why | Files |
+|---|---|---|
+| `engine/skill.py`: every score is one replay of a fund's real trades through a series (buys = same dollars at the quarter's average level, sells = same fraction of units, the rest valued at the last quarter end). The fund side replays each stock through its own total-return series, so fund and index both include dividends. Picking = IRR(fund) − IRR(own labels' indices); allocation = IRR(own labels) − IRR(market); per tier 1–3. A single-sector ETF is a pick at its own tier; conglomerates are compared with SPY; neutral ETFs and unlabelled stocks only count in coverage. IRR = the web's bisection, solved for all funds at once in polars | Plan §7 | `orca/engine/skill.py` |
+| `etf_ranks`: each single-sector ETF position's label ranked by IRR against every other label at its tier (the owner's "did Semiconductors beat the other industries") | Owner, 2026-11-17 | same |
+| The fund compute keeps each fund's trades (`fund_flows`, merged like `fund_state`); a `skill` stage scores all funds after the merge; `orca.run sectors` (Actions input `sectors_only`) rebuilds indices and scores from the lake for a relabel, with no fetch and no fund compute | Relabelling must be cheap | `run/weekly.py`, `run/sectors_step.py`, `run/cli.py`, `pipeline.yml` |
+| Both steps apply the ticker guard: a CSV row (stock or ETF) whose ticker no longer matches the lake's is not trusted and the stock falls back to its SIC code | Ids are a local counter; the test lake's ids are not production's | `run/sectors_step.stock_paths` |
+| Not done: KS-PME (no IRR when a position is too short or no root in [−0.99, 10]); per-position ranks for stocks (ETFs only: 71 replays per position for every stock is too slow); the contract, publish step and web view (phase 6) | | |
+
+## 2026-11-17 — Sector indices built (plan phases 1–3), waiting on the owner's run
+
+| What changed | Why | Files |
+|---|---|---|
+| Phase 1: the pipeline reads each stock's hierarchy label from `data/stock_nodes.csv` (`how=owner` wins; rows placed by name follow `labels.txt`), then a SIC fallback table (870 codes and prefixes, built from Damodaran's SIC codes). ETFs give a tier and a label, or neutral (leveraged ETFs too). The name match over all 41,407 securities added 2,441 stocks (7,552 rows). `relabel_check.py` shows what an edit moves | One CSV to edit; relabel = edit + re-run | `pipeline/orca/hierarchy/assign.py`, `data/`, `tools/` |
+| `labels.txt` overrides only rows placed by name: Orca keeps delisted tickers, so 12 rows share a ticker with a placed company but are another company (stock 611 "AMT" is TD Ameritrade, 14232 "APH" is Aphria) | A ticker-wide override would have mislabelled them | `assign.py` |
+| ETF review: 96 of 98 single-sector ETFs at the right tier; FAS and SOXL are leveraged, so neutral (R12) | Phase 1 | `assign.read_etf_labels` |
+| Phase 2: lake table `shares_hist` (every cover-page count, one SEC call per company, missing first, at most 19,000 calls a run, refreshed after 100 days) and `data/share_overrides.csv` (ordinary shares per ADR for 26 big ADRs, from memory: check in phase 4) | Today's single count misweights the past | `orca/shares_hist.py`, `run/sectors_step.py`, `run/sources.py`, `securities.fetch_shares_history` |
+| Phase 3: `engine/sectors.py` builds every hierarchy label's index (cap weights at the quarter's start, dividends, a quarter-end and a quarter-average level, stale-price and delisting rules, one count per company). The run builds `sector_returns` in the lake after the price stages; a failure is flagged and never stops the run. Nothing is published | Indices first, scores next (phase 5) | `engine/sectors.py`, `run/weekly.py` |
+| Not done: no demo output; `shares_hist` is not in the lake backups (it rebuilds in ~40 min); the ADR ratios are unchecked | | |
+
+## 2026-11-17 — Sector indices: plan reviewed, labels committed, handoff written
+
+| What changed | Why | Files |
+|---|---|---|
+| Labels committed: 5,111 labelled securities (stock → vertical) and 462 classed ETFs (class, level, hierarchy label), plus the model batch inputs and answers keyed by stock id | Owner approved committing (Damodaran's file is public); the scratchpad copies were the only ones and are ephemeral | `pipeline/orca/hierarchy/data/` |
+| Plan reviewed by an architecture review and a code check, then rewritten: share-count history (`shares_hist`), sells replayed as a fraction, quarter-average and quarter-end levels, stale-price rule, SIC fallback for unlabelled stocks, scoring in the pipeline, six phases | Today's single `shares_out` × past price misweights (Apple's count fell ~40% since 2013); matching sell dollars can drive a shadow negative | `docs/superpowers/plans/2026-11-17-sector-indices.md` |
+| Owner: indices at all three tiers with a toggle; ETFs labelled at the tier they track | Chat | `docs/DECISIONS.md` |
+| Not done: no code. Next: a fresh chat runs phases 1–3 from the plan's paste-ready prompt | | |
+
+## 2026-11-17 — Sector return series: decisions recorded, nothing built
+
+| What changed | Why | Files |
+|---|---|---|
+| Decisions recorded: market-cap weighted with no cap (R5), total return with dividends from the start, an existing cap-weighted ETF as a hierarchy label's index where a good one exists, our own index for the 12 broad sectors, for hierarchy labels with no ETF and for back-filling short ETF histories, industry level (tier 2) as the scoring level with sector and vertical toggles | Owner's answers in chat | `docs/DECISIONS.md`, `docs/ROADMAP.md` (S4), `make_review_page.py` (R5) |
+| Analysis (read-only): existing ETFs give 31 of our 327 hierarchy labels (11 of 12 sectors, 8 of 71 industries, 12 of 244 verticals) an ETF of their own, counting only ETFs the 100 funds held; about 25% of our Technology value sits in names XLK does not hold; the funds' buying that predates an ETF is 62% for memory (DRAM, Apr 2026), 22% for airlines, 9% for cybersecurity; the engine's `quarter_px` already gives quarterly closes and dividends per share | Sizes the build and shows where ETFs stand in and where our own index is needed | none |
+| Not done: no index code, no table, no contract change. The first real numbers need a pipeline run because dividends and share counts are in the private lake | | |
+
 ## 2026-11-16 — Popular funds: draft list of 68 names
 
 | What changed | Why | Files |
@@ -31,6 +69,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Draft list of 68 well-known funds, grouped by lineage (Buffett/Graham, Tiger Cubs, macro, activists, quant, other), each matched to a live CIK, book and position count, and flagged if in a top-25 list | Owner asked for a list of famous funds for backlog item 2b, from Wikipedia and press lineage articles (chat) | `docs/superpowers/specs/2026-11-14-popular-funds-draft.md`, `docs/famous-funds.txt` (names, CIK and link only) |
 
 - Not approved: the owner picks names and whether the tab groups by lineage. Only 3 of 68 (Coatue, Slate Path, Appaloosa) are in a top-25 list. Seed Stapleton and Sequoia lineages were not found by search. Nothing built; the contract (`home/popular.json`) comes next.
+
 ## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
 
 | What changed | Why | Files |
@@ -63,6 +102,41 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
 | Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
 
+## 2026-11-16 — ETF mapping restored, fund 66 dropped, data refreshed to quarter 54, rules decided
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner's answers recorded as decided rules: R9 (industry level by default, toggle to sector or vertical), R12 (a single-sector ETF counts as a bet on its hierarchy label, every other ETF has no sector), R13 (the sector score is the IRR of each call replayed through every other sector). Accepted: 13F is quarterly with a 45-day lag, so trades inside a quarter are invisible. Licensing can wait until something is commercial | Chat, 2026-11-16, after a diagram page ("Scoring Sector Picks", private artifact) explained the ETF mapping and the dividend catch | `make_review_page.py`, `docs/DECISIONS.md` |
+| ETF classification restored (it was removed in bf901e0 on a misreading) and applied to the new list: a model classed the 462 biggest ETFs; 98 are single-sector ($17bn bought, 0.8% of all dollars), 364 get no sector | The owner: a fund's ETF buy is a sector pick, so ETF-heavy funds stay in | `tools/etf_batches.py`, `tools/etf_prompt.md` |
+| International Assets Investment Management (rank 66) excluded with `top_funds_universe.py --exclude 1818604` | Owner: drop it ($718bn bought on a $1.7bn book, desk flow) | `tools/top_funds_universe.py` |
+| The monthly run published new data while we worked (latest quarter 53 → 54; 41,407 securities; 328 garbled tickers fixed, e.g. EXMOC → XOM), so everything was re-downloaded and 15 of the 100 funds changed. 7,025 securities; 437 were new: a model labelled 226 stocks (batch 12) and 81 ETFs (ETF batch 3). Earlier answers were reused by stock id (`make_batches.py --missing`, `etf_batches.py make --missing`) | One snapshot must be one vintage; answers keyed by stock id stay valid | `tools/make_batches.py`, `tools/etf_batches.py` |
+| Result: 5,111 stocks labelled, 95% of the $2.1tn bought. ETFs 4.6%, funds, SPACs and unidentified lines 0.1%. Blind audit of 880 default-labelled stocks: the model agrees with the group default on 73% of verticals (97% with labels placed by name); it replaced 234 defaults. 1,034 small defaults (0.8% of dollars) unchecked | The numbers the owner reviews on the page (v11) | `pipeline/orca/hierarchy/README.md` |
+| Check for sector indices: the 30 biggest funds outside the top 100 (Vanguard, BlackRock, State Street, FMR) hold 93.9% labelled stocks, 5.7% ETFs and 0.4% stocks we have not labelled, by value | Answers whether every stock needs a tag before a sector index can be built: a size-weighted index is already about 99.6% covered | README |
+| Not done: no sector return table (ROADMAP S4) exists yet. Next: prototype the 12 sector indices from our labels and compare them with the Select Sector ETFs (XLK, XLF and the rest) | The test of whether hierarchy-built indices track real sector ETFs | `docs/ROADMAP.md` |
+
+## 2026-11-16 — The stocks the 100 best funds ever held, found and labelled
+
+| What changed | Why | Files |
+|---|---|---|
+| The 100 best funds by return since start (`home/top_max.json`) ever held 7,702 securities. 5,361 are labelled (92% of the $2.2tn they bought); 1,815 ETFs and 526 funds, SPACs and unidentifiable lines are not | The owner asked for every stock the top 100 funds ever owned, classified in the hierarchy (chat). Period chosen by me: since start, the one window that covers "ever"; 1y, 3y, 5y and 10y give different funds (any two of the five top-100 lists share only 21 to 58 funds) | `pipeline/orca/hierarchy/tools/top_funds_universe.py` |
+| `matching.py`: matches Orca's names (Bloomberg style, cut at 28 characters, garbled tickers such as EXMOC, 8QR) to Damodaran's global 48,000-company file by distinctive words. 3,433 stocks matched strongly to a US listing, 741 partly or to a foreign line, 1,359 not at all | The 4,014-stock US list reached only 9% of Orca's 41,113 securities. His global file also covers ADRs (Nestlé, Novo, Toyota), so names carry the match, not tickers | `pipeline/orca/hierarchy/matching.py`, `tools/label_securities.py` |
+| A model (11 Claude agents, 295 stocks each, about 200,000 tokens each) gave a first-pass vertical to what the match could not settle, confirmed or rejected the partial matches, and labelled 840 default-labelled stocks blind as an audit | Stocks outside Damodaran's list (delisted, ADRs, new) have no group. SIC codes need a company id Orca does not hold and are too coarse for verticals | `tools/make_batches.py`, `tools/model_prompt.md`, `tools/merge_batches.py` |
+| Audit result: the model agrees with labels placed by name 97% of the time but with Damodaran's group default on only 73% of verticals (94% of sectors). A model that knows the company now replaces a default (224 stocks) | Group defaults are the weakest part of the hierarchy. 1,282 small default-labelled stocks (under 1% of the dollars) are still unchecked | `merge_batches.py` |
+| Review page: top-fund columns (dollars bought, funds), sort by them, dotted orange for a model's label, "group default was ...", a Not labelled tab, rule R8 (changed) | The owner reviews in the artifact; the new stocks and sources must be visible | `tools/make_review_page.py`, `tools/review_page.html` |
+| 15 more tests (name matching, merge, universe, page data). Data outputs are not committed: the repo is public and Damodaran's file has no licence (R10) | A public repo would publish his derived labels | `pipeline/tests/test_hierarchy_{matching,merge,universe,page}.py` |
+| Not done: 1,815 ETFs (7.6% of dollars) have no hierarchy label. The owner says an ETF buy is a sector pick and the ETF-heavy funds stay in the list: 66 of the 100 funds have held an ETF, 12 hold half or more of their current book in ETFs, 4 hold 90% or more (e.g. PPSC Investment Service Corp, rank 15 since start). A model classed the biggest 400 ETFs once (90 single-sector, $29bn bought, commit 1fecf4b) and it was removed in bf901e0 on a misunderstanding. One top-100 fund, International Assets Investment Management (rank 66, $1.7bn book), shows $718bn bought and 4,122 stocks ever, and $458bn of Berkshire A alone; it looks like trading-desk flow, not picks, and may not belong in a top list. `positions.json` covers a fund's current tracking segment only | Listed so the next session does not rediscover them | `pipeline/orca/hierarchy/README.md` |
+
+## 2026-11-16 — Sector hierarchy source committed (`pipeline/orca/hierarchy/`)
+
+| What changed | Why | Files |
+|---|---|---|
+| New `labels.txt`: a three-level hierarchy (12 sectors, 71 industries, 244 industry verticals). 1,292 stocks placed by name, 11 name rules, a default for each of Damodaran's 94 industry groups, extra labels for multi-business companies (Alphabet 5, Amazon 3, CVS 3, Vistra 2), one umbrella (Automotive) | The owner wants funds scored as sector allocators vs stock pickers (ROADMAP F5, D7), and SIC and GICS are too coarse or licensed (Micron, Nvidia and AMD are all SIC 3674). Built and reviewed in a private Claude artifact over 2026-11-15/16 (chat); committed so it is not lost with the session | `pipeline/orca/hierarchy/labels.txt` |
+| `model.py`: parser and labeller (standard library only), reports every problem in `labels.txt` at once | The file is the source of truth, so CI should reject a bad edit | `pipeline/orca/hierarchy/model.py`, `__init__.py` |
+| `tools/`: fetch the three public inputs, label the 4,014 listed stocks, build the review page. Rebuilding gives byte-for-byte the data the owner reviewed | The review page is how the owner edits the hierarchy; the tools make it reproducible | `pipeline/orca/hierarchy/tools/` |
+| 20 tests: every Damodaran group has a default, no unused vertical, the owner's examples hold (Micron, Vistra, Alphabet, Palantir, Leidos, CVS, Tesla, Berkshire) | Decisions made in chat should fail a test if a later edit breaks them | `pipeline/tests/test_hierarchy.py` |
+| DECISIONS entry; ROADMAP D7 and S4 and F5 point at the hierarchy; backlog item 7; ARCHITECTURE module table; CLAUDE.md read-X table and repo map | The change made the old D7 text stale ("SIC → sub-sector → ETF table") | `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md`, `CLAUDE.md` |
+| Not done: nothing reads the hierarchy yet. No `stock_id` mapping, no `pipeline/contract.md` change, no benchmark table. Rules R2–R10 on the review page are recommendations the owner has not confirmed. 188 of 244 verticals have under 10 stocks above $1bn, and 2,620 stocks carry only their Damodaran group default | Listed so the next session starts from the open items, not from the chat | `pipeline/orca/hierarchy/README.md` |
+
 ## 2026-11-15 — Famous funds: Moat investing, Family offices, Sovereign & pension funds, stopped filers
 
 | What changed | Why | Files |
@@ -91,6 +165,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | List researched by a subagent with web search (Wikipedia, Dataroma-style superinvestor lists, EDGAR 13F-HR links): 10 Tiger cubs + Tiger Management, 5 grand-cubs, 22 tech & growth, 39 value, 11 activist, 5 macro, 7 quant/multi-strategy, 6 other. Left out as unconfirmed: Valinor, Joho, Sequoia, Lux, Stripes, Long Pond. sec.gov and data.orcaetf.com were blocked from the session, so no CIK was checked against our own data | | |
 | Open: until the next pipeline run, production files have no `famous` key and the tab says the list arrives with the next data update. After it, check the tab for missing names (a CIK whose filer stopped or changed, e.g. Fundsmith 1569205 vs 1868537, Elliott, Hound, ICONIQ) | | |
 | Checked: pipeline tests, web typecheck and unit tests (3 new tests each side), screenshots at 1280 and 400 px on demo data | | |
+
 ## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
 
 | What changed | Why | Files |

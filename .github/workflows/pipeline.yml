@@ -48,6 +48,10 @@ on:
         description: Home lists only (republish them from the stored funds; no fetch, no recompute)
         type: boolean
         default: false
+      sectors_only:
+        description: Sector indices and fund scores only (after a relabel; no fetch, nothing published)
+        type: boolean
+        default: false
 
 # One run at a time, and a run in progress is never cancelled: it reads the lake from R2 and writes
 # it back, so two at once would lose work.
@@ -119,7 +123,7 @@ jobs:
       - name: Run the pipeline
         timeout-minutes: 300
         env:
-          ORCA_COMMAND: ${{ inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly') }}
+          ORCA_COMMAND: ${{ inputs.sectors_only && 'sectors' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly')) }}
           ORCA_TIME_BUDGET_MIN: ${{ vars.ORCA_TIME_BUDGET_MIN || '270' }}
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
