@@ -39,6 +39,7 @@ class EtfLabel:
     cls: str  # sector, or a neutral class (broad, intl, bond, ...)
     tier: str  # sector | industry | vertical for a sector ETF, else ""
     path: str  # the hierarchy label it tracks, at that tier, else ""
+    ticker: str = ""  # a guard, like the stock CSV's: Orca's ids are a local counter
 
 
 def resolve(rows: Iterable[dict], h: Hierarchy) -> dict[int, StockLabel]:
@@ -135,13 +136,13 @@ def read_etf_labels(f: IO[str], h: Hierarchy) -> tuple[dict[int, EtfLabel], list
     for r in csv.DictReader(f):
         sid = int(r["stock_id"])
         if r["class"] != "sector" or r["leverage"]:  # a 3x fund is not a bet on the sector's return (R12)
-            out[sid] = EtfLabel(r["class"] if r["class"] != "sector" else "leveraged", "", "")
+            out[sid] = EtfLabel(r["class"] if r["class"] != "sector" else "leveraged", "", "", r["ticker"])
             continue
         tier, path = r["level"], r["node"]
         if tier not in TIERS or path not in paths or len(path.split(SEP)) != TIERS.index(tier) + 1:
             problems.append(f"{sid} {r['ticker']}: no hierarchy label {path!r} at tier {tier}")
             continue
-        out[sid] = EtfLabel("sector", tier, path)
+        out[sid] = EtfLabel("sector", tier, path, r["ticker"])
     return out, problems
 
 

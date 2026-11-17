@@ -1,6 +1,6 @@
 # Sector indices and the allocator vs picker score: full plan and handoff
 
-Status: phases 1–3 built on 2026-11-17 (`hierarchy/assign.py`, `shares_hist.py`, `engine/sectors.py`, `run/sectors_step.py`); phase 4 waits on the owner's Actions run. Work continues on branch `claude/gifted-cannon-e5ihyh`, which is not merged to `main`. The decision log is in `docs/DECISIONS.md` (entries dated 2026-11-16 and 2026-11-17).
+Status: phases 1–3 and 5 built on 2026-11-17 (`hierarchy/assign.py`, `shares_hist.py`, `engine/sectors.py`, `engine/skill.py`, `run/sectors_step.py`); phase 4 (the owner's Actions run) checks them on real data; phase 6 (publish, web) waits on it. Work continues on branch `claude/gifted-cannon-e5ihyh`, which is not merged to `main`. The decision log is in `docs/DECISIONS.md` (entries dated 2026-11-16 and 2026-11-17).
 
 ## 1. Terms
 - Hierarchy label: any one sector, industry or industry vertical: 12 + 71 + 244 = 327 in all. The owner also calls a vertical a "sub-industry". In the code it is `Node` (`pipeline/orca/hierarchy/model.py`).
@@ -152,6 +152,10 @@ web: shows the numbers; tier toggle sector | industry | vertical; thin-vertical 
 - `labels.txt` overrides only rows with `how=placed`, because Orca reuses delisted tickers. To move any other stock, edit the CSV.
 - The index build runs as a stage of the monthly run (`sectors`, after `rf`) and writes only the lake. The `orca.run sectors` recompute mode comes with phase 5.
 - Leveraged sector ETFs are neutral.
+- Phase 5: the fund side replays each stock through its own total-return series (dividends reinvested), so it differs slightly from the site's live IRR, which runs to today's price and leaves dividends out.
+- Per-position label ranks are for single-sector ETF positions only (`etf_ranks`); stock positions would need 71 replays each.
+- KS-PME is not built yet; a score is null where the IRR has no root in [−0.99, 10] (e.g. a position bought in the last quarter).
+- The recompute mode runs both steps from the lake; the indices also rebuild in each monthly run (`sectors` stage), and the scores after the fund-state merge (`skill` stage).
 
 ## 10. Defaults chosen (the owner can override)
 - Unlabelled stocks: a SIC → industry "Other" vertical, tagged `sic`.

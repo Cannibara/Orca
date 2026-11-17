@@ -143,6 +143,10 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `rf` | year i32, rate f64 (decimal) |
 | `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history` |
 | `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; draft, not published) |
+| `stock_quarters` | stock_id, q, close, div, vwap (split-adjusted; stocks and ETFs), written with `sector_returns` |
+| `fund_flows`, `fund_flows_run/bNNNNN` | cik, stock_id, q, delta, px, shares_after: each fund's trades over its tracking segment, merged like `fund_state` |
+| `fund_skill` | cik, tier (1–3), irr_fund, irr_label, irr_mkt, picking, allocation, coverage, n (`engine/skill.py`; draft, not published) |
+| `etf_ranks` | cik, stock_id, label, irr, rank, of, best, best_irr: each single-sector ETF position's label ranked by IRR against every label at its tier |
 | `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`), `published.json` |
 

@@ -83,8 +83,8 @@ def test_etf_rows_give_a_tier_and_a_label_path_or_neutral():
     h = parse(TEXT)
     text = "stock_id,ticker,class,level,node,leverage,conf\n7,SOXX,sector,industry,Tech > Chips,,3\n8,SPY,broad,,,,3\n9,BAD,sector,industry,Nope > X,,3\n"
     etfs, problems = assign.read_etf_labels(io.StringIO(text), h)
-    assert etfs[7] == assign.EtfLabel("sector", "industry", "Tech > Chips")
-    assert etfs[8] == assign.EtfLabel("broad", "", "")
+    assert etfs[7] == assign.EtfLabel("sector", "industry", "Tech > Chips", "SOXX")
+    assert etfs[8] == assign.EtfLabel("broad", "", "", "SPY")
     assert 9 not in etfs and problems == ["9 BAD: no hierarchy label 'Nope > X' at tier industry"]
 
 
@@ -118,7 +118,7 @@ def test_the_sic_table_takes_the_most_common_vertical_per_code_and_prefix():
 def test_a_leveraged_sector_etf_is_neutral():
     text = "stock_id,ticker,class,level,node,leverage,conf\n2905,SOXL,sector,industry,Tech > Chips,3x,3\n"
     etfs, problems = assign.read_etf_labels(io.StringIO(text), parse(TEXT))
-    assert etfs[2905] == assign.EtfLabel("leveraged", "", "") and problems == []
+    assert etfs[2905] == assign.EtfLabel("leveraged", "", "", "SOXL") and problems == []
 
 
 def test_moves_lists_each_relabelled_stock_and_the_hierarchy_labels_it_touches():

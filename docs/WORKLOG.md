@@ -5,6 +5,16 @@ Last verified: 2026-11-17
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-17 — Fund scores built (plan phase 5), waiting on the owner's run
+
+| What changed | Why | Files |
+|---|---|---|
+| `engine/skill.py`: every score is one replay of a fund's real trades through a series (buys = same dollars at the quarter's average level, sells = same fraction of units, the rest valued at the last quarter end). The fund side replays each stock through its own total-return series, so fund and index both include dividends. Picking = IRR(fund) − IRR(own labels' indices); allocation = IRR(own labels) − IRR(market); per tier 1–3. A single-sector ETF is a pick at its own tier; conglomerates are compared with SPY; neutral ETFs and unlabelled stocks only count in coverage. IRR = the web's bisection, solved for all funds at once in polars | Plan §7 | `orca/engine/skill.py` |
+| `etf_ranks`: each single-sector ETF position's label ranked by IRR against every other label at its tier (the owner's "did Semiconductors beat the other industries") | Owner, 2026-11-17 | same |
+| The fund compute keeps each fund's trades (`fund_flows`, merged like `fund_state`); a `skill` stage scores all funds after the merge; `orca.run sectors` (Actions input `sectors_only`) rebuilds indices and scores from the lake for a relabel, with no fetch and no fund compute | Relabelling must be cheap | `run/weekly.py`, `run/sectors_step.py`, `run/cli.py`, `pipeline.yml` |
+| Both steps apply the ticker guard: a CSV row (stock or ETF) whose ticker no longer matches the lake's is not trusted and the stock falls back to its SIC code | Ids are a local counter; the test lake's ids are not production's | `run/sectors_step.stock_paths` |
+| Not done: KS-PME (no IRR when a position is too short or no root in [−0.99, 10]); per-position ranks for stocks (ETFs only: 71 replays per position for every stock is too slow); the contract, publish step and web view (phase 6) | | |
+
 ## 2026-11-17 — Sector indices built (plan phases 1–3), waiting on the owner's run
 
 | What changed | Why | Files |

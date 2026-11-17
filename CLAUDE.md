@@ -59,6 +59,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Web e2e | `cd web && npx playwright test` (cloud sessions: prefix `PW_CHROMIUM=/opt/pw-browsers/chromium`) |
 | Pipeline install / tests | `cd pipeline && uv sync --locked && uv run pytest -m "not network"` |
 | Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`); locally `uv run python -m orca.run {weekly\|rebuild\|home\|check-keys\|verify}` (needs the API key env vars) |
+| Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only, nothing published). Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |
