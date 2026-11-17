@@ -321,9 +321,13 @@ def _cusip(line: str, mode: str) -> tuple[str, int, int] | None:
     codes (three digits first) take their computed check digit; in mode PADDED, a 7- or
     8-digit code gets back the leading zeros a filer dropped (9269101 is 009269101), if its check
     digit then holds."""
+    if mode in (EIGHT, PADDED) and _cusip(line, NINE):
+        return None  # a line with a real CUSIP has no other code ("132200 SH" is a share count)
     if mode == EIGHT:
         for m in _CUSIP8.finditer(line):
             code = m[1] + m[3]
+            if m[2] or code[6:].isalpha():  # "132200 SH": a count and its share type, not a code
+                continue
             return code + str(check_digit(code)), m.start(), m.end()
         return None
     if mode == PADDED:
@@ -483,8 +487,13 @@ def _within(parsed: float, declared: float, tolerance: float) -> bool:
     )
 
 
-def check_table(table: Table, value: float | None, entries: int | None) -> str:
-    """The check status of a read table against the declared totals (see STORED)."""
+def check_table(
+    table: Table, value: float | None, entries: int | None, strict: bool = False
+) -> str:
+    """The check status of a read table against the declared totals (see STORED). `strict` (the
+    8-character and zero-padded readings, whose codes cannot fail a check digit) passes a table
+    only on its coded rows' count or on the value total, never on a count that needs uncoded rows
+    or on no totals at all."""
     n, n_all = len(table.rows), len(table.rows) + len(table.invalid)
     parsed = sum(r.value for r in table.rows)
     parsed_all = parsed + sum(table.invalid)
@@ -504,7 +513,7 @@ def check_table(table: Table, value: float | None, entries: int | None) -> str:
             return CLOSE
         return MISMATCH
     if entries is not None:
-        return CLOSE if n_all == entries else MISMATCH
+        return CLOSE if n_all == entries and not strict else MISMATCH
     if any(_within(parsed, t, EXACT) or _within(parsed_all, t, EXACT) for t in table.totals if t):
         return OK  # the summary page is blank, but the table's own total line adds up
     return UNVERIFIED if table.orphans == 0 else MISMATCH
@@ -521,7 +530,7 @@ def read_holdings(texts: list[str]) -> tuple[Table, str, float | None, int | Non
         if status in STORED:
             break
         other = read_table(texts, mode)
-        other_status = check_table(other, value, entries)
+        other_status = check_table(other, value, entries, strict=True)
         if other_status in (OK, CLOSE):
             return other, other_status, value, entries
     return table, status, value, entries

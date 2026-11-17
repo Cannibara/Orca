@@ -375,3 +375,14 @@ AMERICAN EXPRESS        COM     25816109      300       5,000   x       5,000
     filing, rows, check = read_submission(submission(text), ENTRY)
     assert check["status"] == OK
     assert [r["cusip"] for r in rows] == ["009269101", "025816109"]
+
+
+def test_the_fallback_readings_never_take_a_share_count_for_a_code():
+    # Renaissance 2012: one row short of the count, so the 9-character reading fails; the
+    # 8-character one must not read "132200 SH" as a code.
+    text = SUMMARY.format(entries=3, value="").replace("$  ", "") + """
+AAR CORP                     COM              000361105     2534  132200 SH       SOLE    14679        0   117521
+ABB LTD                      SPONSORED ADR    000375204    11225  596100 SH       SOLE    99758        0   496342
+"""
+    filing, rows, check = read_submission(submission(text), ENTRY)
+    assert check["status"] == MISMATCH and rows == []
