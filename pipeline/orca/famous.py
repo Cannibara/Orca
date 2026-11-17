@@ -45,6 +45,9 @@ class Famous:
     match: str
     manager: str
     group: str
+    # Wikipedia titles of the fund and the person behind it (canonical, not redirects): their
+    # page views rank the Most searched list. Rows sharing titles share one place in it.
+    wiki: tuple[str, ...] = ()
 
 
 def load_famous(path: Path = FAMOUS_CSV) -> tuple[Famous, ...]:
@@ -62,5 +65,6 @@ def load_famous(path: Path = FAMOUS_CSV) -> tuple[Famous, ...]:
         if group not in FAMOUS_GROUPS:
             raise ValueError(f"famous.csv: CIK {fund_id} has unknown group {group!r}")
         seen.add((fund_id, group))
-        out.append(Famous(fund_id, match, r["manager"].strip(), group))
+        wiki = tuple(t.strip() for t in (r.get("wiki") or "").split("|") if t.strip())
+        out.append(Famous(fund_id, match, r["manager"].strip(), group, wiki))
     return tuple(out)

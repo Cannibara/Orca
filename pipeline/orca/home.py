@@ -3,7 +3,7 @@ calls. Every list is a plain function of the per-fund snapshots and returns JSON
 (dicts of int, float, str and None; dates as ISO strings), identified by stock_id and fund_id."""
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -107,7 +107,10 @@ def is_excluded_name(name: str) -> bool:
 
 
 def top_funds(
-    snaps: list[FundSnapshot], period: str, famous: Sequence[Famous] = ()
+    snaps: list[FundSnapshot],
+    period: str,
+    famous: Sequence[Famous] = (),
+    views: Mapping[str, int] | None = None,
 ) -> dict[str, list[dict]]:
     """The funds worth ranking over `period` (a key of `config.PERIODS`), by return per year.
 
@@ -122,7 +125,8 @@ def top_funds(
     the list's match word (a CIK typed wrong lists nothing rather than some other fund). Its rows
     add `manager`, `group` (the style list it is shown in; a fund in two lists has a row for each)
     and `until_q`: the last quarter of a fund that stopped filing (its figures run to it), else
-    None."""
+    None, and `views`: the monthly Wikipedia page views of the row's titles (`views`, title ->
+    views), set on one fund per set of titles (`_searched`) and None on every other row."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -143,15 +147,42 @@ def top_funds(
             continue
         picked.append((s, p, f))
     picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
+    searched = _searched(famous, by_id, views or {})
     out["famous"] = [
         {
             **_top_row(s, p),
             "manager": f.manager or None,
             "group": f.group,
             "until_q": int(s.period_q) if s.excluded else None,
+            "views": searched.get(s.fund_id) if f.wiki else None,
         }
         for s, p, f in picked
     ]
+    return out
+
+
+def _searched(
+    famous: Sequence[Famous], by_id: Mapping[int, FundSnapshot], views: Mapping[str, int]
+) -> dict[int, int]:
+    """Fund id -> monthly page views of its Wikipedia titles, for one fund per set of titles: a
+    manager with several filers (Sequoia's funds, Fundsmith's two) is counted once, on the filer
+    still filing with the biggest book. Titles without views count 0; a set with none is left
+    out."""
+    best: dict[tuple[str, ...], FundSnapshot] = {}
+    for f in famous:
+        s = by_id.get(f.fund_id)
+        if not f.wiki or s is None:
+            continue
+        key = tuple(sorted(f.wiki))
+        held = best.get(key)
+        rank = (not s.excluded, s.book, -s.fund_id)
+        if held is None or rank > (not held.excluded, held.book, -held.fund_id):
+            best[key] = s
+    out = {}
+    for key, s in best.items():
+        total = sum(views.get(t, 0) for t in key)
+        if total > 0:
+            out[s.fund_id] = max(out.get(s.fund_id, 0), total)
     return out
 
 

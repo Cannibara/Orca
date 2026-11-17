@@ -21,7 +21,8 @@ class Sources:
     `no_index_days`); `figi` is a FigiClient for `securities.map_cusips`; `sic` and
     `shares_outstanding` take a company CIK; `tbill()` is `rf.fetch_tbill`; `price_universe()`
     is `vendor.load_universe` (None: no universe, every held stock is asked for); `famous()` is
-the Famous funds list (famous.csv; the demo lists its own funds)."""
+the Famous funds list (famous.csv; the demo lists its own funds); `pageviews(titles)` is
+`wiki.fetch_pageviews` (None: no fetching, the views the lake kept are used)."""
 
     list_bulk_zips: Callable[[], list[str]]
     download_bulk_zip: Callable[[str, Path], None]
@@ -34,6 +35,7 @@ the Famous funds list (famous.csv; the demo lists its own funds)."""
     tbill: Callable[[], dict[int, float]]
     price_universe: Callable[[], pl.DataFrame] | None = None
     famous: Callable[[], tuple[Famous, ...]] = load_famous
+    pageviews: Callable[[list[str]], dict[str, int]] | None = None
 
 
 def production_sources() -> Sources:
@@ -46,6 +48,7 @@ def production_sources() -> Sources:
     from orca.sec.live import fetch_new_filings
     from orca.securities import fetch_shares_outstanding, fetch_sic, load_sec_tickers
     from orca.vendor import load_universe
+    from orca.wiki import fetch_pageviews, wiki_client
 
     sec, fred = sec_client(), fred_client()
 
@@ -63,4 +66,5 @@ def production_sources() -> Sources:
         prices=TiingoSource(tiingo_client()),
         tbill=lambda: fetch_tbill(fred),
         price_universe=lambda: load_universe(Client(1.0, {})),  # a public file: no key
+        pageviews=lambda titles: fetch_pageviews(wiki_client(), titles),
     )

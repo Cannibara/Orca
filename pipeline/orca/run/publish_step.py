@@ -4,7 +4,7 @@ files, and the staging folder kept down to what changed."""
 import re
 import shutil
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
 from pathlib import Path
 
@@ -110,9 +110,11 @@ def publish_shared_files(
     today: date,
     compress: bool,
     famous: Sequence[Famous] = (),
+    views: Mapping[str, int] | None = None,
 ) -> dict[str, str]:
     """funds.json, securities.json, latest_prices.json, the home lists (`famous`: famous.csv's
-    funds, for the Famous funds list) and the weekly files of
+    funds, for the Famous funds lists; `views`: Wikipedia page views of
+    their titles, for Most searched) and the weekly files of
     `weekly_ids` (every stock when None); the weekly files are built a chunk of stocks at a time
     (`Context.iter_closes`), so no more than a chunk's daily closes are ever held."""
     lake, last_q = ctx.lake, ctx.last_q
@@ -152,7 +154,7 @@ def publish_shared_files(
 
     home = HomeLists(
         latest_q=last_q,
-        top={period: top_funds(snaps, period, famous) for period in PERIODS},
+        top={period: top_funds(snaps, period, famous, views) for period in PERIODS},
         conviction_q=conviction_moves(snaps, "q", latest_q=last_q, not_stocks=etfs),
         conviction_y=conviction_moves(snaps, "y", latest_q=last_q, not_stocks=etfs),
         wins_losses=wins_losses(snaps, latest_q=last_q),

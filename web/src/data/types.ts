@@ -221,6 +221,8 @@ export type TopRow = {
   group?: string;
   /** Famous funds rows only: the last quarter of a fund that stopped filing (its figures run to it); null when it still files. */
   until_q?: number | null;
+  /** Famous funds rows only: monthly Wikipedia page views of the fund's and its manager's pages (Most searched); null when not ranked. */
+  views?: number | null;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */

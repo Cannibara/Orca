@@ -13,7 +13,7 @@ from pathlib import Path
 
 import polars as pl
 
-from orca.famous import load_famous
+from orca.famous import Famous, load_famous
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -69,6 +69,7 @@ from orca.run.state import (
 )
 from orca.sec.live import FILINGS_SCHEMA
 from orca.storage import Lake
+from orca.wiki import famous_views
 
 log = logging.getLogger(__name__)
 
@@ -351,6 +352,7 @@ def run_weekly(
         metas[cik], snaps[cik] = undump(meta), undump(snap)
     del stored
     order = sorted(metas)
+    famous = sources.famous()
     weekly_ids = None if full else state.pending_weekly
     files.update(
         publish_shared_files(
@@ -361,7 +363,8 @@ def run_weekly(
             weekly_ids,
             today,
             compress,
-            sources.famous(),
+            famous,
+            famous_views(lake, wiki_titles(famous), sources.pageviews),
         )
     )
 
@@ -442,10 +445,12 @@ def run_home(
     *,
     compress: bool = True,
     built: datetime | None = None,
+    pageviews=None,
 ) -> RunStats:
     """Publish the shared files again (search index, securities, latest prices, home lists) from
-    the funds' stored state, recomputing no fund and fetching nothing: for a change to how the
-    home lists are made from it, which then takes minutes instead of a rebuild. The fund and
+    the funds' stored state, recomputing no fund and fetching nothing but the Famous funds'
+    Wikipedia page views (`pageviews`, `Sources.pageviews`; None: the stored ones): for a change
+    to how the home lists are made from it, which then takes minutes instead of a rebuild. The fund and
     weekly files stay as they are. Raises RuntimeError, before anything is written, when the
     deadline quarter has moved on since the last run or anything is owed (the site behind the
     lake, funds or prices pending): a weekly run must come first."""
@@ -466,6 +471,7 @@ def run_home(
     order = sorted(metas)
     run_id = today.strftime("%Y%m%d")
     staging = new_version(out_root, run_id)
+    famous = load_famous()
     files = publish_shared_files(
         ctx,
         staging,
@@ -474,7 +480,8 @@ def run_home(
         set(),
         today,
         compress,
-        load_famous(),
+        famous,
+        famous_views(lake, wiki_titles(famous), pageviews),
     )
     previous = load_published(lake, out_root, compress)
     changed = changed_files(files, previous)
@@ -535,3 +542,8 @@ def verify(
                 rebuilt.update(publish_fund(Path(tmp), result.output, compress))
     expected = {p: sha for p, sha in published.items() if is_fund_path(p, set(chosen))}
     return sorted(p for p in expected.keys() | rebuilt.keys() if expected.get(p) != rebuilt.get(p))
+
+
+def wiki_titles(famous: tuple[Famous, ...]) -> list[str]:
+    """Every Wikipedia title of the Famous funds list, once."""
+    return sorted({t for f in famous for t in f.wiki})
