@@ -133,8 +133,10 @@ fund's name.
   match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
   `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each) and `"until_q"`: for a fund
   that stopped filing, its last quarter, and then its figures cover the period up to that quarter; `null` while it
-  still files. Funds that stopped filing appear in no other list. Files built before
-  2026-11-15 have no `famous` key.
+  still files, and `"views"`: monthly Wikipedia page views (the last 60 days, scaled to 30) of the fund's and its
+  manager's pages (famous.csv `wiki`), set on one fund per set of pages (the filer still filing with the biggest
+  book) and on each of its rows; `null` on every other row and on funds without pages. Funds that stopped filing
+  appear in no other list. Files built before 2026-11-15 have no `famous` key; before 2026-11-17 no `views`.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`

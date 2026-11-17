@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-16 (vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-17 (vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -49,7 +49,8 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `rf.py` | FRED DTB3 yearly average (`fetch_tbill`) |
 | `storage.py` | `Lake` (zstd Parquet, atomic writes), `Manifest` |
 | `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
-| `famous.py`, `famous.csv` | the hand-kept Famous funds list (CIK, match word, manager, group); `Sources.famous` (the demo injects its own) |
+| `famous.py`, `famous.csv` | the hand-kept Famous funds list (CIK, match word, manager, group, Wikipedia titles); `Sources.famous` (the demo injects its own) |
+| `wiki.py` | Most searched: monthly Wikipedia page views of the famous funds' titles (`prop=pageviews`, 50 titles a request, ~10 requests a run, User-Agent with ORCA_CONTACT). `run_weekly` and `run_home` fetch them (`Sources.pageviews`); the lake table `famous_views` keeps the last good ones for when Wikipedia fails |
 | `home.py` | home lists (`top_funds` with its `famous` rows, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
