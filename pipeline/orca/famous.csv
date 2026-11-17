@@ -61,7 +61,7 @@ fund_id,match,manager,group,filer_name,search
 813917,HARRIS ASSOCIATES,Bill Nygren,Value,Harris Associates L P,Bill Nygren
 1709323,HIMALAYA,Li Lu,Buffett inspired,Himalaya Capital Management LLC,Li Lu
 1484150,LINDSELL TRAIN,Nick Train,Moat investing,Lindsell Train Ltd,Nick Train
-1096343,MARKEL,Tom Gayner,Buffett inspired,Markel Group Inc.,Tom Gayner
+1096343,MARKEL,Tom Gayner,Buffett inspired,Markel Group Inc.,Markel Group
 1135778,MILLER VALUE,Bill Miller,Value,"Miller Value Partners, LLC",Bill Miller
 1657335,OAKCLIFF,Bryan Lawrence,Value,"Oakcliff Capital Partners, LP",
 949509,OAKTREE,Howard Marks,Value,Oaktree Capital Management LP,Howard Marks
@@ -98,7 +98,7 @@ fund_id,match,manager,group,filer_name,search
 1037389,RENAISSANCE,Jim Simons,Quant & multi-strategy,Renaissance Technologies LLC,Jim Simons
 1179392,TWO SIGMA,John Overdeck & David Siegel,Quant & multi-strategy,"Two Sigma Investments, LP",John Overdeck
 1656456,APPALOOSA,David Tepper,Family offices,Appaloosa LP,David Tepper
-1166559,GATES FOUNDATION,Bill Gates (Cascade),Family offices,Bill & Melinda Gates Foundation Trust,
+1166559,GATES FOUNDATION,Bill Gates (Cascade),Family offices,Bill & Melinda Gates Foundation Trust,Gates Foundation
 898382,COOPERMAN,Leon Cooperman,Family offices,Cooperman Leon G,Leon Cooperman
 850529,FISHER ASSET,Ken Fisher,Value,"Fisher Asset Management, LLC",Ken Fisher
 1138995,GLENVIEW,Larry Robbins,Fundamental long/short,"Glenview Capital Management, LLC",Larry Robbins
