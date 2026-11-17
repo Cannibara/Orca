@@ -5,7 +5,7 @@ used. `edge_case_inputs` is the one list of them (the site-parity fixture reads 
 
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
@@ -279,8 +279,58 @@ def edge_cases(tmp: Path) -> dict[str, Built]:
 
 
 def edge_case_inputs(tmp: Path) -> dict[str, FundInputs]:
-    """The FundInputs of every hand-built fund (`edge_cases`), by name."""
-    return {name: built.fi for name, built in edge_cases(tmp).items()}
+    """The FundInputs of every hand-built fund (`edge_cases`), by name, and of the PRE_2013 ones
+    again before 2013 ("pre2013_<name>", `shifted`)."""
+    inputs = {name: built.fi for name, built in edge_cases(tmp).items()}
+    return inputs | {f"pre2013_{name}": shifted(inputs[name]) for name in PRE_2013}
+
+
+# --- the same funds before 2013 ---------------------------------------------------------------
+
+PRE_2013 = ("delisted", "exit_and_reentry", "year_ties")  # an exit, a re-entry, five years
+PRE_2013_YEARS = -16  # Q2 2024 (q 45) moves to Q2 2008 (q -19): every quarter index is negative
+
+
+def shifted(fi: FundInputs, years: int = PRE_2013_YEARS) -> FundInputs:
+    """`fi` moved `years` calendar years, with Orca's figures. A multiple of 4 years keeps every
+    date's leap days, so each day count (XIRR's too) and so every figure stays the same: only
+    the quarter indexes and years move. The pipeline's bulk 13F data starts in 2013, so this is
+    how a fund filed before then (negative quarter indexes) is built."""
+    if years % 4 or fi.other is not None:
+        raise ValueError("shift an uncut fund by a multiple of 4 years")
+    dq = 4 * years
+
+    def q(v: int | None) -> int | None:
+        return None if v is None else v + dq
+
+    def by_year(d: dict[int, float]) -> dict[int, float]:
+        return {y + years: v for y, v in d.items()}
+
+    metrics = dict(fi.orca.metrics)
+    for side in ("best_year", "worst_year"):
+        if metrics.get(side) is not None:
+            metrics[side] = {**metrics[side], "label": str(int(metrics[side]["label"]) + years)}
+    for side in ("first_year", "last_year"):
+        if metrics.get(side) is not None:
+            metrics[side] += years
+    stocks = [
+        replace(o, from_q=q(o.from_q), to_q=q(o.to_q), last_q=q(o.last_q),
+                last_sale_q=q(o.last_sale_q), points=by_year(o.points), pnl=by_year(o.pnl))
+        for o in fi.orca_stocks
+    ]  # fmt: skip
+    return replace(
+        fi,
+        period_q=fi.period_q + dq,
+        filed=fi.filed.replace(year=fi.filed.year + years),
+        start=fi.start + dq,
+        end_q=fi.end_q + dq,
+        bound=fi.bound + dq,
+        latest_date=fi.latest_date.replace(year=fi.latest_date.year + years),
+        quarters=[x + dq for x in fi.quarters],
+        years=[y + years for y in fi.years],
+        orca_stocks=stocks,
+        orca=replace(fi.orca, metrics=metrics),
+    )
 
 
 # --- a fund of 500 stocks over 54 quarters ----------------------------------------------------

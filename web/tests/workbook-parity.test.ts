@@ -82,8 +82,9 @@ tally = fresh();
   const src: PriceSource = { tl, prices, weekly: new Map() };
   const newest = c.summary.period_q;
 
-  // The positions as of the newest quarter: all of them (figures) and the quarter's own movers (tag, dw).
-  const all = new Map(buildRows(positions, 0, newest, src, new Map()).map((r) => [r.id, r]));
+  // The positions as of the newest quarter: all of them (figures, from the fund's first quarter, negative
+  // before 2013) and the quarter's own movers (tag, dw).
+  const all = new Map(buildRows(positions, c.summary.tracked_since_q, newest, src, new Map()).map((r) => [r.id, r]));
   const last = new Map(buildRows(positions, newest, newest, src, new Map()).map((r) => [r.id, r]));
   const sales = new Map(
     buildSaleRows({

@@ -13,7 +13,7 @@ import openpyxl
 import pytest
 from conftest import demo_batch
 from test_workbook_outputs import Read, position_irr
-from workbook_fixtures import edge_cases, synthetic_inputs
+from workbook_fixtures import PRE_2013, PRE_2013_YEARS, edge_cases, shifted, synthetic_inputs
 
 from orca.run.compute import FundResult, Prepared
 from orca.run.market import latest_closes
@@ -21,7 +21,7 @@ from orca.run.state import read_table
 from orca.securities import SECURITIES_SCHEMA
 from orca.workbook.build import build_workbook, file_name, workbook_map
 from orca.workbook.inputs import FundInputs, build_inputs, validate
-from orca.workbook.layout import BLOCKS, CHECKS, OTHER_ROWS, SUMMARY_CHECKED
+from orca.workbook.layout import BLOCKS, CHECKS, OTHER_ROWS, OUTPUT_COLUMNS, SUMMARY_CHECKED
 from orca.workbook.model import OTHER_NAME, OTHER_STOCK
 
 CUT_CIK, CUT_KEEP = 9100009, 3  # Seastack (18-24 positions) cut to 3 stock rows
@@ -55,6 +55,8 @@ def cases(demo_run, tmp_path_factory) -> dict[str, Case]:
 
     for key, b in edge_cases(root / "pipeline").items():
         add(key, b.fi, b.p, b.r)
+        if key in PRE_2013:  # the same fund before 2013 (its engine run stays the 2013-on one)
+            add(f"pre2013_{key}", shifted(b.fi), b.p, b.r)
     ctx, batch = demo_batch(demo_run, [CUT_CIK, INACTIVE_CIK])
     latest = latest_closes(demo_run.lake)
     securities = read_table(demo_run.lake, "securities", SECURITIES_SCHEMA)
@@ -317,6 +319,41 @@ def test_best_and_worst_year_ties(funds):
     assert f.fi.years == [2020, 2021, 2022, 2023, 2024]
     got = [f.read.model("ret_if_full", None, str(y)) for y in f.fi.years]
     f.same(got, [None, 1.0, 0.0, 1.0, 0.0], "ret_if_full")
+
+
+# --- before 2013 ------------------------------------------------------------------------------
+
+_QUARTER_COLUMNS = {"from_q", "to_q", "last_q", "last_sale_q"}
+_QUARTER_COLUMNS |= {f"orca_{c}" for c in _QUARTER_COLUMNS}
+_QUARTER_ITEMS = {"period_q", "r_last_q"}
+_YEAR_ITEMS = {"from_year", "to_year", "best_year", "worst_year"}
+_HEADER_ITEMS = {"name", "fund_id", "cik", "period_label", "filed"}
+
+
+@pytest.mark.libreoffice
+@pytest.mark.parametrize("key", PRE_2013)
+def test_before_2013(funds, key):
+    # The fund 16 years earlier: Q2 2024 (q 45) is Q2 2008 (q -19), so every quarter index is
+    # negative and a "last quarter" formula that counted on q + 1 > 0 (the exit, the last trade
+    # and the last sale, the sold positions' hold, the range's last quarter) would lose it. Every
+    # check passes and every Outputs and Summary figure is the 2013-on fund's, its quarters 64
+    # lower and its years 16.
+    f, base = funds[f"pre2013_{key}"], funds[key]
+    years, dq = PRE_2013_YEARS, 4 * PRE_2013_YEARS
+    assert f.fi.bound < 0
+    f.passes()
+    for st in base.fi.stocks:
+        for c in OUTPUT_COLUMNS:
+            want = base.read.out(c.id, st.stock_id)
+            if want is not None and c.id in _QUARTER_COLUMNS:
+                want += dq
+            f.same([f.read.out(c.id, st.stock_id)], [want], f"{key} {st.ticker} {c.id}")
+    for item in f.read.map.summary.at.keys() - _HEADER_ITEMS:
+        want = base.read.summary(item)
+        if want is not None and item in _QUARTER_ITEMS | _YEAR_ITEMS:
+            want += dq if item in _QUARTER_ITEMS else years
+        f.same([f.read.summary(item)], [want], f"{key} {item}")
+    assert f.read.summary("r_last_q") == f.fi.end_q < 0
 
 
 # --- the cut ----------------------------------------------------------------------------------

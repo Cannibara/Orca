@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import type { Summary } from "../data/types";
-import { fmtDate, money } from "../lib/format";
+import { fmtDate, money, qOfYear } from "../lib/format";
 import { reducedMotion } from "./hooks";
 import "./returns.css";
 
@@ -86,7 +86,7 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
 
   // Rounded down, so a book that is not fully priced never reads as 100% and a warning never reads "80%".
   const priced = Math.floor(s.priced_pct * 100 + 1e-9);
-  const quarter = (((s.period_q % 4) + 4) % 4) + 1;
+  const quarter = qOfYear(s.period_q) + 1;
   const holdings = `${s.n_holdings} ${s.n_holdings === 1 ? "holding" : "holdings"} now, ${positionsEver} ${positionsEver === 1 ? "position" : "positions"} ever`;
 
   return (

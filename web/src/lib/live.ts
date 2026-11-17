@@ -2,6 +2,7 @@
 // latest_prices.json. All functions are pure and never return NaN or Infinity:
 // a figure that cannot be computed is null (the UI shows "—").
 import { toRows } from "../data/api";
+import { qOfYear } from "./format";
 import type { Holdings, PositionRow, Positions, Trade, TradeTuple } from "../data/types";
 
 type Flow = [t: number, amount: number];
@@ -14,7 +15,7 @@ const DAY_MS = 86_400_000;
  */
 export const midQuarterMs = (q: number): number => {
   const y = 2013 + Math.floor(q / 4);
-  const m = (q % 4) * 3;
+  const m = qOfYear(q) * 3;
   const start = Date.UTC(y, m, 1);
   const end = Date.UTC(y, m + 3, 0);
   return start + Math.floor((end - start) / DAY_MS / 2) * DAY_MS;

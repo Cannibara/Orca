@@ -263,9 +263,9 @@ const PERIODS: ChoiceOption<Period>[] = [
   { id: "max", label: "Since start" },
 ];
 
-/** The SEC's 13F data starts in 2013, so a period this long has no fund yet. */
+/** Few funds have a record this long, so its empty list gets its own note. */
 const EMPTY: Partial<Record<Period, string>> = {
-  "15y": "No fund has 15 years of 13F data yet: the SEC's data starts in 2013.",
+  "15y": "No fund has 15 years of 13F history that meets the list's rules.",
 };
 
 const TOP_COLUMNS: Col<TopRow>[] = [

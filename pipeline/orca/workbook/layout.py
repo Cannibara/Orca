@@ -62,6 +62,10 @@ DATE = "yyyy-mm-dd"
 GENERAL = "General"
 SCI = "0.00E+00"  # difference cells: a few parts in 1e16 when all is well
 
+# Quarter indexes are negative before 2013 (Q1 1999 is -56). A "last quarter where" formula takes
+# the MAX of (condition) x (quarter + Q_OFFSET), so every quarter counts above the 0 of "none".
+Q_OFFSET = 100
+
 
 def mid_quarter(q: int) -> date:
     """The date a quarter's trades are dated at for XIRR: quarter start + half the days from
@@ -93,6 +97,8 @@ class Columns:
     def __init__(self, years: list[int], quarters: list[int], end_q: int | None = None) -> None:
         if not quarters or quarters != list(range(quarters[0], quarters[-1] + 1)):
             raise ValueError("quarters must be consecutive and not empty")
+        if quarters[0] <= -Q_OFFSET:
+            raise ValueError(f"quarter {quarters[0]} is not above -Q_OFFSET ({-Q_OFFSET})")
         self.end_q = quarters[-1] if end_q is None else end_q
         if not quarters[0] <= self.end_q <= quarters[-1]:
             raise ValueError(f"end_q {self.end_q} is outside the quarter columns")
@@ -1032,9 +1038,9 @@ class Column:
 
 
 def _last_where(conditions: list[str], quarters: str) -> str:
-    """The last quarter whose cells meet every condition, -1 when none (spec 3.1)."""
+    """The last quarter whose cells meet every condition, -Q_OFFSET when none (spec 3.1)."""
     factors = "".join(f"({c})*" for c in conditions)
-    return f"SUMPRODUCT(MAX({factors}({quarters}+1)))-1"
+    return f"SUMPRODUCT(MAX({factors}({quarters}+{Q_OFFSET})))-{Q_OFFSET}"
 
 
 def _in_quarter(r: OutRef, row_id: str, q_column: str, span: str = "tracked") -> str:

@@ -9,6 +9,7 @@
 
 import { yearsSince2013, type Stock } from "../data/api";
 import type { PositionRow, Trade, Weekly } from "../data/types";
+import { qOfYear } from "../lib/format";
 import { irr, positionFlows } from "../lib/live";
 import { qShort } from "./fmt";
 
@@ -28,7 +29,7 @@ export type Timeline = {
 };
 
 /** Last day of quarter q, as UTC milliseconds. */
-const qEndMs = (q: number): number => Date.UTC(2013 + Math.floor(q / 4), (q % 4) * 3 + 3, 0);
+const qEndMs = (q: number): number => Date.UTC(2013 + Math.floor(q / 4), qOfYear(q) * 3 + 3, 0);
 
 /** Last day of quarter q as an ISO date. */
 export const qEndIso = (q: number): string => new Date(qEndMs(q)).toISOString().slice(0, 10);

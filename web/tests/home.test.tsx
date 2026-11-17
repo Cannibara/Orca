@@ -378,13 +378,13 @@ describe("Home", () => {
     expect(await screen.findByText("The famous funds list arrives with the next data update.")).toBeInTheDocument();
   });
 
-  it("the 15-year tab says why no fund qualifies yet", async () => {
+  it("the 15-year tab says why no fund qualifies", async () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("button", { name: "15 years" }));
-    expect(await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.")).toBeInTheDocument();
+    expect(await screen.findByText("No fund has 15 years of 13F history that meets the list's rules.")).toBeInTheDocument();
   });
 
   it("opens with the research heading and no rules line or subtitle", async () => {
@@ -592,7 +592,7 @@ describe("Home", () => {
     renderHome();
     await screen.findByRole("table", { name: "Top funds" });
     await user.click(screen.getByRole("button", { name: "15 years" }));
-    const msg = await screen.findByText("No fund has 15 years of 13F data yet: the SEC's data starts in 2013.");
+    const msg = await screen.findByText("No fund has 15 years of 13F history that meets the list's rules.");
     expect(msg.closest(".state")).not.toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
   });

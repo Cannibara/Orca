@@ -82,6 +82,9 @@ describe("fmt", () => {
     expect(fmt.qShort(53)).toBe("Q2 ’26");
     expect(fmt.qShort(0)).toBe("Q1 ’13");
     expect(fmt.qShort(7)).toBe("Q4 ’14");
+    expect(fmt.qShort(-1)).toBe("Q4 ’12"); // before 2013 the index is negative
+    expect(fmt.qShort(-4)).toBe("Q1 ’12");
+    expect(fmt.qShort(-56)).toBe("Q1 ’99");
     expect(fmt.qLabelFull(53)).toBe("Q2 2026");
     expect(fmt.fmtLong("2026-10-30")).toBe("30 Oct 2026");
     expect(fmt.fmtLong("2026-07-01")).toBe("1 Jul 2026");
