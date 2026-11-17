@@ -5,14 +5,14 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-17 — Famous funds: Most searched list
+## 2026-11-17 — Famous funds: Most searched list (Google Trends)
 
 | What changed | Why | Files |
 |---|---|---|
-| New first list, Most searched: the 50 famous funds whose Wikipedia pages (fund + manager) are read most, from monthly page views over the last 60 days, with a "Wiki views / mo" column. One fund per set of pages (Sequoia's 7 filers count once). Big companies are not ranked (their pages are read for the company); the Gates trust uses the foundation's page; Thrive uses only its firm page (Joshua Kushner's is read for his celebrity) | Owner: "the most searched funds" first, e.g. Situational Awareness. Google Trends has no API and blocks automated use; Wikipedia's page views are free and documented | `pipeline/orca/wiki.py`, `famous.csv` (`wiki`), `home.py` (`_searched`), `run/weekly.py`, `run/cli.py`, `web/src/pages/Home.tsx` |
-| 185 of 365 rows have pages: picked from name variants with a description check against namesakes, then fixed by hand for the best-known names | | `famous.csv` |
-| Preview on 2026-11-17 (60 days): Berkshire/Buffett 274k a month, Temasek 158k (steady daily, not a spike), Soros 156k, Citadel/Griffin 102k, Pershing/Ackman 63k, Scion/Burry 52k … Situational Awareness/Aschenbrenner 32k (#14 of 151) | | none |
-| Runs fetch the views (also `home_only`); if Wikipedia fails, the last good views (lake table `famous_views`) are used. The live list appears after the next pipeline run | | |
+| New first list, Most searched: the 50 famous funds whose manager or founder (or institution, for venture firms and sovereign/pension funds) is searched most on Google, Google Trends worldwide over 12 months, Warren Buffett = 100, with a "Search interest" column. One fund per keyword (Sequoia's 7 filers count once). Big companies are not ranked; the Gates trust is searched as "Gates Foundation" | Owner: "the most searched funds" first (e.g. Situational Awareness), measured with Google Trends on the manager's name, not the fund's | `famous.csv` (`search`), `famous_search.csv`, `famous.py` (`load_search`), `home.py` (`_searched`), `web/src/pages/Home.tsx` |
+| Keywords are compared as Google topics (an investor, not a namesake), 4 a batch with an anchor (Bill Ackman, then a smaller one for faint names) so all share one scale | Trends compares at most 5 terms and only relatively | `pipeline/scripts/google_trends.py` |
+| The scores are a committed snapshot, refreshed by hand with the script (30–60 min; Google throttles). No pipeline run fetches Trends | Google has no Trends API; pytrends is unmaintained and blocked from cloud servers like GitHub's | same |
+| A first version ranked by Wikipedia page views (fetched each run); replaced before merge at the owner's request | | PR #39 |
 | Cross-checked against `docs/famous-funds.txt` (PR #37, CIKs matched to live funds.json): 61 of its 68 CIKs are the same as famous.csv's; the other 7 are added (Slate Path → Tiger cubs; Samlyn, Alpha Wave, Encompass, Woodson, Sylebra's older filer → Fundamental long/short; GMO → Value). The Famous funds tab covers that file's Popular funds idea | Validation from live data this session cannot reach | `famous.csv` |
 
 ## 2026-11-16 — Popular funds: draft list of 68 names

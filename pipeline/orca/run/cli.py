@@ -60,14 +60,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"check-keys: {len(problems)} problem(s)")
         return 1 if problems else 0
     if args.command == "home":
-        from orca.wiki import fetch_pageviews, wiki_client
-
-        stats = run_home(
-            Lake(config.LAKE_DIR),
-            config.OUT_DIR,
-            date.today(),
-            pageviews=lambda titles: fetch_pageviews(wiki_client(), titles),
-        )
+        stats = run_home(Lake(config.LAKE_DIR), config.OUT_DIR, date.today())
         print(f"staging: {stats.staging}")
         print(f"changed: {len(stats.changed)} files, funds recomputed: 0")
         return 0

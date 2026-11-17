@@ -28,7 +28,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 
-from orca.famous import Famous
+from orca.famous import Famous, SearchScores
 from orca.http import FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
@@ -131,22 +131,19 @@ FUNDS = (
 # year and since start), one that stopped filing (listed with its figures to its last quarter),
 # three in Top funds as well, and Kelpwood in two lists.
 DEMO_FAMOUS = (
-    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs", ("Kelpwood Capital", "Iris Kelp")),
-    Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs", ("Wren Orcinus",)),
-    Famous(FUND_CIK0 + 6, "DRIFTWOOD", "Theo Drift", "Tech & growth", ("Driftwood Capital",)),
-    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tech & growth", ("Kelpwood Capital", "Iris Kelp")),
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tiger cubs", "Iris Kelp"),
+    Famous(FUND_CIK0 + 10, "ORCINUS", "Wren Orcinus", "Tiger cubs", "Wren Orcinus"),
+    Famous(FUND_CIK0 + 6, "DRIFTWOOD", "Theo Drift", "Tech & growth", "Theo Drift"),
+    Famous(FUND_CIK0 + 0, "KELPWOOD", "Iris Kelp", "Tech & growth", "Iris Kelp"),
     Famous(FUND_CIK0 + 4, "SALTGLASS", "Ada Brine", "Value"),
-    Famous(FUND_CIK0 + 1, "HALYARD", "", "Value", ("Halyard Point Partners",)),
-    Famous(FUND_CIK0 + 9, "COBBLEREEF", "Mara Cobble", "Value", ("Mara Cobble",)),
+    Famous(FUND_CIK0 + 1, "HALYARD", "", "Value", "Halyard Point Partners"),
+    Famous(FUND_CIK0 + 9, "COBBLEREEF", "Mara Cobble", "Value", "Mara Cobble"),
 )
-# Monthly Wikipedia page views of the demo's titles (Most searched). Wren Orcinus has none.
-DEMO_PAGEVIEWS = {
-    "Kelpwood Capital": 4200,
-    "Iris Kelp": 9100,
-    "Driftwood Capital": 22800,
-    "Halyard Point Partners": 650,
-    "Mara Cobble": 1300,
-}
+# Google Trends scores of the demo's keywords (Most searched). Wren Orcinus has none.
+DEMO_SEARCH = SearchScores(
+    "2026-10-30",
+    {"Iris Kelp": 12.0, "Theo Drift": 31.5, "Halyard Point Partners": 0.4, "Mara Cobble": 2.6},
+)
 LAST_Q = q_index(2026, 2)  # the deadline quarter as of DEMO_TODAY
 CROWDED = (
     "Kelpwood Capital LP",
@@ -364,7 +361,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
         prices=FixtureSource(fx.prices),
         tbill=lambda: dict(fx.tbill),
         famous=lambda: DEMO_FAMOUS,
-        pageviews=lambda titles: {t: DEMO_PAGEVIEWS.get(t, 0) for t in titles},
+        search=lambda: DEMO_SEARCH,
     )
 
 

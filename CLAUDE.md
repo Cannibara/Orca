@@ -27,7 +27,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 - Pipeline: Python ≥ 3.13, `uv`, Polars, httpx, brotli (`pipeline/pyproject.toml`). Runs on GitHub Actions (`.github/workflows/pipeline.yml`): monthly on the 16th at 06:23 UTC, a check on the 1st, or by hand.
 - Storage: R2 bucket `R2_LAKE_BUCKET` (private Parquet lake; holds CUSIPs, never public). R2 bucket `orca-site` (`R2_SITE_BUCKET`, public JSON) is served at `data.orcaetf.com` with a Cloudflare cache rule (edge 1 month, browser 2 h), purged after each upload.
 - Web: React 18 + Vite 7 + TypeScript, react-router 7 (package `react-router`), @tanstack/react-virtual, vitest 4 + jsdom, Playwright (`web/package.json`). Cloudflare Pages project `orca` (`orca-88p.pages.dev`; custom domains `www.orcaetf.com`, bare `orcaetf.com` 301 → www).
-- External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3), Wikipedia page views (Most searched; no key). Keys live only in GitHub secrets.
+- External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Google Trends (Most searched) is a hand-refreshed snapshot (`pipeline/scripts/google_trends.py`), not fetched by runs. Keys live only in GitHub secrets.
 
 ## Repo map
 ```

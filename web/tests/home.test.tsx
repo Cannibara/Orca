@@ -310,10 +310,10 @@ describe("Home", () => {
     expect(await screen.findByText(`Fund page ${id}`)).toBeInTheDocument();
   });
 
-  it("Most searched comes first: the most read famous funds, once each, with their page views", async () => {
+  it("Most searched comes first: the most searched famous funds, once each, with their Google Trends score", async () => {
     const t1 = demo<TopList>("home/top_1y.json");
-    const read = [...new Map((t1.famous ?? []).filter((r) => r.views).map((r) => [r.fund_id, r])).values()].sort(
-      (a, b) => b.views! - a.views!,
+    const read = [...new Map((t1.famous ?? []).filter((r) => r.search).map((r) => [r.fund_id, r])).values()].sort(
+      (a, b) => b.search! - a.search!,
     );
     expect(read.length).toBeGreaterThan(2);
     stubData();
@@ -326,7 +326,7 @@ describe("Home", () => {
     const table = screen.getByRole("table", { name: "Most searched" });
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Fund",
-      "Wiki views / mo",
+      "Search interest",
       "AUM",
       "Positions",
       "Return / yr",
@@ -335,7 +335,9 @@ describe("Home", () => {
     ]);
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(read.map((r) => r.name));
-    expect(within(rows[0]).getByText("23k")).toBeInTheDocument(); // Driftwood: 22,800 a month
+    expect(within(rows[0]).getByText("32")).toBeInTheDocument(); // Driftwood: 31.5 (Buffett = 100)
+    expect(within(rows[rows.length - 1]).getByText("<1")).toBeInTheDocument(); // Halyard: 0.4
+    expect(screen.getByText(/Google Trends interest in the manager or founder .* the 12 months to 30 Oct 2026/)).toBeInTheDocument();
   });
 
   it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {

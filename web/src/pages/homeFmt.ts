@@ -41,11 +41,10 @@ export function fAum(pts: number | null | undefined): string {
   return (Number(digits) === 0 ? "" : pts < 0 ? MINUS : "+") + digits + "%";
 }
 
-/** A count read at a glance: 950 → "950", 4,200 → "4.2k", 22,800 → "23k", 1,250,000 → "1.3M". */
-export function fViews(n: number | null | undefined): string {
-  if (missing(n)) return DASH;
-  if (n >= 999_500) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 9_950) return Math.round(n / 1e3) + "k";
-  if (n >= 1_000) return (n / 1e3).toFixed(1) + "k";
-  return String(Math.round(n));
+/** A Google Trends score (Warren Buffett = 100): whole numbers from 10, one decimal from 1, "<1" below. */
+export function fSearch(x: number | null | undefined): string {
+  if (missing(x)) return DASH;
+  if (x >= 9.95) return String(Math.round(x));
+  if (x >= 0.95) return x.toFixed(1);
+  return x > 0 ? "<1" : "0";
 }

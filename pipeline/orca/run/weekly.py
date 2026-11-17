@@ -14,7 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
-from orca.famous import Famous, load_famous
+from orca.famous import load_famous, load_search
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -70,7 +70,6 @@ from orca.run.state import (
 )
 from orca.sec.live import FILINGS_SCHEMA
 from orca.storage import Lake
-from orca.wiki import famous_views
 
 log = logging.getLogger(__name__)
 
@@ -388,7 +387,7 @@ def run_weekly(
             today,
             compress,
             famous,
-            famous_views(lake, wiki_titles(famous), sources.pageviews),
+            sources.search(),
         )
     )
 
@@ -474,12 +473,10 @@ def run_home(
     *,
     compress: bool = True,
     built: datetime | None = None,
-    pageviews=None,
 ) -> RunStats:
     """Publish the shared files again (search index, securities, latest prices, home lists) from
-    the funds' stored state, recomputing no fund and fetching nothing but the Famous funds'
-    Wikipedia page views (`pageviews`, `Sources.pageviews`; None: the stored ones): for a change
-    to how the home lists are made from it, which then takes minutes instead of a rebuild. The fund and
+    the funds' stored state, recomputing no fund and fetching nothing: for a change to how the
+    home lists are made from it, which then takes minutes instead of a rebuild. The fund and
     weekly files stay as they are. Raises RuntimeError, before anything is written, when the
     deadline quarter has moved on since the last run or anything is owed (the site behind the
     lake, funds or prices pending): a weekly run must come first."""
@@ -510,7 +507,7 @@ def run_home(
         today,
         compress,
         famous,
-        famous_views(lake, wiki_titles(famous), pageviews),
+        load_search(),
     )
     previous = load_published(lake, out_root, compress)
     changed = changed_files(files, previous)
@@ -572,7 +569,3 @@ def verify(
     expected = {p: sha for p, sha in published.items() if is_fund_path(p, set(chosen))}
     return sorted(p for p in expected.keys() | rebuilt.keys() if expected.get(p) != rebuilt.get(p))
 
-
-def wiki_titles(famous: tuple[Famous, ...]) -> list[str]:
-    """Every Wikipedia title of the Famous funds list, once."""
-    return sorted({t for f in famous for t in f.wiki})
