@@ -3,6 +3,7 @@
 import json
 import logging
 import random
+import re
 import statistics
 import tempfile
 import time
@@ -257,6 +258,29 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     drop_parts(lake, FUND_STATE_RUN)
 
 
+_WEEKLY_PATH = re.compile(r"^stock/(\d+)/weekly\.json$")
+DELETIONS_FILE = "deleted.txt"
+
+
+def stale_weekly(previous: dict[str, str], files: dict[str, str], ids: set[int] | None) -> set[str]:
+    """Published weekly files of the stocks this run rebuilt (`ids`; None: all of them) that it
+    no longer writes: those stocks have no priced day now."""
+    gone = set()
+    for path in previous:
+        if path in files or (m := _WEEKLY_PATH.match(path)) is None:
+            continue
+        if ids is None or int(m.group(1)) in ids:
+            gone.add(path)
+    return gone
+
+
+def write_deletions(out_root: Path, paths: set[str]) -> None:
+    """`out_root/deleted.txt`: the site paths the upload step deletes, one per line (only
+    weekly files ever go in it, and the workflow checks each line against that shape)."""
+    target = Path(out_root) / DELETIONS_FILE
+    target.write_text("".join(f"{p}\n" for p in sorted(paths)))
+
+
 def run_weekly(
     lake: Lake,
     out_root: Path,
@@ -413,6 +437,11 @@ def run_weekly(
     dropped = funds.attempted - computed
     merged = dict(files) if rebuild else {**previous, **files}
     merged = {path: sha for path, sha in merged.items() if not is_fund_path(path, dropped)}
+    # A stock whose prices were all dropped has no weekly file any more (contract: no priced
+    # day, no file); the old one must leave the site, or its chart shows the dropped prices.
+    gone = stale_weekly(previous, files, None if full else weekly_ids)
+    merged = {path: sha for path, sha in merged.items() if path not in gone}
+    write_deletions(out_root, gone)
     write_manifest(out_root, run_id, merged, compress, built=built)
 
     # Recomputed funds replaced, dropped ones gone.

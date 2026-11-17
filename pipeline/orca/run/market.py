@@ -12,6 +12,7 @@ import polars as pl
 from orca.http import FetchError
 from orca.prices import TABLE as PRICES_TABLE
 from orca.prices import (
+    drop_stocks,
     compact_prices,
     last_dates,
     part_stocks,
@@ -60,6 +61,9 @@ REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
 US_TICKERS_TABLE = "figi_us_tickers"
 US_TICKERS_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "tried": pl.Date})
 US_TICKERS_PER_RUN = 1000
+# More stocks than this losing their vendor ticker in one run means the vendor's list is broken,
+# not that tickers were corrected: nothing is dropped and the stored table is kept (flagged).
+MAX_VENDOR_LOST = 2000
 # Hand-checked vendor tickers for big holdings no rule finds (a company renamed or moved under a
 # new parent): cusip -> ticker. Tried first among the alternates, and still only over the days
 # the vendor lists the ticker.
@@ -505,14 +509,27 @@ def resolve_vendor_tickers(
         for sid, ticker in resolved.select("stock_id", "ticker").iter_rows()
         if ticker != before.get(sid, tickers.get(sid))
     }
-    if moved:
+    # Stocks the vendor no longer has under any ticker for their held days: what was stored
+    # came under a ticker that is not theirs (an older line of a reused ticker), and goes.
+    lost = set(before) - set(resolved["stock_id"].to_list())
+    if len(lost) > MAX_VENDOR_LOST:  # a broken universe, not a correction: keep everything
+        flags.append({"type": "vendor_tickers_lost", "count": len(lost)})
+        return None
+    if moved or lost:
+        # The stored bars of a moved or lost stock are another ticker's: drop them all, so a
+        # day the new ticker does not cover keeps no stale bar. Owed first, then dropped.
         state.price_refetch |= moved
+        state.pending_stocks |= moved | lost
+        state.pending_weekly |= moved | lost
         state.save(lake)  # before the table, so a history under the old ticker is never kept
+        dropped = drop_stocks(lake, moved | lost)
+        counts["vendor_bars_dropped"] = dropped
     lake.write(VENDOR_TABLE, resolved.sort("stock_id"))
     return {
         "vendor_tickers": resolved.height,
         "no_vendor": len(tickers) - resolved.height,
         "vendor_ticker_changed": len(moved),
+        "vendor_ticker_lost": len(lost),
         **counts,
     }
 

@@ -119,7 +119,7 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
   the week (Monday to Friday) ending on `start + 7 i` days, on today's share basis (split-adjusted, not
   dividend-adjusted). It is `null` for a week in between with no priced day (a trading halt or a data gap); the
   previous close is not carried forward. A day without a close is not priced. A stock without a single priced
-  day has no file.
+  day has no file; a published file is deleted when its stock loses every priced day.
 
 ### Home
 

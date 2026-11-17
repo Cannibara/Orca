@@ -13,7 +13,15 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | 185 of 365 rows have pages: picked from name variants with a description check against namesakes, then fixed by hand for the best-known names | | `famous.csv` |
 | Preview on 2026-11-17 (60 days): Berkshire/Buffett 274k a month, Temasek 158k (steady daily, not a spike), Soros 156k, Citadel/Griffin 102k, Pershing/Ackman 63k, Scion/Burry 52k … Situational Awareness/Aschenbrenner 32k (#14 of 151) | | none |
 | Runs fetch the views (also `home_only`); if Wikipedia fails, the last good views (lake table `famous_views`) are used. The live list appears after the next pipeline run | | |
+| Cross-checked against `docs/famous-funds.txt` (PR #37, CIKs matched to live funds.json): 61 of its 68 CIKs are the same as famous.csv's; the other 7 are added (Slate Path → Tiger cubs; Samlyn, Alpha Wave, Encompass, Woodson, Sylebra's older filer → Fundamental long/short; GMO → Value). The Famous funds tab covers that file's Popular funds idea | Validation from live data this session cannot reach | `famous.csv` |
 
+## 2026-11-16 — Popular funds: draft list of 68 names
+
+| What changed | Why | Files |
+|---|---|---|
+| Draft list of 68 well-known funds, grouped by lineage (Buffett/Graham, Tiger Cubs, macro, activists, quant, other), each matched to a live CIK, book and position count, and flagged if in a top-25 list | Owner asked for a list of famous funds for backlog item 2b, from Wikipedia and press lineage articles (chat) | `docs/superpowers/specs/2026-11-14-popular-funds-draft.md`, `docs/famous-funds.txt` (names, CIK and link only) |
+
+- Not approved: the owner picks names and whether the tab groups by lineage. Only 3 of 68 (Coatue, Slate Path, Appaloosa) are in a top-25 list. Seed Stapleton and Sequoia lineages were not found by search. Nothing built; the contract (`home/popular.json`) comes next.
 ## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
 
 | What changed | Why | Files |
@@ -25,6 +33,14 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
 | Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
 
+## 2026-11-16 — Reused tickers: current vendor line only, wrong prices dropped
+
+| What changed | Why | Files |
+|---|---|---|
+| `vendor.resolve` accepts a ticker only on its current line at Tiingo (the one ending last; a tie goes to the longer line), still only when it overlaps the held days | Tiingo answers a ticker with today's company: Anadarko got today's APC from 2026-02, Macquarie got a 2026 ETF's MIC. About 67 stocks from the repair above, and about 509 from before it, were priced this way (code)(chat) | `pipeline/orca/vendor.py`, `tests/test_vendor.py` (the old "OLD" case now gets no ticker) |
+| A stock whose vendor ticker changes or is lost has every stored bar dropped (`prices.drop_stocks`, one file at a time), is fetched again if it still has a ticker, and is owed to its funds and its weekly file. Over 2000 lost in one run: nothing changes, flag `vendor_tickers_lost` | Refetching on a ticker change kept the old ticker's bars on days the new one lacks; a lost stock kept another company's bars | `pipeline/orca/prices.py`, `run/market.py` |
+| Published `stock/<id>/weekly.json` of a stock left with no priced day is deleted: the run writes `out/deleted.txt`, the upload step checks every line is `stock/<digits>/weekly.json` and deletes them before the manifest | The contract says such a stock has no file, and the upload never deleted anything, so the wrong chart would have stayed | `run/weekly.py` (`stale_weekly`, `write_deletions`), `.github/workflows/pipeline.yml` |
+
 ## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
 
 | What changed | Why | Files |
@@ -32,6 +48,8 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Cloudflare Web Analytics allowed in the CSP (`script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`). Checked against the live page with the new header: no CSP error, beacon loads | It had been switched on in the dashboard while the CSP blocked it: nothing counted, a console error on every page. Owner wants the figures (chat) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts`, DECISIONS, runbook step 8, ROADMAP U5, CLAUDE.md |
 | Vendor-ticker repair: more suffix rules (`*`, GBX, digits after a suffix), then hand-checked overrides by CUSIP, SEC name match, OpenFIGI US ticker with delisted listings (`includeUnlistedEquities`), all still limited to vendor spans that overlap the held days | Owner asked why two stocks had no `weekly.json`. Zeekr: OpenFIGI gave the Mexican "ZKN", Tiingo has "ZK". The Oracle one is a bond (no price expected). The same fault left 1,420 share-like stocks unpriced, among them Exxon's pre-2026 CUSIP ("EXMOC"; Exxon moved under ExxonMobil Holdings Corp with a new CUSIP), EA, WBD, QRVO, RTN, PX, APC: 4.03% of the 60 largest funds' holdings by cost | `pipeline/orca/vendor.py`, `securities.py` (`tickers_by_name`, `us_tickers`), `run/market.py` (`alternate_tickers`, `ticker_overrides`), `run/weekly.py`, `ticker_overrides.csv` (new), tests |
 | Measured on the published files and Tiingo's list, without the OpenFIGI step (needs the private lake): 447 of 1,420 repaired; the 60 largest funds' unpriced share 4.03% → 0.57%. Each repaired stock's history is fetched again on the next pipeline run, so that run is longer | | |
+| Live result (pipeline runs 43810473859 and 43838862209, 16 Nov). Run 1 spent 3 h on 3,213 new filings (the 14 Nov deadline), so its price stage started under the 90-minute reserve and fetched nothing; run 2 fetched 16,362 tickers (110 min), recomputed 11,131 funds. Securities: 653 + 168 vendor tickers changed, 118 by SEC name, 1,551 OpenFIGI US-ticker lookups. Share-like stocks without a price 1,420 → 638; latest prices 13 Nov. Exxon's old CUSIP (XOM, weekly from 2013), EA, WBD, QRVO, RTX, LUMN, TEVA, AUY, LBRDK, Zeekr (ZK, 2024-05 → 2025-12) priced | | |
+| Found after: Tiingo serves a ticker's current company only. A stock matched to an older line of a reused ticker gets the new company's bars (Anadarko → today's APC from 2026-02, Macquarie MIC, Navigant NCI, Sotheby's BID): wrong chart and latest price; fund P&L is mostly untouched, since those holdings ended before the new company's first bar. About 67 such stocks came from this fix, and about 509 were already priced this way before it (`vendor.resolve` accepted any overlapping line). Open: accept only the ticker's latest line and drop prices stored from another company | | |
 | Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
 | Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
 
