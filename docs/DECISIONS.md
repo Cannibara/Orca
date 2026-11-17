@@ -1,6 +1,6 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-16
+Last verified: 2026-11-17
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
@@ -11,6 +11,9 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Decision (chat): total return with dividends from the start, no price-only first look. So the build lives in the pipeline, where the lake holds daily dividends and SEC share counts. The engine's `quarter_px` already gives each stock's quarterly close and dividends per share.
 - Decision (chat): use an existing ETF as a node's index where a good cap-weighted one exists (semiconductors: SOXX or SMH, no test against our own). Build our own for the 12 broad sectors (our definitions differ from GICS: about 25% of our Technology value sits in names XLK does not hold), for nodes with no ETF, and to back-fill an ETF's history before its launch where more than about 15% of the funds' buying predates it (memory ETF: 62%; cybersecurity 9%; airlines 22%).
 - Confirmed (chat): scoring is at industry level (tier 2, 71 industries, R9); sector (12) and industry vertical (244) are toggles, and all three are computed in one pass. Verticals are thin (188 of 244 have under 10 stocks above $1bn), so they widen to the industry (R4). Assumed: a node's index holds the stocks whose main label is in it, so the nodes partition the market; extra labels only choose which index a pick is compared with.
+- Decision (chat, later the same day): an index is needed at every tier, and the toggle compares a stock with its vertical, industry or sector index (Micron vs Memory, vs Semiconductors/SOXX, vs Technology). ETFs must be labelled at the tier they track (SOXX industry, DRAM vertical, XLK sector).
+- Decision (chat): committing the stock → node and ETF → node mapping to the public repo is fine (Damodaran's file is public). Committed in `pipeline/orca/hierarchy/data/`.
+- Reviewed (architecture review, 2026-11-17): share counts need a history (`shares_hist` from the SEC data the code already downloads), sells replay as a fraction of the position, nodes need a quarter-average and a quarter-end level, and scoring runs in the pipeline. Plan and open questions: `docs/superpowers/plans/2026-11-17-sector-indices.md`.
 - Open: not built. Dividends and share counts live in the private lake, so the first real numbers come from a pipeline run.
 
 ## 2026-11-16 — How a fund's sector picks are scored (owner)

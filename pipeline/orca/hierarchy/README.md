@@ -15,6 +15,7 @@ The starting point is Damodaran's 94 US industry groups. Each group has a defaul
 | File | What |
 |---|---|
 | `labels.txt` | The source of truth. Edit this, nothing else. |
+| `data/stock_nodes.csv`, `data/etf_nodes.csv` | The labels for what the top 100 funds held (5,111 securities, 462 ETFs), keyed by stock id with the ticker as a guard. `data/batches/` holds the model's inputs and answers, so `--missing` runs only ask about new names. |
 | `model.py` | `parse` and `load` check `labels.txt` and report every problem at once; `Hierarchy.label(ticker, group, name)` returns the main label, the extra labels and how the main label was found. Standard library only. |
 | `tools/fetch_inputs.sh` | Downloads the three public inputs below. |
 | `tools/build_hierarchy.py` | Labels every listed stock and writes the JSON the review page reads. Needs `openpyxl` (a dev dependency). |
@@ -105,9 +106,9 @@ Nothing below is committed.
 - 1,034 small default-labelled stocks that the top funds held (0.8% of the dollars) and the default-labelled stocks nobody holds are not checked by name; 39 small business-service stocks sit in "Other Business Services".
 - Only the stocks the 100 best funds ever held (and, from Damodaran's file, the US-listed ones) have labels. Orca prices about 22,800 stocks. The 30 biggest funds outside the top 100 already have 99.6% of their value (stocks and ETFs) covered, so the long tail is small; the same tools label more. R8 says a model's first pass, not the SIC code.
 - ETFs: the 1,019 small ETFs are unclassed. Nothing scores ETFs yet.
-- Not wired in: no `stock_id` mapping, no change to `pipeline/contract.md` (change it first), no benchmark table (ROADMAP S4), nothing published.
+- Not wired in: the `stock_id` mapping is committed (`data/`) but the pipeline does not read it; no change to `pipeline/contract.md` (change it first), no benchmark table (ROADMAP S4), nothing published.
 
 ## Next steps
 1. The owner reviews stocks per industry vertical on the Browse tab (sorted by what the top funds bought) and the Not labelled tab, and answers R2–R8.
-2. Build the sector return table (ROADMAP S4) in the pipeline: per node and quarter, a market-cap weighted (no cap, rebalanced each quarter) total return from the engine's `quarter_px` closes and dividends per share and the SEC share counts, for all three tiers; an ETF stands in where a good one exists, and our own series back-fills an ETF's history where it is too short (DECISIONS 2026-11-17). Then settle the licence question (R10) before anything is shown on the site.
+2. Follow `docs/superpowers/plans/2026-11-17-sector-indices.md`. In short, build the sector return table (ROADMAP S4) in the pipeline: per node and quarter, a market-cap weighted (no cap, rebalanced each quarter) total return from the engine's `quarter_px` closes and dividends per share and the SEC share counts, for all three tiers; an ETF stands in where a good one exists, and our own series back-fills an ETF's history where it is too short (DECISIONS 2026-11-17). Then settle the licence question (R10) before anything is shown on the site.
 3. Change `pipeline/contract.md` (`securities.json` has one `sector` string from SIC today), then the pipeline, then the benchmark table (ROADMAP S4) that F4 and F5 share.

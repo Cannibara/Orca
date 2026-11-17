@@ -1,9 +1,18 @@
 # Worklog
 
-Last verified: 2026-11-16
+Last verified: 2026-11-17
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-17 — Sector indices: plan reviewed, labels committed, handoff written
+
+| What changed | Why | Files |
+|---|---|---|
+| Labels committed: 5,111 labelled securities (stock → vertical) and 462 classed ETFs (class, level, node), plus the model batch inputs and answers keyed by stock id | Owner approved committing (Damodaran's file is public); the scratchpad copies were the only ones and are ephemeral | `pipeline/orca/hierarchy/data/` |
+| Plan reviewed by an architecture review and a code check, then rewritten: share-count history (`shares_hist`), sells replayed as a fraction, quarter-average and quarter-end levels, stale-price rule, SIC fallback for unlabelled stocks, scoring in the pipeline, six phases | Today's single `shares_out` × past price misweights (Apple's count fell ~40% since 2013); matching sell dollars can drive a shadow negative | `docs/superpowers/plans/2026-11-17-sector-indices.md` |
+| Owner: indices at all three tiers with a toggle; ETFs labelled at the tier they track | Chat | `docs/DECISIONS.md` |
+| Not done: no code. Next: a fresh chat runs phases 1–3 from the plan's paste-ready prompt | | |
 
 ## 2026-11-17 — Sector return series: decisions recorded, nothing built
 

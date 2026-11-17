@@ -1,0 +1,200 @@
+{"id":45,"k":"broad","c":3}
+{"id":51,"k":"broad","c":3}
+{"id":120,"k":"broad","c":3}
+{"id":2202,"k":"sector","c":3,"lv":"industry","v":2}
+{"id":62,"k":"bond","c":3}
+{"id":720,"k":"sector","c":3,"lv":"sector","v":129}
+{"id":57,"k":"broad","c":3}
+{"id":102,"k":"sector","c":3,"lv":"sector","v":14}
+{"id":676,"k":"bond","c":3}
+{"id":735,"k":"intl","c":3}
+{"id":100,"k":"broad","c":3}
+{"id":680,"k":"broad","c":3}
+{"id":1817,"k":"sector","c":3,"lv":"vertical","v":204}
+{"id":1597,"k":"broad","c":3}
+{"id":38828,"k":"broad","c":1,"n":"unknown fund; guess US quality equity"}
+{"id":2470,"k":"broad","c":3}
+{"id":2302,"k":"sector","c":3,"lv":"sector","v":14}
+{"id":717,"k":"sector","c":3,"lv":"vertical","v":117}
+{"id":5583,"k":"broad","c":3}
+{"id":26844,"k":"crypto","c":3}
+{"id":1189,"k":"sector","c":3,"lv":"sector","v":118}
+{"id":686,"k":"broad","c":3}
+{"id":101,"k":"sector","c":3,"lv":"sector","v":212}
+{"id":736,"k":"intl","c":3}
+{"id":14116,"k":"sector","c":3,"lv":"vertical","v":204}
+{"id":14642,"k":"multi","c":3}
+{"id":1376,"k":"broad","c":3}
+{"id":2584,"k":"cash","c":3}
+{"id":1589,"k":"intl","c":3}
+{"id":1511,"k":"broad","c":3}
+{"id":1324,"k":"broad","c":3}
+{"id":1620,"k":"sector","c":3,"lv":"sector","v":118}
+{"id":31599,"k":"cash","c":1,"n":"guess: enhanced ultra-short income fund"}
+{"id":30689,"k":"cash","c":3}
+{"id":1354,"k":"sector","c":3,"lv":"sector","v":233}
+{"id":1190,"k":"sector","c":2,"lv":"sector","v":81,"n":"staples; spans several Consumer industries"}
+{"id":2142,"k":"broad","c":3}
+{"id":61,"k":"bond","c":3}
+{"id":53,"k":"broad","c":3}
+{"id":2488,"k":"intl","c":3}
+{"id":2138,"k":"broad","c":3}
+{"id":1799,"k":"sector","c":3,"lv":"sector","v":57}
+{"id":69,"k":"broad","c":3}
+{"id":56,"k":"broad","c":3}
+{"id":571,"k":"intl","c":3}
+{"id":2480,"k":"bond","c":3}
+{"id":1690,"k":"theme","c":3}
+{"id":1622,"k":"sector","c":3,"lv":"sector","v":57}
+{"id":675,"k":"intl","c":3}
+{"id":2657,"k":"broad","c":3}
+{"id":2494,"k":"cash","c":3}
+{"id":2565,"k":"broad","c":3}
+{"id":52,"k":"bond","c":3}
+{"id":1587,"k":"intl","c":3}
+{"id":1712,"k":"bond","c":3}
+{"id":1591,"k":"broad","c":3}
+{"id":741,"k":"sector","c":2,"lv":"sector","v":167,"n":"GICS industrials; spills into Defence, Business Services"}
+{"id":13212,"k":"broad","c":3}
+{"id":32803,"k":"theme","c":2,"n":"ex-US infrastructure development theme"}
+{"id":1005,"k":"sector","c":3,"lv":"sector","v":14}
+{"id":677,"k":"intl","c":3}
+{"id":1688,"k":"broad","c":3}
+{"id":1435,"k":"bond","c":3}
+{"id":2137,"k":"bond","c":3}
+{"id":1902,"k":"commodity","c":3}
+{"id":3142,"k":"broad","c":3}
+{"id":2656,"k":"broad","c":3}
+{"id":1797,"k":"intl","c":3}
+{"id":6413,"k":"bond","c":3}
+{"id":17688,"k":"intl","c":3}
+{"id":14219,"k":"theme","c":2,"n":"blockchain; crypto miners, exchanges, payments"}
+{"id":25539,"k":"multi","c":3}
+{"id":31696,"k":"crypto","c":3}
+{"id":2319,"k":"broad","c":3,"lev":"3x"}
+{"id":118,"k":"broad","c":3}
+{"id":2423,"k":"broad","c":3}
+{"id":48,"k":"commodity","c":3}
+{"id":21261,"k":"multi","c":2,"n":"Pacer fund of funds; tactical allocation"}
+{"id":14798,"k":"intl","c":3}
+{"id":1790,"k":"bond","c":3}
+{"id":3011,"k":"sector","c":3,"lv":"sector","v":129}
+{"id":1800,"k":"sector","c":3,"lv":"sector","v":233}
+{"id":1353,"k":"intl","c":3}
+{"id":2596,"k":"broad","c":3}
+{"id":1546,"k":"cash","c":3}
+{"id":2401,"k":"bond","c":3}
+{"id":20297,"k":"commodity","c":3}
+{"id":2204,"k":"intl","c":3}
+{"id":2008,"k":"broad","c":3}
+{"id":738,"k":"sector","c":2,"lv":"sector","v":81,"n":"staples; spans several Consumer industries"}
+{"id":3907,"k":"bond","c":3}
+{"id":1188,"k":"sector","c":3,"lv":"sector","v":200}
+{"id":33333,"k":"intl","c":2,"n":"active country rotation outside US"}
+{"id":2466,"k":"sector","c":3,"lv":"sector","v":212}
+{"id":3120,"k":"commodity","c":3,"lev":"-2x"}
+{"id":11648,"k":"intl","c":3}
+{"id":37608,"k":"sector","c":2,"lv":"sector","v":14,"n":"VanEck TrustCore technology; inferred from name"}
+{"id":26749,"k":"bond","c":3}
+{"id":2931,"k":"sector","c":3,"lv":"sector","v":212}
+{"id":743,"k":"sector","c":3,"lv":"sector","v":224}
+{"id":1618,"k":"broad","c":3}
+{"id":1170,"k":"sector","c":2,"lv":"vertical","v":208,"n":"oil and gas E&P; some gas producers"}
+{"id":1531,"k":"broad","c":3}
+{"id":2351,"k":"intl","c":3}
+{"id":37072,"k":"sector","c":2,"lv":"sector","v":14,"n":"PureCap information technology; inferred from name"}
+{"id":37530,"k":"broad","c":1,"n":"guess: active US equity, Dana"}
+{"id":2490,"k":"broad","c":3}
+{"id":30506,"k":"broad","c":3}
+{"id":1777,"k":"commodity","c":3,"lev":"2x"}
+{"id":2652,"k":"bond","c":3}
+{"id":8673,"k":"sector","c":3,"lv":"sector","v":129}
+{"id":679,"k":"bond","c":3}
+{"id":65,"k":"commodity","c":3}
+{"id":1788,"k":"bond","c":3}
+{"id":3459,"k":"commodity","c":3}
+{"id":33335,"k":"theme","c":3}
+{"id":1404,"k":"intl","c":3}
+{"id":1003,"k":"intl","c":3}
+{"id":1325,"k":"intl","c":3}
+{"id":8675,"k":"sector","c":2,"lv":"sector","v":167,"n":"GICS industrials; spills into Defence, Business Services"}
+{"id":5161,"k":"theme","c":3}
+{"id":16586,"k":"broad","c":3}
+{"id":26646,"k":"theme","c":2,"n":"active US thematic rotation"}
+{"id":16585,"k":"broad","c":3}
+{"id":4049,"k":"broad","c":3}
+{"id":18696,"k":"bond","c":3}
+{"id":29974,"k":"sector","c":2,"lv":"sector","v":195,"n":"defense tech; some aerospace, foreign names"}
+{"id":36294,"k":"sector","c":2,"lv":"sector","v":195,"n":"defense industrials active; inferred from name"}
+{"id":1463,"k":"sector","c":2,"lv":"sector","v":214,"n":"energy MLPs; oil and gas pipelines"}
+{"id":1720,"k":"intl","c":3}
+{"id":13200,"k":"intl","c":3}
+{"id":2478,"k":"bond","c":3}
+{"id":31842,"k":"multi","c":3}
+{"id":3010,"k":"sector","c":2,"lv":"sector","v":167,"n":"GICS industrials; spills into Defence, Business Services"}
+{"id":10084,"k":"intl","c":3}
+{"id":8592,"k":"sector","c":2,"lv":"sector","v":233,"n":"ex-US real estate; foreign holdings"}
+{"id":18732,"k":"broad","c":3}
+{"id":10365,"k":"intl","c":3}
+{"id":1619,"k":"intl","c":3}
+{"id":9310,"k":"theme","c":2,"n":"US industrial renaissance; industrial, infrastructure small-mids"}
+{"id":1722,"k":"sector","c":3,"lv":"sector","v":224}
+{"id":3415,"k":"intl","c":3}
+{"id":18362,"k":"intl","c":3}
+{"id":21038,"k":"cash","c":3}
+{"id":2489,"k":"bond","c":3}
+{"id":1006,"k":"sector","c":3,"lv":"sector","v":129}
+{"id":1009,"k":"sector","c":3,"lv":"sector","v":200}
+{"id":12794,"k":"sector","c":3,"lv":"vertical","v":183}
+{"id":8677,"k":"sector","c":3,"lv":"sector","v":57}
+{"id":14754,"k":"sector","c":2,"lv":"sector","v":14,"n":"ticker RSPT: equal-weight S&P 500 technology"}
+{"id":8672,"k":"sector","c":2,"lv":"sector","v":81,"n":"staples; spans several Consumer industries"}
+{"id":2434,"k":"cash","c":3}
+{"id":2647,"k":"intl","c":3}
+{"id":13648,"k":"sector","c":3,"lv":"vertical","v":218}
+{"id":39537,"k":"sector","c":2,"lv":"sector","v":57,"n":"VanEck TrustCore communication services; inferred from name"}
+{"id":1577,"k":"bond","c":3}
+{"id":37074,"k":"sector","c":2,"lv":"sector","v":84,"n":"PureCap consumer discretionary; inferred from name"}
+{"id":1326,"k":"theme","c":2,"n":"aerospace and defense; spans Industrials and Defence"}
+{"id":2551,"k":"broad","c":3}
+{"id":1621,"k":"sector","c":3,"lv":"sector","v":200}
+{"id":2465,"k":"sector","c":3,"lv":"sector","v":14}
+{"id":19157,"k":"bond","c":3}
+{"id":1719,"k":"intl","c":3}
+{"id":36,"k":"sector","c":3,"lv":"sector","v":212}
+{"id":17681,"k":"bond","c":3}
+{"id":2717,"k":"sector","c":3,"lv":"sector","v":129,"lev":"3x"}
+{"id":8671,"k":"sector","c":2,"lv":"sector","v":84,"n":"discretionary; AMZN, TSLA sit outside Consumer"}
+{"id":2475,"k":"broad","c":3}
+{"id":5156,"k":"broad","c":3}
+{"id":8772,"k":"commodity","c":3}
+{"id":1542,"k":"broad","c":3}
+{"id":60,"k":"broad","c":3}
+{"id":16022,"k":"intl","c":3}
+{"id":17685,"k":"bond","c":3}
+{"id":673,"k":"intl","c":3}
+{"id":1012,"k":"cash","c":3}
+{"id":2450,"k":"commodity","c":3}
+{"id":5591,"k":"bond","c":3}
+{"id":8777,"k":"bond","c":3}
+{"id":22761,"k":"commodity","c":3}
+{"id":3274,"k":"sector","c":2,"lv":"sector","v":84,"n":"discretionary AlphaDEX; mostly Consumer sector"}
+{"id":6171,"k":"bond","c":3}
+{"id":32865,"k":"crypto","c":3}
+{"id":1729,"k":"intl","c":3}
+{"id":3765,"k":"broad","c":3}
+{"id":36292,"k":"bond","c":2,"n":"global government bonds, likely USD hedged"}
+{"id":37607,"k":"sector","c":2,"lv":"sector","v":84,"n":"VanEck TrustCore discretionary; inferred from name"}
+{"id":14584,"k":"sector","c":2,"lv":"vertical","v":213,"n":"gas-weighted E&Ps; some oil producers"}
+{"id":2481,"k":"cash","c":2,"n":"floating-rate Treasuries; near-zero duration"}
+{"id":683,"k":"sector","c":3,"lv":"vertical","v":117}
+{"id":37531,"k":"broad","c":2,"n":"Dana concentrated US dividend stocks"}
+{"id":1496,"k":"broad","c":3}
+{"id":1727,"k":"bond","c":3}
+{"id":14784,"k":"broad","c":3}
+{"id":14750,"k":"broad","c":3}
+{"id":30264,"k":"multi","c":3}
+{"id":693,"k":"bond","c":3}
+{"id":14677,"k":"crypto","c":3}
+{"id":1323,"k":"sector","c":3,"lv":"sector","v":212}
+{"id":1521,"k":"broad","c":3}
