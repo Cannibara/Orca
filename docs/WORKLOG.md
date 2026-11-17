@@ -1,9 +1,25 @@
 # Worklog
 
-Last verified: 2026-11-16
+Last verified: 2026-11-17
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-17 — Pre-2013 13F history (1999 to mid-2013) from the old text filings
+
+| What changed | Why | Files |
+|---|---|---|
+| New source `legacy`: every 13F-HR / 13F-HR/A in the EDGAR full index 1999Q1–2013Q3 not already stored, its free-text table read by CUSIP check digit and stored only when it agrees with the filer's declared entry count or value total (or declares none); a check row per filing in lake table `legacy_checks` | Owner: "fully utilise pre-2013 SEC 13F data". The bulk data sets start with 2013 Q2 filings, so even Q1 2013 was missing (Berkshire began Q2 2013) | `pipeline/orca/sec/legacy.py`, `run/ingest.py` (`ingest_legacy`) |
+| New command `backfill` (Pipeline input `backfill`): legacy filings until 40 min of the budget are left, then new CUSIPs, vendor tickers and older prices; computes and publishes nothing | ~160,000 downloads at 8/s ≈ 5.5 h: two runs, then one ordinary run computes | `run/weekly.py` (`run_backfill`), `run/cli.py`, `.github/workflows/pipeline.yml` |
+| Reader measured on 607 sampled filings (1999–2013): of 568 text filings 74.3% `ok`, 3.0% `close`, 12.5% `unverified`, 6.3% `mismatch`, 3.0% `no_rows`, 0.9% `empty`; Berkshire Q4 2004 exact (66 rows, $35.76bn) | Prototype first, rules added for each failure seen (wrapped rows, one field per line, Berkshire repeats, totals, typo CUSIPs, 8-char CUSIPs, swapped headings, dollar tables) | `tests/test_legacy.py` |
+| Dead companies kept: a CUSIP first held before 2013 that OpenFIGI misses is asked again with delisted securities (method `unlisted`), never matched by name, no vendor code kept as a ticker, no SEC lookups | OpenFIGI's plain mapping returns nothing for Enron, Lehman, WaMu, Gillette (checked); without them old returns read too high; a name match would merge old and new GM (design review) | `securities.py` (`map_unlisted`), `run/market.py` |
+| Prices from 1999 (`HISTORY_START`); stocks held before 2013 get only their missing years fetched once (stage "price history", after the regular refresh); vendor tickers checked over the 2013+ span for stocks also held since; T-bills from 1999, refetched when the stored table starts later | Old closes, dividends and splits (a missed split reads as a trade); keep today's prices unchanged | `prices.py` (`fetch_heads`), `run/market.py` (`backfill_price_heads`, `held_spans`, `update_rf`), `rf.py` |
+| `verify` skips funds owed a recompute; the coverage gate counts active funds only; source rank bulk > live > legacy; the SEC client's rate limit is thread-safe | The monthly check and the gate would fail after a backfill; downloads run 4 at once | `run/weekly.py`, `holdings.py`, `http.py` |
+| Web: one `qOfYear` helper for every quarter-of-year sum (`-1 % 4` is −1 in JS: Q4 2012 read "Q0 2012"), no quarter-0 floors in charts and What-if, new 15y empty note. Workbook: `Q_OFFSET` = 100 in "last quarter" formulas | Negative quarter indexes before 2013 | `web/src/lib/format.ts` and callers, `web/src/fund/whatif.ts`, `pipeline/orca/workbook/layout.py`, `summary.py` |
+| Design spec, then a design review (14 findings, 8 changes folded in; see its section 13) | Plan first | `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md` |
+
+- Not run yet: the backfill itself. Next: merge, run Pipeline with `backfill` until it prints `"left": {"price_histories": 0, "quarters": 0}`, then an ordinary run; check `legacy_checks` counts, Berkshire from 1999, the 15y lists, health flags, run time, and the share of funds whose tracking segment reaches their first legacy quarter (two unreadable filings in a row cut a fund's older history).
+- Open: Famous funds that stopped before 2013 (Pabrai's 2004–11 filer, Peninsula, Castle Point; WORKLOG 2026-11-16) can now be listed: the owner decides.
 
 ## 2026-11-17 — Famous funds: Most searched list (Google Trends)
 

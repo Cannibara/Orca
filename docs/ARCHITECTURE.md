@@ -1,13 +1,13 @@
 # Architecture
 
-Last verified: 2026-11-17 (vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-17 (pre-2013 history from text filings; vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
 ```mermaid
 flowchart LR
   subgraph Sources
-    SEC[SEC EDGAR<br/>13F data-set ZIPs, daily index,<br/>submissions, company_tickers, companyconcept]
+    SEC[SEC EDGAR<br/>13F data-set ZIPs, daily index,<br/>full index + pre-2013 text filings,<br/>submissions, company_tickers, companyconcept]
     FIGI[OpenFIGI mapping API]
     TI[Tiingo daily prices<br/>+ supported_tickers.zip]
     FRED[FRED DTB3]
@@ -41,6 +41,7 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `http.py` | `Client` (rate limit, retries), `FetchError`, `sec_client`, `figi_client`, `tiingo_client`, `fred_client` |
 | `sec/bulk.py` | list and parse SEC 13F data-set ZIPs (`list_bulk_zips`, `parse_bulk_zip`, `raw_holdings`, `value_to_usd`) |
 | `sec/live.py` | EDGAR daily index + submission `.txt` parsing (`fetch_new_filings`, `parse_daily_index`) |
+| `sec/legacy.py` | pre-2013 13F filings: EDGAR full index (`fetch_index`), free-text information tables found by CUSIP check digit (`read_table`), checked against the filer's declared totals (`check_table`), per full-index quarter (`fetch_quarter`, 4 downloads at once) |
 | `holdings.py` | `select_reports`, `build_holdings`, `fill_gaps` |
 | `securities.py` | CUSIP → FIGI/ticker (`map_cusips`), stock ids, SIC → sector, SEC lookups |
 | `vendor.py` | Tiingo ticker universe (`load_universe`, `resolve`, `candidates`) |
@@ -56,42 +57,44 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
 | `demo.py` | synthetic offline dataset for `web/public/demo-data` |
 
-CLI: `python -m orca.run {weekly | rebuild | home | check-keys | verify [--sample N --seed S] | workbook --fund ID [--fund ID …] [--out DIR --max-positions N] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
+CLI: `python -m orca.run {weekly | rebuild | backfill | home | check-keys | verify [--sample N --seed S] | workbook --fund ID [--fund ID …] [--out DIR --max-positions N] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
 
 Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIINGO_RATE_PER_SEC`, `FRED_KEY`, `ORCA_TIME_BUDGET_MIN`, `ORCA_LAKE_DIR` (default `data/lake`), `ORCA_OUT_DIR` (default `data/out`), `ORCA_NETWORK` (tests).
 
 ### Ingestion
 | Item | Fact |
 |---|---|
-| Schedule | `pipeline.yml`: `23 6 16 * *` (the job is named `weekly` but runs monthly), `41 7 1 * *` runs `verify`; both need `vars.ORCA_SCHEDULE_ENABLED == 'true'`; manual inputs `full`, `home_only`; concurrency group `pipeline` |
-| Prices | daily bars from each stock's last stored date to today (`prices.TiingoSource`, `startDate`/`endDate`); targets: latest-quarter holdings, SPY, exits within `EXIT_REFRESH_QUARTERS = 6`, never-fetched stocks; stalest first (`run/market.refresh_prices`) |
+| Schedule | `pipeline.yml`: `23 6 16 * *` (the job is named `weekly` but runs monthly), `41 7 1 * *` runs `verify`; both need `vars.ORCA_SCHEDULE_ENABLED == 'true'`; manual inputs `full`, `home_only`, `backfill` (one at most; `backfill` uploads and purges nothing); concurrency group `pipeline` |
+| Prices | daily bars from each stock's last stored date to today, from `prices.HISTORY_START` = 1999-01-01 for a new stock (`prices.TiingoSource`, `startDate`/`endDate`); then stage "price history": the missing years before a stock's first stored bar for stocks held before 2013 (`run/market.backfill_price_heads`, `prices.fetch_heads`, once each: `state.price_backfilled`); targets: latest-quarter holdings, SPY, exits within `EXIT_REFRESH_QUARTERS = 6`, never-fetched stocks; stalest first (`run/market.refresh_prices`) |
 | Timeouts | job 330 min, step 300 min; budget `ORCA_TIME_BUDGET_MIN` (default 270, `run/budget.py`); the price stage stops with `min(90, budget/3)` min left (`run/market.py` `PRICES_RESERVE_MIN`) |
 | SEC | `SEC_RATE_PER_SEC = 8.0` (`http.py`); User-Agent `Orca research {ORCA_CONTACT}`, `RuntimeError` if unset |
 | Others | OpenFIGI keyed 25 req/6 s × 100 jobs (anonymous 25/60 s × 10); Tiingo 2.5/s default; FRED 2/s; timeout 30 s |
 | Retries | up to 4, sleeping 2/4/8/16 s, on transport errors, 429 and 5xx; other 4xx and all 3xx raise (no redirects) (`Client._request`) |
 | Breakers | prices stop on 401/403/429 or 25 consecutive failures (`prices.py`); live ingest stops after 3 refused days/downloads or a 429 (`live.py`) |
 | Idempotency | `ingested.json` (ZIP name → sha256; the skip check is by name only); per-quarter parts replaced by (accession, source); `state.json` pending sets are cleared only after a successful publish; `_reconcile_published` compares `published.json` with the site manifest; only changed files upload; `manifest.json` last |
-| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` / `HealthGateError` abort before the manifest; the lake is saved after any run. Health gates (`run/gates.check_health`, called in `run_weekly` after the CUSIP scan): lake has CUSIPs but none mapped to a stock; median `priced_pct` below `config.COVERAGE_MIN` = 0.90 (live 0.988); funds with reports were tried and none was computed (`_Funds.with_reports`; funds without a report are not counted, and not when the time budget cut the run). `run_home` is not gated |
-| verify | rebuilds 50 random published funds from raw parts and compares sha256 with `published.json`; no API calls |
+| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` / `HealthGateError` abort before the manifest; the lake is saved after any run. Health gates (`run/gates.check_health`, called in `run_weekly` after the CUSIP scan): lake has CUSIPs but none mapped to a stock; median `priced_pct` of the active funds below `config.COVERAGE_MIN` = 0.90 (live 0.988); funds with reports were tried and none was computed (`_Funds.with_reports`; funds without a report are not counted, and not when the time budget cut the run). `run_home` is not gated |
+| verify | rebuilds 50 random published funds from raw parts and compares sha256 with `published.json`, leaving out funds owed a recompute (after a backfill they differ until the next run); no API calls |
 
 ### 13F quirks handled
 | Quirk | Handling (file, function) |
 |---|---|
 | Amendments | base = latest 13F-HR, or the latest RESTATEMENT; NEW HOLDINGS amendments filed after it are added and summed; unknown types ignored; bulk beats live for the same accession (`holdings.select_reports`, `_bulk_first_unique`) |
 | Value units | VALUE × 1000 for filings before 2023-01-03, dollars from then (`config.VALUE_DOLLARS_FROM`, `bulk._unit_multiplier`); valuation uses shares × our price, VALUE only as a fallback price |
-| CUSIP mapping | OpenFIGI (prefer `exchCode == "US"`, composite FIGI), else exact name match to one SEC ticker; ETF when `securityType == "ETP"`; retried/remapped every 28 days (≤ 2000 per run); vendor tickers resolved from Tiingo's list (`securities.map_cusips`, `vendor.candidates`) |
+| CUSIP mapping | OpenFIGI (prefer `exchCode == "US"`, composite FIGI), else exact name match to one SEC ticker; a CUSIP first held before 2013 is never name-matched and, if not found, is asked again with `includeUnlistedEquities` (`securities.map_unlisted`, method `unlisted`: Enron, Lehman; a vendor code such as `8181760Q` is not kept as a ticker, and no SEC CIK lookups); ETF when `securityType == "ETP"`; retried/remapped every 28 days (≤ 2000 per run); vendor tickers resolved from Tiingo's list (`securities.map_cusips`, `vendor.candidates`) |
 | Options, bonds | PUT/CALL and PRN rows are stored but only `kind == "SH"` enters P&L and pricing (`run/compute.py`); their value still counts in `priced_pct` |
+| Pre-2013 (legacy) | `python -m orca.run backfill` (`run/weekly.run_backfill`): EDGAR full-index quarters 1999Q1–2013Q3 not in `state.legacy_done`, oldest first, until 40 min of the budget are left (`run/ingest.ingest_legacy`); accessions already stored from bulk/live are not downloaded; each filing's check goes to `legacy_checks/<YYYYQn>`; then new CUSIPs, vendor tickers and price history. Stored statuses: `ok` (entry count = coded rows, or value total within 0.5%, × 1 / × 1000 / ÷ 1000), `close` (within 2%), `unverified` (no totals declared). Not stored: `mismatch`, `no_rows`, `empty`, `paper`, `no_period`, `download_failed`. Period from the SEC header, CIK from its first filer, amendment type from the cover's checked box. Funds touched wait in `pending_funds` for the next ordinary run. Sample of 607 (2026-11-17): 89.8% of text filings stored (spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`) |
 | Filing lag | latest quarter = quarter whose 45-day deadline has passed (`weekly.deadline_quarter`, `DEADLINE_DAYS = 45`) |
 | Missed quarters | one missed quarter is carried (`carried=True`); a gap of 2+ starts a new segment and only the last segment is computed; `inactive` when the last filing is older than `last_q − 1` (`holdings.fill_gaps`, `compute_fund`) |
 | Splits | prices split-adjusted, share counts adjusted by quarter factors; suspicious 2/3/4/5/10× changes flagged (`prices.split_adjust_prices`, `compute.split_suspects`) |
 | Unpriced | a held unpriced stock enters the book at its first priced close; fallback chain last close → implied price; > 10× mismatch flagged (`engine/position.compute_position`) |
 | Duplicates | SUBMISSION/COVERPAGE de-duplicated by accession; share classes summed per `stock_id` |
 | Confidential treatment | UNKNOWN / not handled in code |
+| Pre-2013 text tables | fixed-width, tabs, quotes, wrapped rows, one field per line, HTML; 6-2-1 spaced or hyphenated CUSIPs; 8-character CUSIPs (check digit computed) when no 9-character one validates; Berkshire-style rows repeating the CUSIP above; total and subtotal lines skipped (they add up the rows above); rows with a mistyped CUSIP or a SEDOL counted for the check, not stored; headings with SHARES before VALUE swap the two numbers; a table in dollars (median value per share > 1 in thousands) stored as dollars (`sec/legacy.py`) (code) |
 | Notice filings | 13F-NT / 13F-NT/A carry no holdings and are skipped (`sec/bulk.KEPT_FORMS`); a fund that only filed a notice shows its previous quarter (Pershing Square Q2 2026) (code)(chat) |
 | Value in thousands after 2023 | some filers kept reporting thousands; ~1,000 `price_mismatch` flags, often exactly 1000× (chat) |
 | Invalid CUSIPs | ~29,000 filing CUSIPs (often a dropped leading zero) get an OpenFIGI error → method "error", no name match, left out (`securities.py`) (code)(chat) |
 | Delisted stocks | OpenFIGI drops the US ticker and returns a foreign listing (`XLNXEUR`, `TWTRUSD`, `EA*`, `RTN1USD`, `ZKN`). `vendor.candidates` strips a currency suffix (GBX included) or a trailing `*`, then trailing digits after one. A stock still without a vendor ticker tries, in order: `pipeline/orca/ticker_overrides.csv` (hand-checked, by CUSIP: Exxon's pre-2026 CUSIP → XOM, CenturyLink → LUMN, …), the SEC ticker of the same normalised name (exactly one SEC row; not for tickers with `-` or spaces), and OpenFIGI's US ticker with `includeUnlistedEquities` (asked once per stock, kept in lake table `figi_us_tickers`, ≤ 1000 a run). Bonds and options (tickers with spaces) only get overrides (`run/market.alternate_tickers`) (code) |
-| Reused tickers | Tiingo serves a ticker's prices for whoever trades under it today, so only a ticker's current line (the one that ends last) counts, only when it overlaps the stock's held span, and not when the stock was also held during an older line that ended over 31 days before the current one began (a filer still reporting Anadarko in 2026) (`vendor.resolve`; `FB` today is not Facebook, `APC` today is not Anadarko). A stock whose vendor ticker changes or goes has all its stored bars dropped (`prices.drop_stocks`; a changed one is fetched again), its funds recomputed, and its published `weekly.json` deleted: the run lists the paths in `out/deleted.txt` and the upload step deletes them (lines checked against `stock/<id>/weekly.json`). More than 2000 lost in one run is taken for a broken vendor list: nothing changes, flag `vendor_tickers_lost` (`run/market.resolve_vendor_tickers`) (code) |
+| Reused tickers | Tiingo serves a ticker's prices for whoever trades under it today, so only a ticker's current line (the one that ends last) counts, only when it overlaps the stock's held span, and not when the stock was also held during an older line that ended over 31 days before the current one began (a filer still reporting Anadarko in 2026) (`vendor.resolve`; `FB` today is not Facebook, `APC` today is not Anadarko). A stock whose vendor ticker changes or goes has all its stored bars dropped (`prices.drop_stocks`; a changed one is fetched again), its funds recomputed, and its published `weekly.json` deleted: the run lists the paths in `out/deleted.txt` and the upload step deletes them (lines checked against `stock/<id>/weekly.json`). More than 2000 lost in one run is taken for a broken vendor list: nothing changes, flag `vendor_tickers_lost` (`run/market.resolve_vendor_tickers`) (code) A stock also held from 2013 on is checked over its 2013+ span only, so its pre-2013 quarters cannot cost it today's ticker (`run/market.held_spans`) (code) |
 | Holding companies and corporates | single-stock vehicles jump 0 → 96%+; filers like Alphabet Inc. report huge new stakes; book jumps from newly priced holdings or restructurings (Woodbridge $737M → $25.2bn). Conviction skips largest holding > 33% and AUM change outside ½–2× (code `home._conviction_quarter`)(chat) |
 | Share-count errors | some BRK-A share counts were off 15–28× (chat) |
 | Spin-offs, in-kind transfers | shares received in a spin-off or moved in kind by a wealth-management client look like trades; not separable in 13F data (chat) |
@@ -133,16 +136,17 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 ## Lake schema (zstd Parquet, `storage.Lake.write`)
 | Table | Columns (units) |
 |---|---|
-| `filings/qNNN`, `reports/qNNN` | accession, cik i64, period i16 (quarter index), filed date, form, amendment_type, manager_name, source (bulk/live) |
+| `filings/qNNN`, `reports/qNNN` | accession, cik i64, period i16 (quarter index), filed date, form, amendment_type, manager_name, source (bulk/live/legacy; bulk beats live beats legacy for one accession, `holdings.SOURCE_RANK`). Before 2013 NNN is negative (`q-56` = Q1 1999; parts sort as text) |
 | `raw_holdings/qNNN` | accession, cusip, issuer, title, shares f64, sh_type, put_call, value_usd f64 (dollars), source |
 | `holdings/qNNN` | cik, q i16, cusip, kind (SH/PRN/PUT/CALL), shares, value_usd, filed |
 | `securities` | stock_id i32, figi, ticker, name, is_etf, cik, sic i32, sector, shares_out |
-| `cusip_map` | cusip, stock_id, method, tried (internal only, never published) |
+| `cusip_map` | cusip, stock_id, method (openfigi / name / unmapped / error / unlisted: found only with delisted securities included, for CUSIPs first held before 2013, never by name), tried (internal only, never published) |
+| `legacy_checks/<YYYYQn>` | accession, cik, period, filed, form, status, rows, invalid_rows, parsed_value, declared_value, declared_entries (one row per pre-2013 filing read; private) |
 | `prices_daily/{y<year>, z<run>-NNNN}` | raw unadjusted OHLC f32, volume f64, split_factor f32, dividend f32 |
 | `vendor_tickers` | stock_id, ticker, end |
-| `rf` | year i32, rate f64 (decimal) |
+| `rf` | year i32, rate f64 (decimal); from 1999 (`rf.START`), fetched again when the stored table starts later |
 | `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
-| JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`), `published.json` |
+| JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`, `price_backfilled`, `legacy_done`), `published.json` |
 
 ### Lake backups (`pipeline.yml`, step "Back up the lake state")
 - After a scheduled run that succeeded end to end (pipeline and save; never a manual run, so reruns cannot flush the good monthly backups), `rclone copy` puts the small, hard-to-rebuild lake state in `backups/<UTC date>/` of the PRIVATE lake bucket: `ingested.json`, `state.json`, `published.json`, `fund_state`, `cusip_map`, `vendor_tickers`, `securities`, `rf`. Not `prices_daily` (large; refetched from Tiingo) and not `filings`/`raw_holdings`/`holdings`/`reports` (rebuilt from the SEC's files). The source is the local lake just saved, not a server-side copy (no overlap with the live keys).

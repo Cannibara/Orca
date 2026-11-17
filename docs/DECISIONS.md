@@ -1,10 +1,18 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-16
+Last verified: 2026-11-17
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-17 — Pre-2013 13F history read from the old text filings
+- Decision: read every 13F-HR and 13F-HR/A filed on EDGAR from 1999 to the XML switch in mid-2013 (source `legacy`), find each row by its CUSIP check digit, and store a filing only if its table agrees with the filer's own declared entry count or value total (or declares none); prices and T-bills go back to 1999 (owner: "fully utilise pre-2013 SEC 13F data"; spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`) (chat)(code).
+- Context: the bulk data sets start with 2013 Q2 filings, so even Q1 2013 was missing (Berkshire's history began Q2 2013). On a 607-filing sample, 89.8% of text filings are stored: 77.3% agree with the filer's totals and 12.5% declare none to check (code `sec/legacy.py`).
+- Companies that died before today are kept: a CUSIP first held before 2013 that OpenFIGI does not find is asked again with delisted securities included, and is never matched by name (old GM vs new GM); without that, old books lose their losers and old returns read too high (code `run/market.map_new_cusips`).
+- A stock also held since 2013 keeps today's ticker rule over its 2013+ span only, so the older history cannot cost it its prices (code `run/market.held_spans`).
+- Rejected: a full price refetch from 1999 (re-downloads every 2013+ bar); storing near-miss tables (wrong numbers are worse than less history); carrying unreadable quarters as filed (stale books) (chat).
+- Consequences: a backfill run (`backfill` input) before the next ordinary run; a fund with two unreadable filings in a row shows only its history after them; run time and lake size grow (chat).
 
 ## 2026-11-10 — Planned features conflict with earlier positions
 Planned features F1–F5 (`docs/ROADMAP.md`, proposals until the owner approves) cut across earlier decisions. Resolve each with the owner before building:
@@ -203,7 +211,7 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 ## 2026-11-03 — Home page review rulings
 - Decision: eyebrow "Quarterly 13F Data from SEC.gov", h1 "Fund Manager Research", no subtitle or rule line, columns "AUM" and "Max Drawdown", every column sortable on every home list, 100 rows per page, periods 10y and 15y added (chat)(git 2a30794; code `PERIODS`).
 - Context: the owner's 9 comments on a commentable artifact copy of the live site (chat).
-- Consequences: the 15y tab is empty until 2028 (data starts 2013) (chat).
+- Consequences: the 15y tab was empty until 2028 (data started in 2013); since the pre-2013 history (2026-11-17) it is not (chat).
 
 ## 2026-11-02 — Pipeline runs monthly on the 16th (git 49e3a54)
 - Context: the 16th falls after each 13F deadline (Feb 14, May 15, Aug 14, Nov 14).

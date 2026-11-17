@@ -27,7 +27,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 - Pipeline: Python ≥ 3.13, `uv`, Polars, httpx, brotli (`pipeline/pyproject.toml`). Runs on GitHub Actions (`.github/workflows/pipeline.yml`): monthly on the 16th at 06:23 UTC, a check on the 1st, or by hand.
 - Storage: R2 bucket `R2_LAKE_BUCKET` (private Parquet lake; holds CUSIPs, never public). R2 bucket `orca-site` (`R2_SITE_BUCKET`, public JSON) is served at `data.orcaetf.com` with a Cloudflare cache rule (edge 1 month, browser 2 h), purged after each upload.
 - Web: React 18 + Vite 7 + TypeScript, react-router 7 (package `react-router`), @tanstack/react-virtual, vitest 4 + jsdom, Playwright (`web/package.json`). Cloudflare Pages project `orca` (`orca-88p.pages.dev`; custom domains `www.orcaetf.com`, bare `orcaetf.com` 301 → www).
-- External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Google Trends (Most searched) is a hand-refreshed snapshot (`pipeline/scripts/google_trends.py`), not fetched by runs. Keys live only in GitHub secrets.
+- External data: SEC EDGAR (bulk 13F data sets, daily index, full index and pre-2013 text filings, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Google Trends (Most searched) is a hand-refreshed snapshot (`pipeline/scripts/google_trends.py`), not fetched by runs. Keys live only in GitHub secrets.
 
 ## Repo map
 ```
@@ -56,7 +56,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Web build | `cd web && npm run build` (vite build + `scripts/prerender.mjs`) |
 | Web e2e | `cd web && npx playwright test` (cloud sessions: prefix `PW_CHROMIUM=/opt/pw-browsers/chromium`) |
 | Pipeline install / tests | `cd pipeline && uv sync --locked && uv run pytest -m "not network"` |
-| Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`); locally `uv run python -m orca.run {weekly\|rebuild\|home\|check-keys\|verify}` (needs the API key env vars) |
+| Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`, `backfill`); locally `uv run python -m orca.run {weekly\|rebuild\|backfill\|home\|check-keys\|verify}` (needs the API key env vars) |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |
@@ -76,6 +76,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 - `VITE_DATA_URL` must be a bare origin (no trailing slash or space); a bad value fails the build. `SITE_URL` likewise.
 - The demo fund IDs (9100001–9100012) do not exist in production. Test production with e.g. `/fund/1067983` (Berkshire Hathaway).
 - Part years are derived from quarter counts, not labels (the demo labels a part year "2014").
+- Quarters before 2013 are negative (Q1 1999 = −56): in TypeScript use `qOfYear` (`web/src/lib/format.ts`), never `q % 4`. The pre-2013 history comes from text filings (`pipeline/orca/sec/legacy.py`), read by the `backfill` input before an ordinary run computes it. The demo has no pre-2013 fund.
 - jsdom has no IntersectionObserver/ResizeObserver. Hooks in `web/src/fund/hooks.ts` degrade, and tests stub `requestIdleCallback` (`web/tests/idle.ts`).
 - The R2 CORS policy was set in the dashboard. The Site CORS workflow fails (`AccessDenied`) until its token has Admin rights.
 - The pipeline job is named `weekly` but runs monthly.
