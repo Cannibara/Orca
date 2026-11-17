@@ -76,8 +76,8 @@ FILER:
     return header.encode("latin-1")
 
 
-def table(text: str, eight: bool = False):
-    return read_table(document_texts(submission(text).decode("latin-1")), eight)
+def table(text: str, mode: str = legacy.NINE):
+    return read_table(document_texts(submission(text).decode("latin-1")), mode)
 
 
 def test_cusip_check_digit():
@@ -360,3 +360,18 @@ def test_a_blank_summary_page_is_checked_against_the_tables_total_line():
     assert read_submission(submission(text), ENTRY)[2]["status"] == OK
     wrong = FIXED.replace("</TABLE>", "Column Total                          9,999\n</TABLE>")
     assert read_submission(submission(wrong), ENTRY)[2]["status"] == UNVERIFIED
+
+
+def test_a_value_total_in_billions():
+    assert declared_totals(["Information Table Value Total: $43.7 Billion\n"]) == (43_700_000.0, None)
+
+
+def test_cusips_missing_their_leading_zeros():
+    text = SUMMARY.format(entries=2, value="1,300") + """
+SECURITY                CLASS   CUSIP        VALUE       QTY      SOLE
+AIRBORNE INC.           COM     9269101     1,000      42,750   x      42,750
+AMERICAN EXPRESS        COM     25816109      300       5,000   x       5,000
+"""
+    filing, rows, check = read_submission(submission(text), ENTRY)
+    assert check["status"] == OK
+    assert [r["cusip"] for r in rows] == ["009269101", "025816109"]

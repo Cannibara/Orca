@@ -116,11 +116,21 @@ _UUENCODED = re.compile(r"^begin [0-7]{3} ", re.MULTILINE)
 _CUSIP9 = re.compile(
     r"(?<![0-9A-Z])([0-9A-Z]{6})([ -]?)([0-9A-Z]{2})\2([0-9])(?![0-9A-Z])"
 )
+NINE, EIGHT, PADDED = "nine", "eight", "padded"  # how CUSIPs are written, tried in this order
+_SHORT_CODE = re.compile(r"(?<![0-9A-Z.,$])([0-9]{7,8})(?![0-9A-Z.,])")
 _CUSIP8 = re.compile(
     r"(?<![0-9A-Z.,$])([0-9]{3}[0-9A-Z]{3})([ -]?)([0-9A-Z]{2})(?![0-9A-Z.,])"
 )
 _TOKEN = re.compile(r"\S+")
-_NUMBER = re.compile(r"^\$?\(?([0-9][0-9,]*(?:\.[0-9]+)?)\)?(SH|PRN)?$")
+_NUMBER = re.compile(r"^\$?\(?([0-9][0-9,]*(?:\.[0-9]*)?)\)?(SH|PRN)?$")  # "74,650,000.PRN" too
+# A value with cents run into a grouped share count: "4,530.0010,100,000" is 4,530.00 and 10,100,000.
+_GLUED_PAIR = re.compile(
+    r"^([0-9][0-9,]*\.[0-9]{2})([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?(?:SH|PRN)?)$"
+)
+# A CUSIP run into a grouped value: "4642876551,526,435".
+_CUSIP_GLUED = re.compile(
+    r"(?<![0-9A-Z])([0-9A-Z]{9})(?=[0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?(?![0-9,]))"
+)
 # Longest first: "Table Entry Total" must not be taken as "Table Entry" (filers also drop "Total").
 _TOTAL_LABEL = re.compile(
     r"(TABLE\s+ENTRY\s+TOTAL|TABLE\s+VALUE\s+TOTAL|VALUE\s+TOTAL|TOTAL\s+VALUE|ENTRY\s+TOTAL"
@@ -128,13 +138,18 @@ _TOTAL_LABEL = re.compile(
     re.IGNORECASE,
 )
 _TOTAL_WORD = re.compile(r"\bTOTALS?\b")
+_SCALE_WORD = re.compile(r"\s*(BILLION|MILLION)")
+_SCALES = {"BILLION": 1e6, "MILLION": 1e3}  # to thousands
 _UNIT_NOTE = re.compile(
     r"\(?\s*(?:X|IN)\s*\$?\s*1,?000'?S?\s*\)?|\(\s*\$?\s*000'?S?\s*\)|\$\s*1,?000\b"
     r"|\(\s*(?:IN\s+)?(?:THOUSANDS|DOLLARS)\s*\)",
     re.IGNORECASE,
 )
 # The label's number: before any word (the next label's "13F" is not it).
-_LABEL_NUMBER = re.compile(r"[^A-Z0-9]*?(\$)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)")
+# Thousands may be grouped with spaces ("$1 335 366 000").
+_LABEL_NUMBER = re.compile(
+    r"[^A-Z0-9]*?(\$)?\s*([0-9]{1,3}(?:[ ,][0-9]{3})+(?:\.[0-9]+)?|[0-9][0-9,]*(?:\.[0-9]+)?)"
+)
 _HEADER_PERIOD = re.compile(r"CONFORMED PERIOD OF REPORT:\s*([0-9]{8})")
 _HEADER_NAME = re.compile(r"COMPANY CONFORMED NAME:\s*([^\r\n]+)")
 _HEADER_CIK = re.compile(r"CENTRAL INDEX KEY:\s*([0-9]+)")
@@ -242,6 +257,19 @@ def _number(token: str) -> tuple[float | None, str | None]:
     return float(m[1].replace(",", "")), m[2]
 
 
+def _tokens(line: str, start: int = 0):
+    """(token, start column, end column) from column `start`; a glued value-and-shares pair is
+    split in two."""
+    for m in _TOKEN.finditer(line, start):
+        pair = _GLUED_PAIR.match(m.group())
+        if pair:
+            cut = m.start() + len(pair[1])
+            yield pair[1], m.start(), cut
+            yield pair[2], cut, m.end()
+        else:
+            yield m.group(), m.start(), m.end()
+
+
 def _numbers(
     line: str, start: int = 0
 ) -> tuple[list[tuple[float, int, int]], list[str]]:
@@ -249,13 +277,13 @@ def _numbers(
     the words after the first one (where SH/PRN and PUT/CALL are)."""
     found: list[tuple[float, int, int]] = []
     words: list[str] = []
-    for m in _TOKEN.finditer(line, start):
-        token = m.group()
+    for token, begin, end in _tokens(line, start):
         if token == "$":
             continue
         value, glued = _number(token) if len(found) < 2 else (None, None)
         if value is not None:
-            found.append((value, m.start(), m.end()))
+            # A glued "SH" is not part of the number: "1860000.00SH" ends where "13684.00 SH" does.
+            found.append((value, begin, end - len(glued or "")))
             if glued:
                 words.append(glued)
         elif found:
@@ -266,10 +294,10 @@ def _numbers(
 def _all_numbers(line: str) -> list[tuple[float, int, int]]:
     """Every number on the line with its start and end columns."""
     found = []
-    for m in _TOKEN.finditer(line):
-        value, _ = _number(m.group())
+    for token, begin, end in _tokens(line):
+        value, glued = _number(token)
         if value is not None:
-            found.append((value, m.start(), m.end()))
+            found.append((value, begin, end - len(glued or "")))
     return found
 
 
@@ -288,25 +316,37 @@ def _aligned_numbers(
     return None
 
 
-def _cusip(line: str, eight: bool) -> tuple[str, int, int] | None:
-    """The first CUSIP on the line: (code, start column, end column). With `eight`, 8-character
-    codes (three digits first) take their computed check digit."""
-    if eight:
+def _cusip(line: str, mode: str) -> tuple[str, int, int] | None:
+    """The first CUSIP on the line: (code, start column, end column). In mode EIGHT, 8-character
+    codes (three digits first) take their computed check digit; in mode PADDED, a 7- or
+    8-digit code gets back the leading zeros a filer dropped (9269101 is 009269101), if its check
+    digit then holds."""
+    if mode == EIGHT:
         for m in _CUSIP8.finditer(line):
             code = m[1] + m[3]
             return code + str(check_digit(code)), m.start(), m.end()
         return None
-    for m in _CUSIP9.finditer(line):
-        code = m[1] + m[3] + m[4]
-        if any(ch.isdigit() for ch in code[:6]) and valid_cusip(code):
-            return code, m.start(), m.end()
+    if mode == PADDED:
+        for m in _SHORT_CODE.finditer(line):
+            code = m[1].zfill(9)
+            if valid_cusip(code) and len(_all_numbers(line[m.end() :])) >= 2:
+                return code, m.start(), m.end()
+    for pattern in (_CUSIP9, _CUSIP_GLUED):
+        for m in pattern.finditer(line):
+            code = m[1] + m[3] + m[4] if pattern is _CUSIP9 else m[1]
+            # A 9-digit voting count after the row's numbers passes the check digit 1 time in 10;
+            # a real CUSIP has the row's numbers after it (names hold numbers too: "S&P 500").
+            if len(_all_numbers(line[: m.start()])) >= 2 and len(_all_numbers(line[m.end() :])) < 2:
+                break
+            if any(ch.isdigit() for ch in code[:6]) and valid_cusip(code):
+                return code, m.start(), m.end()
     return None
 
 
-def _shares_first(lines: list[str], eight: bool) -> bool:
+def _shares_first(lines: list[str], mode: str) -> bool:
     """Whether the column headings above the first row put the share count before the value
     (on one heading line: "CUSIP  SHARES  VALUE (X$1000)"). The form asks for value first."""
-    first = next((i for i, line in enumerate(lines) if _cusip(line, eight)), None)
+    first = next((i for i, line in enumerate(lines) if _cusip(line, mode)), None)
     for line in lines[max(0, (first or 0) - HEADER_LINES) : first or 0]:
         value, shares = _VALUE_WORD.search(line), _SHARES_WORD.search(line)
         if value and shares:
@@ -319,7 +359,7 @@ def _issuer(line: str, start: int) -> str | None:
     return name or None
 
 
-def read_table(texts: list[str], eight: bool = False) -> Table:
+def read_table(texts: list[str], mode: str = NINE) -> Table:
     """The holdings rows of a filing's texts. See the module docstring and section 5 of
     docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md for the rules."""
     rows: list[Row] = []
@@ -331,18 +371,18 @@ def read_table(texts: list[str], eight: bool = False) -> Table:
         columns: tuple[int, int] | None = None  # where the last row's two numbers end
         since_total = 0.0  # values since the text began or its last total line
         text_total = 0.0  # values since the text began
-        swapped = _shares_first(lines, eight)
+        swapped = _shares_first(lines, mode)
         i = 0
         while i < len(lines):
             line = lines[i]
-            found = _cusip(line, eight)
+            found = _cusip(line, mode)
             if found:
                 code, start, end = found
                 numbers, words = _numbers(line, end)
                 j = i
                 # A wrapped row, or one field per line: read on to the next CUSIP.
                 while len(numbers) < 2 and j + 1 < len(lines) and j - i < LOOKAHEAD:
-                    if _cusip(lines[j + 1], eight):
+                    if _cusip(lines[j + 1], mode):
                         break
                     j += 1
                     more, more_words = _numbers(lines[j])
@@ -417,14 +457,17 @@ def declared_totals(texts: list[str]) -> tuple[float | None, int | None]:
         window = "\n".join(
             [line for line in whole[m.end() : m.end() + 400].split("\n") if line.strip()][:2]
         )
-        n = _LABEL_NUMBER.match(_UNIT_NOTE.sub(" ", window).upper())
+        text = _UNIT_NOTE.sub(" ", window).upper()
+        n = _LABEL_NUMBER.match(text)
         if not n:
             continue
-        number = float(n[2].replace(",", ""))
+        number = float(n[2].replace(",", "").replace(" ", ""))
         if "ENTRY" in m[1].upper() and not n[1]:
             entries = int(number) if entries is None else entries
         elif value is None:
-            value = number
+            # "$43.7 Billion": in thousands, like the table (the scales in `_within` do the rest).
+            scale = _SCALE_WORD.match(text, n.end())
+            value = number * _SCALES[scale[1]] if scale else number
     return value, entries
 
 
@@ -463,15 +506,18 @@ def check_table(table: Table, value: float | None, entries: int | None) -> str:
 
 def read_holdings(texts: list[str]) -> tuple[Table, str, float | None, int | None]:
     """The best reading of a filing's table, its check status and the declared totals: 9-character
-    CUSIPs first, then 8-character ones if that does not pass."""
+    CUSIPs first, then 8-character ones, then ones missing their leading zeros, each only if the
+    one before does not pass (the later readings are kept only when the filer's totals agree)."""
     value, entries = declared_totals(texts)
     table = read_table(texts)
     status = check_table(table, value, entries)
-    if status not in STORED:
-        eight = read_table(texts, eight=True)
-        eight_status = check_table(eight, value, entries)
-        if eight_status in STORED:
-            return eight, eight_status, value, entries
+    for mode in (EIGHT, PADDED):
+        if status in STORED:
+            break
+        other = read_table(texts, mode)
+        other_status = check_table(other, value, entries)
+        if other_status in (OK, CLOSE):
+            return other, other_status, value, entries
     return table, status, value, entries
 
 
