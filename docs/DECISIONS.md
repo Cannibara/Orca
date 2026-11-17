@@ -15,6 +15,7 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Decision (chat): committing the stock → hierarchy label and ETF → hierarchy label mapping to the public repo is fine (Damodaran's file is public). Committed in `pipeline/orca/hierarchy/data/`.
 - Reviewed (architecture review, 2026-11-17): share counts need a history (`shares_hist` from the SEC data the code already downloads), sells replay as a fraction of the position, hierarchy labels need a quarter-average and a quarter-end level, and scoring runs in the pipeline. Plan and open questions: `docs/superpowers/plans/2026-11-17-sector-indices.md`.
 - Decision (chat): conglomerates (`@nosector`) score against SPY; share counts get a history table (`shares_hist`).
+- Decision (chat, supersedes the ETF stand-in above): our own index for every hierarchy label at all three tiers, no ETF stand-ins and no spot check against ETFs. Once the calculation exists it is less work than choosing and splicing ETFs, children add up to their parent, and ETF fees do not flatter funds.
 - Open: not built. Dividends and share counts live in the private lake, so the first real numbers come from a pipeline run.
 
 ## 2026-11-16 — How a fund's sector picks are scored (owner)

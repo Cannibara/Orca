@@ -15,7 +15,7 @@ The default comparison level is industry (tier 2, 71 hierarchy labels). The user
 - Hierarchy is `pipeline/orca/hierarchy/labels.txt`. Each stock has one main label (a vertical). A hierarchy label's index holds every stock whose main label sits under it, so each tier partitions the market. Extra labels only choose comparisons.
 - Indices are market-cap weighted, with no cap on any stock, rebalanced each quarter, and measured as total return with dividends.
 - Accuracy of about 90% is enough. Shortcuts are fine.
-- A good existing cap-weighted ETF stands in for a hierarchy label, at any tier. We build our own index for the 12 broad sectors, for hierarchy labels with no ETF, and to back-fill an ETF's history before launch.
+- Our own index for every hierarchy label, at all three tiers. No ETF stands in, and no spot check against ETFs (owner, 2026-11-17: once the calculation exists it is less work than choosing and splicing ETFs).
 - A fund buying a single-sector ETF is a sector pick at that ETF's hierarchy label and level. Broad, bond, international, leveraged and theme ETFs are neutral. So ETFs must be labelled at the right tier: SOXX is the Semiconductors industry, DRAM is the Memory vertical, XLK is the Technology sector.
 - The labels may be committed to the public repo. They derive from Damodaran's public file; licensing is parked.
 - The 13F quarterly data and its 45-day lag are accepted.
@@ -56,10 +56,7 @@ The default comparison level is industry (tier 2, 71 hierarchy labels). The user
    - Report the share of value affected. Survivorship is ROADMAP D4: 18,728 stocks have no vendor ticker.
 5. Unlabelled stocks. They would break the partition. Fall back to a SIC → industry table derived from the SIC codes in Damodaran's file, and put them in an "Other" bucket of that industry, tagged. Labelling new names stays an offline agent job, prompted by a health flag.
 6. `@nosector` (Diversified Conglomerates). It sits in the Industrials index so the partition holds, but its picks score against the market.
-7. ETF stand-ins.
-   - They break "children add up to the parent", so picking + allocation won't sum exactly. Say so.
-   - Their fees of 0.35–0.5% a year flatter funds.
-   - Splice by chaining returns at the ETF's first full quarter, using the ETF's own lake bars with dividends.
+7. ETF stand-ins: dropped. With our own index everywhere, children add up to their parent, no ETF fees flatter funds, and no splicing is needed. A fund's ETF buy still counts as a pick at the ETF's hierarchy label; its own return is the ETF's price plus dividends.
 8. End date. Score the fund and its shadows to the same quarter end. The live IRR on the site runs to the latest price, so it is a different number.
 
 ## Architecture
@@ -78,7 +75,6 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
   - Per hierarchy label and quarter: `ret_q` = Σ wᵢ (closeᵢ,q + divᵢ,q) / closeᵢ,q−1 − 1, with weights fixed at the quarter's start.
   - It also gives `level_end`, `level_avg`, `n` and coverage.
   - It builds an own series for every hierarchy label.
-  - A committed `preferred` table picks own, ETF, or splice for each hierarchy label.
 - Fund scoring runs inside the fund compute, next to `compute_position`.
   - Per tier: IRR_fund, IRR_node, IRR_mkt, picking, allocation, a KS-PME ratio (stable when an IRR has no root), coverage and number of picks.
   - Raw figures go in snapshots; thresholds are applied at publish.
@@ -87,23 +83,21 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 ## Phases
 1. Mapping, in the repo.
    - Load the CSVs. Every vertical must resolve in `labels.txt`. Test the ticker guard against a `securities.json` snapshot.
-   - Review the 98 sector ETFs' levels and hierarchy labels, and list the candidate ETF for each hierarchy label (31 of 327 hierarchy labels have one today).
+   - Review the 98 sector ETFs' tier and hierarchy label (SOXX industry, DRAM vertical, XLK sector), since a fund's ETF buy is scored there.
    - Add the SIC fallback table.
 2. `shares_hist` and its fetch step: a one-off backfill under the time budget. Test offline with fixture JSON (share classes, a split, the ADR override).
-3. `engine/sectors.py`. Test with hand-computed indices: two stocks, a dividend, a mid-quarter delisting, a stale price, an IPO, the splice, and children adding up to the parent. Add demo output.
+3. `engine/sectors.py`. Test with hand-computed indices: two stocks, a dividend, a mid-quarter delisting, a stale price, an IPO, and children adding up to the parent. Add demo output.
 4. Owner run 1 (private).
-   - Write the series to the lake and a private CSV comparing our indices with XLK, XLF, SOXX and SPY.
-   - Pass: quarterly-return correlation above 0.95 and drift under ~2% a year for sectors.
-   - Then fill the `preferred` table.
+   - Write the series to the lake and report the health flags (coverage, stale prices, fallback share counts). No ETF comparison.
 5. Shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its hierarchy label's whole index scores picking = 0.
 6. Contract change, publish step, then the web view, shown only when the file exists. Owner run 2 gives the first real numbers.
 
 ## Decided after review (owner, 2026-11-17)
 - `@nosector` (conglomerates) picks score against SPY (total return, from its lake bars with dividends).
 - Share counts: build `shares_hist` as designed.
+- Own index for every hierarchy label; no ETF stand-ins, no spot check.
 
 ## Open owner decisions
-- Which ETFs count as "good" stand-ins. Proposal: cap-weighted, at least $500m in assets, tracking our hierarchy label's definition, and passing the correlation test in phase 4.
 - Thin verticals: 188 of 244 have fewer than 10 stocks above $1bn. Widen to the industry (R4)?
 - Fallback for unlabelled stocks. Proposal: SIC → industry "Other", tagged.
 
@@ -111,10 +105,10 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 - With no cap, Technology's top five are 58% of it, so a Technology picking score largely says whether a fund owned NVIDIA.
 - Before anything public: Tiingo and Damodaran licences (ROADMAP L1, R10), advice rules (L3), and ranking by a shrunk score with n shown.
 - Health flags to add: unlabelled index value, unlabelled fund dollars, fallback share counts.
-- Revisit later: point-in-time labels (a company that changes business), one-core compute time (S3), and whether to keep ETF stand-ins once our own indices pass.
+- Revisit later: point-in-time labels (a company that changes business), and one-core compute time (S3).
 
 ## Cost estimate
 Phases 1–3 ≈ 1 fresh chat (~2–3M tokens); phases 5–6 ≈ another. Owner runs: 2 Actions runs (~80 min each, plus ~40 min one-off for the share backfill).
 
 ## Paste-ready prompt for a fresh chat
-> Read CLAUDE.md, then docs/superpowers/plans/2026-11-17-sector-indices.md and follow it. Start with phase 1 (load and test the committed mappings in pipeline/orca/hierarchy/data/, review the 98 sector ETFs' levels/hierarchy labels against labels.txt, add the SIC fallback), then phases 2–3 with TDD. Keep to ~90% accuracy, take shortcuts, stop before phase 4 and tell me what Actions run to start. Ask me the open owner decisions listed in the plan before you hard-code any of them.
+> Read CLAUDE.md, then docs/superpowers/plans/2026-11-17-sector-indices.md and follow it. Start with phase 1 (load and test the committed mappings in pipeline/orca/hierarchy/data/, review the 98 sector ETFs' tier and hierarchy label against labels.txt, add the SIC fallback), then phases 2–3 with TDD. Keep to ~90% accuracy, take shortcuts, stop before phase 4 and tell me what Actions run to start. Ask me the open owner decisions listed in the plan before you hard-code any of them.
