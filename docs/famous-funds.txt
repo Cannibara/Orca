@@ -1,0 +1,85 @@
+Famous funds (Popular funds list, backlog item 2b)
+Last verified: 2026-11-14
+Status: owner can still add or cut names. Format: CIK | fund | person or link
+Lineage links come from Wikipedia and press articles: check before publishing.
+CIKs match data.orcaetf.com/funds.json on 2026-11-14.
+
+BUFFETT AND GRAHAM LINE
+1067983 | Berkshire Hathaway | Buffett
+783412 | Daily Journal | Munger
+1709323 | Himalaya Capital | Li Lu
+1549575 | Dalal Street | Pabrai
+1404599 | Aquamarine Capital | Guy Spier
+1096343 | Markel Group | Tom Gayner
+1720792 | Ruane, Cunniff & Goldfarb | Sequoia Fund
+732905 | Tweedy, Browne | Graham school
+860643 | Gardner Russo & Quinn | Tom Russo
+1036325 | Davis Selected Advisers | Chris Davis
+813917 | Harris Associates | Oakmark
+807985 | Southeastern Asset Mgmt | Mason Hawkins
+1112520 | Akre Capital | Chuck Akre
+1056831 | Fairholme | Bruce Berkowitz
+1061768 | Baupost | Seth Klarman
+1079114 | Greenlight | David Einhorn
+1166559 | Gates Foundation Trust | Gates
+
+TIGER LINE (JULIAN ROBERTSON)
+1027451 | Tiger Management | root
+1167483 | Tiger Global | Chase Coleman
+1103804 | Viking Global | Halvorsen
+1061165 | Lone Pine | Mandel
+1135730 | Coatue | Laffont
+934639 | Maverick Capital | Ainslie
+1389507 | Discovery Capital | Citrone
+1747057 | D1 Capital | Sundheim
+1214822 | Steadfast Capital | Pitts
+1421097 | Samlyn Capital | Pohly
+1559706 | Slate Path | Greenspan
+1558858 | Alpha Wave Global | Gerson
+1541901 | Encompass Capital | Kantor
+1569049 | Light Street | Kacher
+1581811 | Egerton Capital | Bollinger
+1009258 | Deerfield | Snider
+1353316 | Hound Partners | Auerbach
+1627436 | Sylebra | Fieler
+1697848 | Woodson Capital | Davis
+1654648 | Cat Rock | Captain
+
+MACRO AND TRADERS
+1029160 | Soros Fund Management | Soros
+1536411 | Duquesne Family Office | Druckenmiller
+1656456 | Appaloosa | Tepper
+1350694 | Bridgewater | Dalio
+923093 | Tudor Investment | PT Jones
+1448574 | Moore Capital | Bacon
+
+ACTIVISTS AND EVENT
+1336528 | Pershing Square Capital | Ackman
+921669 | Icahn | Icahn
+1345471 | Trian | Peltz
+1791786 | Elliott | Singer
+1040273 | Third Point | Loeb
+1517137 | Starboard | Smith
+1418814 | ValueAct | Mason
+1159159 | JANA Partners | Barry Rosenstein
+1582090 | Sachem Head | Scott Ferguson
+1535472 | Corvex | Keith Meister
+1647251 | TCI Fund | Chris Hohn
+1138995 | Glenview | Larry Robbins
+898382 | Cooperman | Leon Cooperman
+949509 | Oaktree | Howard Marks
+1035674 | Paulson & Co | John Paulson
+1649339 | Scion Asset Mgmt | Michael Burry
+
+QUANT AND MULTI-STRATEGY
+1037389 | Renaissance Technologies | Jim Simons
+1423053 | Citadel Advisors | Ken Griffin
+1603466 | Point72 | Steve Cohen
+1009207 | D. E. Shaw | D. E. Shaw
+1179392 | Two Sigma | Two Sigma
+1273087 | Millennium Management | Izzy Englander
+1167557 | AQR Capital | Cliff Asness
+
+OTHER WELL KNOWN
+1697748 | ARK Investment | Cathie Wood
+1352662 | GMO | Jeremy Grantham

@@ -75,6 +75,12 @@
 .home .tbl-wrap{--nm-w:19em;--stk-w:14em}
 .home .tbl-wrap a.nm,.home .tbl-wrap .stk.fund{max-width:var(--nm-w)}
 @container app (max-width:559px){.home .tbl-wrap{--nm-w:10em;--stk-w:10em}}
+/* Famous funds: one list per style inside the panel, each under a hairline with its heading and line */
+.home .fam{border-top:1px solid var(--line)}
+.home .fam-h{padding:14px var(--ppad) 10px}
+.home .fam-h h3{font:600 15px/20px var(--f-sans);letter-spacing:-.01em}
+.home .fam-h p{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;text-wrap:pretty}
+.home .fam .tbl-wrap{--tpad:var(--ppad);border-width:1px 0 0;border-radius:0}
 /* two lists side by side (wins and losses) when the panel is wide enough, stacked otherwise */
 .home .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px var(--gap);align-items:start}
 .home .duo>div{display:flex;flex-direction:column;gap:8px;min-width:0}

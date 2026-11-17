@@ -119,16 +119,27 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
   the week (Monday to Friday) ending on `start + 7 i` days, on today's share basis (split-adjusted, not
   dividend-adjusted). It is `null` for a week in between with no priced day (a trading halt or a data gap); the
   previous close is not carried forward. A day without a close is not priced. A stock without a single priced
-  day has no file.
+  day has no file; a published file is deleted when its stock loses every priced day.
 
 ### Home
 
 Each file is an object with `latest_q`, the quarter the lists are about. `name` in every row below is the
 fund's name.
 
-- `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...]}`,
-  best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return", "max_dd",
-  "sharpe"}`.
+- `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...],
+  "famous": [...], "search_asof"}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
+  "max_dd", "sharpe"}`. `famous` lists the funds of `pipeline/orca/famous.csv` (hand-kept) whatever the Top funds
+  rules say, when they have a performance for the period, ≥ 80% of the book priced and a name holding the list's
+  match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
+  `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each) and `"until_q"`: for a fund
+  that stopped filing, its last quarter, and then its figures cover the period up to that quarter; `null` while it
+  still files, and `"search"`: the Google Trends score of the fund's search keyword (its manager or founder, or the
+  firm for venture firms; famous.csv `search`), Warren Buffett = 100, worldwide over the 12 months to `search_asof`; set on
+  one fund per keyword (the filer still filing with the biggest book) and on each of its rows, `null` on every
+  other row, and `"fame"`: the same score on every row of the keyword (Sequoia's seven filers all have it), for the
+  site to order each list by popularity; `null` without a score. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
+  Google Trends snapshot (`pipeline/orca/famous_search.csv`), `null` without one. Files built before 2026-11-15
+  have no `famous` key; before 2026-11-17 no `search` or `search_asof`; before 2026-11-18 no `fame`.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`

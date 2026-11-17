@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-16
+Last verified: 2026-11-17
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -28,7 +28,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 - Pipeline: Python ≥ 3.13, `uv`, Polars, httpx, brotli (`pipeline/pyproject.toml`). Runs on GitHub Actions (`.github/workflows/pipeline.yml`): monthly on the 16th at 06:23 UTC, a check on the 1st, or by hand.
 - Storage: R2 bucket `R2_LAKE_BUCKET` (private Parquet lake; holds CUSIPs, never public). R2 bucket `orca-site` (`R2_SITE_BUCKET`, public JSON) is served at `data.orcaetf.com` with a Cloudflare cache rule (edge 1 month, browser 2 h), purged after each upload.
 - Web: React 18 + Vite 7 + TypeScript, react-router 7 (package `react-router`), @tanstack/react-virtual, vitest 4 + jsdom, Playwright (`web/package.json`). Cloudflare Pages project `orca` (`orca-88p.pages.dev`; custom domains `www.orcaetf.com`, bare `orcaetf.com` 301 → www).
-- External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Keys live only in GitHub secrets.
+- External data: SEC EDGAR (bulk 13F data sets, daily index, data.sec.gov), OpenFIGI, Tiingo prices, FRED (DTB3). Google Trends (Most searched) is a hand-refreshed snapshot (`pipeline/scripts/google_trends.py`), not fetched by runs. Keys live only in GitHub secrets.
 
 ## Repo map
 ```
@@ -75,7 +75,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 ## Gotchas
 - Merging to `main` deploys production (Web workflow). PR #3 was squash-merged as a2a1554 on 2026-11-09.
 - After a squash merge, merge `main` into the working branch; force-push is blocked in cloud sessions.
-- The CSP is strict (`web/scripts/prerender.mjs`). A new external script, font or fetch host must be added there, and Cloudflare Web Analytics must stay off.
+- The CSP is strict (`web/scripts/prerender.mjs`). A new external script, font or fetch host must be added there. Cloudflare Web Analytics is on and allowed there (`static.cloudflareinsights.com`, `cloudflareinsights.com`).
 - `VITE_DATA_URL` must be a bare origin (no trailing slash or space); a bad value fails the build. `SITE_URL` likewise.
 - The demo fund IDs (9100001–9100012) do not exist in production. Test production with e.g. `/fund/1067983` (Berkshire Hathaway).
 - Part years are derived from quarter counts, not labels (the demo labels a part year "2014").

@@ -132,10 +132,15 @@ Built (`pipeline/orca/workbook/`, `orca.run workbook`, the Workbook Action). Whe
 - Decision: bare `orcaetf.com` 301-redirects to `www` via a Cloudflare Redirect Rule; both stay Pages custom domains (chat).
 - Consequences: CORS origins must list `www`, bare, `orca-88p.pages.dev`, `http://localhost:5173` (code `.github/workflows/site-cors.yml`).
 
+## 2026-11-15 — Cloudflare Web Analytics on, allowed in the CSP
+- Decision: keep Web Analytics switched on in the Pages project (Cloudflare injects its beacon) and allow it in the CSP: `script-src` adds `https://static.cloudflareinsights.com`, `connect-src` adds `https://cloudflareinsights.com` (code `web/scripts/prerender.mjs`). Supersedes "must stay off" below (owner, chat).
+- Why: the owner wants visit, page, referrer and speed figures; it is free, cookieless, collects no personal data. It had been switched on while the CSP blocked it, so nothing was counted and every page logged an error (chat).
+- Rejected for now: a hand-added snippet (ROADMAP U5) needs the site token in the code for the same result; a custom event counter for clicks inside pages (later, if needed).
+
 ## 2026-11-09 — CSP generated at build, fonts self-hosted
 - Decision: `dist/_headers` written by `web/scripts/prerender.mjs` with `connect-src 'self' <origin of VITE_DATA_URL>`; strict `style-src 'self'` (React sets styles through the CSSOM); Instrument Sans + Geist Mono woff2 in `web/src/assets/fonts` (code).
 - Rejected: static `public/_headers` (cannot name the data origin); switching to system fonts (would lose the approved look) (chat).
-- Consequences: any new third-party script/host (analytics, embeds) is blocked until added to the CSP; Cloudflare Web Analytics must stay off (chat)(code).
+- Consequences: any new third-party script/host (analytics, embeds) is blocked until added to the CSP; Cloudflare Web Analytics must stay off (chat)(code). (Superseded 2026-11-15: on, and allowed in the CSP.)
 
 ## 2026-11-09 — Bucket CORS set in the dashboard
 - Decision: the owner set the `orca-site` CORS policy by hand (chat).

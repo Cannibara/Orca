@@ -1,0 +1,7 @@
+cusip,ticker,why
+30231G102,XOM,Exxon Mobil before its 2026 holding company (new CUSIP); OpenFIGI gives EXMOC and the old US line as 9666655D
+156700106,LUMN,CenturyLink renamed Lumen; the vendor keeps the history under LUMN; OpenFIGI gives CTLEUR
+913017109,RTX,United Technologies became RTX in 2020; the vendor keeps the history under RTX; OpenFIGI gives UTXZ
+881624209,TEVA,Teva ADR; OpenFIGI gives TEVAN
+98462Y100,AUY,Yamana Gold traded as AUY in New York; OpenFIGI gives YRI
+530307305,LBRDK,Liberty Broadband C; OpenFIGI gives 8L8C

@@ -143,7 +143,7 @@ Effort: S = under a day, M = a few days, L = a week or more. Priority: **now** =
 | U2. Freshness labels: "Data as of {manifest built}" across the site, and "Prices as of {date}" on F3 and F4. Ruling R5 says tables do not mark stale prices. | F3, F4 | Weekly or monthly data read as live. | S | with F3 and F4 |
 | U3. Site-wide footer: "Estimates from SEC 13F filings. Not investment advice." | F3, F5 (L3) | The disclaimer is easy to miss today. | S | now |
 | U4. Accessibility: a keyboard way to reorder columns (move left/right; WCAG 2.2 2.5.7 Dragging Movements); an axe check in Playwright; a table version of each new chart (like "Show the numbers") | F2, F4 | Keyboard and screen-reader users are excluded. | S–M | with F2 and F4 |
-| U5. Analytics: Cloudflare Web Analytics added by hand with CSP entries (not the injected script, which must stay off), or a minimal self-hosted counter. Measure tab, export and view use. | Demand for F1–F5 and the paid-tier decision. | Building features nobody uses. | S | next |
+| U5. Analytics: page views, referrers and speed are covered since 2026-11-15 (Cloudflare Web Analytics, injected, allowed in the CSP). Still open: a minimal self-hosted event counter to measure tab, export and view use. | Demand for F1–F5 and the paid-tier decision. | Building features nobody uses. | S | next |
 | U6. A Method section for each new metric, plus empty, loading and error states (reuse `State` and the "no fund qualifies yet" pattern from the 15y tab) | F3–F5 | Numbers that cannot be explained; blank pages. | S | with each feature |
 
 ### 8. LLM workflow hygiene

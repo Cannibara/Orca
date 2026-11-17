@@ -149,6 +149,39 @@ def _name_match(issuer: str | None, titles: dict[str, list[tuple[str, str]]]) ->
     return None, ticker, title, False
 
 
+def tickers_by_name(names: dict[int, str | None], sec_tickers: pl.DataFrame) -> dict[int, str]:
+    """For each key of `names` (key -> security name), the SEC ticker whose title has the same
+    normalised name, when exactly one SEC row has it (`sec_tickers`: `load_sec_tickers`)."""
+    titles = _titles_by_normalised_name(sec_tickers)
+    found = {}
+    for key, name in names.items():
+        if (match := _name_match(name, titles)) is not None and match[1]:
+            found[key] = match[1]
+    return found
+
+
+def us_tickers(client: FigiClient, cusips: list[str]) -> dict[str, str | None]:
+    """Each CUSIP's US ticker, delisted listings included (`includeUnlistedEquities`: OpenFIGI
+    otherwise drops a US line once the stock delists, "ZK" for Zeekr). None when OpenFIGI knows
+    no US listing; a CUSIP whose job came back with an error is left out (ask again later)."""
+    found: dict[str, str | None] = {}
+    for start in range(0, len(cusips), client.jobs_per_request):
+        batch = cusips[start : start + client.jobs_per_request]
+        jobs = [
+            {"idType": "ID_CUSIP", "idValue": c, "exchCode": "US", "includeUnlistedEquities": True}
+            for c in batch
+        ]
+        results = client.post_json(FIGI_URL, jobs).json()
+        if not isinstance(results, list) or len(results) != len(jobs):
+            raise ValueError(f"OpenFIGI answered {len(jobs)} jobs with an unaligned response")
+        for cusip, result in zip(batch, results):
+            if "error" in result and not result.get("data"):
+                continue
+            us = [d for d in result.get("data") or [] if d.get("exchCode") == "US"]
+            found[cusip] = normalise_ticker(us[0].get("ticker")) if us else None
+    return found
+
+
 # --- stock ids ------------------------------------------------------------------------------
 
 

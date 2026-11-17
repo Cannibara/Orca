@@ -1,0 +1,373 @@
+fund_id,match,manager,group,filer_name,search
+1027451,TIGER MANAGEMENT,Julian Robertson,Tiger cubs,Tiger Management L.L.C.,Julian Robertson
+1062589,BLUE RIDGE,John Griffin,Tiger cubs,"Blue Ridge Capital, L.L.C.",John Griffin
+1166309,BRIDGER,Roberto Mignone,Tiger cubs,"Bridger Management, LLC",
+1135730,COATUE,Philippe Laffont,Tiger cubs,Coatue Management LLC,Philippe Laffont
+1389507,DISCOVERY CAPITAL,Rob Citrone,Tiger cubs,"Discovery Capital Management, LLC",Rob Citrone
+1569049,LIGHT STREET,Glen Kacher,Tiger cubs,"Light Street Capital Management, LLC",
+1061165,LONE PINE,Stephen Mandel,Tiger cubs,Lone Pine Capital LLC,Stephen Mandel
+934639,MAVERICK CAPITAL,Lee Ainslie,Tiger cubs,Maverick Capital Ltd,Lee Ainslie
+1167483,TIGER GLOBAL,Chase Coleman,Tiger cubs,Tiger Global Management LLC,Chase Coleman
+1103804,VIKING GLOBAL,Andreas Halvorsen,Tiger cubs,Viking Global Investors LP,Andreas Halvorsen
+1747057,D1 CAPITAL,Dan Sundheim,Tiger cubs,D1 Capital Partners L.P.,Dan Sundheim
+1353316,HOUND PARTNERS,Jonathan Auerbach,Tiger cubs,"Hound Partners, LLC",
+1503174,SRS INVESTMENT,Karthik Sarma,Tiger cubs,"SRS Investment Management, LLC",Karthik Sarma
+1664492,TIGER PACIFIC,Run Ye,Tiger cubs,Tiger Pacific Capital LP,
+1553936,TYBOURNE,Eashwar Krishnan,Tiger cubs,Tybourne Capital Management (HK) Ltd,Eashwar Krishnan
+1540531,12 WEST,Joel Ramin,Tech & growth,12 West Capital Management LP,
+1578684,ABDIEL,Colin Moran,Tech & growth,"Abdiel Capital Advisors, LP",
+1540358,AH CAPITAL,Andreessen Horowitz (a16z),Venture capital,"AH Capital Management, L.L.C.",Andreessen Horowitz
+1230239,ALKEON,Takis Sparaggis,Tech & growth,Alkeon Capital Management LLC,
+1541617,ALTIMETER,Brad Gerstner,Tech & growth,"Altimeter Capital Management, LP",Brad Gerstner
+1697748,ARK INVESTMENT,Cathie Wood,Tech & growth,ARK Investment Management LLC,Cathie Wood
+1777813,ATREIDES,Gavin Baker,Tech & growth,"Atreides Management, LP",Gavin Baker
+1088875,BAILLIE GIFFORD,Tom Slater,Tech & growth,Baillie Gifford & Co,Tom Slater
+1017918,BAMCO,Ron Baron,Tech & growth,BAMCO Inc /NY/,Ron Baron
+1602189,DRAGONEER,Marc Stad,Tech & growth,"Dragoneer Investment Group, LLC",Marc Stad
+1798849,DURABLE CAPITAL,Henry Ellenbogen,Tech & growth,Durable Capital Partners LP,Henry Ellenbogen
+1017645,GENERAL ATLANTIC,General Atlantic (growth equity),Venture capital,"General Atlantic, L.P.",General Atlantic
+1840735,GREENOAKS,Neil Mehta,Tech & growth,Greenoaks Capital Partners LLC,Neil Mehta
+1569709,ICONIQ,Divesh Makan,Tech & growth,"ICONIQ Capital, LLC",Divesh Makan
+1525234,JERICHO,Josh Resnick,Tech & growth,Jericho Capital Asset Management L.P.,
+1410830,MATRIX CAPITAL,David Goel,Tech & growth,"Matrix Capital Management Company, LP",David Goel
+1034524,POLEN CAPITAL,Dan Davidowitz,Tech & growth,Polen Capital Management LLC,Dan Davidowitz
+1020066,SANDS CAPITAL,Frank Sands,Tech & growth,"Sands Capital Management, LLC",
+2045724,SITUATIONAL AWARENESS,Leopold Aschenbrenner,Tech & growth,Situational Awareness LP,Leopold Aschenbrenner
+1765681,THRIVE CAPITAL,Thrive Capital (Josh Kushner),Venture capital,"Thrive Capital Management, LLC",Thrive Capital
+1387322,WHALE ROCK,Alex Sacerdote,Tech & growth,Whale Rock Capital Management LLC,
+1358706,ABRAMS CAPITAL,David Abrams,Value,"Abrams Capital Management, L.P.",
+1112520,AKRE,Chuck Akre,Moat investing,Akre Capital Management LLC,Chuck Akre
+1631014,ALTAROCK,Mark Massey,Value,AltaRock Partners LLC,
+1404599,AQUAMARINE,Guy Spier,Buffett inspired,"Aquamarine Capital Management, LLC",Guy Spier
+1061768,BAUPOST,Seth Klarman,Value,Baupost Group LLC/MA,Seth Klarman
+1067983,BERKSHIRE HATHAWAY,Warren Buffett,Buffett inspired,Berkshire Hathaway Inc,Warren Buffett
+1553733,BRAVE WARRIOR,Glenn Greenberg,Value,"Brave Warrior Advisors, LLC",
+783412,DAILY JOURNAL,Charlie Munger,Buffett inspired,Daily Journal Corp,Charlie Munger
+1549575,DALAL STREET,Mohnish Pabrai,Buffett inspired,"Dalal Street, LLC",Mohnish Pabrai
+1036325,DAVIS SELECTED,Chris Davis,Value,Davis Selected Advisers,
+200217,DODGE,,Value,Dodge & Cox,Dodge & Cox
+1671657,DORSEY ASSET,Pat Dorsey,Moat investing,"Dorsey Asset Management, LLC",
+915191,FAIRFAX FINANCIAL,Prem Watsa,Buffett inspired,Fairfax Financial Holdings Ltd/ Can,Prem Watsa
+1056831,FAIRHOLME,Bruce Berkowitz,Value,Fairholme Capital Management LLC,Bruce Berkowitz
+1325447,FIRST EAGLE,,Value,"First Eagle Investment Management, LLC",First Eagle Investments
+1377581,FIRST PACIFIC ADVISORS,Steven Romick,Value,"First Pacific Advisors, LLC",
+1868537,FUNDSMITH,Terry Smith,Moat investing,Fundsmith Investment Services Ltd,Terry Smith
+1569205,FUNDSMITH,Terry Smith,Moat investing,Fundsmith LLP,Terry Smith
+807249,GAMCO,Mario Gabelli,Value,"GAMCO Investors, Inc. et al",Mario Gabelli
+860643,GARDNER RUSSO,Thomas Russo,Buffett inspired,Gardner Russo & Quinn LLC,
+1641864,GIVERNY,Francois Rochon,Value,Giverny Capital Inc.,
+1510387,GOTHAM,Joel Greenblatt,Value,"Gotham Asset Management, LLC",Joel Greenblatt
+1079114,GREENLIGHT,David Einhorn,Value,Greenlight Capital Inc,David Einhorn
+813917,HARRIS ASSOCIATES,Bill Nygren,Value,Harris Associates L P,Bill Nygren
+1709323,HIMALAYA,Li Lu,Buffett inspired,Himalaya Capital Management LLC,Li Lu
+1484150,LINDSELL TRAIN,Nick Train,Moat investing,Lindsell Train Ltd,Nick Train
+1096343,MARKEL,Tom Gayner,Buffett inspired,Markel Group Inc.,Markel Group
+1135778,MILLER VALUE,Bill Miller,Value,"Miller Value Partners, LLC",Bill Miller
+1657335,OAKCLIFF,Bryan Lawrence,Value,"Oakcliff Capital Partners, LP",
+949509,OAKTREE,Howard Marks,Value,Oaktree Capital Management LP,Howard Marks
+1720792,RUANE,Sequoia Fund,Buffett inspired,"Ruane, Cunniff & Goldfarb L.P.","Ruane, Cunniff & Goldfarb"
+1649339,SCION,Michael Burry,Value,"Scion Asset Management, LLC",Michael Burry
+1115373,SEMPER AUGUSTUS,Christopher Bloomstran,Buffett inspired,Semper Augustus Investments Group LLC,
+807985,SOUTHEASTERN ASSET,Mason Hawkins,Value,Southeastern Asset Management Inc/TN/,Mason Hawkins
+1099281,THIRD AVENUE,Marty Whitman,Value,Third Avenue Management LLC,Marty Whitman
+732905,TWEEDY,,Buffett inspired,"Tweedy, Browne Co LLC","Tweedy, Browne"
+1697868,VALLEY FORGE,Dev Kantesaria,Value,"Valley Forge Capital Management, LP",
+859804,WEDGEWOOD,David Rolfe,Moat investing,Wedgewood Partners Inc,
+883965,WEITZ,Wally Weitz,Value,"Weitz Investment Management, Inc.",
+1535472,CORVEX,Keith Meister,Activists,Corvex Management LP,
+1791786,ELLIOTT,Paul Singer,Activists,Elliott Investment Management L.P.,Paul Singer
+921669,ICAHN,Carl Icahn,Activists,Icahn Carl C,Carl Icahn
+1159159,JANA PARTNERS,Barry Rosenstein,Activists,JANA Partners LLC,Barry Rosenstein
+1336528,PERSHING SQUARE,Bill Ackman,Moat investing,"Pershing Square Capital Management, L.P.",Bill Ackman
+1582090,SACHEM HEAD,Scott Ferguson,Activists,Sachem Head Capital Management LP,Scott Ferguson
+1517137,STARBOARD,Jeff Smith,Activists,Starboard Value LP,Jeff Smith
+1647251,TCI FUND,Christopher Hohn,Moat investing,TCI Fund Management Ltd,Christopher Hohn
+1040273,THIRD POINT,Dan Loeb,Activists,Third Point LLC,Dan Loeb
+1345471,TRIAN,Nelson Peltz,Activists,"Trian Fund Management, L.P.",Nelson Peltz
+1418814,VALUEACT,Mason Morfit,Activists,"ValueAct Holdings, L.P.",Mason Morfit
+1350694,BRIDGEWATER,Ray Dalio,Macro,"Bridgewater Associates, LP",Ray Dalio
+1536411,DUQUESNE,Stanley Druckenmiller,Family offices,Duquesne Family Office LLC,Stanley Druckenmiller
+1448574,MOORE CAPITAL,Louis Bacon,Family offices,"Moore Capital Management, LP",Louis Bacon
+1029160,SOROS FUND,George Soros,Family offices,Soros Fund Management LLC,George Soros
+923093,TUDOR INVESTMENT,Paul Tudor Jones,Macro,Tudor Investment Corp et al,Paul Tudor Jones
+1167557,AQR CAPITAL,Cliff Asness,Quant & multi-strategy,AQR Capital Management LLC,Cliff Asness
+1423053,CITADEL ADVISORS,Ken Griffin,Quant & multi-strategy,Citadel Advisors LLC,Ken Griffin
+1009207,SHAW,David E. Shaw,Quant & multi-strategy,"D. E. Shaw & Co., Inc.",D. E. Shaw
+1273087,MILLENNIUM MANAGEMENT,Israel Englander,Quant & multi-strategy,Millennium Management LLC,Israel Englander
+1603466,POINT72,Steve Cohen,Quant & multi-strategy,"Point72 Asset Management, L.P.",Steve Cohen
+1037389,RENAISSANCE,Jim Simons,Quant & multi-strategy,Renaissance Technologies LLC,Jim Simons
+1179392,TWO SIGMA,John Overdeck & David Siegel,Quant & multi-strategy,"Two Sigma Investments, LP",John Overdeck
+1656456,APPALOOSA,David Tepper,Family offices,Appaloosa LP,David Tepper
+1166559,GATES FOUNDATION,Bill Gates (Cascade),Family offices,Bill & Melinda Gates Foundation Trust,Gates Foundation
+898382,COOPERMAN,Leon Cooperman,Family offices,Cooperman Leon G,Leon Cooperman
+850529,FISHER ASSET,Ken Fisher,Value,"Fisher Asset Management, LLC",Ken Fisher
+1138995,GLENVIEW,Larry Robbins,Fundamental long/short,"Glenview Capital Management, LLC",Larry Robbins
+1035674,PAULSON,John Paulson,Family offices,Paulson & Co. Inc.,John Paulson
+1607841,TTGP,Sequoia Capital (US growth / TTGP),Venture capital,"SC US (TTGP), Ltd.",Sequoia Capital
+1374246,SC XII MANAGEMENT,Sequoia Capital (US Venture XII),Venture capital,SC XII Management LLC,Sequoia Capital
+1261135,SC XI MANAGEMENT,Sequoia Capital (US Venture XI),Venture capital,SC XI Management LLC,Sequoia Capital
+1206787,SC X MANAGEMENT,Sequoia Capital (US Venture X),Venture capital,SC X Management LLC,Sequoia Capital
+1367787,SCGF III,Sequoia Capital Growth Fund III,Venture capital,SCGF III Management LLC,Sequoia Capital
+1471126,SCGF GENPAR,Sequoia Capital Growth Fund (GenPar),Venture capital,"SCGF GenPar, Ltd.",Sequoia Capital
+1537530,SCGE,Sequoia Capital Global Equities,Venture capital,"SCGE Management, L.P.",Sequoia Capital
+1470766,HSG HOLDING,HongShan (formerly Sequoia Capital China),Venture capital,HSG Holding Ltd (formerly SC China Holding Ltd),HongShan
+1822015,SEQUOIA CHINA EQUITY,Sequoia Capital China public equities (HongShan),Venture capital,Sequoia China Equity Partners (Hong Kong) Ltd,HongShan
+1279329,SHEN NEIL NANPENG,Neil Shen (founder of HongShan / Sequoia China),Venture capital,Shen Neil Nanpeng,Neil Shen
+1886840,PEAK XV,Peak XV Partners (formerly Sequoia Capital India),Venture capital,"Peak XV Partners Operations LLC (formerly Sequoia Capital India Operations II, LLC)",
+1500595,KPCB XIII,Kleiner Perkins (KPCB XIII),Venture capital,"KPCB XIII Associates, LLC",Kleiner Perkins
+1546196,KPCB XIV,Kleiner Perkins (KPCB XIV),Venture capital,"KPCB XIV Associates, LLC",Kleiner Perkins
+1547838,KPCB XV,Kleiner Perkins (KPCB XV),Venture capital,"KPCB XV Associates, LLC",Kleiner Perkins
+1500599,KPCB XII ASSOCIATES,Kleiner Perkins (KPCB XII),Venture capital,"KPCB XII Associates, LLC",Kleiner Perkins
+1611737,KPCB DGF II,Kleiner Perkins Digital Growth Fund II,Venture capital,"KPCB DGF II Associates, LLC",
+1535603,ACCEL XI,Accel (Accel XI),Venture capital,Accel XI Associates L.L.C.,
+1923783,ACCEL LEADERS 4,Accel (Leaders 4 growth fund),Venture capital,Accel Leaders 4 Associates L.P.,
+1767987,ACCEL GROWTH FUND V,Accel (Growth Fund V),Venture capital,Accel Growth Fund V Associates L.L.C.,
+1494996,ACCEL X ASSOCIATES,Accel (Accel X),Venture capital,Accel X Associates L.L.C.,
+1660424,GREYLOCK XIV,Greylock (XIV),Venture capital,Greylock XIV GP LLC,
+1877892,GREYLOCK 15,Greylock (15),Venture capital,Greylock 15 GP LLC,
+1541539,GREYLOCK XIII,Greylock (XIII),Venture capital,Greylock XIII GP LLC,
+1413877,GREYLOCK XII GP,Greylock (XII),Venture capital,Greylock XII GP LLC,
+1351699,GREYLOCK XI GP,Greylock (XI),Venture capital,Greylock XI GP Limited Partnership,
+1846021,FOUNDERS FUND VII,Founders Fund (VII),Venture capital,"Founders Fund VII Management, LLC",Founders Fund
+1616081,FOUNDERS FUND IV,Founders Fund (IV),Venture capital,"Founders Fund IV Management, LLC",Founders Fund
+1695329,FOUNDERS FUND II MANAGEMENT,Founders Fund (II),Venture capital,"Founders Fund II Management, LLC",Founders Fund
+1853431,FOUNDERS FUND GROWTH,Founders Fund (Growth),Venture capital,"Founders Fund Growth Management, LLC",Founders Fund
+1853382,FOUNDERS FUND VI MANAGEMENT,Founders Fund (VI),Venture capital,"Founders Fund VI Management, LLC",Founders Fund
+1637946,GENERAL CATALYST,General Catalyst,Venture capital,"General Catalyst Group Management, LLC",General Catalyst
+1780948,LIGHTSPEED OPPORTUNITY,Lightspeed Venture Partners (Opportunity Fund),Venture capital,"Lightspeed Opportunity Fund, L.P.",Lightspeed Venture Partners
+1611751,INDEX VENTURE ASSOCIATES V,Index Ventures (V),Venture capital,Index Venture Associates V Ltd,Index Ventures
+1447962,INDEX VENTURE ASSOCIATES IV,Index Ventures (IV),Venture capital,Index Venture Associates IV Ltd,Index Ventures
+1503683,INDEX VENTURE ASSOCIATES III,Index Ventures (III),Venture capital,Index Venture Associates III Ltd,Index Ventures
+1305473,INSIGHT HOLDINGS,Insight Partners,Venture capital,"Insight Holdings Group, LLC",Insight Partners
+1512848,NEA MANAGEMENT,New Enterprise Associates (NEA),Venture capital,"NEA Management Company, LLC",New Enterprise Associates
+1494127,DEER MANAGEMENT,Bessemer Venture Partners,Venture capital,Deer Management Co. LLC,Bessemer Venture Partners
+1548594,BATTERY MANAGEMENT,Battery Ventures,Venture capital,Battery Management Corp.,Battery Ventures
+1640275,"INSTITUTIONAL VENTURE MANAGEMENT XV,",IVP (XV),Venture capital,"Institutional Venture Management XV, LLC",
+1716997,INSTITUTIONAL VENTURE MANAGEMENT XVI,IVP (XVI),Venture capital,"Institutional Venture Management XVI, LLC",
+1550304,INSTITUTIONAL VENTURE MANAGEMENT XIV,IVP (XIV),Venture capital,"Institutional Venture Management XIV, LLC",
+1493921,INSTITUTIONAL VENTURE MANAGEMENT XIII,IVP (XIII),Venture capital,"Institutional Venture Management XIII, LLC",
+1689508,REDPOINT,Redpoint Ventures,Venture capital,"Redpoint Management, LLC",Redpoint Ventures
+1829132,GGV CAPITAL,GGV Capital,Venture capital,GGV Capital LLC,GGV Capital
+2065606,NOTABLE CAPITAL,Notable Capital (formerly GGV Capital US),Venture capital,"Notable Capital Management, L.L.C.",
+1836733,RIBBIT MANAGEMENT,Ribbit Capital,Venture capital,"Ribbit Management Company, LLC",Ribbit Capital
+1912628,RIBBIT CAPITAL GP II,Ribbit Capital (GP II),Venture capital,"Ribbit Capital GP II, Ltd.",Ribbit Capital
+1697452,RIBBIT CAPITAL GP IV,Ribbit Capital (GP IV),Venture capital,"Ribbit Capital GP IV, Ltd.",Ribbit Capital
+1846237,VALOR MANAGEMENT,Valor Equity Partners,Venture capital,Valor Management LLC,Antonio Gracias
+1667766,8VC,8VC (Joe Lonsdale),Venture capital,"8VC GP I, LLC",8VC
+1964312,SOCIAL CAPITAL,Social Capital (Chamath Palihapitiya),Venture capital,Social Capital Group LLC,
+1550172,DST GLOBAL,DST Global (Yuri Milner),Venture capital,DST Global Advisors Ltd,DST Global
+1549497,DST GLOBAL,"DST Global (Yuri Milner), early entity",Venture capital,DST Global Ltd,DST Global
+1740858,GALILEO,DST Global / Yuri Milner trust vehicle,Venture capital,Galileo (PTC) Ltd,DST Global
+1911136,PARADIGM OPERATIONS,Paradigm (crypto VC),Venture capital,Paradigm Operations LP,Paradigm
+2067181,PANTERA,Pantera Capital (crypto),Venture capital,Pantera Capital Partners LP,Pantera Capital
+1677323,UNION SQUARE GP 2008,Union Square Ventures (2008 fund),Venture capital,"Union Square GP 2008, L.L.C.",Union Square Ventures
+1633002,UNION SQUARE OPPORTUNITY,Union Square Ventures (Opportunity),Venture capital,"Union Square Opportunity GP, L.L.C.",Union Square Ventures
+1640023,UNION SQUARE GP 2004,Union Square Ventures (2004 fund),Venture capital,"Union Square GP 2004, L.L.C.",Union Square Ventures
+1731509,SB INVESTMENT ADVISERS,SoftBank Vision Fund (SB Investment Advisers),Venture capital,SB Investment Advisers (UK) Ltd,SoftBank Vision Fund
+1626282,TECHNOLOGY CROSSOVER MANAGEMENT VIII,TCV (VIII),Venture capital,"Technology Crossover Management VIII, Ltd.",
+1698264,TECHNOLOGY CROSSOVER MANAGEMENT IX,TCV (IX),Venture capital,"Technology Crossover Management IX, Ltd.",
+1787727,"TECHNOLOGY CROSSOVER MANAGEMENT X,",TCV (X),Venture capital,"Technology Crossover Management X, Ltd.",
+1977402,TECHNOLOGY CROSSOVER MANAGEMENT XI,TCV (XI),Venture capital,"Technology Crossover Management XI, Ltd.",
+830588,SUMMIT PARTNERS,Summit Partners (growth equity),Venture capital,"Summit Partners, L.P.",Summit Partners
+1772583,NORWEST VENTURE PARTNERS XIII,Norwest Venture Partners (XIII),Venture capital,"Norwest Venture Partners XIII, LP",Norwest Venture Partners
+1842721,NORWEST VENTURE PARTNERS XIV,Norwest Venture Partners (XIV),Venture capital,"Norwest Venture Partners XIV, LP",Norwest Venture Partners
+1534522,"NORWEST VENTURE PARTNERS XI,",Norwest Venture Partners (XI),Venture capital,"Norwest Venture Partners XI, LP",Norwest Venture Partners
+1176230,NORWEST VENTURE PARTNERS VIII,Norwest Venture Partners (VIII),Venture capital,Norwest Venture Partners VIII LP,Norwest Venture Partners
+1850694,CANAAN PARTNERS XI,Canaan Partners (XI),Venture capital,Canaan Partners XI LLC,Canaan Partners
+1673228,CANAAN PARTNERS X LLC,Canaan Partners (X),Venture capital,Canaan Partners X LLC,Canaan Partners
+1514133,CANAAN PARTNERS VII,Canaan Partners (VII),Venture capital,Canaan Partners VII LLC,Canaan Partners
+1404329,MAYFIELD XII,Mayfield (XII),Venture capital,"Mayfield XII Management, L.L.C.",
+1911541,MENLO VENTURES,Menlo Ventures,Venture capital,"Menlo Ventures Management, L.P.",
+1600025,MATRIX VIII,Matrix Partners (now Matrix),Venture capital,Matrix VIII US Management Co. LLC,Matrix Partners
+1259923,MATRIX VII MANAGEMENT,Matrix Partners (VII),Venture capital,Matrix VII Management Co LLC,Matrix Partners
+1644978,"FOUNDRY GROUP, LLC",Foundry Group,Venture capital,"Foundry Group, LLC",
+1965482,FOUNDRY GROUP NEXT,Foundry Group (Next),Venture capital,"Foundry Group Next, LLC",
+1844719,FIRST ROUND CAPITAL,First Round Capital,Venture capital,"First Round Capital Management III, LLC",First Round Capital
+1640445,SPARK MANAGEMENT PARTNERS III,Spark Capital (III),Venture capital,"Spark Management Partners III (AIV I), LLC",Spark Capital
+1600213,"SPARK MANAGEMENT PARTNERS II,",Spark Capital (II),Venture capital,"Spark Management Partners II, LLC",Spark Capital
+1608856,SPARK GROWTH MANAGEMENT,Spark Capital (Growth),Venture capital,Spark Growth Management Partners LLC,Spark Capital
+1923934,BOND CAPITAL,BOND (Mary Meeker),Venture capital,"Bond Capital Management, LP",Mary Meeker
+1363542,BLUECREST,Michael Platt,Family offices,BlueCrest Capital Management LLP (earlier: BlueCrest Capital Management Ltd),Michael Platt
+1610880,BLUECREST,Michael Platt,Family offices,"BlueCrest Capital Management Ltd (St Helier, Jersey)",Michael Platt
+1652044,ALPHABET,Google,Big companies,Alphabet Inc.,
+1045810,NVIDIA,,Big companies,NVIDIA CORP,
+1065521,SOFTBANK,Masayoshi Son,Big companies,SOFTBANK GROUP CORP.,
+60086,LOEWS,,Big companies,LOEWS CORP,
+1543151,UBER,,Big companies,"Uber Technologies, Inc",
+1018724,AMAZON,,Big companies,AMAZON COM INC,
+1094517,TOYOTA,,Big companies,TOYOTA MOTOR CORP/,
+882095,GILEAD,,Big companies,"GILEAD SCIENCES, INC.",
+1090012,DEVON ENERGY,,Big companies,DEVON ENERGY CORP/DE,
+1388325,NOVO HOLDINGS,Novo Nordisk Foundation,Big companies,Novo Holdings A/S,
+104889,GRAHAM HOLDINGS,,Big companies,Graham Holdings Co,
+104169,WALMART,,Big companies,Walmart Inc.,
+200406,JOHNSON & JOHNSON,,Big companies,JOHNSON & JOHNSON,
+50863,INTEL,,Big companies,INTEL CORP,
+310158,MERCK,,Big companies,"MERCK & CO., INC.",
+1577552,ALIBABA,,Big companies,Alibaba Group Holding Ltd,
+858877,CISCO,,Big companies,"CISCO SYSTEMS, INC.",
+27904,DELTA AIR LINES,,Big companies,"DELTA AIR LINES, INC.",
+100517,UNITED AIRLINES,,Big companies,"United Airlines Holdings, Inc.",
+2488,ADVANCED MICRO DEVICES,,Big companies,ADVANCED MICRO DEVICES INC,
+78003,PFIZER,,Big companies,PFIZER INC,
+64803,CVS HEALTH,,Big companies,CVS HEALTH Corp,
+1704720,CANNAE,Bill Foley,Big companies,"Cannae Holdings, Inc.",
+872589,REGENERON,,Big companies,REGENERON PHARMACEUTICALS INC,
+1374170,NORGES BANK,Norway's oil fund,Sovereign & pension funds,Norges Bank,
+1582202,SWISS NATIONAL BANK,Switzerland's central bank,Sovereign & pension funds,Swiss National Bank,
+1918181,SAUDI CENTRAL BANK,Saudi Arabia's central bank (SAMA),Sovereign & pension funds,Saudi Central Bank,
+1441689,KOREA INVESTMENT CORP,Korea's sovereign wealth fund,Sovereign & pension funds,Korea Investment Corp,
+1767640,PUBLIC INVESTMENT FUND,Saudi Arabia's sovereign wealth fund,Sovereign & pension funds,Public Investment Fund,
+1021944,TEMASEK,Singapore's state investor,Sovereign & pension funds,Temasek Holdings (Private) Ltd,
+1704268,MUBADALA,Abu Dhabi sovereign investor,Sovereign & pension funds,Mubadala Investment Co PJSC,
+1814011,ABU DHABI INVESTMENT COUNCIL,Abu Dhabi sovereign fund (Mubadala unit),Sovereign & pension funds,Abu Dhabi Investment Council Co P.J.S.C,
+1582681,ALASKA PERMANENT FUND,Alaska's oil fund,Sovereign & pension funds,Alaska Permanent Fund Corp,
+1283718,CANADA PENSION PLAN,Canada Pension Plan (CPP Investments),Sovereign & pension funds,Canada Pension Plan Investment Board,
+898286,CAISSE DE DEPOT,Quebec's pension manager (CDPQ),Sovereign & pension funds,Caisse de depot et placement du Quebec,
+937567,ONTARIO TEACHERS,Ontario Teachers' Pension Plan,Sovereign & pension funds,Ontario Teachers Pension Plan Board,
+1396318,PUBLIC SECTOR PENSION,Canada's federal public-service pension (PSP),Sovereign & pension funds,Public Sector Pension Investment Board,
+1228242,BRITISH COLUMBIA INVESTMENT,British Columbia's pension manager (BCI),Sovereign & pension funds,British Columbia Investment Management Corp,
+1053321,OMERS,Ontario municipal workers' pension,Sovereign & pension funds,OMERS Administration Corp,
+1463559,ALBERTA INVESTMENT MANAGEMENT,Alberta's pension manager (AIMCo),Sovereign & pension funds,Alberta Investment Management Corp,
+1535845,HEALTHCARE OF ONTARIO,Ontario hospital workers' pension (HOOPP),Sovereign & pension funds,Healthcare of Ontario Pension Plan Trust Fund,
+1811568,INVESTMENT MANAGEMENT CORP OF ONTARIO,Ontario public pension manager (IMCO),Sovereign & pension funds,Investment Management Corp of Ontario,
+919079,CALIFORNIA PUBLIC EMPLOYEES,"CalPERS, largest US public pension",Sovereign & pension funds,California Public Employees Retirement System,
+1081019,CALIFORNIA STATE TEACHERS,"CalSTRS, California teachers' pension",Sovereign & pension funds,California State Teachers Retirement System,
+810265,COMMON RETIREMENT FUND,New York State's pension fund,Sovereign & pension funds,New York State Common Retirement Fund,
+314969,NEW YORK STATE TEACHERS,New York teachers' pension,Sovereign & pension funds,New York State Teachers Retirement System,
+938076,STATE BOARD OF ADMINISTRATION OF FLORIDA,Florida Retirement System,Sovereign & pension funds,State Board of Administration of Florida Retirement System,
+796848,TEACHER RETIREMENT SYSTEM OF TEXAS,Texas teachers' pension,Sovereign & pension funds,Teacher Retirement System of Texas,
+854157,WISCONSIN INVESTMENT BOARD,Wisconsin's pension manager (SWIB),Sovereign & pension funds,State of Wisconsin Investment Board,
+1007280,PUBLIC EMPLOYEES RETIREMENT SYSTEM OF OHIO,Ohio public employees' pension (OPERS),Sovereign & pension funds,Public Employees Retirement System of Ohio,
+820478,OHIO,Ohio teachers' pension,Sovereign & pension funds,STRS Ohio (State Teachers Retirement System of Ohio),
+762152,STATE OF MICHIGAN RETIREMENT,Michigan public pensions,Sovereign & pension funds,State of Michigan Retirement System,
+1107314,OREGON PUBLIC EMPLOYEES,Oregon public pension,Sovereign & pension funds,Oregon Public Employees Retirement Fund,
+1005354,VIRGINIA RETIREMENT SYSTEM,Virginia Retirement System,Sovereign & pension funds,Virginia Retirement Systems et al,
+1761054,STATE OF NORTH CAROLINA,North Carolina state pension,Sovereign & pension funds,Treasurer of the State of North Carolina,
+1483066,COMMON PENSION FUND D,New Jersey state pension (equity fund),Sovereign & pension funds,State of New Jersey Common Pension Fund D,
+1558481,ARIZONA STATE RETIREMENT,Arizona public pension,Sovereign & pension funds,Arizona State Retirement System,
+1434819,APG ASSET MANAGEMENT,Dutch civil servants' pension (ABP),Sovereign & pension funds,APG Asset Management N.V.,
+1472190,PGGM,Dutch healthcare workers' pension,Sovereign & pension funds,PGGM Investments,
+1603328,FORSTA AP-FONDEN,Swedish state pension fund AP1,Sovereign & pension funds,Forsta AP-fonden,
+1535452,ANDRA AP-FONDEN,Swedish state pension fund AP2,Sovereign & pension funds,Andra AP-fonden,
+1650290,TREDJE AP-FONDEN,Swedish state pension fund AP3,Sovereign & pension funds,Tredje AP-fonden,
+1540880,FJARDE AP-FONDEN,Swedish state pension fund AP4,Sovereign & pension funds,Fjarde AP-fonden /Fourth Swedish National Pension Fund,
+2105395,ARBEJDSMARKEDETS,Denmark's national pension (ATP),Sovereign & pension funds,Arbejdsmarkedets Tillaegspension,
+1717443,KLP KAPITALFORVALTNING,Norway's largest pension company (KLP),Sovereign & pension funds,KLP Kapitalforvaltning AS,
+1587381,USS INVESTMENT MANAGEMENT,UK universities' pension (USS),Sovereign & pension funds,USS Investment Management Ltd,
+1658020,RAILWAY PENSION,UK railway workers' pension (Railpen),Sovereign & pension funds,Railway Pension Investments Ltd,
+1608046,NATIONAL PENSION SERVICE,Korea's national pension,Sovereign & pension funds,National Pension Service,
+1600177,EMPLOYEES PROVIDENT FUND,Malaysia's national pension (EPF),Sovereign & pension funds,Employees Provident Fund Board,
+1694164,AUSTRALIANSUPER,Australia's largest super fund,Sovereign & pension funds,AustralianSuper Pty Ltd,
+1989400,UNISUPER,Australian universities' super fund,Sovereign & pension funds,UniSuper Management Pty Ltd,
+2012816,AWARE SUPER,Australian public-sector super fund,Sovereign & pension funds,Aware Super Pty Ltd as trustee of Aware Super,
+1730896,UNITED SUPER,"Cbus, Australian construction workers' super",Sovereign & pension funds,United Super Pty Ltd in its capacity as Trustee for the Construction & Building Unions Superannuation Fund,
+728014,RUANE,Sequoia Fund,Buffett inspired,"RUANE, CUNNIFF & GOLDFARB INC (earlier RUANE CUNNIFF & CO INC)","Ruane, Cunniff & Goldfarb"
+1534380,SQ ADVISORS,Lou Simpson (GEICO),Buffett inspired,"SQ Advisors, LLC",
+1953324,AQUAMARINE ZURICH,Guy Spier,Buffett inspired,Aquamarine Zurich AG,Guy Spier
+1568820,ARLINGTON VALUE,Allan Mecham,Buffett inspired,"Arlington Value Capital, LLC",
+775368,ALLEGHANY CORP,Weston Hicks,Buffett inspired,ALLEGHANY CORP /DE,Weston Hicks
+93859,BIGLARI HOLDINGS,Sardar Biglari,Buffett inspired,BIGLARI HOLDINGS INC.,Sardar Biglari
+1334429,BIGLARI CAPITAL,Sardar Biglari,Buffett inspired,BIGLARI CAPITAL CORP.,Sardar Biglari
+846222,GREENHAVEN ASSOCIATES,Edgar Wachenheim,Value,GREENHAVEN ASSOCIATES INC,Edgar Wachenheim
+1389403,CHOU ASSOCIATES MANAGEMENT,Francis Chou,Buffett inspired,Chou Associates Management Inc.,
+1142062,VAN DEN BERG MANAGEMENT,Arnold Van Den Berg,Buffett inspired,"VAN DEN BERG MANAGEMENT I, INC (formerly VAN DEN BERG MANAGEMENT INC/TX; d/b/a Century Management)",
+1039565,KAHN BROTHERS,Irving Kahn (Graham's assistant),Buffett inspired,KAHN BROTHERS GROUP INC (formerly KAHN BROTHERS & CO INC /DE/),Irving Kahn
+1541448,VERITAS ASSET,Andy Headley,Moat investing,Veritas Asset Management LLP,
+1351950,FINDLAY PARK,James Findlay,Moat investing,Findlay Park Partners LLP,
+1817797,SEILERN,Peter Seilern,Moat investing,Seilern Investment Management Ltd,
+1574947,COMGEST,,Moat investing,Comgest Global Investors S.A.S.,
+1376879,AKO CAPITAL,Nicolai Tangen,Moat investing,AKO Capital LLP,Nicolai Tangen
+1601407,TROY ASSET,Sebastian Lyon,Moat investing,Troy Asset Management Ltd,
+1384801,ZAKARIA,Nick Sleep & Qais Zakaria,Moat investing,"Sleep, Zakaria & CO Ltd.",
+1279936,CANTILLON,William von Mueffling,Moat investing,CANTILLON CAPITAL MANAGEMENT LLC,William von Mueffling
+1387366,ENSEMBLE CAPITAL,Sean Stannard-Stockton,Moat investing,"Ensemble Capital Management, LLC",
+1911378,SABER CAPITAL,John Huber,Moat investing,"Saber Capital Managment, LLC",
+1106129,JENSEN INVESTMENT,Eric Schoenstein,Moat investing,JENSEN INVESTMENT MANAGEMENT INC,
+1061186,WCM INVESTMENT,Paul Black / Mike Trigg,Moat investing,"WCM INVESTMENT MANAGEMENT, LLC",
+764532,FIDUCIARY MANAGEMENT,Ted Kellner (founder),Moat investing,FIDUCIARY MANAGEMENT INC /WI/,
+1697233,GQG PARTNERS,Rajiv Jain,Moat investing,GQG Partners LLC,Rajiv Jain
+928196,HARDING LOEVNER,,Moat investing,HARDING LOEVNER LP,
+1290668,SUSTAINABLE GROWTH ADVISERS,George Fraise / Gordon Marchand,Moat investing,"Sustainable Growth Advisers, LP",
+860561,EDGEWOOD MANAGEMENT,Alan Breed,Moat investing,EDGEWOOD MANAGEMENT LLC,
+1556785,VULCAN VALUE,C.T. Fitzpatrick,Moat investing,"Vulcan Value Partners, LLC",
+1340807,BARES CAPITAL,Brian Bares,Moat investing,"Bares Capital Management, Inc.",
+1350585,COHO PARTNERS,Peter Thompson,Moat investing,"Coho Partners, Ltd.",
+1006364,HARDMAN JOHNSTON,,Moat investing,Hardman Johnston Global Advisors LLC,
+1021223,KAYNE ANDERSON RUDNICK,,Moat investing,KAYNE ANDERSON RUDNICK INVESTMENT MANAGEMENT LLC,
+1536105,MAGELLAN ASSET,Hamish Douglass (to 2022),Moat investing,Magellan Asset Management Ltd,Hamish Douglass
+1619844,HYPERION ASSET,Mark Arnold / Jason Orthman,Moat investing,Hyperion Asset Management Ltd,
+1844830,LAKEHOUSE CAPITAL,Joe Magyer,Moat investing,Lakehouse Capital Pty Ltd,
+2104890,MONTAKA,Andrew Macken,Moat investing,Montaka Global Pty Ltd,
+1538449,MAWER INVESTMENT,Paul Moroz,Moat investing,Mawer Investment Management Ltd.,Paul Moroz
+1315868,BURGUNDY ASSET,Richard Rooney / Tony Arrell,Moat investing,Burgundy Asset Management Ltd.,
+1732008,GUARDCAP,Michael Boyd,Moat investing,GUARDCAP ASSET MANAGEMENT Ltd,
+2040263,RULE ONE PARTNERS,Phil Town (Rule #1),Moat investing,"Rule One Partners, LLC",Phil Town
+1581811,EGERTON CAPITAL (UK),John Armitage,Fundamental long/short,Egerton Capital (UK) LLP,John Armitage
+1608485,LANSDOWNE PARTNERS,Paul Ruddock & Steven Heinz (founders),Fundamental long/short,Lansdowne Partners (UK) LLP,Paul Ruddock
+1318757,"MARSHALL WACE, LLP",Paul Marshall & Ian Wace,Fundamental long/short,"Marshall Wace, LLP",Paul Marshall
+1628110,MELVIN CAPITAL,Gabe Plotkin,Fundamental long/short,Melvin Capital Management LP,Gabe Plotkin
+1107310,EMINENCE CAPITAL,Ricky Sandler,Fundamental long/short,"EMINENCE CAPITAL, LP",
+1000097,KINGDON CAPITAL,Mark Kingdon,Fundamental long/short,"KINGDON CAPITAL MANAGEMENT, L.L.C.",
+1517857,SOROBAN CAPITAL,Eric Mandelblatt,Fundamental long/short,Soroban Capital Partners LP,
+1214822,STEADFAST CAPITAL MANAGEMENT LP,Robert Pitts,Fundamental long/short,Steadfast Capital Management LP,
+1609098,DARSANA CAPITAL,Anand Desai,Fundamental long/short,Darsana Capital Partners LP,
+1700574,HOLOCENE ADVISORS,Brandon Haley,Fundamental long/short,"Holocene Advisors, LP",
+1784547,WOODLINE PARTNERS,Michael Rockefeller & Karl Kroeker,Fundamental long/short,Woodline Partners LP,
+1424381,LAKEWOOD CAPITAL MANAGEMENT,Anthony Bozza,Fundamental long/short,"Lakewood Capital Management, LP",
+1654648,CAT ROCK CAPITAL,Alex Captain,Fundamental long/short,CAT ROCK CAPITAL MANAGEMENT LP,
+1611613,HITCHWOOD CAPITAL,James Crichton,Fundamental long/short,Hitchwood Capital Management LP,
+1569064,SUVRETTA CAPITAL,Aaron Cowen,Fundamental long/short,"SUVRETTA CAPITAL MANAGEMENT, LLC",
+1353312,TREMBLANT CAPITAL,Brett Barakett,Fundamental long/short,TREMBLANT CAPITAL GROUP,
+1168664,PENNANT CAPITAL,Alan Fournier,Fundamental long/short,"PENNANT CAPITAL MANAGEMENT, LLC",
+1319998,SOUTHPOINT CAPITAL ADVISORS,John S. Clark II,Fundamental long/short,Southpoint Capital Advisors LP,
+1166147,ANDOR CAPITAL,Dan Benton,Fundamental long/short,"ANDOR CAPITAL MANAGEMENT, L.L.C.",
+1316580,LUXOR CAPITAL GROUP,Christian Leone,Fundamental long/short,"Luxor Capital Group, LP",
+1328785,SENVEST,Richard Mashaal,Fundamental long/short,"Senvest Management, LLC",
+1569688,KERRISDALE ADVISERS,Sahm Adrangi,Fundamental long/short,"Kerrisdale Advisers, LLC",
+1279150,SCOPIA CAPITAL,Jerome Lande & Matt Sirovich,Fundamental long/short,Scopia Capital Management LP,
+1423686,CADIAN CAPITAL,Eric Bannasch,Fundamental long/short,"CADIAN CAPITAL MANAGEMENT, LP",
+1568788,PALESTRA CAPITAL,Andrew Immerman,Fundamental long/short,Palestra Capital Management LLC,
+1512173,MAPLELANE CAPITAL,Leon Shaulov,Fundamental long/short,"MAPLELANE CAPITAL, LLC",
+1510669,CONTOUR ASSET MANAGEMENT,David Meyer,Fundamental long/short,Contour Asset Management LLC,
+1606430,TWO CREEKS CAPITAL,Ryan Pedlow,Fundamental long/short,"Two Creeks Capital Management, LP",
+1675884,SKYE GLOBAL MANAGEMENT,Jamie Sterne,Fundamental long/short,Skye Global Management LP,
+1533950,ZWEIG-DIMENNA,Joe DiMenna,Fundamental long/short,Zweig-DiMenna Associates LLC,
+1054587,OZ MANAGEMENT,Daniel Och,Quant & multi-strategy,OZ MANAGEMENT LP,Daniel Och
+909661,FARALLON CAPITAL,Tom Steyer / Andrew Spokes,Quant & multi-strategy,FARALLON CAPITAL MANAGEMENT LLC,Farallon Capital
+1567752,BLOOM TREE PARTNERS,Alok Agrawal,Fundamental long/short,"BLOOM TREE PARTNERS, LLC",
+1759364,TOTEM POINT,Darren Dinneen,Fundamental long/short,"Totem Point Management, LLC",
+1574717,HENGISTBURY,Stuart Powers,Fundamental long/short,Hengistbury Investment Partners LLP,
+1621855,ALTA PARK CAPITAL,Bijan Modanlou & Jay Kodali (co-founders),Fundamental long/short,"Alta Park Capital, LP",
+1659815,KORA MANAGEMENT,Nitin Saigal,Tiger cubs,Kora Management LP,
+1768041,GREENVALE CAPITAL,Bruce Emery,Fundamental long/short,Greenvale Capital LLP,
+1574886,TEEWINOT CAPITAL,Michael Moriarty,Fundamental long/short,"Teewinot Capital Advisers, L.L.C.",
+1654111,PELHAM CAPITAL,Ross Turner,Fundamental long/short,Pelham Capital Ltd.,
+2003074,SYLEBRA CAPITAL LLC,Dan Gibson,Fundamental long/short,Sylebra Capital LLC,Dan Gibson
+1313756,OWL CREEK ASSET MANAGEMENT,Jeffrey Altman,Fundamental long/short,"Owl Creek Asset Management, L.P.",
+1491072,ANSON FUNDS,Moez Kassam,Fundamental long/short,Anson Funds Management LP,
+1535279,TIGER LEGATUS,Jesse Ro,Tiger cubs,"Tiger Legatus Capital Management, LLC",
+1401388,VALINOR MANAGEMENT,David Gallo,Tiger cubs,"VALINOR MANAGEMENT, LLC",
+1106500,JOHO CAPITAL,Robert Karr,Tiger cubs,Joho Capital LLC,
+1452929,CONATUS CAPITAL,David Kowitz,Tiger cubs,Conatus Capital Management LP,
+1301050,SHANNON RIVER,Spencer Waxman,Fundamental long/short,Shannon River Fund Management CO LLC,
+1276845,HIGHSIDE CAPITAL,Lee Hobson,Fundamental long/short,HIGHSIDE CAPITAL MANAGEMENT L P,
+1156175,BROOKSIDE CAPITAL|BAIN CAPITAL PUBLIC EQUITY,Bain Capital (Brookside),Fundamental long/short,BROOKSIDE CAPITAL MANAGEMENT LLC,
+1224962,PERCEPTIVE ADVISORS,Joe Edelman,Healthcare specialists,PERCEPTIVE ADVISORS LLC,Joe Edelman
+1346824,RA CAPITAL MANAGEMENT,Peter Kolchinsky,Healthcare specialists,"RA CAPITAL MANAGEMENT, L.P.",Peter Kolchinsky
+1263508,BAKER BROS,Felix & Julian Baker,Healthcare specialists,BAKER BROS. ADVISORS LP,Baker Brothers Advisors
+1009258,DEERFIELD MANAGEMENT,James Flynn,Healthcare specialists,"DEERFIELD MANAGEMENT COMPANY, L.P. (SERIES C)",James Flynn
+1055951,ORBIMED ADVISORS,Sam Isaly / Carl Gordon,Healthcare specialists,ORBIMED ADVISORS LLC,Sam Isaly
+1534261,CASDIN CAPITAL,Eli Casdin,Healthcare specialists,"Casdin Capital, LLC",
+1587114,ECOR1 CAPITAL,Oleg Nodelman,Healthcare specialists,"EcoR1 Capital, LLC",
+1425738,REDMILE GROUP,Jeremy Green,Healthcare specialists,"Redmile Group, LLC",
+1595725,ROCK SPRINGS CAPITAL,Kris Jenner,Healthcare specialists,Rock Springs Capital Management LP,
+1633313,AVORO|VENBIO,Behzad Aghazadeh,Healthcare specialists,Avoro Capital Advisors LLC,
+1377452,VISIUM ASSET MANAGEMENT,Jacob Gottlieb,Healthcare specialists,"Visium Asset Management, LP",Jacob Gottlieb
+1559706,SLATE PATH,David Greenspan,Tiger cubs,Slate Path Capital LP,
+1421097,SAMLYN,Robert Pohly,Fundamental long/short,"Samlyn Capital, LLC",
+1558858,ALPHA WAVE,Rick Gerson,Fundamental long/short,"Alpha Wave Global, LP",
+1541901,ENCOMPASS CAPITAL,Todd Kantor,Fundamental long/short,Encompass Capital Advisors LLC,
+1697848,WOODSON,Woodson Davis,Fundamental long/short,"Woodson Capital Management, LP",
+1627436,SYLEBRA,Dan Gibson,Fundamental long/short,Sylebra Capital Ltd,Dan Gibson
+1352662,GRANTHAM MAYO|GMO,Jeremy Grantham,Value,"Grantham, Mayo, Van Otterloo & Co. LLC",Jeremy Grantham

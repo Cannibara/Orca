@@ -1,9 +1,28 @@
 # Worklog
 
-Last verified: 2026-11-17
+Last verified: 2026-11-18
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-18 — Famous funds: every list opens by popularity
+
+| What changed | Why | Files |
+|---|---|---|
+| Every famous list opens with its most popular fund first: Google Trends score, then AUM. The Fund heading cycles A–Z, Z–A, most popular (shown as "most popular" beside it); from another column it starts at A–Z | Owner: rank every fund by search or popularity, and let users get back to it by clicking Fund | `web/src/pages/Home.tsx` (`popularity`, `famousColumns`), `lib/sort.ts` (`cycle`, `orders`), `components/DataTable.tsx` (`alt`) |
+| New `fame` on every famous row: its keyword's score on all rows of the keyword (`search` stays on one filer per keyword for Most searched). Needs a Pipeline run before the order shows live; until then every fund falls back to AUM | Sequoia's other filers need the score to sort with their firm | `pipeline/orca/home.py`, `contract.md`, `web/src/data/types.ts` |
+
+## 2026-11-17 — Famous funds: Most searched list (Google Trends)
+
+| What changed | Why | Files |
+|---|---|---|
+| New first list, Most searched: the 50 famous funds whose manager or founder (or firm, for venture firms) is searched most on Google, Google Trends worldwide over 12 months, Warren Buffett = 100, with a "Search interest" column. One fund per keyword (Sequoia's 7 filers count once). Big companies and Sovereign & pension funds are not ranked. Exceptions the owner asked for (2026-11-17): the Gates trust ("Gates Foundation", 14.0) and Markel ("Markel Group", 3.9, the insurer: customers search it too, so it reads high); Gardner Russo & Quinn has no measurable searches and stays out | Owner: "the most searched funds" first (e.g. Situational Awareness), measured with Google Trends on the manager's name, not the fund's | `famous.csv` (`search`), `famous_search.csv`, `famous.py` (`load_search`), `home.py` (`_searched`), `web/src/pages/Home.tsx` |
+| Keywords are compared as Google topics (an investor, not a namesake), 4 a batch with an anchor (Bill Ackman, then a smaller one for faint names) so all share one scale | Trends compares at most 5 terms and only relatively | `pipeline/scripts/google_trends.py` |
+| The scores are a committed snapshot, refreshed by hand with the script (30–60 min; Google throttles). No pipeline run fetches Trends | Google has no Trends API; pytrends is unmaintained and blocked from cloud servers like GitHub's | same |
+| First snapshot (2026-11-17), top 10: Buffett 100, Soros 31, a16z 25, Burry 21, Dalio 19, Sequoia 17, Cathie Wood 14, Ackman 14, Munger 13, Aschenbrenner 12. 109 keywords score above 0 (14 more are too faint to read and show nowhere); 9 common names (e.g. John Griffin, Rajiv Jain, Tom Slater) have no Google topic and are left out; 15 distinctive names with no topic are searched as exact phrases ("Nick Train": the bare words scored 60× more, from unrelated searches) | Topics picked by hand where automatic matching chose a namesake (David E. Shaw → the firm, La Caisse → the pension fund, not a Crédit Agricole bank); Farallon uses the firm, not Tom Steyer (searched for his politics) | `famous_search.csv` |
+| State funds dropped from the ranking: in a first run AustralianSuper (30), CalPERS, Texas Teachers, the Saudi and Swiss central banks and the Gates Foundation outranked Dalio | Their names are searched by members, citizens and markets, not for their investing; the owner asked for manager or founder names | `famous.csv`, `test_search.py` |
+| A first version ranked by Wikipedia page views (fetched each run); replaced before merge at the owner's request | | PR #39 |
+| Cross-checked against `docs/famous-funds.txt` (PR #37, CIKs matched to live funds.json): 61 of its 68 CIKs are the same as famous.csv's; the other 7 are added (Slate Path → Tiger cubs; Samlyn, Alpha Wave, Encompass, Woodson, Sylebra's older filer → Fundamental long/short; GMO → Value). The Famous funds tab covers that file's Popular funds idea | Validation from live data this session cannot reach | `famous.csv` |
 
 ## 2026-11-17 — Fund scores built (plan phase 5), waiting on the owner's run
 
@@ -43,6 +62,46 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Analysis (read-only): existing ETFs give 31 of our 327 hierarchy labels (11 of 12 sectors, 8 of 71 industries, 12 of 244 verticals) an ETF of their own, counting only ETFs the 100 funds held; about 25% of our Technology value sits in names XLK does not hold; the funds' buying that predates an ETF is 62% for memory (DRAM, Apr 2026), 22% for airlines, 9% for cybersecurity; the engine's `quarter_px` already gives quarterly closes and dividends per share | Sizes the build and shows where ETFs stand in and where our own index is needed | none |
 | Not done: no index code, no table, no contract change. The first real numbers need a pipeline run because dividends and share counts are in the private lake | | |
 
+## 2026-11-16 — Popular funds: draft list of 68 names
+
+| What changed | Why | Files |
+|---|---|---|
+| Draft list of 68 well-known funds, grouped by lineage (Buffett/Graham, Tiger Cubs, macro, activists, quant, other), each matched to a live CIK, book and position count, and flagged if in a top-25 list | Owner asked for a list of famous funds for backlog item 2b, from Wikipedia and press lineage articles (chat) | `docs/superpowers/specs/2026-11-14-popular-funds-draft.md`, `docs/famous-funds.txt` (names, CIK and link only) |
+
+- Not approved: the owner picks names and whether the tab groups by lineage. Only 3 of 68 (Coatue, Slate Path, Appaloosa) are in a top-25 list. Seed Stapleton and Sequoia lineages were not found by search. Nothing built; the contract (`home/popular.json`) comes next.
+
+## 2026-11-16 — Famous funds: Buffett inspired, more moat, Fundamental long/short
+
+| What changed | Why | Files |
+|---|---|---|
+| New Buffett inspired list (21; Berkshire moved here from Value, with Pabrai, Li Lu, Daily Journal, Spier ×2, Markel, Fairfax, Sequoia Fund ×2, Tweedy Browne, Russo, Bloomstran, Lou Simpson, Mecham, Alleghany, Biglari ×2, Chou, Van Den Berg, Kahn Brothers). Pabrai's 2004–11 filer, Weschler's Peninsula and Combs' Castle Point left out: they stopped before 2013. Pabrai's Wagons fund files N-PORT, not 13F | Owner; "Richer, Wiser, Happier" insurer = Markel (Gayner) | `pipeline/orca/famous.csv`, `famous.py`, `web/src/pages/Home.tsx` |
+| Moat investing +31 (strong and medium fits: Nomad, Magellan, Hyperion, Veritas, Findlay Park, Seilern, Comgest, AKO, Troy, GuardCap, Cantillon, Ensemble, Jensen, WCM, SGA, Bares, Saber, FMI, GQG, Lakehouse, Montaka, Mawer, Burgundy …), Wedgewood moved from Value, Rule One Partners (Phil Town, CIK 2040263) | Owner | same |
+| New Fundamental long/short list (31 + Glenview from Value: Egerton, Lansdowne, Marshall Wace, Melvin, Eminence, Kingdon, Soroban, Steadfast, Darsana, Holocene, Woodline, Lakewood, Cat Rock …); Sculptor (OZ Management) and Farallon added to Quant & multi-strategy. Left for the owner: 18 smaller or Tiger-linked long/shorts and 11 healthcare specialists (Baker Bros, RA, Perceptive, OrbiMed, Deerfield …), in the session research | Owner: a home for famous funds no other list fits | same |
+| Owner approved the rest: Healthcare specialists list (11: Perceptive, RA, Baker Bros, Deerfield, OrbiMed, Casdin, EcoR1, Redmile, Rock Springs, Avoro, Visium); Tiger-linked long/shorts to Tiger cubs (Joho, Tiger Legatus, Valinor, Kora, Conatus); 13 smaller long/shorts to Fundamental long/short. A match may list alternatives split by `|` for a renamed filer (Brookside → Bain Capital Public Equity, venBio → Avoro) | Owner (chat) | `famous.csv`, `famous.py`, `home.py` (`_name_matches`), `Home.tsx` |
+| Lists now open with Buffett inspired, Moat investing, Value | | `famous.py` `FAMOUS_GROUPS`, `Home.tsx` |
+| Answers: Market Wizards' latest is "Market Wizards: The Next Generation" (June 2026), traders without 13Fs. Funds off 13F (e.g. Aoris) publish holdings under local rules (Australian PHD twice a year, ASX active funds quarterly, UCITS half-yearly, US N-PORT quarterly); not built | | none |
+
+## 2026-11-16 — Reused tickers: current vendor line only, wrong prices dropped
+
+| What changed | Why | Files |
+|---|---|---|
+| `vendor.resolve` accepts a ticker only on its current line at Tiingo (the one ending last; a tie goes to the longer line), still only when it overlaps the held days | Tiingo answers a ticker with today's company: Anadarko got today's APC from 2026-02, Macquarie got a 2026 ETF's MIC. About 67 stocks from the repair above, and about 509 from before it, were priced this way (code)(chat) | `pipeline/orca/vendor.py`, `tests/test_vendor.py` (the old "OLD" case now gets no ticker) |
+| A stock whose vendor ticker changes or is lost has every stored bar dropped (`prices.drop_stocks`, one file at a time), is fetched again if it still has a ticker, and is owed to its funds and its weekly file. Over 2000 lost in one run: nothing changes, flag `vendor_tickers_lost` | Refetching on a ticker change kept the old ticker's bars on days the new one lacks; a lost stock kept another company's bars | `pipeline/orca/prices.py`, `run/market.py` |
+| Run 43984346762 (17 Nov, 2 h 7 min, after #38): 106 stocks lost their vendor ticker, 65,939 bars dropped, 106 weekly files deleted (Macquarie, Navigant, Sotheby's now 404); XOM, EA, ZK kept. Share-like unpriced 638 → 744 (the 106 wrong ones). Anadarko kept today's APC: a filer still reports it in 2026, so its held days overlap the new line. Fixed after: a current line is refused when the stock was also held during an older line that ended over 31 days before it (`vendor._held_before_reuse`; a 3-day gap such as Wolfspeed's relisting still counts as the same listing) | | `pipeline/orca/vendor.py`, `tests/test_vendor.py` |
+| Published `stock/<id>/weekly.json` of a stock left with no priced day is deleted: the run writes `out/deleted.txt`, the upload step checks every line is `stock/<digits>/weekly.json` and deletes them before the manifest | The contract says such a stock has no file, and the upload never deleted anything, so the wrong chart would have stayed | `run/weekly.py` (`stale_weekly`, `write_deletions`), `.github/workflows/pipeline.yml` |
+
+## 2026-11-16 — Prices for stocks with a broken ticker; analytics allowed
+
+| What changed | Why | Files |
+|---|---|---|
+| Cloudflare Web Analytics allowed in the CSP (`script-src` + `static.cloudflareinsights.com`, `connect-src` + `cloudflareinsights.com`). Checked against the live page with the new header: no CSP error, beacon loads | It had been switched on in the dashboard while the CSP blocked it: nothing counted, a console error on every page. Owner wants the figures (chat) | `web/scripts/prerender.mjs`, `web/tests/prerender.test.ts`, DECISIONS, runbook step 8, ROADMAP U5, CLAUDE.md |
+| Vendor-ticker repair: more suffix rules (`*`, GBX, digits after a suffix), then hand-checked overrides by CUSIP, SEC name match, OpenFIGI US ticker with delisted listings (`includeUnlistedEquities`), all still limited to vendor spans that overlap the held days | Owner asked why two stocks had no `weekly.json`. Zeekr: OpenFIGI gave the Mexican "ZKN", Tiingo has "ZK". The Oracle one is a bond (no price expected). The same fault left 1,420 share-like stocks unpriced, among them Exxon's pre-2026 CUSIP ("EXMOC"; Exxon moved under ExxonMobil Holdings Corp with a new CUSIP), EA, WBD, QRVO, RTN, PX, APC: 4.03% of the 60 largest funds' holdings by cost | `pipeline/orca/vendor.py`, `securities.py` (`tickers_by_name`, `us_tickers`), `run/market.py` (`alternate_tickers`, `ticker_overrides`), `run/weekly.py`, `ticker_overrides.csv` (new), tests |
+| Measured on the published files and Tiingo's list, without the OpenFIGI step (needs the private lake): 447 of 1,420 repaired; the 60 largest funds' unpriced share 4.03% → 0.57%. Each repaired stock's history is fetched again on the next pipeline run, so that run is longer | | |
+| Live result (pipeline runs 43810473859 and 43838862209, 16 Nov). Run 1 spent 3 h on 3,213 new filings (the 14 Nov deadline), so its price stage started under the 90-minute reserve and fetched nothing; run 2 fetched 16,362 tickers (110 min), recomputed 11,131 funds. Securities: 653 + 168 vendor tickers changed, 118 by SEC name, 1,551 OpenFIGI US-ticker lookups. Share-like stocks without a price 1,420 → 638; latest prices 13 Nov. Exxon's old CUSIP (XOM, weekly from 2013), EA, WBD, QRVO, RTX, LUMN, TEVA, AUY, LBRDK, Zeekr (ZK, 2024-05 → 2025-12) priced | | |
+| Found after: Tiingo serves a ticker's current company only. A stock matched to an older line of a reused ticker gets the new company's bars (Anadarko → today's APC from 2026-02, Macquarie MIC, Navigant NCI, Sotheby's BID): wrong chart and latest price; fund P&L is mostly untouched, since those holdings ended before the new company's first bar. About 67 such stocks came from this fix, and about 509 were already priced this way before it (`vendor.resolve` accepted any overlapping line). Open: accept only the ticker's latest line and drop prices stored from another company | | |
+| Caveat: a company whose spin-off the vendor shows as a price drop (UTX → RTX in 2020, Carrier and Otis) now shows that drop as a loss; the engine has no spin-off handling (as for any other spin-off) | | |
+| Checked: full pipeline suite (10 new tests; the run-level ones fail with the alternates switched off) | | |
+
 ## 2026-11-16 — ETF mapping restored, fund 66 dropped, data refreshed to quarter 54, rules decided
 
 | What changed | Why | Files |
@@ -77,6 +136,35 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | 20 tests: every Damodaran group has a default, no unused vertical, the owner's examples hold (Micron, Vistra, Alphabet, Palantir, Leidos, CVS, Tesla, Berkshire) | Decisions made in chat should fail a test if a later edit breaks them | `pipeline/tests/test_hierarchy.py` |
 | DECISIONS entry; ROADMAP D7 and S4 and F5 point at the hierarchy; backlog item 7; ARCHITECTURE module table; CLAUDE.md read-X table and repo map | The change made the old D7 text stale ("SIC → sub-sector → ETF table") | `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/superpowers/specs/2026-11-13-idea-backlog-and-order.md`, `CLAUDE.md` |
 | Not done: nothing reads the hierarchy yet. No `stock_id` mapping, no `pipeline/contract.md` change, no benchmark table. Rules R2–R10 on the review page are recommendations the owner has not confirmed. 188 of 244 verticals have under 10 stocks above $1bn, and 2,620 stocks carry only their Damodaran group default | Listed so the next session starts from the open items, not from the chat | `pipeline/orca/hierarchy/README.md` |
+
+## 2026-11-15 — Famous funds: Moat investing, Family offices, Sovereign & pension funds, stopped filers
+
+| What changed | Why | Files |
+|---|---|---|
+| New lists: Moat investing (Pershing Square, TCI, Fundsmith ×2, Akre, Lindsell Train, Dorsey), Family offices (Duquesne, Soros, Moore, BlueCrest ×2, Cooperman, Paulson, Appaloosa, Gates Foundation Trust), Sovereign & pension funds (49: 7 sovereign, 2 central banks, 40 pensions incl. Canada's big 8 + IMCO, 15 US, AustralianSuper, UniSuper, Aware Super, Cbus, Korea NPS, Malaysia EPF, Swedish AP1–4). "Other" is gone (Fisher and Glenview → Value); Berkshire is no longer under Big companies | Owner (chat). Not filing a 13F: GIC, QIA, ADIA, KIA, Future Fund, NZ Super (13D/G only), CIC (one 2009 filing), Tencent (13D/G only, CIK 1293451) | `pipeline/orca/famous.csv`, `famous.py` (`FAMOUS_GROUPS`), `web/src/pages/Home.tsx` |
+| Funds that stopped filing are listed: an inactive fund's periods now end at its last quarter (`compute._snapshot`, was the deadline quarter, so it had no period but "since start"); famous rows add `until_q` and the web prints "filed until Qn YYYY". Inactive funds stay out of every other list (`excluded`) | Owner: show them (e.g. BlueCrest, filed to 2018) | `pipeline/orca/run/compute.py`, `home.py`, `contract.md`, `Home.tsx` |
+| Open: the stored snapshots of inactive funds predate this, so they need one Pipeline run with `full` (~2.5 h) before stopped funds show for 1y/3y/5y/10y | | |
+| Answer: GV and CapitalG file no 13F of their own; they are "other included managers" on Alphabet's one 13F (CIK 1652044), so the Alphabet row holds their listed stakes | Owner asked | none |
+
+## 2026-11-15 — Famous funds: one list per style, VC and Big companies
+
+| What changed | Why | Files |
+|---|---|---|
+| The tab shows 9 lists, one per style, each under its own heading and line, 10 funds a page with its own page buttons; the one period switch drives them all. Rows carry `group`; a CIK can be in two lists | Owner (chat) | `web/src/pages/Home.tsx` (`FAMOUS_GROUPS`, `FamousGroup`, `ListTable pageSize/pagerAbove`), `home.css` (`.fam`), `pipeline/orca/famous.py` (`FAMOUS_GROUPS`), `home.py`, `contract.md` |
+| New Venture capital list: 87 rows (Sequoia's US, growth, Global Equities, HongShan, Neil Shen and Peak XV filers; a16z, Kleiner, Accel, Greylock, Founders Fund, General Catalyst, NEA, Insight, Ribbit, TCV, BOND and more). Many VCs file one 13F per fund; stale ones list nothing. GV, CapitalG, Intel Capital and Qualcomm Ventures file inside their parent's 13F. Not found: Benchmark, Lux, Khosla (13F-NT only), YC, Sutter Hill | Owner asked for VC funds incl. Sequoia's offices | `pipeline/orca/famous.csv` |
+| New Big companies list: 25 companies filing their own 13F (Berkshire, Alphabet, NVIDIA, SoftBank, Loews, Uber, Amazon, Toyota, Gilead … Regeneron); only 26 were found, not 30. Research says SpaceX listed on 2026-06-12 (SPCX) and is now most of Alphabet's 13F (not checked here) | Owner asked for big companies with big 13F books (e.g. Google/SpaceX) | same |
+| Ackman (Pershing Square) moved from Activists to Value; BlueCrest (Michael Platt, CIKs 1363542 and 1610880) added under Macro, but it filed only until 2018, so it lists nothing (a famous row needs a current performance). TCI was already listed | Owner | same |
+| Possible next list (not built): sovereign funds that file 13F (Norges Bank, Swiss National Bank, Korea Investment Corp, Saudi PIF, Temasek, Mubadala, ADIC; CIKs in the session research) | | |
+
+## 2026-11-15 — Famous funds tab
+
+| What changed | Why | Files |
+|---|---|---|
+| New home tab "Famous funds" beside Top funds: same columns and period chips (the period is shared), each row links to the fund page, the manager's name under the fund name | Owner asked for a list of famous funds, with key attention on Tiger cubs and popular tech funds (chat) | `web/src/pages/Home.tsx`, `web/src/data/types.ts` |
+| `top_{period}.json` gains `famous` rows (Top funds' row plus `manager`) for the 105 CIKs of `famous.csv`, skipping the Top funds rules but keeping the data checks (perf for the period, ≥ 80% priced, no flag) and a match word on the filer name so a wrong CIK lists nothing | Famous funds are often small, young or concentrated; one file per period keeps it one fetch | `pipeline/orca/famous.py`, `famous.csv`, `home.py`, `publish.py`, `run/publish_step.py`, `run/sources.py`, `run/weekly.py`, `demo.py`, `contract.md` |
+| List researched by a subagent with web search (Wikipedia, Dataroma-style superinvestor lists, EDGAR 13F-HR links): 10 Tiger cubs + Tiger Management, 5 grand-cubs, 22 tech & growth, 39 value, 11 activist, 5 macro, 7 quant/multi-strategy, 6 other. Left out as unconfirmed: Valinor, Joho, Sequoia, Lux, Stripes, Long Pond. sec.gov and data.orcaetf.com were blocked from the session, so no CIK was checked against our own data | | |
+| Open: until the next pipeline run, production files have no `famous` key and the tab says the list arrives with the next data update. After it, check the tab for missing names (a CIK whose filer stopped or changed, e.g. Fundsmith 1569205 vs 1868537, Elliott, Hound, ICONIQ) | | |
+| Checked: pipeline tests, web typecheck and unit tests (3 new tests each side), screenshots at 1280 and 400 px on demo data | | |
 
 ## 2026-11-15 — Security: web dependencies upgraded, npm audit clean
 

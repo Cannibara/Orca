@@ -824,7 +824,7 @@ def test_shared_files_follow_the_contract(tmp_path):
 def test_home_files_carry_latest_q_and_the_lists(tmp_path):
     shared(tmp_path)
     top = decoded(tmp_path, "home/top_3y.json")
-    assert set(top) == {"latest_q", "period", "eligible", "giants"}
+    assert set(top) == {"latest_q", "period", "eligible", "giants", "famous", "search_asof"}
     assert (top["latest_q"], top["period"], top["giants"]) == (53, "3y", [])
     assert top["eligible"][0]["fund_id"] == 7
     assert decoded(tmp_path, "home/conviction_q.json") == {

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import polars as pl
 
+from orca.famous import Famous, SearchScores, load_famous, load_search
 from orca.http import FigiClient
 from orca.prices import PriceSource
 
@@ -19,7 +20,9 @@ class Sources:
     is `sec.live.fetch_new_filings` on the shared SEC client (it fills stats, including
     `no_index_days`); `figi` is a FigiClient for `securities.map_cusips`; `sic` and
     `shares_outstanding` take a company CIK; `tbill()` is `rf.fetch_tbill`; `price_universe()`
-    is `vendor.load_universe` (None: no universe, every held stock is asked for)."""
+    is `vendor.load_universe` (None: no universe, every held stock is asked for); `famous()` is
+the Famous funds list (famous.csv; the demo lists its own funds) and `search()` their Google
+Trends scores (famous_search.csv, a snapshot; the demo has its own)."""
 
     list_bulk_zips: Callable[[], list[str]]
     download_bulk_zip: Callable[[str, Path], None]
@@ -31,6 +34,8 @@ class Sources:
     prices: PriceSource
     tbill: Callable[[], dict[int, float]]
     price_universe: Callable[[], pl.DataFrame] | None = None
+    famous: Callable[[], tuple[Famous, ...]] = load_famous
+    search: Callable[[], SearchScores] = load_search
     shares_history: Callable[[int], list] | None = None  # None: the share-count history is not kept
 
 

@@ -16,6 +16,8 @@ from orca.securities import (
     normalise_name,
     normalise_ticker,
     sector_for_sic,
+    tickers_by_name,
+    us_tickers,
 )
 
 FIGI_URL = "https://api.openfigi.com/v3/mapping"
@@ -813,3 +815,38 @@ def test_fetch_shares_outstanding_404_is_none_and_other_errors_raise():
 
     with pytest.raises(FetchError):
         fetch_shares_outstanding(make_client(lambda r: httpx.Response(403)), 1)
+
+
+# --- other tickers for a stock the price vendor does not have -------------------------------
+
+
+def test_tickers_by_name_needs_exactly_one_sec_row():
+    sec = tickers_frame(
+        ("XOM", 34088, "EXXON MOBIL CORP"),
+        ("GOOGL", 1652044, "Alphabet Inc."),
+        ("GOOG", 1652044, "Alphabet Inc."),
+    )
+    names = {34: "EXXON MOBIL CORP", 7: "ALPHABET INC-CL A", 8: "NOBODY LTD", 9: None}
+    assert tickers_by_name(names, sec) == {34: "XOM"}
+
+
+def test_us_tickers_include_delisted_us_listings():
+    seen = []
+    results = {
+        "98923K103": found(hit("BBG0ZK", "ZK", "ZEEKR"), hit("BBG0ZKM", "ZKN", "ZEEKR", exchCode="MM")),
+        "000000001": found(hit("BBG0X", "XCO", "X", exchCode="GR")),
+        "000000002": {"error": "Invalid idValue format"},
+    }
+    client = make_figi_client(figi_handler(results, seen), jobs_per_request=2)
+
+    out = us_tickers(client, ["98923K103", "000000001", "000000002", "000000003"])
+
+    assert out == {"98923K103": "ZK", "000000001": None, "000000003": None}  # the error: no answer
+    sent = [job for r in seen for job in json.loads(r.content)]
+    assert [len(json.loads(r.content)) for r in seen] == [2, 2]
+    assert sent[0] == {
+        "idType": "ID_CUSIP",
+        "idValue": "98923K103",
+        "exchCode": "US",
+        "includeUnlistedEquities": True,
+    }

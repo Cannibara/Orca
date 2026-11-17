@@ -119,6 +119,7 @@ class HomeLists:
     crowded: list[dict]
     calls_q: list[dict]
     calls_y: list[dict]
+    search_asof: str | None = None  # the Google Trends snapshot's date (Most searched)
 
 
 # --- writing files ----------------------------------------------------------------------------
@@ -429,6 +430,8 @@ def publish_shared(
             "period": period,
             "eligible": top["eligible"],
             "giants": top["giants"],
+            "famous": top.get("famous", []),
+            "search_asof": home.search_asof,
         }
     docs["home/wins_losses.json"] = {
         "latest_q": latest_q,

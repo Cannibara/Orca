@@ -4,7 +4,7 @@ files, and the staging folder kept down to what changed."""
 import re
 import shutil
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import date
 from pathlib import Path
 
@@ -12,6 +12,7 @@ import brotli
 import polars as pl
 
 from orca.config import PERIODS
+from orca.famous import Famous, SearchScores
 from orca.home import (
     FundSnapshot,
     calls,
@@ -108,8 +109,12 @@ def publish_shared_files(
     weekly_ids: set[int] | None,
     today: date,
     compress: bool,
+    famous: Sequence[Famous] = (),
+    search: SearchScores | None = None,
 ) -> dict[str, str]:
-    """funds.json, securities.json, latest_prices.json, the home lists and the weekly files of
+    """funds.json, securities.json, latest_prices.json, the home lists (`famous`: famous.csv's
+    funds, for the Famous funds lists; `search`: their keywords' Google Trends scores, for Most
+    searched) and the weekly files of
     `weekly_ids` (every stock when None); the weekly files are built a chunk of stocks at a time
     (`Context.iter_closes`), so no more than a chunk's daily closes are ever held."""
     lake, last_q = ctx.lake, ctx.last_q
@@ -149,7 +154,10 @@ def publish_shared_files(
 
     home = HomeLists(
         latest_q=last_q,
-        top={period: top_funds(snaps, period) for period in PERIODS},
+        top={
+            period: top_funds(snaps, period, famous, search.scores if search else None)
+            for period in PERIODS
+        },
         conviction_q=conviction_moves(snaps, "q", latest_q=last_q, not_stocks=etfs),
         conviction_y=conviction_moves(snaps, "y", latest_q=last_q, not_stocks=etfs),
         wins_losses=wins_losses(snaps, latest_q=last_q),
@@ -157,6 +165,7 @@ def publish_shared_files(
         crowded=crowded_buys(snaps, latest_q=last_q),
         calls_q=calls(snaps, mcap, q_close, px_on_filed, "q", latest_q=last_q),
         calls_y=calls(snaps, mcap, q_close, px_on_filed, "y", latest_q=last_q),
+        search_asof=search.asof if search else None,
     )
 
     table = securities.with_columns(

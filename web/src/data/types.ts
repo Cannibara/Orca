@@ -215,6 +215,16 @@ export type TopRow = {
   ann_return: number;
   max_dd: number | null;
   sharpe: number | null;
+  /** Famous funds rows only: the person behind the fund. */
+  manager?: string | null;
+  /** Famous funds rows only: the style list it is shown in (a fund in two lists has two rows). */
+  group?: string;
+  /** Famous funds rows only: the last quarter of a fund that stopped filing (its figures run to it); null when it still files. */
+  until_q?: number | null;
+  /** Famous funds rows only: Google Trends search interest in the fund's manager (or institution), Warren Buffett = 100 (Most searched); null when not ranked. */
+  search?: number | null;
+  /** Famous funds rows only: the same score on every row of the keyword, to order each list by popularity; null without one (files before 2026-11-18 have none). */
+  fame?: number | null;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */
@@ -223,6 +233,10 @@ export type TopList = {
   period: string;
   eligible: TopRow[];
   giants: TopRow[];
+  /** Missing from files built before the Famous funds list existed. */
+  famous?: TopRow[];
+  /** The date of the Google Trends snapshot behind Most searched (12 months to it); missing in older files. */
+  search_asof?: string | null;
 };
 
 /** conviction, just_filed, crowded, calls_q, calls_y */

@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
@@ -9,7 +16,15 @@ import { State } from "../components/State";
 import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { loadFunds, loadHome, loadLatestPrices, loadSecurities, priceMap, stockMap, type Stock } from "../data/api";
+import {
+  loadFunds,
+  loadHome,
+  loadLatestPrices,
+  loadSecurities,
+  priceMap,
+  stockMap,
+  type Stock,
+} from "../data/api";
 import type {
   CallRow,
   ConvictionRow,
@@ -18,12 +33,22 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import { count, DASH, HOME_TITLE, pct, printsZero, qLabel, ratio, tidyName } from "../lib/format";
+import {
+  count,
+  DASH,
+  fmtDate,
+  HOME_TITLE,
+  pct,
+  printsZero,
+  qLabel,
+  ratio,
+  tidyName,
+} from "../lib/format";
 import { qShort } from "../fund/fmt";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
-import { fAum, fBook, fPrice, fWeight } from "./homeFmt";
+import { fAum, fBook, fPrice, fSearch, fWeight } from "./homeFmt";
 import "./home.css";
 
 // ---- loading ----------------------------------------------------------------
@@ -62,10 +87,27 @@ type Lookup = {
 };
 
 async function loadLookup(): Promise<Lookup> {
-  const [sec, lp, funds] = await Promise.all([loadSecurities(), loadLatestPrices(), loadFunds().catch(() => null)]);
+  const [sec, lp, funds] = await Promise.all([
+    loadSecurities(),
+    loadLatestPrices(),
+    loadFunds().catch(() => null),
+  ]);
   // SEC names come in capitals with legal suffixes; the lists print them tidied, as the fund page does.
-  const stocks = new Map([...stockMap(sec)].map(([id, s]): [number, Stock] => [id, { ...s, name: tidyName(s.name) }]));
-  return { stocks, prices: priceMap(lp), books: new Map(funds ? funds.id.map((id, i): [number, number] => [id, funds.book[i]]) : []) };
+  const stocks = new Map(
+    [...stockMap(sec)].map(([id, s]): [number, Stock] => [
+      id,
+      { ...s, name: tidyName(s.name) },
+    ]),
+  );
+  return {
+    stocks,
+    prices: priceMap(lp),
+    books: new Map(
+      funds
+        ? funds.id.map((id, i): [number, number] => [id, funds.book[i]])
+        : [],
+    ),
+  };
 }
 
 // ---- cells --------------------------------------------------------------------
@@ -92,7 +134,15 @@ function FundLink({ id, name }: { id: number; name: string }) {
 }
 
 /** A fund's name over its reported book, as a stock shows its ticker over its company. */
-function FundCell({ lookup, id, name }: { lookup: Lookup; id: number; name: string }) {
+function FundCell({
+  lookup,
+  id,
+  name,
+}: {
+  lookup: Lookup;
+  id: number;
+  name: string;
+}) {
   const book = lookup.books.get(id);
   return (
     <div className="stk fund">
@@ -103,7 +153,15 @@ function FundCell({ lookup, id, name }: { lookup: Lookup; id: number; name: stri
 }
 
 /** Ticker over the company name, linking to the stock's page within a fund. */
-function StockLink({ lookup, fundId, stockId }: { lookup: Lookup; fundId: number; stockId: number }) {
+function StockLink({
+  lookup,
+  fundId,
+  stockId,
+}: {
+  lookup: Lookup;
+  fundId: number;
+  stockId: number;
+}) {
   return (
     <Link className="tick stk" to={`/fund/${fundId}/stock/${stockId}`}>
       <StockLabel stock={lookup.stocks.get(stockId)} stockId={stockId} />
@@ -134,7 +192,14 @@ function matchFunds(funds: FundsIndex, query: string): Match[] {
   const hits: (Match & { rank: number })[] = [];
   funds.name.forEach((name, i) => {
     const at = name.toLowerCase().indexOf(q);
-    if (at >= 0) hits.push({ id: funds.id[i], name, book: funds.book[i], n: funds.n[i], rank: at === 0 ? 0 : 1 });
+    if (at >= 0)
+      hits.push({
+        id: funds.id[i],
+        name,
+        book: funds.book[i],
+        n: funds.n[i],
+        rank: at === 0 ? 0 : 1,
+      });
   });
   hits.sort((a, b) => a.rank - b.rank || b.book - a.book);
   return hits.slice(0, MAX_MATCHES);
@@ -147,16 +212,30 @@ function FundSearch() {
   // The results can be put away (Escape, or focus leaving the box) without losing the text; typing or focus brings them back.
   const [open, setOpen] = useState(true);
   const input = useRef<HTMLInputElement>(null);
-  const matches = useMemo(() => (funds.status === "ready" ? matchFunds(funds.data, query) : []), [funds, query]);
+  const matches = useMemo(
+    () => (funds.status === "ready" ? matchFunds(funds.data, query) : []),
+    [funds, query],
+  );
   const typed = query.trim() !== "";
   const showing = typed && open && funds.status !== "error";
 
   // "/" jumps to the search from anywhere that is not a text field (the hint in the field says so).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      if (
+        e.key !== "/" ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        e.defaultPrevented
+      )
+        return;
       const t = e.target;
-      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (
+        t instanceof HTMLElement &&
+        (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+      )
+        return;
       e.preventDefault();
       input.current?.focus();
     };
@@ -212,7 +291,11 @@ function FundSearch() {
             /
           </kbd>
         </div>
-        <button className="btn btn-secondary" type="submit" disabled={matches.length === 0}>
+        <button
+          className="btn btn-secondary"
+          type="submit"
+          disabled={matches.length === 0}
+        >
           Open fund
         </button>
       </form>
@@ -269,12 +352,39 @@ const EMPTY: Partial<Record<Period, string>> = {
 };
 
 const TOP_COLUMNS: Col<TopRow>[] = [
-  { header: "Fund", key: "name", align: "l", width: FUND_W, by: (r) => r.name.toLowerCase(), cell: (r) => <FundLink id={r.fund_id} name={r.name} /> },
+  {
+    header: "Fund",
+    key: "name",
+    align: "l",
+    width: FUND_W,
+    by: (r) => r.name.toLowerCase(),
+    cell: (r) => <FundLink id={r.fund_id} name={r.name} />,
+  },
   { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => fBook(r.book) },
-  { header: "Positions", key: "positions", by: (r) => r.n_positions, cell: (r) => count(r.n_positions) },
-  { header: "Return / yr", key: "ret", by: (r) => r.ann_return, cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return, 0)}</Signed> },
-  { header: "Max Drawdown", key: "dd", by: (r) => r.max_dd, cell: (r) => pct(r.max_dd, 0, false) },
-  { header: "Sharpe", key: "sharpe", by: (r) => r.sharpe, cell: (r) => ratio(r.sharpe) },
+  {
+    header: "Positions",
+    key: "positions",
+    by: (r) => r.n_positions,
+    cell: (r) => count(r.n_positions),
+  },
+  {
+    header: "Return / yr",
+    key: "ret",
+    by: (r) => r.ann_return,
+    cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return, 0)}</Signed>,
+  },
+  {
+    header: "Max Drawdown",
+    key: "dd",
+    by: (r) => r.max_dd,
+    cell: (r) => pct(r.max_dd, 0, false),
+  },
+  {
+    header: "Sharpe",
+    key: "sharpe",
+    by: (r) => r.sharpe,
+    cell: (r) => ratio(r.sharpe),
+  },
 ];
 
 /** Rows shown on one page of a long list. */
@@ -295,6 +405,8 @@ function ListTable<R>({
   rowKey,
   empty = "Nothing to show.",
   paged = false,
+  pageSize = PAGE_SIZE,
+  pagerAbove = true,
   fixed = paged,
 }: {
   columns: Col<R>[];
@@ -305,6 +417,9 @@ function ListTable<R>({
   rowKey?: (r: R, i: number) => string | number;
   empty?: string;
   paged?: boolean;
+  pageSize?: number;
+  /** Page buttons above the table as well as below (short pages need them only below). */
+  pagerAbove?: boolean;
   fixed?: boolean;
 }) {
   const { sorted, sort, onSort } = useSortedRows(rows, columns, initial);
@@ -315,8 +430,9 @@ function ListTable<R>({
     setPage(0);
   }
   const shown = useMemo(
-    () => (paged ? sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : sorted),
-    [paged, sorted, page],
+    () =>
+      paged ? sorted.slice(page * pageSize, (page + 1) * pageSize) : sorted,
+    [paged, sorted, page, pageSize],
   );
   if (rows.length === 0) {
     return (
@@ -325,26 +441,338 @@ function ListTable<R>({
       </div>
     );
   }
-  const pager = paged ? <Pager page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={setPage} noun={noun} /> : null;
+  const pager = paged ? (
+    <Pager
+      page={page}
+      pageSize={pageSize}
+      total={sorted.length}
+      onPage={setPage}
+      noun={noun}
+    />
+  ) : null;
   return (
     <>
-      {pager}
-      <DataTable label={label} columns={columns} rows={shown} rowKey={rowKey} sort={sort} onSort={onSort} fixed={fixed} />
+      {pagerAbove && pager}
+      <DataTable
+        label={label}
+        columns={columns}
+        rows={shown}
+        rowKey={rowKey}
+        sort={sort}
+        onSort={onSort}
+        fixed={fixed}
+      />
       {pager}
     </>
   );
 }
 
 const BEST_RETURN: SortState = { key: "ret", dir: -1 };
+/** Famous lists open with the most popular fund first. */
+const MOST_POPULAR: SortState = { key: "pop", dir: -1 };
 
-function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) => void }) {
+/**
+ * Every famous fund's place in the popularity order, 1 = most popular: funds with a Google Trends score
+ * by score (a manager's several filers share it), then the rest by size. A fund in two lists has one place.
+ */
+function popularity(rows: TopRow[]): Map<number, number> {
+  const best = new Map<number, TopRow>();
+  for (const r of rows) {
+    const held = best.get(r.fund_id);
+    if (!held || (r.fame ?? 0) > (held.fame ?? 0)) best.set(r.fund_id, r);
+  }
+  const order = [...best.values()].sort(
+    (a, b) =>
+      (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book || a.fund_id - b.fund_id,
+  );
+  return new Map(order.map((r, i) => [r.fund_id, i + 1]));
+}
+
+/**
+ * Top funds' columns, with the person behind the fund under its name (people know "Burry", not "Scion").
+ * The Fund heading steps through A to Z, Z to A and most popular first (`rank` from `popularity`).
+ */
+function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
+  return TOP_COLUMNS.map((c) =>
+    c.key !== "name"
+      ? c
+      : {
+          ...c,
+          orders: { pop: (r) => -(rank.get(r.fund_id) ?? Infinity) },
+          cycle: [
+            { key: "name", dir: 1 },
+            { key: "name", dir: -1 },
+            MOST_POPULAR,
+          ],
+          alt: { pop: "most popular" },
+          cell: (r) => (
+            <div className="stk fund">
+              <FundLink id={r.fund_id} name={r.name} />
+              {(r.manager || r.until_q != null) && (
+                <span className="sub">
+                  {[
+                    r.manager,
+                    r.until_q != null && `filed until ${qLabel(r.until_q)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              )}
+            </div>
+          ),
+        },
+  );
+}
+
+/** Most searched: Famous funds' columns with the search score after the name, most searched first. */
+function searchedColumns(
+  asof: string | null | undefined,
+  rank: Map<number, number>,
+): Col<TopRow>[] {
+  const famous = famousColumns(rank);
+  const tip = `Google Trends, worldwide, the 12 months to ${asof ? fmtDate(asof) : "the last snapshot"}; Warren Buffett = 100`;
+  return [
+    famous[0],
+    {
+      header: "Search interest",
+      key: "search",
+      by: (r) => r.search ?? null,
+      cell: (r) => <span title={tip}>{fSearch(r.search)}</span>,
+    },
+    ...famous.slice(1),
+  ];
+}
+const MOST_SEARCHED_ORDER: SortState = { key: "search", dir: -1 };
+/** Funds in Most searched: the head of the ranking, as a list of what people look up should be. */
+const MOST_SEARCHED_MAX = 50;
+function mostSearchedAbout(asof: string | null | undefined): string {
+  const when = asof ? ` over the 12 months to ${fmtDate(asof)}` : "";
+  return `The famous funds people search Google for most: Google Trends interest in the manager or founder (or the firm, for venture firms), worldwide${when}. Warren Buffett = 100.`;
+}
+
+/** The most searched famous funds, once each (a fund in two lists has its score on both rows). */
+function mostSearched(rows: TopRow[]): TopRow[] {
+  const seen = new Set<number>();
+  return rows
+    .filter((r) => r.search != null && r.search > 0)
+    .sort((a, b) => b.search! - a.search! || a.fund_id - b.fund_id)
+    .filter((r) => !seen.has(r.fund_id) && !!seen.add(r.fund_id))
+    .slice(0, MOST_SEARCHED_MAX);
+}
+
+/**
+ * The famous funds' styles, in page order (pipeline/orca/famous.py FAMOUS_GROUPS), each with a line about it.
+ * A group the pipeline publishes that is not here is listed last, without a line.
+ */
+const FAMOUS_GROUPS: { name: string; about: string }[] = [
+  {
+    name: "Buffett inspired",
+    about:
+      'Berkshire Hathaway and the investors closest to Buffett: friends, partners, disciples and "baby Berkshires".',
+  },
+  {
+    name: "Moat investing",
+    about:
+      "Concentrated owners of a few great businesses with lasting advantages, held for years.",
+  },
+  { name: "Value", about: "Value investors: good companies bought cheap." },
+  {
+    name: "Tiger cubs",
+    about:
+      "Julian Robertson's Tiger Management and the funds its alumni started or it seeded (cubs and grand-cubs).",
+  },
+  {
+    name: "Fundamental long/short",
+    about:
+      "Stock pickers who also bet against stocks. The 13F shows only what they own, not their bets against.",
+  },
+  {
+    name: "Healthcare specialists",
+    about:
+      "Funds that invest only in healthcare and biotech, often backing drug makers before and after their trial results.",
+  },
+  { name: "Tech & growth", about: "Growth investors focused on technology." },
+  {
+    name: "Venture capital",
+    about:
+      "Venture firms. Their 13F shows only listed stakes, mostly companies they backed before the IPO.",
+  },
+  {
+    name: "Activists",
+    about: "Investors who buy big stakes to push companies to change.",
+  },
+  {
+    name: "Macro",
+    about:
+      "Macro funds. The 13F shows only their US stocks, not their bonds, currencies or futures.",
+  },
+  {
+    name: "Family offices",
+    about:
+      "Star traders and billionaires investing their own fortunes, mostly in stocks.",
+  },
+  {
+    name: "Quant & multi-strategy",
+    about: "Quant and multi-manager firms with large, fast-trading books.",
+  },
+  {
+    name: "Big companies",
+    about:
+      "Companies investing their own money, like Google in SpaceX. A 13F shows only listed shares, so a stake shows up once the company lists.",
+  },
+  {
+    name: "Sovereign & pension funds",
+    about:
+      "Countries' wealth funds, central banks and big pension and superannuation funds.",
+  },
+];
+
+/** Rows a page in each famous list: short pages keep nine lists scannable. */
+const FAMOUS_PAGE = 10;
+
+/** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
+ * without a group (none should come) goes to a list named "Other", last. */
+function byGroup(
+  rows: TopRow[],
+): { name: string; about?: string; rows: TopRow[] }[] {
+  const groups = new Map<string, TopRow[]>();
+  for (const r of rows) {
+    const g = r.group ?? "Other";
+    groups.set(g, [...(groups.get(g) ?? []), r]);
+  }
+  const known = FAMOUS_GROUPS.filter((g) => groups.has(g.name)).map((g) => ({
+    ...g,
+    rows: groups.get(g.name)!,
+  }));
+  const rest = [...groups.keys()]
+    .filter((g) => !FAMOUS_GROUPS.some((k) => k.name === g))
+    .sort();
+  return [...known, ...rest.map((name) => ({ name, rows: groups.get(name)! }))];
+}
+
+function FamousFunds({
+  period,
+  onPeriod,
+}: {
+  period: Period;
+  onPeriod: (p: Period) => void;
+}) {
+  const list = useLoad(() => loadHome(`top_${period}`), [period]);
+  const rows = list.status === "ready" ? list.data.famous : undefined;
+  const groups = useMemo(() => byGroup(rows ?? []), [rows]);
+  const searched = useMemo(() => mostSearched(rows ?? []), [rows]);
+  const rank = useMemo(() => popularity(rows ?? []), [rows]);
+  const columns = useMemo(() => famousColumns(rank), [rank]);
+  const searchedCols = useMemo(
+    () =>
+      searchedColumns(
+        list.status === "ready" ? list.data.search_asof : undefined,
+        rank,
+      ),
+    [list, rank],
+  );
+  const asof = list.status === "ready" ? list.data.search_asof : undefined;
+  return (
+    <Panel
+      title="Famous funds"
+      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Each list opens with its most popular fund first (most searched on Google, then biggest); select a heading to sort, and Fund again to cycle A–Z, Z–A and most popular."
+      controls={
+        <Choice
+          label="Period"
+          options={PERIODS}
+          value={period}
+          onChange={onPeriod}
+        />
+      }
+    >
+      {list.status !== "ready" ? (
+        <Status state={list} />
+      ) : groups.length === 0 ? (
+        <div className="pb">
+          <State>
+            {rows === undefined
+              ? "The famous funds list arrives with the next data update."
+              : (EMPTY[period] ??
+                "No famous fund has a long enough record for this period yet.")}
+          </State>
+        </div>
+      ) : (
+        <>
+          {searched.length > 0 && (
+            <FamousGroup
+              name="Most searched"
+              about={mostSearchedAbout(asof)}
+              rows={searched}
+              columns={searchedCols}
+              initial={MOST_SEARCHED_ORDER}
+            />
+          )}
+          {groups.map((g) => (
+            <FamousGroup key={g.name} {...g} columns={columns} />
+          ))}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/** One style's list: its heading and line, then its table with its own page buttons. */
+function FamousGroup({
+  name,
+  about,
+  rows,
+  columns,
+  initial = MOST_POPULAR,
+}: {
+  name: string;
+  about?: string;
+  rows: TopRow[];
+  columns: Col<TopRow>[];
+  initial?: SortState;
+}) {
+  const id = useId();
+  return (
+    <section className="fam" aria-labelledby={id}>
+      <div className="fam-h">
+        <h3 id={id}>{name}</h3>
+        {about && <p>{about}</p>}
+      </div>
+      <ListTable
+        label={name}
+        noun="funds"
+        columns={columns}
+        rows={rows}
+        initial={initial}
+        rowKey={(r) => r.fund_id}
+        paged
+        pageSize={FAMOUS_PAGE}
+        pagerAbove={false}
+      />
+    </section>
+  );
+}
+
+function TopFunds({
+  period,
+  onPeriod,
+}: {
+  period: Period;
+  onPeriod: (p: Period) => void;
+}) {
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
   return (
     <>
       <Panel
         title="Top funds"
         subtitle="Estimated return a year over the chosen period. Select a heading to sort."
-        controls={<Choice label="Period" options={PERIODS} value={period} onChange={onPeriod} />}
+        controls={
+          <Choice
+            label="Period"
+            options={PERIODS}
+            value={period}
+            onChange={onPeriod}
+          />
+        }
       >
         {list.status !== "ready" ? (
           <Status state={list} />
@@ -382,7 +810,8 @@ function TopFunds({ period, onPeriod }: { period: Period; onPeriod: (p: Period) 
 const fW0 = (w: number) => (w > 0 && w < 0.5 ? "<1%" : Math.round(w) + "%");
 
 /** The weight before a move, in percent: after less the change (floating-point dust clamped to 0). */
-const weightBefore = (r: ConvictionRow) => Math.max(0, r.weight_after * 100 - r.change_pts);
+const weightBefore = (r: ConvictionRow) =>
+  Math.max(0, r.weight_after * 100 - r.change_pts);
 
 /**
  * A move's weight as the fund page's Positions table draws it: "was → now" over a bar of the weight before in
@@ -396,11 +825,24 @@ function WeightCell({ r, maxW }: { r: ConvictionRow; maxW: number }) {
   const solid = Math.min(now, prev);
   const diff = Math.abs(now - prev);
   return (
-    <span className="wcell" title={`Weight ${fW0(prev)} before, ${fW0(now)} after (${fAum(r.change_pts)} of the fund's AUM)`}>
+    <span
+      className="wcell"
+      title={`Weight ${fW0(prev)} before, ${fW0(now)} after (${fAum(r.change_pts)} of the fund's AUM)`}
+    >
       <span className="wn">{`${fW0(prev)} → ${fW0(now)}`}</span>
       <span className="mbs">
-        {solid > 0 && <i className="mb" style={{ width: Math.max(2, pct(solid)).toFixed(1) + "%" }} />}
-        {diff > 0 && <i className={"mb mbx " + (now > prev ? "up" : "dn")} style={{ width: Math.max(2, pct(diff)).toFixed(1) + "%" }} />}
+        {solid > 0 && (
+          <i
+            className="mb"
+            style={{ width: Math.max(2, pct(solid)).toFixed(1) + "%" }}
+          />
+        )}
+        {diff > 0 && (
+          <i
+            className={"mb mbx " + (now > prev ? "up" : "dn")}
+            style={{ width: Math.max(2, pct(diff)).toFixed(1) + "%" }}
+          />
+        )}
       </span>
     </span>
   );
@@ -419,18 +861,35 @@ function BoughtBox({ q }: { q: number }) {
 /** Sort value of a fund or stock name column. */
 const lower = (text: string | undefined) => (text ?? "").toLowerCase();
 
-function fundCol<R>(lookup: Lookup, id: (r: R) => number, name: (r: R) => string): Col<R> {
-  return { header: "Fund", key: "fund", align: "l", width: FUND_W, by: (r) => lower(name(r)), cell: (r) => <FundCell lookup={lookup} id={id(r)} name={name(r)} /> };
+function fundCol<R>(
+  lookup: Lookup,
+  id: (r: R) => number,
+  name: (r: R) => string,
+): Col<R> {
+  return {
+    header: "Fund",
+    key: "fund",
+    align: "l",
+    width: FUND_W,
+    by: (r) => lower(name(r)),
+    cell: (r) => <FundCell lookup={lookup} id={id(r)} name={name(r)} />,
+  };
 }
 
-function stockCol<R>(lookup: Lookup, fund: (r: R) => number, stock: (r: R) => number): Col<R> {
+function stockCol<R>(
+  lookup: Lookup,
+  fund: (r: R) => number,
+  stock: (r: R) => number,
+): Col<R> {
   return {
     header: "Stock",
     key: "stock",
     align: "l",
     width: STOCK_W,
     by: (r) => lower(lookup.stocks.get(stock(r))?.ticker),
-    cell: (r) => <StockLink lookup={lookup} fundId={fund(r)} stockId={stock(r)} />,
+    cell: (r) => (
+      <StockLink lookup={lookup} fundId={fund(r)} stockId={stock(r)} />
+    ),
   };
 }
 
@@ -445,24 +904,73 @@ const MOVE_WINDOWS: ChoiceOption<CallWindow>[] = [
 const CONVICTION_RULE =
   "Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before and at least half its largest holding. Funds ≥ $500M; no ETFs.";
 
-function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; onWin: (w: CallWindow) => void }) {
-  const list = useLoad(() => loadHome(win === "q" ? "conviction_q" : "conviction_y"), [win]);
+function Conviction({
+  lookup,
+  win,
+  onWin,
+}: {
+  lookup: Lookup;
+  win: CallWindow;
+  onWin: (w: CallWindow) => void;
+}) {
+  const list = useLoad(
+    () => loadHome(win === "q" ? "conviction_q" : "conviction_y"),
+    [win],
+  );
   const rows = list.status === "ready" ? list.data.rows : null;
   const columns = useMemo<Col<ConvictionRow>[]>(() => {
     // The longest bar (the biggest weight before or after) sets the scale, so bars compare across rows.
-    const maxW = Math.max(1, ...(rows ?? []).map((r) => Math.max(weightBefore(r), r.weight_after * 100)));
+    const maxW = Math.max(
+      1,
+      ...(rows ?? []).map((r) =>
+        Math.max(weightBefore(r), r.weight_after * 100),
+      ),
+    );
     const now = (r: ConvictionRow) => lookup.prices.get(r.stock_id) ?? null;
-    const since = (r: ConvictionRow) => change(lookup.prices.get(r.stock_id), r.est_price);
+    const since = (r: ConvictionRow) =>
+      change(lookup.prices.get(r.stock_id), r.est_price);
     const quarter: Col<ConvictionRow>[] =
-      win === "y" ? [{ header: "Quarter", key: "q", by: (r) => r.q, cell: (r) => qLabel(r.q) }] : [];
+      win === "y"
+        ? [
+            {
+              header: "Quarter",
+              key: "q",
+              by: (r) => r.q,
+              cell: (r) => qLabel(r.q),
+            },
+          ]
+        : [];
     return [
-      fundCol(lookup, (r) => r.fund_id, (r) => r.name),
-      stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
+      fundCol(
+        lookup,
+        (r) => r.fund_id,
+        (r) => r.name,
+      ),
+      stockCol(
+        lookup,
+        (r) => r.fund_id,
+        (r) => r.stock_id,
+      ),
       ...quarter,
       // Sorts by the signed change in the fund's AUM, so the biggest buys lead and sales trail (or the reverse).
-      { header: "Weight", key: "weight", by: (r) => r.change_pts, cell: (r) => <WeightCell r={r} maxW={maxW} /> },
-      { header: "$ bought / sold", key: "usd", by: (r) => r.usd, cell: (r) => <Signed v={r.usd}>{fBook(r.usd, true)}</Signed> },
-      { header: "Est. price", key: "est", by: (r) => r.est_price, cell: (r) => fPrice(r.est_price) },
+      {
+        header: "Weight",
+        key: "weight",
+        by: (r) => r.change_pts,
+        cell: (r) => <WeightCell r={r} maxW={maxW} />,
+      },
+      {
+        header: "$ bought / sold",
+        key: "usd",
+        by: (r) => r.usd,
+        cell: (r) => <Signed v={r.usd}>{fBook(r.usd, true)}</Signed>,
+      },
+      {
+        header: "Est. price",
+        key: "est",
+        by: (r) => r.est_price,
+        cell: (r) => fPrice(r.est_price),
+      },
       { header: "Price now", key: "now", by: now, cell: (r) => fPrice(now(r)) },
       {
         header: "Since",
@@ -479,7 +987,14 @@ function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; o
     <Panel
       title="Conviction moves"
       subtitle={CONVICTION_RULE}
-      controls={<Choice label="Moves from" options={MOVE_WINDOWS} value={win} onChange={onWin} />}
+      controls={
+        <Choice
+          label="Moves from"
+          options={MOVE_WINDOWS}
+          value={win}
+          onChange={onWin}
+        />
+      }
     >
       {list.status !== "ready" ? (
         <Status state={list} />
@@ -493,12 +1008,19 @@ function Conviction({ lookup, win, onWin }: { lookup: Lookup; win: CallWindow; o
             rows={list.data.rows}
             initial={MOST_UNUSUAL}
             rowKey={(r) => `${r.fund_id}-${r.stock_id}-${r.q}`}
-            empty={win === "q" ? "No conviction moves this quarter." : "No conviction moves in the last 4 quarters."}
+            empty={
+              win === "q"
+                ? "No conviction moves this quarter."
+                : "No conviction moves in the last 4 quarters."
+            }
             paged
           />
           <p className="pf">
-            {win === "q" ? `${qLabel(list.data.latest_q)} filings` : `The 4 quarters to ${qLabel(list.data.latest_q)}`}, the
-            most unusual move for its fund first. "Since" = price change from the estimated trade price to today.
+            {win === "q"
+              ? `${qLabel(list.data.latest_q)} filings`
+              : `The 4 quarters to ${qLabel(list.data.latest_q)}`}
+            , the most unusual move for its fund first. "Since" = price change
+            from the estimated trade price to today.
           </p>
         </>
       )}
@@ -510,9 +1032,22 @@ function WinsLosses({ lookup }: { lookup: Lookup }) {
   const list = useLoad(() => loadHome("wins_losses"), []);
   const columns = useMemo<Col<WinLossRow>[]>(
     () => [
-      fundCol(lookup, (r) => r.fund_id, (r) => r.name),
-      stockCol(lookup, (r) => r.fund_id, (r) => r.stock_id),
-      { header: "Quarter P&L", key: "pnl", by: (r) => r.pnl, cell: (r) => <Signed v={r.pnl}>{fBook(r.pnl, true)}</Signed> },
+      fundCol(
+        lookup,
+        (r) => r.fund_id,
+        (r) => r.name,
+      ),
+      stockCol(
+        lookup,
+        (r) => r.fund_id,
+        (r) => r.stock_id,
+      ),
+      {
+        header: "Quarter P&L",
+        key: "pnl",
+        by: (r) => r.pnl,
+        cell: (r) => <Signed v={r.pnl}>{fBook(r.pnl, true)}</Signed>,
+      },
     ],
     [lookup],
   );
@@ -531,11 +1066,25 @@ function WinsLosses({ lookup }: { lookup: Lookup }) {
         <div className="pb duo">
           <div>
             <h3>Biggest wins</h3>
-            <ListTable label="Biggest wins" noun="wins" columns={columns} rows={list.data.wins} initial={{ key: "pnl", dir: -1 }} empty="No wins to show." />
+            <ListTable
+              label="Biggest wins"
+              noun="wins"
+              columns={columns}
+              rows={list.data.wins}
+              initial={{ key: "pnl", dir: -1 }}
+              empty="No wins to show."
+            />
           </div>
           <div>
             <h3>Biggest losses</h3>
-            <ListTable label="Biggest losses" noun="losses" columns={columns} rows={list.data.losses} initial={{ key: "pnl", dir: 1 }} empty="No losses to show." />
+            <ListTable
+              label="Biggest losses"
+              noun="losses"
+              columns={columns}
+              rows={list.data.losses}
+              initial={{ key: "pnl", dir: 1 }}
+              empty="No losses to show."
+            />
           </div>
         </div>
       )}
@@ -554,13 +1103,31 @@ function Crowded({ lookup }: { lookup: Lookup }) {
         by: (r) => lower(lookup.stocks.get(r.stock_id)?.ticker),
         cell: (r) => (
           <span className="tick stk">
-            <StockLabel stock={lookup.stocks.get(r.stock_id)} stockId={r.stock_id} />
+            <StockLabel
+              stock={lookup.stocks.get(r.stock_id)}
+              stockId={r.stock_id}
+            />
           </span>
         ),
       },
-      { header: "Funds buying", key: "funds", by: (r) => r.funds_buying, cell: (r) => count(r.funds_buying) },
-      { header: "Total bought", key: "bought", by: (r) => r.total_bought, cell: (r) => fBook(r.total_bought) },
-      { header: "Avg weight after", key: "weight", by: (r) => r.avg_weight_after, cell: (r) => fWeight(r.avg_weight_after) },
+      {
+        header: "Funds buying",
+        key: "funds",
+        by: (r) => r.funds_buying,
+        cell: (r) => count(r.funds_buying),
+      },
+      {
+        header: "Total bought",
+        key: "bought",
+        by: (r) => r.total_bought,
+        cell: (r) => fBook(r.total_bought),
+      },
+      {
+        header: "Avg weight after",
+        key: "weight",
+        by: (r) => r.avg_weight_after,
+        cell: (r) => fWeight(r.avg_weight_after),
+      },
     ],
     [lookup],
   );
@@ -600,18 +1167,38 @@ const WINDOWS: ChoiceOption<CallWindow>[] = [
   { id: "y", label: "Last 4 quarters' buys" },
 ];
 
-type Call = { row: CallRow; price: number | undefined; sinceBuy: number | null; sinceFiled: number | null };
+type Call = {
+  row: CallRow;
+  price: number | undefined;
+  sinceBuy: number | null;
+  sinceFiled: number | null;
+};
 
 /** Every row of the file with today's figures, best first (or worst first); rows without a price go last. */
-function rankCalls(rows: CallRow[], prices: Map<number, number>, mode: Mode): Call[] {
+function rankCalls(
+  rows: CallRow[],
+  prices: Map<number, number>,
+  mode: Mode,
+): Call[] {
   const dir = mode === "best" ? -1 : 1;
   return rows
     .map((row) => {
       const price = prices.get(row.stock_id);
-      return { row, price, sinceBuy: change(price, row.est_price), sinceFiled: change(price, row.price_on_filed) };
+      return {
+        row,
+        price,
+        sinceBuy: change(price, row.est_price),
+        sinceFiled: change(price, row.price_on_filed),
+      };
     })
     .sort((a, b) =>
-      a.sinceBuy === null ? (b.sinceBuy === null ? 0 : 1) : b.sinceBuy === null ? -1 : dir * (a.sinceBuy - b.sinceBuy),
+      a.sinceBuy === null
+        ? b.sinceBuy === null
+          ? 0
+          : 1
+        : b.sinceBuy === null
+          ? -1
+          : dir * (a.sinceBuy - b.sinceBuy),
     );
 }
 
@@ -631,19 +1218,53 @@ function Calls({
   win: CallWindow;
   onWin: (w: CallWindow) => void;
 }) {
-  const list = useLoad(() => loadHome(win === "q" ? "calls_q" : "calls_y"), [win]);
+  const list = useLoad(
+    () => loadHome(win === "q" ? "calls_q" : "calls_y"),
+    [win],
+  );
   const ranked = useMemo(
-    () => (list.status === "ready" ? rankCalls(list.data.rows, lookup.prices, mode) : []),
+    () =>
+      list.status === "ready"
+        ? rankCalls(list.data.rows, lookup.prices, mode)
+        : [],
     [list, lookup, mode],
   );
   const columns = useMemo<Col<Call>[]>(
     () => [
-      stockCol(lookup, (c) => c.row.fund_id, (c) => c.row.stock_id),
-      fundCol(lookup, (c) => c.row.fund_id, (c) => c.row.name),
-      { header: "Bought", key: "q", by: (c) => c.row.q, cell: (c) => <BoughtBox q={c.row.q} /> },
-      { header: "Est. buy price", key: "est", by: (c) => c.row.est_price, cell: (c) => fPrice(c.row.est_price) },
-      { header: "Price now", key: "now", by: (c) => c.price ?? null, cell: (c) => fPrice(c.price ?? null) },
-      { header: "Since fund's buy", key: "since", by: (c) => c.sinceBuy, cell: (c) => <SinceBox v={c.sinceBuy} /> },
+      stockCol(
+        lookup,
+        (c) => c.row.fund_id,
+        (c) => c.row.stock_id,
+      ),
+      fundCol(
+        lookup,
+        (c) => c.row.fund_id,
+        (c) => c.row.name,
+      ),
+      {
+        header: "Bought",
+        key: "q",
+        by: (c) => c.row.q,
+        cell: (c) => <BoughtBox q={c.row.q} />,
+      },
+      {
+        header: "Est. buy price",
+        key: "est",
+        by: (c) => c.row.est_price,
+        cell: (c) => fPrice(c.row.est_price),
+      },
+      {
+        header: "Price now",
+        key: "now",
+        by: (c) => c.price ?? null,
+        cell: (c) => fPrice(c.price ?? null),
+      },
+      {
+        header: "Since fund's buy",
+        key: "since",
+        by: (c) => c.sinceBuy,
+        cell: (c) => <SinceBox v={c.sinceBuy} />,
+      },
       {
         header: "Since 13F went public",
         key: "filed",
@@ -659,8 +1280,18 @@ function Calls({
       subtitle={CALLS_RULE}
       controls={
         <>
-          <Choice label="Best or worst" options={MODES} value={mode} onChange={onMode} />
-          <Choice label="Buys from" options={WINDOWS} value={win} onChange={onWin} />
+          <Choice
+            label="Best or worst"
+            options={MODES}
+            value={mode}
+            onChange={onMode}
+          />
+          <Choice
+            label="Buys from"
+            options={WINDOWS}
+            value={win}
+            onChange={onWin}
+          />
         </>
       }
     >
@@ -679,9 +1310,10 @@ function Calls({
             empty="No buys in this window."
           />
           <p className="pf">
-            "Since 13F went public" starts on the day the 13F was filed: what a copier could still have caught. Each
-            list holds at most the 50 best and 50 worst buys at the last data build; the order here uses today's
-            prices.
+            "Since 13F went public" starts on the day the 13F was filed: what a
+            copier could still have caught. Each list holds at most the 50 best
+            and 50 worst buys at the last data build; the order here uses
+            today's prices.
           </p>
         </>
       )}
@@ -691,9 +1323,10 @@ function Calls({
 
 // ---- page ----------------------------------------------------------------------------
 
-type TabId = "top" | "conviction" | "wins" | "crowded" | "calls";
+type TabId = "top" | "famous" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
   { id: "top", label: "Top funds" },
+  { id: "famous", label: "Famous funds" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
   { id: "crowded", label: "Crowded buys" },
@@ -712,6 +1345,8 @@ export default function Home() {
 
   let panel: ReactNode;
   if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
+  else if (tab === "famous")
+    panel = <FamousFunds period={period} onPeriod={setPeriod} />;
   else if (lookup.status !== "ready") {
     // Stocks, prices and fund sizes are what these lists are made of: the panel waits for them.
     panel = (
@@ -719,10 +1354,22 @@ export default function Home() {
         <Status state={lookup} />
       </Panel>
     );
-  } else if (tab === "conviction") panel = <Conviction lookup={lookup.data} win={moveWin} onWin={setMoveWin} />;
+  } else if (tab === "conviction")
+    panel = (
+      <Conviction lookup={lookup.data} win={moveWin} onWin={setMoveWin} />
+    );
   else if (tab === "wins") panel = <WinsLosses lookup={lookup.data} />;
   else if (tab === "crowded") panel = <Crowded lookup={lookup.data} />;
-  else panel = <Calls lookup={lookup.data} mode={mode} onMode={setMode} win={win} onWin={setWin} />;
+  else
+    panel = (
+      <Calls
+        lookup={lookup.data}
+        mode={mode}
+        onMode={setMode}
+        win={win}
+        onWin={setWin}
+      />
+    );
 
   return (
     <div className="fp">
@@ -737,13 +1384,22 @@ export default function Home() {
 
         {/* The search sits level with the tabs, at the right. */}
         <div className="tabrow">
-          <Tabs tabs={TABS} value={tab} onChange={setTab} label="Home lists" idPrefix="home" />
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            onChange={setTab}
+            label="Home lists"
+            idPrefix="home"
+          />
           <FundSearch />
         </div>
         <div className="home-body" {...tabPanelProps("home", tab)}>
           {panel}
         </div>
-        <p className="cap foot">All figures are estimates built from 13F filings, not a fund's real return.</p>
+        <p className="cap foot">
+          All figures are estimates built from 13F filings, not a fund's real
+          return.
+        </p>
       </div>
     </div>
   );

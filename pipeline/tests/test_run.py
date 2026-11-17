@@ -1200,6 +1200,195 @@ def test_a_repaired_ticker_fetches_the_history_under_the_vendors_one(fixtures, t
     assert shown["ticker"][shown["stock_id"].index(stock_id)] == ticker  # not the foreign one
 
 
+def _break_ticker(lake, stock_id, ticker):
+    """Give one security a ticker the vendor does not have, as OpenFIGI names some stocks."""
+    securities = lake.read("securities")
+    lake.write(
+        "securities",
+        securities.with_columns(
+            ticker=pl.when(pl.col("stock_id") == stock_id)
+            .then(pl.lit(ticker))
+            .otherwise(pl.col("ticker"))
+        ),
+    )
+
+
+def _us_ticker_figi(answers: dict[str, str], asked: list):
+    """OpenFIGI stub for the US-ticker lookup: cusip -> US ticker; records the jobs."""
+
+    def handler(request):
+        jobs = json.loads(request.content)
+        asked.extend(jobs)
+        body = [
+            {"data": [{"ticker": answers[j["idValue"]], "exchCode": "US"}]}
+            if j["idValue"] in answers
+            else {"warning": "No identifier found."}
+            for j in jobs
+        ]
+        return httpx.Response(200, json=body)
+
+    return FigiClient(
+        1e6, {}, transport=httpx.MockTransport(handler), sleep=lambda s: None, jobs_per_request=100
+    )
+
+
+def test_a_stock_found_by_its_sec_name_is_priced_under_that_ticker(fixtures, tmp_path):
+    run(tmp_path, fixture_sources(fixtures), WEEK1)
+    lake = Lake(tmp_path / "lake")
+    stock_id, ticker, name = (
+        lake.read("securities").filter(pl.col("ticker").is_not_null()).select("stock_id", "ticker", "name").row(0)
+    )
+    _break_ticker(lake, stock_id, "EXMOC")  # no repair of its own reaches the real ticker
+    sec = pl.DataFrame(
+        [(ticker, 1, name)], schema={"ticker": pl.String, "cik": pl.Int64, "title": pl.String}, orient="row"
+    )
+    source = Asking(fixtures.prices)
+    listed = universe_of(fixtures)
+    sources = replace(
+        fixture_sources(fixtures), prices=source, price_universe=lambda: listed, sec_tickers=lambda: sec
+    )
+
+    stats = run(tmp_path, sources, WEEK2)
+
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert vendor[stock_id] == ticker
+    assert (ticker, date(2013, 1, 1)) in source.asked  # its whole history, under the SEC ticker
+    assert stats.staging is not None
+
+
+def test_a_delisted_stocks_us_ticker_comes_from_openfigi_once(fixtures, tmp_path):
+    run(tmp_path, fixture_sources(fixtures), WEEK1)
+    lake = Lake(tmp_path / "lake")
+    cusip_map = lake.read("cusip_map").filter(pl.col("method") == "openfigi")
+    cusip, stock_id = cusip_map.sort("cusip").select("cusip", "stock_id").row(0)
+    ticker = dict(lake.read("securities").select("stock_id", "ticker").iter_rows())[stock_id]
+    _break_ticker(lake, stock_id, "ZKN")  # a Mexican listing
+    asked = []
+    listed = universe_of(fixtures)
+    sources = replace(
+        fixture_sources(fixtures),
+        price_universe=lambda: listed,
+        figi=_us_ticker_figi({cusip: ticker}, asked),
+    )
+
+    run(tmp_path, sources, WEEK2)
+
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert vendor[stock_id] == ticker
+    lookups = [j for j in asked if j.get("includeUnlistedEquities")]
+    assert [j["idValue"] for j in lookups] == [cusip]
+    assert lake.read("figi_us_tickers").select("stock_id", "ticker").rows() == [(stock_id, ticker)]
+
+    asked.clear()
+    run(tmp_path, sources, WEEK3)  # the answer is kept: OpenFIGI is not asked again
+    assert not [j for j in asked if j.get("includeUnlistedEquities")]
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert vendor[stock_id] == ticker
+
+
+def test_a_hand_checked_override_names_the_vendor_ticker(fixtures, tmp_path, monkeypatch):
+    run(tmp_path, fixture_sources(fixtures), WEEK1)
+    lake = Lake(tmp_path / "lake")
+    cusip, stock_id = (
+        lake.read("cusip_map").filter(pl.col("method") == "openfigi").sort("cusip")
+        .select("cusip", "stock_id").row(0)
+    )
+    ticker = dict(lake.read("securities").select("stock_id", "ticker").iter_rows())[stock_id]
+    _break_ticker(lake, stock_id, "EXMOC")
+    overrides = tmp_path / "overrides.csv"
+    overrides.write_text(f"cusip,ticker,why\n{cusip},{ticker.lower()},test\n")
+    monkeypatch.setattr("orca.run.market.TICKER_OVERRIDES_CSV", overrides)
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+
+    run(tmp_path, sources, WEEK2)
+
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert vendor[stock_id] == ticker
+
+
+def test_the_shipped_overrides_are_well_formed():
+    from orca.run.market import ticker_overrides
+
+    overrides = ticker_overrides()
+    assert overrides["30231G102"] == "XOM"
+    assert all(len(c) == 9 and t and " " not in t for c, t in overrides.items())
+
+
+def test_a_bond_never_borrows_a_shares_ticker(fixtures, tmp_path):
+    run(tmp_path, fixture_sources(fixtures), WEEK1)
+    lake = Lake(tmp_path / "lake")
+    cusip_map = lake.read("cusip_map").filter(pl.col("method") == "openfigi")
+    cusip, stock_id = cusip_map.sort("cusip").select("cusip", "stock_id").row(0)
+    securities = dict(lake.read("securities").select("stock_id", "ticker").iter_rows())
+    name = dict(lake.read("securities").select("stock_id", "name").iter_rows())[stock_id]
+    ticker = securities[stock_id]
+    _break_ticker(lake, stock_id, f"{ticker} 6-5 01-15-29 D")
+    sec = pl.DataFrame(
+        [(ticker, 1, name)], schema={"ticker": pl.String, "cik": pl.Int64, "title": pl.String}, orient="row"
+    )
+    asked = []
+    listed = universe_of(fixtures)
+    sources = replace(
+        fixture_sources(fixtures),
+        price_universe=lambda: listed,
+        sec_tickers=lambda: sec,
+        figi=_us_ticker_figi({cusip: ticker}, asked),
+    )
+
+    run(tmp_path, sources, WEEK2)
+
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert stock_id not in vendor
+    assert not [j for j in asked if j.get("includeUnlistedEquities")]
+
+
+def test_a_stock_on_an_older_line_of_a_reused_ticker_loses_its_prices_and_chart(fixtures, tmp_path):
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    lake = Lake(tmp_path / "lake")
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    stock_id, ticker = sorted(vendor.items())[1]  # a held stock (the first is the benchmark)
+    path = f"stock/{stock_id}/weekly.json"
+    assert path in read_json(tmp_path / "out" / "manifest.json")["files"]
+    # The vendor now lists the ticker again for a later company, after the stock was last held:
+    # its prices under the ticker would be that company's.
+    later = pl.DataFrame(
+        [(ticker, date(2027, 1, 4), date(2027, 6, 30))],
+        schema=UNIVERSE_SCHEMA, orient="row",
+    )
+    reused = pl.concat([listed, later])
+
+    stats = run(tmp_path, replace(sources, price_universe=lambda: reused), WEEK2)
+
+    assert stock_id not in dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert stock_id not in set(lake.read("prices_daily")["stock_id"].to_list())
+    assert path not in read_json(tmp_path / "out" / "manifest.json")["files"]
+    assert (tmp_path / "out" / "deleted.txt").read_text().splitlines() == [path]
+    assert stats.staging is not None
+
+    run(tmp_path, replace(sources, price_universe=lambda: reused), WEEK3)
+    assert (tmp_path / "out" / "deleted.txt").read_text() == ""  # deleted once
+
+
+def test_a_universe_that_loses_most_tickers_changes_nothing(fixtures, tmp_path, monkeypatch):
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    lake = Lake(tmp_path / "lake")
+    stored = lake.read("vendor_tickers")
+    bars = lake.read("prices_daily").height
+    monkeypatch.setattr("orca.run.market.MAX_VENDOR_LOST", 0)
+    keep = sorted(listed["ticker"].to_list())[0]
+
+    stats = run(tmp_path, replace(sources, price_universe=lambda: listed.filter(pl.col("ticker") == keep)), WEEK2)
+
+    assert any(f["type"] == "vendor_tickers_lost" for f in stats.flags)
+    assert lake.read("vendor_tickers").equals(stored)
+    assert lake.read("prices_daily").height >= bars  # nothing dropped
+
+
 def test_a_failed_universe_download_keeps_the_stored_vendor_table(fixtures, tmp_path):
     listed = universe_of(fixtures)
     sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
