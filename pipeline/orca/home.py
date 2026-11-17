@@ -127,7 +127,8 @@ def top_funds(
     and `until_q`: the last quarter of a fund that stopped filing (its figures run to it), else
     None, and `search`: the Google Trends score of the row's keyword (`search`, keyword ->
     score, Warren Buffett = 100), set on one fund per keyword (`_searched`), None on every other
-    row."""
+    row, and `fame`: the same score on every row of the keyword (Sequoia's seven filers all have
+    it), for the web to order every list by popularity; None without a score."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -148,7 +149,8 @@ def top_funds(
             continue
         picked.append((s, p, f))
     picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
-    searched = _searched(famous, by_id, search or {})
+    scores = search or {}
+    searched = _searched(famous, by_id, scores)
     out["famous"] = [
         {
             **_top_row(s, p),
@@ -156,6 +158,7 @@ def top_funds(
             "group": f.group,
             "until_q": int(s.period_q) if s.excluded else None,
             "search": searched.get(s.fund_id) if f.search else None,
+            "fame": float(scores[f.search]) if scores.get(f.search, 0) > 0 else None,
         }
         for s, p, f in picked
     ]

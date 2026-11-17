@@ -1,5 +1,11 @@
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
-import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 
 export type Column<T> = {
   header: string;
@@ -10,6 +16,8 @@ export type Column<T> = {
   cell: (row: T) => ReactNode;
   /** The column's width (a CSS length) when the table is `fixed`; ignored otherwise. */
   width?: string;
+  /** Other sort keys that light this heading, with the words shown beside it (a heading that cycles through orders). */
+  alt?: Record<string, string>;
 };
 
 /** dir 1 = ascending, -1 = descending. The caller sorts `rows`; the table only shows the state. */
@@ -51,7 +59,9 @@ function SortIcon({ desc }: { desc: boolean }) {
   );
 }
 
-const interactive = (target: EventTarget) => target instanceof Element && target.closest("a, button, input, select, textarea");
+const interactive = (target: EventTarget) =>
+  target instanceof Element &&
+  target.closest("a, button, input, select, textarea");
 
 export function DataTable<T>({
   columns,
@@ -75,14 +85,21 @@ export function DataTable<T>({
     initialRect: { width: 0, height: FALLBACK_VIEW_H },
     // Without layout the observed height is 0 and the virtualizer would render no rows at all.
     observeElementRect: (instance, cb) =>
-      observeElementRect(instance, (rect) => cb(rect.height > 0 ? rect : { ...rect, height: FALLBACK_VIEW_H })),
+      observeElementRect(instance, (rect) =>
+        cb(rect.height > 0 ? rect : { ...rect, height: FALLBACK_VIEW_H }),
+      ),
   });
 
   // Indexes of the rows to render, and the height of the rows left out above and below them.
   const windowed = virtual ? virtualizer.getVirtualItems() : [];
-  const indexes = virtual ? windowed.map((v) => v.index) : rows.map((_, i) => i);
+  const indexes = virtual
+    ? windowed.map((v) => v.index)
+    : rows.map((_, i) => i);
   const padTop = windowed.length > 0 ? windowed[0].start : 0;
-  const padBottom = windowed.length > 0 ? virtualizer.getTotalSize() - windowed[windowed.length - 1].end : 0;
+  const padBottom =
+    windowed.length > 0
+      ? virtualizer.getTotalSize() - windowed[windowed.length - 1].end
+      : 0;
   const first = windowed.length > 0 ? windowed[0].index : -1;
   const last = windowed.length > 0 ? windowed[windowed.length - 1].index : -1;
 
@@ -91,20 +108,27 @@ export function DataTable<T>({
   // pins are dropped when either changes (a filter, a sort, other columns) and measured afresh.
   // Callers keep `columns` and `rows` the same objects between renders (module constants, useMemo).
   useLayoutEffect(() => {
-    scroller.current?.querySelectorAll<HTMLElement>("thead th").forEach((th) => {
-      th.style.minWidth = "";
-    });
+    scroller.current
+      ?.querySelectorAll<HTMLElement>("thead th")
+      .forEach((th) => {
+        th.style.minWidth = "";
+      });
   }, [virtual, columns, rows]);
   useLayoutEffect(() => {
     if (!virtual) return;
-    scroller.current?.querySelectorAll<HTMLElement>("thead th").forEach((th) => {
-      const w = th.offsetWidth;
-      if (w > (parseFloat(th.style.minWidth) || 0)) th.style.minWidth = `${w}px`;
-    });
+    scroller.current
+      ?.querySelectorAll<HTMLElement>("thead th")
+      .forEach((th) => {
+        const w = th.offsetWidth;
+        if (w > (parseFloat(th.style.minWidth) || 0))
+          th.style.minWidth = `${w}px`;
+      });
   }, [virtual, columns, rows, first, last]);
 
   const header = (c: Column<T>, i: number) => {
-    const dir = sort && c.key !== undefined && sort.key === c.key ? sort.dir : 0;
+    const dir =
+      sort && c.key !== undefined && sort.key === c.key ? sort.dir : 0;
+    const alt = sort ? c.alt?.[sort.key] : undefined;
     return (
       <th
         key={i}
@@ -121,6 +145,12 @@ export function DataTable<T>({
           >
             {c.header}
             {dir !== 0 && <SortIcon desc={dir < 0} />}
+            {alt && (
+              <>
+                {" "}
+                <span className="alt">{alt}</span>
+              </>
+            )}
           </button>
         ) : (
           c.header
@@ -138,7 +168,10 @@ export function DataTable<T>({
             if (!interactive(e.target)) onRow(row);
           },
           onKeyDown: (e: KeyboardEvent) => {
-            if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+            if (
+              (e.key === "Enter" || e.key === " ") &&
+              e.target === e.currentTarget
+            ) {
               e.preventDefault();
               onRow(row);
             }
@@ -169,7 +202,9 @@ export function DataTable<T>({
       </tr>
     ) : null;
 
-  const widths = columns.map((c) => c.width).filter((w): w is string => w !== undefined);
+  const widths = columns
+    .map((c) => c.width)
+    .filter((w): w is string => w !== undefined);
   const minWidth = fixed
     ? `calc(${[...widths, `${columns.length - widths.length} * var(--col-min)`].join(" + ")})`
     : undefined;

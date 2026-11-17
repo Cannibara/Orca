@@ -158,6 +158,7 @@ def test_famous_funds_ignore_the_top_fund_rules_but_not_the_data_checks():
         "group": "Big companies",
         "until_q": None,
         "search": None,
+        "fame": None,
     }
     assert out["famous"][4]["manager"] is None
     assert ids(out["eligible"]) == [2, 6, 8]  # Top funds is unchanged
