@@ -3,7 +3,7 @@ calls. Every list is a plain function of the per-fund snapshots and returns JSON
 (dicts of int, float, str and None; dates as ISO strings), identified by stock_id and fund_id."""
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -107,7 +107,10 @@ def is_excluded_name(name: str) -> bool:
 
 
 def top_funds(
-    snaps: list[FundSnapshot], period: str, famous: Sequence[Famous] = ()
+    snaps: list[FundSnapshot],
+    period: str,
+    famous: Sequence[Famous] = (),
+    search: Mapping[str, float] | None = None,
 ) -> dict[str, list[dict]]:
     """The funds worth ranking over `period` (a key of `config.PERIODS`), by return per year.
 
@@ -122,7 +125,9 @@ def top_funds(
     the list's match word (a CIK typed wrong lists nothing rather than some other fund). Its rows
     add `manager`, `group` (the style list it is shown in; a fund in two lists has a row for each)
     and `until_q`: the last quarter of a fund that stopped filing (its figures run to it), else
-    None."""
+    None, and `search`: the Google Trends score of the row's keyword (`search`, keyword ->
+    score, Warren Buffett = 100), set on one fund per keyword (`_searched`), None on every other
+    row."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -143,15 +148,39 @@ def top_funds(
             continue
         picked.append((s, p, f))
     picked.sort(key=lambda spf: _return_order(spf[1].ann_return) + (spf[0].fund_id, spf[2].group))
+    searched = _searched(famous, by_id, search or {})
     out["famous"] = [
         {
             **_top_row(s, p),
             "manager": f.manager or None,
             "group": f.group,
             "until_q": int(s.period_q) if s.excluded else None,
+            "search": searched.get(s.fund_id) if f.search else None,
         }
         for s, p, f in picked
     ]
+    return out
+
+
+def _searched(
+    famous: Sequence[Famous], by_id: Mapping[int, FundSnapshot], scores: Mapping[str, float]
+) -> dict[int, float]:
+    """Fund id -> Google Trends score of its keyword, for one fund per keyword: a manager with
+    several filers (Sequoia's funds, Fundsmith's two) is counted once, on the filer still filing
+    with the biggest book. A keyword without a score is left out."""
+    best: dict[str, FundSnapshot] = {}
+    for f in famous:
+        s = by_id.get(f.fund_id)
+        if not f.search or s is None:
+            continue
+        held = best.get(f.search)
+        rank = (not s.excluded, s.book, -s.fund_id)
+        if held is None or rank > (not held.excluded, held.book, -held.fund_id):
+            best[f.search] = s
+    out: dict[int, float] = {}
+    for key, s in best.items():
+        if scores.get(key, 0) > 0:
+            out[s.fund_id] = max(out.get(s.fund_id, 0.0), float(scores[key]))
     return out
 
 

@@ -40,3 +40,11 @@ export function fAum(pts: number | null | undefined): string {
   const digits = Math.abs(pts).toFixed(1);
   return (Number(digits) === 0 ? "" : pts < 0 ? MINUS : "+") + digits + "%";
 }
+
+/** A Google Trends score (Warren Buffett = 100): whole numbers from 10, one decimal from 1, "<1" below. */
+export function fSearch(x: number | null | undefined): string {
+  if (missing(x)) return DASH;
+  if (x >= 9.95) return String(Math.round(x));
+  if (x >= 0.95) return x.toFixed(1);
+  return x > 0 ? "<1" : "0";
+}

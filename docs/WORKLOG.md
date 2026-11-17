@@ -5,6 +5,18 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-17 — Famous funds: Most searched list (Google Trends)
+
+| What changed | Why | Files |
+|---|---|---|
+| New first list, Most searched: the 50 famous funds whose manager or founder (or firm, for venture firms) is searched most on Google, Google Trends worldwide over 12 months, Warren Buffett = 100, with a "Search interest" column. One fund per keyword (Sequoia's 7 filers count once). Big companies and Sovereign & pension funds are not ranked. Exceptions the owner asked for (2026-11-17): the Gates trust ("Gates Foundation", 14.0) and Markel ("Markel Group", 3.9, the insurer: customers search it too, so it reads high); Gardner Russo & Quinn has no measurable searches and stays out | Owner: "the most searched funds" first (e.g. Situational Awareness), measured with Google Trends on the manager's name, not the fund's | `famous.csv` (`search`), `famous_search.csv`, `famous.py` (`load_search`), `home.py` (`_searched`), `web/src/pages/Home.tsx` |
+| Keywords are compared as Google topics (an investor, not a namesake), 4 a batch with an anchor (Bill Ackman, then a smaller one for faint names) so all share one scale | Trends compares at most 5 terms and only relatively | `pipeline/scripts/google_trends.py` |
+| The scores are a committed snapshot, refreshed by hand with the script (30–60 min; Google throttles). No pipeline run fetches Trends | Google has no Trends API; pytrends is unmaintained and blocked from cloud servers like GitHub's | same |
+| First snapshot (2026-11-17), top 10: Buffett 100, Soros 31, a16z 25, Burry 21, Dalio 19, Sequoia 17, Cathie Wood 14, Ackman 14, Munger 13, Aschenbrenner 12. 109 keywords score above 0 (14 more are too faint to read and show nowhere); 9 common names (e.g. John Griffin, Rajiv Jain, Tom Slater) have no Google topic and are left out; 15 distinctive names with no topic are searched as exact phrases ("Nick Train": the bare words scored 60× more, from unrelated searches) | Topics picked by hand where automatic matching chose a namesake (David E. Shaw → the firm, La Caisse → the pension fund, not a Crédit Agricole bank); Farallon uses the firm, not Tom Steyer (searched for his politics) | `famous_search.csv` |
+| State funds dropped from the ranking: in a first run AustralianSuper (30), CalPERS, Texas Teachers, the Saudi and Swiss central banks and the Gates Foundation outranked Dalio | Their names are searched by members, citizens and markets, not for their investing; the owner asked for manager or founder names | `famous.csv`, `test_search.py` |
+| A first version ranked by Wikipedia page views (fetched each run); replaced before merge at the owner's request | | PR #39 |
+| Cross-checked against `docs/famous-funds.txt` (PR #37, CIKs matched to live funds.json): 61 of its 68 CIKs are the same as famous.csv's; the other 7 are added (Slate Path → Tiger cubs; Samlyn, Alpha Wave, Encompass, Woodson, Sylebra's older filer → Fundamental long/short; GMO → Value). The Famous funds tab covers that file's Popular funds idea | Validation from live data this session cannot reach | `famous.csv` |
+
 ## 2026-11-16 — Popular funds: draft list of 68 names
 
 | What changed | Why | Files |
