@@ -59,6 +59,17 @@ The default comparison level is industry (tier 2, 71 hierarchy labels). The user
 7. ETF stand-ins: dropped. With our own index everywhere, children add up to their parent, no ETF fees flatter funds, and no splicing is needed. A fund's ETF buy still counts as a pick at the ETF's hierarchy label; its own return is the ETF's price plus dividends.
 8. End date. Score the fund and its shadows to the same quarter end. The live IRR on the site runs to the latest price, so it is a different number.
 
+## Relabelling must be cheap (owner, 2026-11-17)
+Moving a stock to another hierarchy label must re-compute every number with one edit and one run.
+- One place to edit. `labels.txt` wins over `data/stock_nodes.csv`: a ticker listed there is placed by it at run time, whatever the CSV says. The CSV only supplies the labels the model and the group defaults found. Moving SK Hynix into Memory is one line (done: `Memory: MU SNDK RMBS MRAM SKHY`).
+- Nothing caches a stock's label. The index pass and the score replay read the labels fresh on each run. No label is stored in fund snapshots.
+- A recompute mode that skips ingest and the 48-min fund compute: `orca.run sectors` locally, plus an Actions input `sectors_only`.
+  - It rebuilds `node_returns` from the lake prices and `shares_hist` (minutes).
+  - It replays each fund's quarterly flows from a lake table the fund compute writes (`fund_flows`: cik, stock_id, q, dollars, share fraction).
+  - It republishes the sector files.
+- A test: moving one stock changes only the series of its old and new hierarchy labels (and their parents), and only the scores of funds that held it.
+- `tools/relabel_check.py` (small): lists what a `labels.txt` edit moves (stocks, $ bought by the top funds, the hierarchy labels affected) before you run.
+
 ## Architecture
 ```
 labels (committed CSVs) ─┐
@@ -89,16 +100,16 @@ web: shows the numbers, tier toggle (sector | industry | vertical)
 3. `engine/sectors.py`. Test with hand-computed indices: two stocks, a dividend, a mid-quarter delisting, a stale price, an IPO, and children adding up to the parent. Add demo output.
 4. Owner run 1 (private).
    - Write the series to the lake and report the health flags (coverage, stale prices, fallback share counts). No ETF comparison.
-5. Shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its hierarchy label's whole index scores picking = 0.
+5. `fund_flows` table, `sectors` recompute mode, shadow replay and a Python XIRR in the engine. Test parity with `live.ts` `irr`, and that a fund holding its hierarchy label's whole index scores picking = 0.
 6. Contract change, publish step, then the web view, shown only when the file exists. Owner run 2 gives the first real numbers.
 
 ## Decided after review (owner, 2026-11-17)
 - `@nosector` (conglomerates) picks score against SPY (total return, from its lake bars with dividends).
 - Share counts: build `shares_hist` as designed.
 - Own index for every hierarchy label; no ETF stand-ins, no spot check.
+- Thin verticals are not widened: show the real vertical index with a warning (stock count, biggest stock's weight). Widening would show one index under another's name.
 
 ## Open owner decisions
-- Thin verticals: 188 of 244 have fewer than 10 stocks above $1bn. Widen to the industry (R4)?
 - Fallback for unlabelled stocks. Proposal: SIC → industry "Other", tagged.
 
 ## Risks

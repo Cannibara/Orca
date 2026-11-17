@@ -5092,7 +5092,7 @@ stock_id,ticker,kind,vertical,extras,how,conf
 40235,MFP,stock,Consumer > Food > Food Processing & Ingredients,,model,2
 40343,PBLS,stock,Healthcare > Pharma & Biotech > Biotechnology,,model,2
 40391,QNT,stock,Technology > Quantum Computing > Quantum Hardware & Software,,model,3
-40423,SKHY,stock,Technology > Semiconductors > Other Semiconductors,,default,3
+40423,SKHY,stock,Technology > Semiconductors > Memory,,placed,3
 40490,SUJA,stock,Consumer > Beverages & Tobacco > Non-Alcoholic Beverages,,model,3
 40493,SSMR,stock,Materials > Metals & Mining > Precious Metals Mining,,model,2
 40588,TGB,stock,Materials > Metals & Mining > Industrial Metals Mining,,model,1

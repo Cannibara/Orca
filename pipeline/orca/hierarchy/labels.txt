@@ -2,7 +2,7 @@
 # A full path ('+ A > B > C: TICKERS') puts an extra label in another branch. '## A > B # text' gives an industry a description.
 # '@umbrella X <= Y ; Z' gives every main-label member of Y and Z the extra label X.
 ## Technology > Semiconductors
-Memory: MU SNDK RMBS MRAM
+Memory: MU SNDK RMBS MRAM SKHY
 GPUs & AI Accelerators: NVDA
 +GPUs & AI Accelerators: AMD
 CPUs & Processors: AMD INTC
