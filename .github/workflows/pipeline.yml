@@ -169,6 +169,17 @@ jobs:
           # HEAD request rclone makes after each upload (the PUT's answer already confirms it).
           rclone copy "$staging" "r2:${R2_SITE_BUCKET}" --include "*.json" --ignore-times \
             --transfers 64 --checkers 64 --s3-no-head "${headers[@]}"
+          # Weekly files of stocks left with no priced day (their prices turned out to be another
+          # company's) are deleted, so their charts go. Only lines of exactly that shape are
+          # accepted; anything else stops the step before a single delete.
+          if [ -s data/out/deleted.txt ]; then
+            if grep -vqE '^stock/[0-9]+/weekly\.json$' data/out/deleted.txt; then
+              echo "::error::data/out/deleted.txt has a line that is not a stock weekly file"
+              exit 1
+            fi
+            echo "deleting $(wc -l < data/out/deleted.txt) stale weekly files"
+            rclone delete "r2:${R2_SITE_BUCKET}" --files-from-raw data/out/deleted.txt --s3-no-head
+          fi
           # Last, so a reader never finds a manifest that names a file not yet uploaded.
           rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
       - name: Clear the Cloudflare cache

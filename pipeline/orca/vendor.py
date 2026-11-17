@@ -82,20 +82,26 @@ def resolve(
     alternates: Mapping[int, Sequence[str]] | None = None,
 ) -> pl.DataFrame:
     """VENDOR_SCHEMA rows: for each stock of `tickers` (stock_id -> ticker), the first of its
-    `candidates` (with its `alternates`, stock_id -> other tickers) the vendor lists over a span
-    that overlaps the stock's held span (`held`: stock_id -> first, last day; a stock without one
-    takes any span), and the last day of the vendor's prices for it. A stock with no such
-    candidate is left out: the vendor has nothing."""
+    `candidates` (with its `alternates`, stock_id -> other tickers) whose current line at the
+    vendor (the one that ends last) overlaps the stock's held span (`held`: stock_id -> first,
+    last day; a stock without one takes any span), and that line's last day. Only the current
+    line counts: the vendor serves a ticker's prices for whoever trades under it today, so an
+    older line of a reused ticker ("APC" for Anadarko, 1986-2019, now another company) would
+    bring another company's prices. A stock with no such candidate is left out."""
     alternates = alternates or {}
-    spans: dict[str, list[tuple[date, date]]] = {}
+    current: dict[str, tuple[date, date]] = {}
     for ticker, start, end in universe.iter_rows():
-        spans.setdefault(ticker, []).append((start, end))
+        old = current.get(ticker)
+        # The line that ends last; of two ending the same day, the longer (a one-day line on a
+        # listing's last day is the same listing).
+        if old is None or end > old[1] or (end == old[1] and start < old[0]):
+            current[ticker] = (start, end)
     rows = []
     for stock_id, ticker in tickers.items():
         first, last = held.get(stock_id, (date.min, date.max))
         for name in candidates(ticker, alternates.get(stock_id, ())):
-            ends = [end for start, end in spans.get(name, []) if start <= last and end >= first]
-            if ends:
-                rows.append((stock_id, name, max(ends)))
+            line = current.get(name)
+            if line is not None and line[0] <= last and line[1] >= first:
+                rows.append((stock_id, name, line[1]))
                 break
     return pl.DataFrame(rows, schema=VENDOR_SCHEMA, orient="row")

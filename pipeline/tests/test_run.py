@@ -1343,6 +1343,52 @@ def test_a_bond_never_borrows_a_shares_ticker(fixtures, tmp_path):
     assert not [j for j in asked if j.get("includeUnlistedEquities")]
 
 
+def test_a_stock_on_an_older_line_of_a_reused_ticker_loses_its_prices_and_chart(fixtures, tmp_path):
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    lake = Lake(tmp_path / "lake")
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    stock_id, ticker = sorted(vendor.items())[1]  # a held stock (the first is the benchmark)
+    path = f"stock/{stock_id}/weekly.json"
+    assert path in read_json(tmp_path / "out" / "manifest.json")["files"]
+    # The vendor now lists the ticker again for a later company, after the stock was last held:
+    # its prices under the ticker would be that company's.
+    later = pl.DataFrame(
+        [(ticker, date(2027, 1, 4), date(2027, 6, 30))],
+        schema=UNIVERSE_SCHEMA, orient="row",
+    )
+    reused = pl.concat([listed, later])
+
+    stats = run(tmp_path, replace(sources, price_universe=lambda: reused), WEEK2)
+
+    assert stock_id not in dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert stock_id not in set(lake.read("prices_daily")["stock_id"].to_list())
+    assert path not in read_json(tmp_path / "out" / "manifest.json")["files"]
+    assert (tmp_path / "out" / "deleted.txt").read_text().splitlines() == [path]
+    assert stats.staging is not None
+
+    run(tmp_path, replace(sources, price_universe=lambda: reused), WEEK3)
+    assert (tmp_path / "out" / "deleted.txt").read_text() == ""  # deleted once
+
+
+def test_a_universe_that_loses_most_tickers_changes_nothing(fixtures, tmp_path, monkeypatch):
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    lake = Lake(tmp_path / "lake")
+    stored = lake.read("vendor_tickers")
+    bars = lake.read("prices_daily").height
+    monkeypatch.setattr("orca.run.market.MAX_VENDOR_LOST", 0)
+    keep = sorted(listed["ticker"].to_list())[0]
+
+    stats = run(tmp_path, replace(sources, price_universe=lambda: listed.filter(pl.col("ticker") == keep)), WEEK2)
+
+    assert any(f["type"] == "vendor_tickers_lost" for f in stats.flags)
+    assert lake.read("vendor_tickers").equals(stored)
+    assert lake.read("prices_daily").height >= bars  # nothing dropped
+
+
 def test_a_failed_universe_download_keeps_the_stored_vendor_table(fixtures, tmp_path):
     listed = universe_of(fixtures)
     sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)

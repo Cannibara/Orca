@@ -66,13 +66,17 @@ def test_resolve_picks_the_listed_ticker_over_the_held_days():
         1: (date(2013, 1, 1), date(2026, 9, 30)),
         2: (date(2015, 1, 1), date(2021, 12, 31)),
         3: (date(2013, 1, 1), date(2021, 12, 31)),  # held only before FB's line starts
-        4: (date(2013, 1, 1), date(2013, 12, 31)),
+        4: (date(2013, 1, 1), date(2013, 12, 31)),  # only the older line of a reused ticker
+        7: (date(2020, 1, 1), date(2026, 9, 30)),  # the current line of that ticker
     }
-    out = resolve({1: "AAPL", 2: "XLNXEUR", 3: "FB", 4: "OLD", 5: "NONE", 6: None}, held, u)
+    tickers = {1: "AAPL", 2: "XLNXEUR", 3: "FB", 4: "OLD", 5: "NONE", 6: None, 7: "OLD"}
+    out = resolve(tickers, held, u)
+    # The vendor serves "OLD" for whoever trades under it today: stock 4 would get the later
+    # company's prices, so it gets none.
     assert out.rows() == [
         (1, "AAPL", date(2026, 10, 30)),
         (2, "XLNX", date(2022, 2, 14)),
-        (4, "OLD", date(2014, 3, 31)),
+        (7, "OLD", date(2026, 10, 30)),
     ]
 
 

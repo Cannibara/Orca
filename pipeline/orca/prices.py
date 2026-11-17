@@ -137,6 +137,28 @@ def read_prices(lake: Lake) -> pl.DataFrame:
     return prices.unique(subset=_KEY, keep="last", maintain_order=True).sort(_KEY)
 
 
+def drop_stocks(lake: Lake, stock_ids: Iterable[int]) -> int:
+    """Delete every stored bar of `stock_ids` (prices fetched under a ticker that turned out to
+    be another company's), rewriting only the files that hold some, one at a time so memory stays
+    at one file. Returns the number of bars dropped."""
+    ids = sorted(set(stock_ids))
+    if not ids:
+        return 0
+    paths = [lake.root / f"{TABLE}.parquet"] + [_part_path(lake, p) for p in lake.parts(TABLE)]
+    dropped = 0
+    for path in paths:
+        if not path.exists():
+            continue
+        hits = pl.scan_parquet(path).filter(pl.col("stock_id").is_in(ids)).select(pl.len()).collect().item()
+        if not hits:
+            continue
+        kept = pl.read_parquet(path).filter(~pl.col("stock_id").is_in(ids))
+        part = None if path.parent == lake.root else path.stem
+        lake.write(TABLE, kept, part=part)
+        dropped += hits
+    return dropped
+
+
 def _part_path(lake: Lake, part: str):
     return lake.root / TABLE / f"{part}.parquet"
 
