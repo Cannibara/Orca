@@ -9,7 +9,7 @@ import io
 import re
 import zipfile
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 
@@ -75,6 +75,23 @@ def candidates(ticker: str | None, alternates: Sequence[str] = ()) -> list[str]:
     return list(dict.fromkeys(found))
 
 
+REUSE_GAP = timedelta(days=31)  # a ticker idle this long, then listed again, is another company's
+
+
+def _held_before_reuse(
+    lines: list[tuple[date, date]], current: tuple[date, date], first: date, last: date
+) -> bool:
+    """Whether the stock was held while the ticker named an earlier company: an older line that
+    ended over REUSE_GAP before the current one began overlaps the held days. A stock some
+    filer still reports years after it was bought out (Anadarko held into 2026) would otherwise
+    take the later company's prices."""
+    return any(
+        end < current[0] - REUSE_GAP and start <= last and end >= first
+        for start, end in lines
+        if (start, end) != current
+    )
+
+
 def resolve(
     tickers: Mapping[int, str | None],
     held: Mapping[int, tuple[date, date]],
@@ -87,21 +104,25 @@ def resolve(
     last day; a stock without one takes any span), and that line's last day. Only the current
     line counts: the vendor serves a ticker's prices for whoever trades under it today, so an
     older line of a reused ticker ("APC" for Anadarko, 1986-2019, now another company) would
-    bring another company's prices. A stock with no such candidate is left out."""
+    bring another company's prices. Nor does a current line when the stock was also held during
+an older line that ended over a month before it began (`_held_before_reuse`). A stock with no
+such candidate is left out."""
     alternates = alternates or {}
-    current: dict[str, tuple[date, date]] = {}
+    lines: dict[str, list[tuple[date, date]]] = {}
     for ticker, start, end in universe.iter_rows():
-        old = current.get(ticker)
-        # The line that ends last; of two ending the same day, the longer (a one-day line on a
-        # listing's last day is the same listing).
-        if old is None or end > old[1] or (end == old[1] and start < old[0]):
-            current[ticker] = (start, end)
+        lines.setdefault(ticker, []).append((start, end))
+    # The line that ends last; of two ending the same day, the longer (a one-day line on a
+    # listing's last day is the same listing).
+    current = {t: min(ls, key=lambda line: (-line[1].toordinal(), line[0])) for t, ls in lines.items()}
     rows = []
     for stock_id, ticker in tickers.items():
         first, last = held.get(stock_id, (date.min, date.max))
         for name in candidates(ticker, alternates.get(stock_id, ())):
             line = current.get(name)
-            if line is not None and line[0] <= last and line[1] >= first:
-                rows.append((stock_id, name, line[1]))
-                break
+            if line is None or line[0] > last or line[1] < first:
+                continue
+            if _held_before_reuse(lines[name], line, first, last):
+                continue
+            rows.append((stock_id, name, line[1]))
+            break
     return pl.DataFrame(rows, schema=VENDOR_SCHEMA, orient="row")
