@@ -505,7 +505,7 @@ def run_backfill(
     heads = heads or {"owed": 0, "fetched": 0, "empty": 0, "failed": 0}
     done["price_history"] = heads
     done["left"] = {  # what the next backfill would still do (the run is done at zero)
-        "quarters": len(index_quarters()) - len(state.legacy_done & set(index_quarters())),
+        "quarters": len(set(index_quarters()) - state.legacy_done) + len(state.legacy_retry),
         "price_histories": heads["owed"] - heads["fetched"] - heads["empty"],
     }
     state.save(lake)

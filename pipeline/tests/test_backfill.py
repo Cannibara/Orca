@@ -310,3 +310,31 @@ def test_state_keeps_the_backfill_sets(tmp_path):
     State(price_backfilled={3, 1}, legacy_done={"1999Q1"}).save(lake)
     loaded = State.load(lake)
     assert loaded.price_backfilled == {1, 3} and loaded.legacy_done == {"1999Q1"}
+
+
+def test_a_failed_download_is_tried_once_more_by_the_next_backfill(tmp_path):
+    asked: list = []
+    fetch = legacy_quarter(asked)
+    failing = LEGACY["2013Q1"].accession
+
+    def flaky(key, skip, stats):
+        filings, raw, checks = fetch(key, skip, stats)
+        if key == "2013Q1" and asked.count("2013Q1") == 1:  # the first read: its download failed
+            failed = checks.filter(pl.col("accession") == failing).with_columns(
+                status=pl.lit("download_failed")
+            )
+            return filings.clear(), raw.clear(), failed
+        return filings, raw, checks
+
+    src = replace(sources([], []), legacy_quarter=flaky)
+    lake = Lake(tmp_path / "lake")
+    done, _ = run_backfill(lake, src, TODAY)
+    assert State.load(lake).legacy_retry == {"2013Q1"}
+    assert done["left"]["quarters"] == 1
+
+    done, _ = run_backfill(lake, src, TODAY)
+    state = State.load(lake)
+    assert state.legacy_retry == set() and done["left"]["quarters"] == 0
+    checks = lake.read("legacy_checks", part="2013Q1")
+    assert checks["status"].to_list() == ["ok"]
+    assert lake.read("filings", part=f"q{q_index(2012, 4):03d}")["accession"].to_list() == [failing]

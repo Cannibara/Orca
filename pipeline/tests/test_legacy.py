@@ -346,3 +346,17 @@ MICROSOFT CORP    COM     594918104     500,000    5  SH
 
 def test_a_value_total_with_an_in_thousands_note():
     assert declared_totals(["Value Total (in thousands): 1,234\n"]) == (1234.0, None)
+
+
+def test_totals_without_the_word_total_or_below_blank_lines():
+    assert declared_totals(["Form 13F Information Table Entry 54\nForm 13F Information Table Value $78828572\n"]) == (78828572.0, 54)
+    assert declared_totals(["Information Table Entry Total:\n\n\n         131\n"]) == (None, 131)
+    blank = "Entry Total: ______________\nForm 13F Information Table Value Total: $______________\n(thousands)\n"
+    assert declared_totals([blank]) == (None, None)
+
+
+def test_a_blank_summary_page_is_checked_against_the_tables_total_line():
+    text = FIXED.replace("</TABLE>", "Column Total                          1,500\n</TABLE>")
+    assert read_submission(submission(text), ENTRY)[2]["status"] == OK
+    wrong = FIXED.replace("</TABLE>", "Column Total                          9,999\n</TABLE>")
+    assert read_submission(submission(wrong), ENTRY)[2]["status"] == UNVERIFIED

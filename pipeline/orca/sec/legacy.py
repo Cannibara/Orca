@@ -15,7 +15,7 @@ import logging
 import re
 import statistics
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 import polars as pl
@@ -121,7 +121,13 @@ _CUSIP8 = re.compile(
 )
 _TOKEN = re.compile(r"\S+")
 _NUMBER = re.compile(r"^\$?\(?([0-9][0-9,]*(?:\.[0-9]+)?)\)?(SH|PRN)?$")
-_TOTAL_LABEL = re.compile(r"(VALUE\s+TOTAL|TOTAL\s+VALUE|ENTRY\s+TOTAL)", re.IGNORECASE)
+# Longest first: "Table Entry Total" must not be taken as "Table Entry" (filers also drop "Total").
+_TOTAL_LABEL = re.compile(
+    r"(TABLE\s+ENTRY\s+TOTAL|TABLE\s+VALUE\s+TOTAL|VALUE\s+TOTAL|TOTAL\s+VALUE|ENTRY\s+TOTAL"
+    r"|TABLE\s+ENTRY|TABLE\s+VALUE)",
+    re.IGNORECASE,
+)
+_TOTAL_WORD = re.compile(r"\bTOTALS?\b")
 _UNIT_NOTE = re.compile(
     r"\(?\s*(?:X|IN)\s*\$?\s*1,?000'?S?\s*\)?|\(\s*\$?\s*000'?S?\s*\)|\$\s*1,?000\b"
     r"|\(\s*(?:IN\s+)?(?:THOUSANDS|DOLLARS)\s*\)",
@@ -159,6 +165,7 @@ class Table:
     rows: list[Row]
     invalid: list[float]  # values of rows whose code is not a valid CUSIP
     orphans: int  # CUSIPs found without their two numbers
+    totals: list[float] = field(default_factory=list)  # numbers on the table's own TOTAL lines
 
 
 def index_quarters() -> list[str]:
@@ -256,16 +263,22 @@ def _numbers(
     return found, words
 
 
-def _aligned_numbers(
-    line: str, columns: tuple[int, int]
-) -> list[tuple[float, int, int]] | None:
-    """Two numbers in a row of the line that end in the value and shares columns (within
-    COLUMN_SLACK), else None. Numbers before them (parts of a mistyped code) do not count."""
+def _all_numbers(line: str) -> list[tuple[float, int, int]]:
+    """Every number on the line with its start and end columns."""
     found = []
     for m in _TOKEN.finditer(line):
         value, _ = _number(m.group())
         if value is not None:
             found.append((value, m.start(), m.end()))
+    return found
+
+
+def _aligned_numbers(
+    line: str, columns: tuple[int, int]
+) -> list[tuple[float, int, int]] | None:
+    """Two numbers in a row of the line that end in the value and shares columns (within
+    COLUMN_SLACK), else None. Numbers before them (parts of a mistyped code) do not count."""
+    found = _all_numbers(line)
     for first, second in zip(found, found[1:]):
         if (
             abs(first[2] - columns[0]) <= COLUMN_SLACK
@@ -311,6 +324,7 @@ def read_table(texts: list[str], eight: bool = False) -> Table:
     docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md for the rules."""
     rows: list[Row] = []
     invalid: list[float] = []
+    totals: list[float] = []
     orphans = 0
     for lines in _lines(texts):
         above: Row | None = None  # the row a continuation line repeats
@@ -358,6 +372,8 @@ def read_table(texts: list[str], eight: bool = False) -> Table:
             if not line.strip():
                 i += 1
                 continue
+            if _TOTAL_WORD.search(line):  # the check's fallback when no summary page has totals
+                totals += [value for value, _, _ in _all_numbers(line)]
             numbers = _aligned_numbers(line, columns) if columns else None
             if numbers is None:
                 above = None if _SEPARATOR.match(line) or not _numbers(line)[0] else above
@@ -383,7 +399,7 @@ def read_table(texts: list[str], eight: bool = False) -> Table:
                 invalid.append(value)
                 above = None
             i += 1
-    return Table(rows, invalid, orphans)
+    return Table(rows, invalid, orphans, totals)
 
 
 def _adds_up(value: float, total: float) -> bool:
@@ -397,12 +413,15 @@ def declared_totals(texts: list[str]) -> tuple[float | None, int | None]:
     whole = "\n".join(texts)
     value = entries = None
     for m in _TOTAL_LABEL.finditer(whole):
-        window = "\n".join(whole[m.end() : m.end() + 200].split("\n")[:3])
+        # The label's line and the next non-blank one ("Entry Total:" then blank lines, then 131).
+        window = "\n".join(
+            [line for line in whole[m.end() : m.end() + 400].split("\n") if line.strip()][:2]
+        )
         n = _LABEL_NUMBER.match(_UNIT_NOTE.sub(" ", window).upper())
         if not n:
             continue
         number = float(n[2].replace(",", ""))
-        if m[1].upper().startswith("ENTRY") and not n[1]:
+        if "ENTRY" in m[1].upper() and not n[1]:
             entries = int(number) if entries is None else entries
         elif value is None:
             value = number
@@ -437,6 +456,8 @@ def check_table(table: Table, value: float | None, entries: int | None) -> str:
         return MISMATCH
     if entries is not None:
         return CLOSE if n_all == entries else MISMATCH
+    if any(_within(parsed, t, EXACT) or _within(parsed_all, t, EXACT) for t in table.totals if t):
+        return OK  # the summary page is blank, but the table's own total line adds up
     return UNVERIFIED if table.orphans == 0 else MISMATCH
 
 

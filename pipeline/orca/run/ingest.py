@@ -224,13 +224,16 @@ def ingest_legacy(
     reserve: float = 0.0,
 ) -> dict | None:
     """Ingest the pre-2013 full-index quarters not read yet (`state.legacy_done`), oldest first,
-    until only `reserve` minutes of the time budget are left; a quarter is recorded only once its rows and checks are
-    stored, so one cut short is read again whole next run (its legacy rows are replaced). Filings
-    already stored from the bulk data sets or the live feed are not downloaded. A failed index or
-    SEC throttling stops the stage for this run and is flagged. Returns the counts to log."""
+    until only `reserve` minutes of the time budget are left; a quarter is recorded only once its
+    rows and checks are stored, so one cut short is read again whole next run (its legacy rows are
+    replaced). Filings already stored from the bulk data sets or the live feed are not downloaded.
+    A quarter with failed downloads is listed in `state.legacy_retry`, and the next run asks for
+    those filings once more (only those), after the quarters not read yet. A failed index or SEC
+    throttling stops the stage for this run and is flagged. Returns the counts to log."""
     if sources.legacy_quarter is None:
         return None
     todo = [key for key in index_quarters() if key not in state.legacy_done]
+    todo += sorted(state.legacy_retry & state.legacy_done)
     if not todo:
         return None
     known = {
@@ -248,18 +251,31 @@ def ingest_legacy(
             budget.cut("legacy")
             break
         stats: dict = {}
+        retry = key in state.legacy_done
+        old = lake.read(LEGACY_CHECKS, part=key) if retry else pl.DataFrame(schema=CHECKS_SCHEMA)
+        read_before = set(old.filter(pl.col("status") != FAILED)["accession"].to_list())
         try:
-            filings, raw, checks = sources.legacy_quarter(key, known, stats)
+            filings, raw, checks = sources.legacy_quarter(key, known | read_before, stats)
         except FetchError as err:
             flags.append(
                 {"type": "legacy_failed", "quarter": key, "url": strip_query(err.url), "status": err.status}
             )
             break
         state.pending_funds |= ingest(lake, filings, raw, LEGACY, counts)
-        lake.write(LEGACY_CHECKS, checks.cast(CHECKS_SCHEMA), part=key)
-        state.legacy_done.add(key)
-        state.save(lake)  # only now: a crash before re-reads the quarter
+        checks = checks.cast(CHECKS_SCHEMA)
         statuses = checks["status"]
+        if retry:  # this read's rows replace the failed ones
+            read_now = checks["accession"].to_list()
+            keep = old.cast(CHECKS_SCHEMA).filter(~pl.col("accession").is_in(read_now))
+            lake.write(LEGACY_CHECKS, pl.concat([keep, checks]), part=key)
+        else:
+            lake.write(LEGACY_CHECKS, checks, part=key)
+        state.legacy_done.add(key)
+        if retry or not (statuses == FAILED).any():
+            state.legacy_retry.discard(key)  # one retry only: a filing refused twice is let go
+        else:
+            state.legacy_retry.add(key)
+        state.save(lake)  # only now: a crash before re-reads the quarter
         counts.filings_parsed += filings.height
         done["quarters"] += 1
         done["read"] += checks.height
