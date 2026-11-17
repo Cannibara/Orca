@@ -92,7 +92,7 @@ fund_id,match,manager,group,filer_name,search
 923093,TUDOR INVESTMENT,Paul Tudor Jones,Macro,Tudor Investment Corp et al,Paul Tudor Jones
 1167557,AQR CAPITAL,Cliff Asness,Quant & multi-strategy,AQR Capital Management LLC,Cliff Asness
 1423053,CITADEL ADVISORS,Ken Griffin,Quant & multi-strategy,Citadel Advisors LLC,Ken Griffin
-1009207,SHAW,David E. Shaw,Quant & multi-strategy,"D. E. Shaw & Co., Inc.",David E. Shaw
+1009207,SHAW,David E. Shaw,Quant & multi-strategy,"D. E. Shaw & Co., Inc.",D. E. Shaw
 1273087,MILLENNIUM MANAGEMENT,Israel Englander,Quant & multi-strategy,Millennium Management LLC,Israel Englander
 1603466,POINT72,Steve Cohen,Quant & multi-strategy,"Point72 Asset Management, L.P.",Steve Cohen
 1037389,RENAISSANCE,Jim Simons,Quant & multi-strategy,Renaissance Technologies LLC,Jim Simons
@@ -334,7 +334,7 @@ fund_id,match,manager,group,filer_name,search
 1675884,SKYE GLOBAL MANAGEMENT,Jamie Sterne,Fundamental long/short,Skye Global Management LP,
 1533950,ZWEIG-DIMENNA,Joe DiMenna,Fundamental long/short,Zweig-DiMenna Associates LLC,
 1054587,OZ MANAGEMENT,Daniel Och,Quant & multi-strategy,OZ MANAGEMENT LP,Daniel Och
-909661,FARALLON CAPITAL,Tom Steyer / Andrew Spokes,Quant & multi-strategy,FARALLON CAPITAL MANAGEMENT LLC,Tom Steyer
+909661,FARALLON CAPITAL,Tom Steyer / Andrew Spokes,Quant & multi-strategy,FARALLON CAPITAL MANAGEMENT LLC,Farallon Capital
 1567752,BLOOM TREE PARTNERS,Alok Agrawal,Fundamental long/short,"BLOOM TREE PARTNERS, LLC",
 1759364,TOTEM POINT,Darren Dinneen,Fundamental long/short,"Totem Point Management, LLC",
 1574717,HENGISTBURY,Stuart Powers,Fundamental long/short,Hengistbury Investment Partners LLP,
