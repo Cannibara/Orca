@@ -78,7 +78,7 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 ### 13F quirks handled
 | Quirk | Handling (file, function) |
 |---|---|
-| Amendments | base = latest 13F-HR, or the latest RESTATEMENT; NEW HOLDINGS amendments filed after it are added and summed; unknown types ignored; bulk beats live for the same accession (`holdings.select_reports`, `_bulk_first_unique`) |
+| Amendments | base = latest 13F-HR, or the latest RESTATEMENT; NEW HOLDINGS amendments filed after it are added and summed; unknown types ignored, unless the fund-quarter has no original or restatement (then the latest is the base: Kahn Brothers filed every pre-2013 report as an unmarked amendment); bulk beats live beats legacy for the same accession (`holdings.select_reports`, `_bulk_first_unique`) |
 | Value units | VALUE × 1000 for filings before 2023-01-03, dollars from then (`config.VALUE_DOLLARS_FROM`, `bulk._unit_multiplier`); valuation uses shares × our price, VALUE only as a fallback price |
 | CUSIP mapping | OpenFIGI (prefer `exchCode == "US"`, composite FIGI), else exact name match to one SEC ticker; a CUSIP first held before 2013 is never name-matched and, if not found, is asked again with `includeUnlistedEquities` (`securities.map_unlisted`, method `unlisted`: Enron, Lehman; a vendor code such as `8181760Q` is not kept as a ticker, and no SEC CIK lookups); ETF when `securityType == "ETP"`; retried/remapped every 28 days (≤ 2000 per run); vendor tickers resolved from Tiingo's list (`securities.map_cusips`, `vendor.candidates`) |
 | Options, bonds | PUT/CALL and PRN rows are stored but only `kind == "SH"` enters P&L and pricing (`run/compute.py`); their value still counts in `priced_pct` |
