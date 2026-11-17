@@ -9,9 +9,10 @@ pytrends is unmaintained and Google blocks bursts of requests (the script waits 
 run takes 30-60 minutes). Each keyword is compared as a Google topic (column `topic`: a /m/ or /g/
 id, so "Michael Burry" means the investor and not a namesake). A new keyword gets the first topic
 Google suggests whose type fits (an investor for a person, a company or fund for an institution);
-with none it is left out until someone fills `topic` in by hand (the keyword itself is allowed
-there for a name with no namesakes). Scores chain through anchors: every batch of 4 keywords holds
-an anchor, so all land on one scale; keywords too small to read against the first anchor are
+with none it is left out until someone fills `topic` in by hand (a name with no namesakes can
+go there in double quotes, "Gavin Baker": an exact phrase, since the bare words also count searches
+holding them apart, "nick jr train" for Nick Train). Scores chain through anchors: every batch of 4
+keywords holds an anchor, so all land on one scale; keywords too small to read against the first anchor are
 measured again against a smaller one. The saved file is what the site shows: commit it."""
 
 import csv
@@ -31,7 +32,7 @@ ANCHOR = "Bill Ackman"  # mid-level: big and small names both read well against 
 TIMEFRAME = "today 12-m"
 PERSON = re.compile(r"investor|business|fund|financ|hedge|entrepreneur|billionaire|executive|banker|economist|philanthrop|venture|capitalist|manager|trader|ceo|founder", re.I)
 INSTITUTION = re.compile(r"company|firm|fund|invest|bank|venture|pension|corporation|agency|organi|capital|asset|holding|partner|foundation|retirement|sovereign|financ", re.I)
-STAFF = {"Venture capital", "Sovereign & pension funds"}  # keyword is the institution, not a person
+STAFF = {"Venture capital"}  # keyword is the firm, not a person
 
 trends = TrendReq(hl="en-US", tz=0, timeout=(10, 30))
 

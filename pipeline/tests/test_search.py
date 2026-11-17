@@ -51,5 +51,7 @@ def test_famous_csv_search_keywords():
     assert sum(bool(f.search) for f in famous) >= 150
     # company names are searched for the company, not its investing: Big companies are not ranked
     assert not any(f.search for f in famous if f.group == "Big companies")
+    # nor state funds: members check their pensions, markets watch central banks
+    assert not any(f.search for f in famous if f.group == "Sovereign & pension funds")
     for f in famous:
         assert f.search == f.search.strip()

@@ -46,8 +46,9 @@ class Famous:
     match: str
     manager: str
     group: str
-    # What people search Google for to find this fund: its manager or founder, or the institution
-    # where no one person is its face (venture firms, sovereign and pension funds). Its Google
+    # What people search Google for to find this fund: its manager or founder, or the firm for
+    # venture firms (whose partners are searched for other things). Sovereign and pension funds
+    # have none: their names are searched by members, citizens and markets, not investors. Its Google
     # Trends score (famous_search.csv) ranks the Most searched list; rows sharing a keyword
     # (Sequoia's filers) share one place in it. "" = not ranked.
     search: str = ""

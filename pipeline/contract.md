@@ -134,7 +134,7 @@ fund's name.
   `FAMOUS_GROUPS` in `pipeline/orca/famous.py`; a fund in two lists has a row for each) and `"until_q"`: for a fund
   that stopped filing, its last quarter, and then its figures cover the period up to that quarter; `null` while it
   still files, and `"search"`: the Google Trends score of the fund's search keyword (its manager or founder, or the
-  institution; famous.csv `search`), Warren Buffett = 100, worldwide over the 12 months to `search_asof`; set on
+  firm for venture firms; famous.csv `search`), Warren Buffett = 100, worldwide over the 12 months to `search_asof`; set on
   one fund per keyword (the filer still filing with the biggest book) and on each of its rows, `null` on every
   other row. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
   Google Trends snapshot (`pipeline/orca/famous_search.csv`), `null` without one. Files built before 2026-11-15

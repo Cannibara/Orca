@@ -1,152 +1,133 @@
 keyword,topic,topic_name,score,asof
-8VC,/g/11w7g_xpyb,8VC (Venture capital company),,
-AIMCo,/m/03cdrfh,AIMCo (Fund management corporation),,
-Alaska Permanent Fund,/m/012_3z,Alaska Permanent Fund (Government department),,
-Andreas Halvorsen,/m/0py0v60,Ole Andreas Halvorsen (CEO of Viking Global Investors),,
-Andreessen Horowitz,/m/0drx3br,Andreessen Horowitz (Capital market company),,
-Antonio Gracias,/g/11xfpcdls6,Antonio Gracias (Investor),,
-AustralianSuper,/m/0gg5zq6,AustralianSuper (Topic),,
-Baker Brothers Advisors,/m/02_47qj,Baker Brothers Advisors (Company),,
-Barry Rosenstein,/g/11dd_rn0m2,Barry Rosenstein (Hedge fund manager),,
-Battery Ventures,/m/030p8cr,Battery Ventures (Private equity company),,
-Bessemer Venture Partners,/m/085b7v,Bessemer Venture Partners (Venture capital financing company),,
-Bill Ackman,/m/02vyqqk,Bill Ackman (American hedge fund manager),,
-Bill Miller,/m/08v0g7,Bill Miller (Investor),,
-Bill Nygren,Bill Nygren,search term (no topic),,
-Brad Gerstner,/g/11g9n71sx0,Brad Gerstner (Investor),,
-Bruce Berkowitz,/m/09v62qb,Bruce Berkowitz (Manager),,
-CPP Investments,/m/03qkbf3,CPP Investments (Asset management company),,
-CalPERS,/m/04lt6z,CalPERS (Government agency),,
-Canaan Partners,/g/11f00_2ydl,Canaan Partners (Venture capital financing company),,
-Carl Icahn,/m/01cv_g,Carl Icahn (American businessman and investor),,
-Cathie Wood,/g/11f0ymd2j7,Cathie Wood (American investor),,
-Charlie Munger,/m/03p6gq,Charlie Munger (American businessman and investor),,
-Chase Coleman,/g/11bw4d3lyy,Chase Coleman III (American hedge fund manager),,
-Christopher Hohn,/m/0nhgrw_,Christopher Hohn (British hedge fund manager),,
-Chuck Akre,/m/0gyxb18,Charles T. Akre (Investor and financier),,
-Cliff Asness,/m/0czd_p9,Cliff Asness (Co-Founder of AQR Capital Management),,
-D. E. Shaw,/m/03nsfv,D. E. Shaw & Co. (Hedge fund company),,
-DST Global,/g/11c3tg7fty,DST Global (Capital market company),,
-Dan Davidowitz,Dan Davidowitz,search term (no topic),,
+8VC,/g/11w7g_xpyb,8VC (Venture capital company),1.40,2026-11-17
+Andreas Halvorsen,/m/0py0v60,Ole Andreas Halvorsen (CEO of Viking Global Investors),0.06,2026-11-17
+Andreessen Horowitz,/m/0drx3br,Andreessen Horowitz (Capital market company),24.71,2026-11-17
+Antonio Gracias,/g/11xfpcdls6,Antonio Gracias (Investor),0.55,2026-11-17
+Baker Brothers Advisors,/m/02_47qj,Baker Brothers Advisors (Company),0.29,2026-11-17
+Barry Rosenstein,/g/11dd_rn0m2,Barry Rosenstein (Hedge fund manager),0.00,2026-11-17
+Battery Ventures,/m/030p8cr,Battery Ventures (Private equity company),1.45,2026-11-17
+Bessemer Venture Partners,/m/085b7v,Bessemer Venture Partners (Venture capital financing company),3.55,2026-11-17
+Bill Ackman,/m/02vyqqk,Bill Ackman (American hedge fund manager),13.53,2026-11-17
+Bill Miller,/m/08v0g7,Bill Miller (Investor),0.10,2026-11-17
+Bill Nygren,"""Bill Nygren""",exact phrase (no topic),0.00,2026-11-17
+Brad Gerstner,/g/11g9n71sx0,Brad Gerstner (Investor),1.21,2026-11-17
+Bruce Berkowitz,/m/09v62qb,Bruce Berkowitz (Manager),0.01,2026-11-17
+Canaan Partners,/g/11f00_2ydl,Canaan Partners (Venture capital financing company),0.00,2026-11-17
+Carl Icahn,/m/01cv_g,Carl Icahn (American businessman and investor),2.68,2026-11-17
+Cathie Wood,/g/11f0ymd2j7,Cathie Wood (American investor),14.31,2026-11-17
+Charlie Munger,/m/03p6gq,Charlie Munger (American businessman and investor),12.52,2026-11-17
+Chase Coleman,/g/11bw4d3lyy,Chase Coleman III (American hedge fund manager),0.21,2026-11-17
+Christopher Hohn,/m/0nhgrw_,Christopher Hohn (British hedge fund manager),1.16,2026-11-17
+Chuck Akre,/m/0gyxb18,Charles T. Akre (Investor and financier),0.05,2026-11-17
+Cliff Asness,/m/0czd_p9,Cliff Asness (Co-Founder of AQR Capital Management),1.39,2026-11-17
+D. E. Shaw,/m/03nsfv,D. E. Shaw & Co. (Hedge fund company),7.16,2026-11-17
+DST Global,/g/11c3tg7fty,DST Global (Capital market company),0.58,2026-11-17
+Dan Davidowitz,"""Dan Davidowitz""",exact phrase (no topic),0.00,2026-11-17
 Dan Gibson,,,,
-Dan Loeb,/m/0264vqh,Daniel S. Loeb (American investor and hedge fund manager),,
-Dan Sundheim,Dan Sundheim,search term (no topic),,
-Daniel Och,/m/05zrz_m,Daniel Och (Hedge fund manager and former CEO of Och-Ziff Capital Management),,
-David Einhorn,/m/02p_18t,David Einhorn (Hedge fund manager),,
-David Goel,/m/0vpv2kr,David Goel (Investor),,
-David Tepper,/m/0cmdlc,David Tepper (Founder of Appaloosa Management),,
-Divesh Makan,Divesh Makan,search term (no topic),,
-Dodge & Cox,/m/09v26g,Dodge & Cox (Investment management company),,
-Eashwar Krishnan,Eashwar Krishnan,search term (no topic),,
-Edgar Wachenheim,/g/11h7fnw2ht,Edgar Wachenheim III (American investor),,
-Farallon Capital,/m/04n197v,Farallon Capital (Company),,
-First Eagle Investments,/m/0bbwwpw,First Eagle Investments (Topic),,
-First Round Capital,/m/05mz5sh,First Round Capital (Venture capital company),,
-Founders Fund,/m/027v1qs,Founders Fund (Venture capital financing company),,
-GGV Capital,/m/05mxfb2,GGV Capital (Venture capital),,
-Gabe Plotkin,/g/11r3gmm69q,Gabe Plotkin (Businessman),,
-Gates Foundation,/m/012mjr,Gates Foundation (Private foundation),,
-Gavin Baker,Gavin Baker,search term (no topic),,
-General Atlantic,/m/04grj6t,General Atlantic (Private equity company),,
-General Catalyst,/m/02kw_3g,General Catalyst Partners (Venture capital company),,
-George Soros,/m/0gyk6w,George Soros (Hungarian-American investor and philanthropist),,
-Guy Spier,/m/0hgll8g,Guy Spier (Swiss-German investor),,
-Hamish Douglass,/g/11b_lmwt5,Hamish M. Douglass (Topic),,
-Henry Ellenbogen,Henry Ellenbogen,search term (no topic),,
-HongShan,/g/11vj9yqjbh,HongShan (Venture capital company),,
-Howard Marks,/m/0ktz0nh,Howard S. Marks (Co-chairman of Oaktree Capital Management),,
-Index Ventures,/m/03cwfng,Index Ventures (Venture capital company),,
-Insight Partners,/m/05xp6c,Insight Partners (Private equity company),,
-Irving Kahn,/m/027t7tx,Irving Kahn (American investor and philanthropist),,
-Israel Englander,/m/079l0bx,Israel Englander (Chairperson of Millennium Management LLC),,
+Dan Loeb,/m/0264vqh,Daniel S. Loeb (American investor and hedge fund manager),1.16,2026-11-17
+Dan Sundheim,"""Dan Sundheim""",exact phrase (no topic),0.04,2026-11-17
+Daniel Och,/m/05zrz_m,Daniel Och (Hedge fund manager and former CEO of Och-Ziff Capital Management),0.01,2026-11-17
+David Einhorn,/m/02p_18t,David Einhorn (Hedge fund manager),1.25,2026-11-17
+David Goel,/m/0vpv2kr,David Goel (Investor),0.00,2026-11-17
+David Tepper,/m/0cmdlc,David Tepper (Founder of Appaloosa Management),2.17,2026-11-17
+Divesh Makan,"""Divesh Makan""",exact phrase (no topic),0.00,2026-11-17
+Dodge & Cox,/m/09v26g,Dodge & Cox (Investment management company),1.87,2026-11-17
+Eashwar Krishnan,"""Eashwar Krishnan""",exact phrase (no topic),0.00,2026-11-17
+Edgar Wachenheim,/g/11h7fnw2ht,Edgar Wachenheim III (American investor),0.00,2026-11-17
+Farallon Capital,/m/04n197v,Farallon Capital (Company),0.64,2026-11-17
+First Eagle Investments,/m/0bbwwpw,First Eagle Investments (Topic),1.03,2026-11-17
+First Round Capital,/m/05mz5sh,First Round Capital (Venture capital company),0.80,2026-11-17
+Founders Fund,/m/027v1qs,Founders Fund (Venture capital financing company),6.11,2026-11-17
+GGV Capital,/m/05mxfb2,GGV Capital (Venture capital),0.55,2026-11-17
+Gabe Plotkin,/g/11r3gmm69q,Gabe Plotkin (Businessman),0.20,2026-11-17
+Gavin Baker,"""Gavin Baker""",exact phrase (no topic),1.43,2026-11-17
+General Atlantic,/m/04grj6t,General Atlantic (Private equity company),4.60,2026-11-17
+General Catalyst,/m/02kw_3g,General Catalyst Partners (Venture capital company),4.77,2026-11-17
+George Soros,/m/0gyk6w,George Soros (Hungarian-American investor and philanthropist),31.05,2026-11-17
+Guy Spier,/m/0hgll8g,Guy Spier (Swiss-German investor),0.22,2026-11-17
+Hamish Douglass,/g/11b_lmwt5,Hamish M. Douglass (Topic),0.00,2026-11-17
+Henry Ellenbogen,"""Henry Ellenbogen""",exact phrase (no topic),0.03,2026-11-17
+HongShan,/g/11vj9yqjbh,HongShan (Venture capital company),1.23,2026-11-17
+Howard Marks,/m/0ktz0nh,Howard S. Marks (Co-chairman of Oaktree Capital Management),4.07,2026-11-17
+Index Ventures,/m/03cwfng,Index Ventures (Venture capital company),2.18,2026-11-17
+Insight Partners,/m/05xp6c,Insight Partners (Private equity company),6.80,2026-11-17
+Irving Kahn,/m/027t7tx,Irving Kahn (American investor and philanthropist),0.00,2026-11-17
+Israel Englander,/m/079l0bx,Israel Englander (Chairperson of Millennium Management LLC),0.58,2026-11-17
 Jacob Gottlieb,,,,
 James Flynn,,,,
-Jeff Smith,/g/11f4hw2bfs,Jeff Smith (CEO of Starboard Value),,
-Jeremy Grantham,/m/04054wt,Jeremy Grantham (British investor),,
-Jim Simons,/m/07cjwm,Jim Simons (American hedge fund manager and investor),,
+Jeff Smith,/g/11f4hw2bfs,Jeff Smith (CEO of Starboard Value),0.01,2026-11-17
+Jeremy Grantham,/m/04054wt,Jeremy Grantham (British investor),1.84,2026-11-17
+Jim Simons,/m/07cjwm,Jim Simons (American hedge fund manager and investor),4.09,2026-11-17
 Joe Edelman,,,,
-Joel Greenblatt,/m/0c8ymn,Joel Greenblatt (American academic and hedge fund manager),,
-John Armitage,/g/11gfk0pfzt,John Armitage (Investor),,
+Joel Greenblatt,/m/0c8ymn,Joel Greenblatt (American academic and hedge fund manager),1.36,2026-11-17
+John Armitage,/g/11gfk0pfzt,John Armitage (Investor),0.03,2026-11-17
 John Griffin,,,,
-John Overdeck,/m/069f9hq,John Overdeck (Chairperson of Two Sigma Investments),,
-John Paulson,/m/03h55f2,John Paulson (American hedge fund manager),,
-Julian Robertson,/m/049qn7,Julian Robertson (American investor),,
-Karthik Sarma,Karthik Sarma,search term (no topic),,
-Ken Fisher,/m/0d9wct,"Kenneth Fisher (Executive chairman of the Fisher Investments, Inc.)",,
-Ken Griffin,/m/080hnv,Ken Griffin (CEO of Citadel LLC),,
-Kleiner Perkins,/m/01rs59,Kleiner Perkins (Kp company),,
-La Caisse,/m/09l06k,La Caisse (Pension fund company),,
-Larry Robbins,/m/011q990m,Larry Robbins (CEO of Glenview Capital Management),,
-Lee Ainslie,/m/0cc8rw7,Lee Ainslie (Managing partner of Maverick Capital),,
-Leon Cooperman,/m/0fqlt48,Leon Cooperman (American investor and hedge fund manager),,
-Leopold Aschenbrenner,/g/11gfmlftj_,Leopold Aschenbrenner (German investor),,
-Li Lu,/m/01qgj3,Li Lu (Chinese-American investor and businessman),,
-Lightspeed Venture Partners,/m/04_07bz,Lightspeed Venture Partners (Private equity company),,
-Louis Bacon,/m/0g32c6,Louis Bacon (American investor and hedge fund manager),,
-Marc Stad,/g/11f01h7zjq,Marc Stad (Managing partner of Dragoneer Investment Group),,
-Mario Gabelli,/m/0dg4n9,Mario Gabelli (American investor and investment advisor),,
-Marty Whitman,Marty Whitman,search term (no topic),,
-Mary Meeker,/m/0c802g,Mary Meeker (American venture capitalist),,
-Mason Hawkins,/m/0fmvz0,Mason Hawkins (American investor),,
-Mason Morfit,/m/0_yfg25,Mason Morfit (Businessperson ‧ Jordana Brewster's husband),,
-Matrix Partners,/m/026vvzr,Matrix Partners (Private equity company),,
-Michael Burry,/m/0bmfvhk,Michael Burry (American investor),,
-Michael Platt,/m/011q39b4,Michael Platt (Financier),,
-Mohnish Pabrai,/m/02vpbt4,Mohnish Pabrai (American businessman and investor),,
-National Pension Service,/g/1hhnprwyh,"National Pension Service (Pension office in Suwon, South Korea)",,
-Neil Mehta,/g/11f014v0dq,Neil Mehta (Capitalist),,
-Neil Shen,/g/11crzf1xtl,Neil Shen (Chinese venture capitalist and entrepreneur),,
-Nelson Peltz,/m/0fxbfs,Nelson Peltz (American businessman and investor),,
-New Enterprise Associates,/m/072nvz,New Enterprise Associates (Venture capital financing company),,
-New York State Common Retirement Fund,/g/11ffv6c9yd,New York State Common Retirement Fund (Topic),,
-Nick Train,Nick Train,search term (no topic),,
-Nicolai Tangen,/g/11g1hllxfx,Nicolai Tangen (CEO of Norges Bank Investment Management),,
-Norges Bank,/m/04mqt0,Norges Bank (Central bank company),,
-Norwest Venture Partners,/m/02_78vj,Norwest Venture Partners (Private equity company),,
-Pantera Capital,/m/0136_0v0,Pantera Capital (Venture capital),,
+John Overdeck,/m/069f9hq,John Overdeck (Chairperson of Two Sigma Investments),0.57,2026-11-17
+John Paulson,/m/03h55f2,John Paulson (American hedge fund manager),1.74,2026-11-17
+Julian Robertson,/m/049qn7,Julian Robertson (American investor),0.27,2026-11-17
+Karthik Sarma,"""Karthik Sarma""",exact phrase (no topic),0.01,2026-11-17
+Ken Fisher,/m/0d9wct,"Kenneth Fisher (Executive chairman of the Fisher Investments, Inc.)",1.07,2026-11-17
+Ken Griffin,/m/080hnv,Ken Griffin (CEO of Citadel LLC),8.76,2026-11-17
+Kleiner Perkins,/m/01rs59,Kleiner Perkins (Kp company),7.92,2026-11-17
+Larry Robbins,/m/011q990m,Larry Robbins (CEO of Glenview Capital Management),0.03,2026-11-17
+Lee Ainslie,/m/0cc8rw7,Lee Ainslie (Managing partner of Maverick Capital),0.02,2026-11-17
+Leon Cooperman,/m/0fqlt48,Leon Cooperman (American investor and hedge fund manager),0.82,2026-11-17
+Leopold Aschenbrenner,/g/11gfmlftj_,Leopold Aschenbrenner (German investor),11.54,2026-11-17
+Li Lu,/m/01qgj3,Li Lu (Chinese-American investor and businessman),1.57,2026-11-17
+Lightspeed Venture Partners,/m/04_07bz,Lightspeed Venture Partners (Private equity company),2.01,2026-11-17
+Louis Bacon,/m/0g32c6,Louis Bacon (American investor and hedge fund manager),0.30,2026-11-17
+Marc Stad,/g/11f01h7zjq,Marc Stad (Managing partner of Dragoneer Investment Group),0.24,2026-11-17
+Mario Gabelli,/m/0dg4n9,Mario Gabelli (American investor and investment advisor),0.88,2026-11-17
+Marty Whitman,"""Marty Whitman""",exact phrase (no topic),0.00,2026-11-17
+Mary Meeker,/m/0c802g,Mary Meeker (American venture capitalist),0.30,2026-11-17
+Mason Hawkins,/m/0fmvz0,Mason Hawkins (American investor),0.00,2026-11-17
+Mason Morfit,/m/0_yfg25,Mason Morfit (Businessperson ‧ Jordana Brewster's husband),0.39,2026-11-17
+Matrix Partners,/m/026vvzr,Matrix Partners (Private equity company),0.54,2026-11-17
+Michael Burry,/m/0bmfvhk,Michael Burry (American investor),21.06,2026-11-17
+Michael Platt,/m/011q39b4,Michael Platt (Financier),0.70,2026-11-17
+Mohnish Pabrai,/m/02vpbt4,Mohnish Pabrai (American businessman and investor),1.41,2026-11-17
+Neil Mehta,/g/11f014v0dq,Neil Mehta (Capitalist),0.23,2026-11-17
+Neil Shen,/g/11crzf1xtl,Neil Shen (Chinese venture capitalist and entrepreneur),0.33,2026-11-17
+Nelson Peltz,/m/0fxbfs,Nelson Peltz (American businessman and investor),3.96,2026-11-17
+New Enterprise Associates,/m/072nvz,New Enterprise Associates (Venture capital financing company),0.72,2026-11-17
+Nick Train,"""Nick Train""",exact phrase (no topic),0.04,2026-11-17
+Nicolai Tangen,/g/11g1hllxfx,Nicolai Tangen (CEO of Norges Bank Investment Management),0.83,2026-11-17
+Norwest Venture Partners,/m/02_78vj,Norwest Venture Partners (Private equity company),1.43,2026-11-17
+Pantera Capital,/m/0136_0v0,Pantera Capital (Venture capital),0.59,2026-11-17
 Paradigm,,,,
-Paul Marshall,/m/04f_ltj,Paul Marshall (Investor),,
-Paul Moroz,Paul Moroz,search term (no topic),,
-Paul Ruddock,/m/0j29sfq,Paul Ruddock (British businessman and philanthropist),,
-Paul Singer,/m/02pkmry,Paul Singer (CEO of Elliott Management Corporation),,
-Paul Tudor Jones,/m/06pw0j,Paul Tudor Jones (American investor),,
-Peter Kolchinsky,/g/1yyzknzk7,Peter Kolchinsky (Author),,
-Phil Town,/m/0415g7q,Phil Town (American investor and hedge fund manager),,
-Philippe Laffont,/g/11f62p3fkk,Philippe Laffont (Investor),,
-Prem Watsa,/m/03d73lp,Prem Watsa (CEO of Fairfax Financial),,
-Public Investment Fund,/g/120j30ls,Public Investment Fund (Company),,
-Public Sector Pension Investment Board,/m/07kb9fb,Public Sector Pension Investment Board (Capital market company),,
+Paul Marshall,/m/04f_ltj,Paul Marshall (Investor),0.56,2026-11-17
+Paul Moroz,"""Paul Moroz""",exact phrase (no topic),0.00,2026-11-17
+Paul Ruddock,/m/0j29sfq,Paul Ruddock (British businessman and philanthropist),0.00,2026-11-17
+Paul Singer,/m/02pkmry,Paul Singer (CEO of Elliott Management Corporation),1.63,2026-11-17
+Paul Tudor Jones,/m/06pw0j,Paul Tudor Jones (American investor),2.03,2026-11-17
+Peter Kolchinsky,/g/1yyzknzk7,Peter Kolchinsky (Author),0.02,2026-11-17
+Phil Town,/m/0415g7q,Phil Town (American investor and hedge fund manager),0.32,2026-11-17
+Philippe Laffont,/g/11f62p3fkk,Philippe Laffont (Investor),0.39,2026-11-17
+Prem Watsa,/m/03d73lp,Prem Watsa (CEO of Fairfax Financial),0.43,2026-11-17
 Rajiv Jain,,,,
-Ray Dalio,/m/03m5jmp,Ray Dalio (American investor),,
-Redpoint Ventures,/m/02hrl04,Redpoint Ventures (Private equity company),,
-Ribbit Capital,/g/11g9hmb53b,Ribbit Capital (Venture capital company),,
-Rob Citrone,Rob Citrone,search term (no topic),,
-Ron Baron,/m/03c_j5r,Ronald S. Baron (American businessperson),,
-"Ruane, Cunniff & Goldfarb",/m/0bv4yd,"Ruane, Cunniff & Goldfarb (Fund)",,
-STRS Ohio,/m/03ws5dk,State Teachers Retirement System of Ohio (Insurance service company),,
-Sam Isaly,Sam Isaly,search term (no topic),,
-Sardar Biglari,/m/09rsz0r,Sardar Biglari (CEO of Steak 'n Shake),,
-Saudi Central Bank,/m/07gjr7,Saudi Central Bank (Central bank),,
+Ray Dalio,/m/03m5jmp,Ray Dalio (American investor),18.96,2026-11-17
+Redpoint Ventures,/m/02hrl04,Redpoint Ventures (Private equity company),0.59,2026-11-17
+Ribbit Capital,/g/11g9hmb53b,Ribbit Capital (Venture capital company),0.60,2026-11-17
+Rob Citrone,"""Rob Citrone""",exact phrase (no topic),0.17,2026-11-17
+Ron Baron,/m/03c_j5r,Ronald S. Baron (American businessperson),0.87,2026-11-17
+"Ruane, Cunniff & Goldfarb",/m/0bv4yd,"Ruane, Cunniff & Goldfarb (Fund)",0.17,2026-11-17
+Sam Isaly,"""Sam Isaly""",exact phrase (no topic),0.00,2026-11-17
+Sardar Biglari,/m/09rsz0r,Sardar Biglari (CEO of Steak 'n Shake),0.44,2026-11-17
 Scott Ferguson,,,,
-Sequoia Capital,/m/043ttv,Sequoia Capital (Venture capital company),,
-Seth Klarman,/m/03d86tg,Seth Klarman (CEO of the Baupost Group),,
-SoftBank Vision Fund,/g/11dxd0t808,Softbank Vision Fund (Venture capital company),,
-Spark Capital,/m/02_y_wk,Spark Capital (Venture capital company),,
-Stanley Druckenmiller,/m/04hv1t,Stanley Druckenmiller (American investor),,
-State of Wisconsin Investment Board,/g/11dxf0m6j9,State of Wisconsin Investment Board (Asset management company),,
-Stephen Mandel,/m/0cc76_f,Stephen Mandel (Hedge fund manager),,
-Steve Cohen,/m/06bqw0,Steve Cohen (Businessman),,
-Summit Partners,/g/11bc5fppdy,Summit Partners (Capital market company),,
-Swiss National Bank,/m/074fgv,Swiss National Bank (Central bank),,
-Teacher Retirement System of Texas,/m/05p5kb9,Teacher Retirement System of Texas (Government agency),,
-Temasek Holdings,/m/02lvw_,Temasek Holdings (Private) Limited (Corporation),,
-Terry Smith,/m/0k3nvdq,Terry Smith (CEO of Fundsmith),,
-Thrive Capital,/g/11r3rsnwqn,Thrive Capital (Venture capital company),,
-Tom Gayner,Tom Gayner,search term (no topic),,
+Sequoia Capital,/m/043ttv,Sequoia Capital (Venture capital company),16.85,2026-11-17
+Seth Klarman,/m/03d86tg,Seth Klarman (CEO of the Baupost Group),1.39,2026-11-17
+SoftBank Vision Fund,/g/11dxd0t808,Softbank Vision Fund (Venture capital company),1.73,2026-11-17
+Spark Capital,/m/02_y_wk,Spark Capital (Venture capital company),1.35,2026-11-17
+Stanley Druckenmiller,/m/04hv1t,Stanley Druckenmiller (American investor),4.84,2026-11-17
+Stephen Mandel,/m/0cc76_f,Stephen Mandel (Hedge fund manager),0.13,2026-11-17
+Steve Cohen,/m/06bqw0,Steve Cohen (Businessman),4.24,2026-11-17
+Summit Partners,/g/11bc5fppdy,Summit Partners (Capital market company),1.60,2026-11-17
+Terry Smith,/m/0k3nvdq,Terry Smith (CEO of Fundsmith),0.65,2026-11-17
+Thrive Capital,/g/11r3rsnwqn,Thrive Capital (Venture capital company),3.14,2026-11-17
+Tom Gayner,"""Tom Gayner""",exact phrase (no topic),0.00,2026-11-17
 Tom Slater,,,,
-"Tweedy, Browne",/m/06401j0,"Tweedy, Browne (Investment company)",,
-UniSuper,/m/02vz6hr,UniSuper (Company),,
-Union Square Ventures,/m/02k_lr4,Union Square Ventures (Venture capital),,
-Warren Buffett,/m/01d_ys,Warren Buffett (American investor and former CEO of Berkshire Hathaway),,
-Weston Hicks,Weston Hicks,search term (no topic),,
-William von Mueffling,/g/11jffy4t5q,William von Mueffling (Investor),,
+"Tweedy, Browne",/m/06401j0,"Tweedy, Browne (Investment company)",0.26,2026-11-17
+Union Square Ventures,/m/02k_lr4,Union Square Ventures (Venture capital),0.53,2026-11-17
+Warren Buffett,/m/01d_ys,Warren Buffett (American investor and former CEO of Berkshire Hathaway),100.00,2026-11-17
+Weston Hicks,"""Weston Hicks""",exact phrase (no topic),0.00,2026-11-17
+William von Mueffling,/g/11jffy4t5q,William von Mueffling (Investor),0.01,2026-11-17

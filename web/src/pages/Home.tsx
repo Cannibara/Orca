@@ -380,7 +380,7 @@ const MOST_SEARCHED_ORDER: SortState = { key: "search", dir: -1 };
 const MOST_SEARCHED_MAX = 50;
 function mostSearchedAbout(asof: string | null | undefined): string {
   const when = asof ? ` over the 12 months to ${fmtDate(asof)}` : "";
-  return `The famous funds people search Google for most: Google Trends interest in the manager or founder (or the institution, for venture firms and state funds), worldwide${when}. Warren Buffett = 100.`;
+  return `The famous funds people search Google for most: Google Trends interest in the manager or founder (or the firm, for venture firms), worldwide${when}. Warren Buffett = 100.`;
 }
 
 /** The most searched famous funds, once each (a fund in two lists has its score on both rows). */

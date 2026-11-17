@@ -98,7 +98,7 @@ fund_id,match,manager,group,filer_name,search
 1037389,RENAISSANCE,Jim Simons,Quant & multi-strategy,Renaissance Technologies LLC,Jim Simons
 1179392,TWO SIGMA,John Overdeck & David Siegel,Quant & multi-strategy,"Two Sigma Investments, LP",John Overdeck
 1656456,APPALOOSA,David Tepper,Family offices,Appaloosa LP,David Tepper
-1166559,GATES FOUNDATION,Bill Gates (Cascade),Family offices,Bill & Melinda Gates Foundation Trust,Gates Foundation
+1166559,GATES FOUNDATION,Bill Gates (Cascade),Family offices,Bill & Melinda Gates Foundation Trust,
 898382,COOPERMAN,Leon Cooperman,Family offices,Cooperman Leon G,Leon Cooperman
 850529,FISHER ASSET,Ken Fisher,Value,"Fisher Asset Management, LLC",Ken Fisher
 1138995,GLENVIEW,Larry Robbins,Fundamental long/short,"Glenview Capital Management, LLC",Larry Robbins
@@ -213,33 +213,33 @@ fund_id,match,manager,group,filer_name,search
 64803,CVS HEALTH,,Big companies,CVS HEALTH Corp,
 1704720,CANNAE,Bill Foley,Big companies,"Cannae Holdings, Inc.",
 872589,REGENERON,,Big companies,REGENERON PHARMACEUTICALS INC,
-1374170,NORGES BANK,Norway's oil fund,Sovereign & pension funds,Norges Bank,Norges Bank
-1582202,SWISS NATIONAL BANK,Switzerland's central bank,Sovereign & pension funds,Swiss National Bank,Swiss National Bank
-1918181,SAUDI CENTRAL BANK,Saudi Arabia's central bank (SAMA),Sovereign & pension funds,Saudi Central Bank,Saudi Central Bank
+1374170,NORGES BANK,Norway's oil fund,Sovereign & pension funds,Norges Bank,
+1582202,SWISS NATIONAL BANK,Switzerland's central bank,Sovereign & pension funds,Swiss National Bank,
+1918181,SAUDI CENTRAL BANK,Saudi Arabia's central bank (SAMA),Sovereign & pension funds,Saudi Central Bank,
 1441689,KOREA INVESTMENT CORP,Korea's sovereign wealth fund,Sovereign & pension funds,Korea Investment Corp,
-1767640,PUBLIC INVESTMENT FUND,Saudi Arabia's sovereign wealth fund,Sovereign & pension funds,Public Investment Fund,Public Investment Fund
-1021944,TEMASEK,Singapore's state investor,Sovereign & pension funds,Temasek Holdings (Private) Ltd,Temasek Holdings
+1767640,PUBLIC INVESTMENT FUND,Saudi Arabia's sovereign wealth fund,Sovereign & pension funds,Public Investment Fund,
+1021944,TEMASEK,Singapore's state investor,Sovereign & pension funds,Temasek Holdings (Private) Ltd,
 1704268,MUBADALA,Abu Dhabi sovereign investor,Sovereign & pension funds,Mubadala Investment Co PJSC,
 1814011,ABU DHABI INVESTMENT COUNCIL,Abu Dhabi sovereign fund (Mubadala unit),Sovereign & pension funds,Abu Dhabi Investment Council Co P.J.S.C,
-1582681,ALASKA PERMANENT FUND,Alaska's oil fund,Sovereign & pension funds,Alaska Permanent Fund Corp,Alaska Permanent Fund
-1283718,CANADA PENSION PLAN,Canada Pension Plan (CPP Investments),Sovereign & pension funds,Canada Pension Plan Investment Board,CPP Investments
-898286,CAISSE DE DEPOT,Quebec's pension manager (CDPQ),Sovereign & pension funds,Caisse de depot et placement du Quebec,La Caisse
+1582681,ALASKA PERMANENT FUND,Alaska's oil fund,Sovereign & pension funds,Alaska Permanent Fund Corp,
+1283718,CANADA PENSION PLAN,Canada Pension Plan (CPP Investments),Sovereign & pension funds,Canada Pension Plan Investment Board,
+898286,CAISSE DE DEPOT,Quebec's pension manager (CDPQ),Sovereign & pension funds,Caisse de depot et placement du Quebec,
 937567,ONTARIO TEACHERS,Ontario Teachers' Pension Plan,Sovereign & pension funds,Ontario Teachers Pension Plan Board,
-1396318,PUBLIC SECTOR PENSION,Canada's federal public-service pension (PSP),Sovereign & pension funds,Public Sector Pension Investment Board,Public Sector Pension Investment Board
+1396318,PUBLIC SECTOR PENSION,Canada's federal public-service pension (PSP),Sovereign & pension funds,Public Sector Pension Investment Board,
 1228242,BRITISH COLUMBIA INVESTMENT,British Columbia's pension manager (BCI),Sovereign & pension funds,British Columbia Investment Management Corp,
 1053321,OMERS,Ontario municipal workers' pension,Sovereign & pension funds,OMERS Administration Corp,
-1463559,ALBERTA INVESTMENT MANAGEMENT,Alberta's pension manager (AIMCo),Sovereign & pension funds,Alberta Investment Management Corp,AIMCo
+1463559,ALBERTA INVESTMENT MANAGEMENT,Alberta's pension manager (AIMCo),Sovereign & pension funds,Alberta Investment Management Corp,
 1535845,HEALTHCARE OF ONTARIO,Ontario hospital workers' pension (HOOPP),Sovereign & pension funds,Healthcare of Ontario Pension Plan Trust Fund,
 1811568,INVESTMENT MANAGEMENT CORP OF ONTARIO,Ontario public pension manager (IMCO),Sovereign & pension funds,Investment Management Corp of Ontario,
-919079,CALIFORNIA PUBLIC EMPLOYEES,"CalPERS, largest US public pension",Sovereign & pension funds,California Public Employees Retirement System,CalPERS
+919079,CALIFORNIA PUBLIC EMPLOYEES,"CalPERS, largest US public pension",Sovereign & pension funds,California Public Employees Retirement System,
 1081019,CALIFORNIA STATE TEACHERS,"CalSTRS, California teachers' pension",Sovereign & pension funds,California State Teachers Retirement System,
-810265,COMMON RETIREMENT FUND,New York State's pension fund,Sovereign & pension funds,New York State Common Retirement Fund,New York State Common Retirement Fund
+810265,COMMON RETIREMENT FUND,New York State's pension fund,Sovereign & pension funds,New York State Common Retirement Fund,
 314969,NEW YORK STATE TEACHERS,New York teachers' pension,Sovereign & pension funds,New York State Teachers Retirement System,
 938076,STATE BOARD OF ADMINISTRATION OF FLORIDA,Florida Retirement System,Sovereign & pension funds,State Board of Administration of Florida Retirement System,
-796848,TEACHER RETIREMENT SYSTEM OF TEXAS,Texas teachers' pension,Sovereign & pension funds,Teacher Retirement System of Texas,Teacher Retirement System of Texas
-854157,WISCONSIN INVESTMENT BOARD,Wisconsin's pension manager (SWIB),Sovereign & pension funds,State of Wisconsin Investment Board,State of Wisconsin Investment Board
+796848,TEACHER RETIREMENT SYSTEM OF TEXAS,Texas teachers' pension,Sovereign & pension funds,Teacher Retirement System of Texas,
+854157,WISCONSIN INVESTMENT BOARD,Wisconsin's pension manager (SWIB),Sovereign & pension funds,State of Wisconsin Investment Board,
 1007280,PUBLIC EMPLOYEES RETIREMENT SYSTEM OF OHIO,Ohio public employees' pension (OPERS),Sovereign & pension funds,Public Employees Retirement System of Ohio,
-820478,OHIO,Ohio teachers' pension,Sovereign & pension funds,STRS Ohio (State Teachers Retirement System of Ohio),STRS Ohio
+820478,OHIO,Ohio teachers' pension,Sovereign & pension funds,STRS Ohio (State Teachers Retirement System of Ohio),
 762152,STATE OF MICHIGAN RETIREMENT,Michigan public pensions,Sovereign & pension funds,State of Michigan Retirement System,
 1107314,OREGON PUBLIC EMPLOYEES,Oregon public pension,Sovereign & pension funds,Oregon Public Employees Retirement Fund,
 1005354,VIRGINIA RETIREMENT SYSTEM,Virginia Retirement System,Sovereign & pension funds,Virginia Retirement Systems et al,
@@ -256,10 +256,10 @@ fund_id,match,manager,group,filer_name,search
 1717443,KLP KAPITALFORVALTNING,Norway's largest pension company (KLP),Sovereign & pension funds,KLP Kapitalforvaltning AS,
 1587381,USS INVESTMENT MANAGEMENT,UK universities' pension (USS),Sovereign & pension funds,USS Investment Management Ltd,
 1658020,RAILWAY PENSION,UK railway workers' pension (Railpen),Sovereign & pension funds,Railway Pension Investments Ltd,
-1608046,NATIONAL PENSION SERVICE,Korea's national pension,Sovereign & pension funds,National Pension Service,National Pension Service
+1608046,NATIONAL PENSION SERVICE,Korea's national pension,Sovereign & pension funds,National Pension Service,
 1600177,EMPLOYEES PROVIDENT FUND,Malaysia's national pension (EPF),Sovereign & pension funds,Employees Provident Fund Board,
-1694164,AUSTRALIANSUPER,Australia's largest super fund,Sovereign & pension funds,AustralianSuper Pty Ltd,AustralianSuper
-1989400,UNISUPER,Australian universities' super fund,Sovereign & pension funds,UniSuper Management Pty Ltd,UniSuper
+1694164,AUSTRALIANSUPER,Australia's largest super fund,Sovereign & pension funds,AustralianSuper Pty Ltd,
+1989400,UNISUPER,Australian universities' super fund,Sovereign & pension funds,UniSuper Management Pty Ltd,
 2012816,AWARE SUPER,Australian public-sector super fund,Sovereign & pension funds,Aware Super Pty Ltd as trustee of Aware Super,
 1730896,UNITED SUPER,"Cbus, Australian construction workers' super",Sovereign & pension funds,United Super Pty Ltd in its capacity as Trustee for the Construction & Building Unions Superannuation Fund,
 728014,RUANE,Sequoia Fund,Buffett inspired,"RUANE, CUNNIFF & GOLDFARB INC (earlier RUANE CUNNIFF & CO INC)","Ruane, Cunniff & Goldfarb"
