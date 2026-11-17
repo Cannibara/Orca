@@ -2,7 +2,7 @@
 # A full path ('+ A > B > C: TICKERS') puts an extra label in another branch. '## A > B # text' gives an industry a description.
 # '@umbrella X <= Y ; Z' gives every main-label member of Y and Z the extra label X.
 ## Technology > Semiconductors
-Memory: MU SNDK RMBS MRAM SKHY
+Memory: MU SNDK RMBS MRAM SKHY WDC
 GPUs & AI Accelerators: NVDA
 +GPUs & AI Accelerators: AMD
 CPUs & Processors: AMD INTC
@@ -50,7 +50,7 @@ Crypto & Digital Assets: COIN MSTR GLXY MARA RIOT CLSK CIFR WULF HUT CORZ BMNR C
 ## Technology > Hardware
 Consumer Devices: AAPL
 Computers & Servers: DELL HPQ HPE SMCI PENG
-Data Storage: NTAP WDC PSTG QMCO
+Data Storage: NTAP PSTG QMCO
 Networking Equipment: CSCO ANET UI FFIV EXTR NTCT DGII CALX HLIT
 Optical & Photonics: LITE CIEN VIAV AAOI COHR IPGP LASR
 Public Safety Technology: MSI AXON

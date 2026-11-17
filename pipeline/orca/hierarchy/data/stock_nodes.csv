@@ -420,7 +420,7 @@ stock_id,ticker,kind,vertical,extras,how,conf
 478,VNO,stock,Property > REITs > Office REITs,,placed,3
 479,WAT,stock,Healthcare > Life Sciences & Health Tech > Life Science Technology,,placed,3
 480,WEN,stock,Consumer > Restaurants > Quick-Service & Fast Casual,,placed,3
-481,WDC,stock,Technology > Hardware > Data Storage,,placed,3
+481,WDC,stock,Technology > Semiconductors > Memory,,placed,3
 482,WU,stock,Technology > Payments > Digital Payments & Money Transfer,,placed,3
 483,WHR,stock,Consumer > Household goods > Appliances,,placed,3
 484,WSM,stock,Consumer > Retail > Home Furnishings Retail,,placed,3
@@ -3901,7 +3901,7 @@ stock_id,ticker,kind,vertical,extras,how,conf
 21869,NOVAQ,stock,Energy > Solar > Solar Energy Production,,model,3
 21877,TIXT,stock,Business Services > Outsourcing & Customer Experience > Business Process Outsourcing,,model,3
 21922,VIST,stock,Energy > Oil > Production,,default,3
-21927,WDC 1-5 02-01-24,bond,Technology > Hardware > Data Storage,,placed,3
+21927,WDC 1-5 02-01-24,bond,Technology > Semiconductors > Memory,,placed,3
 21932,XPEL,stock,Industrials > Manufacturing > Auto Parts,Industrials > Manufacturing > Automotive,placed,3
 21939,TSEOQ,stock,Materials > Chemicals > Commodity Chemicals,,default,3
 21969,ALIM,stock,Healthcare > Pharma & Biotech > Pharmaceuticals,,model,3
