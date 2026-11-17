@@ -5,6 +5,13 @@ Last verified: 2026-11-17
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-18 — Famous funds: every list opens by popularity
+
+| What changed | Why | Files |
+|---|---|---|
+| Every famous list opens with its most popular fund first: Google Trends score, then AUM. The Fund heading cycles A–Z, Z–A, most popular (shown as "most popular" beside it); from another column it starts at A–Z | Owner: rank every fund by search or popularity, and let users get back to it by clicking Fund | `web/src/pages/Home.tsx` (`popularity`, `famousColumns`), `lib/sort.ts` (`cycle`, `orders`), `components/DataTable.tsx` (`alt`) |
+| New `fame` on every famous row: its keyword's score on all rows of the keyword (`search` stays on one filer per keyword for Most searched). Needs a Pipeline run before the order shows live; until then every fund falls back to AUM | Sequoia's other filers need the score to sort with their firm | `pipeline/orca/home.py`, `contract.md`, `web/src/data/types.ts` |
+
 ## 2026-11-17 — Pre-2013 13F history (1999 to mid-2013) from the old text filings
 
 | What changed | Why | Files |

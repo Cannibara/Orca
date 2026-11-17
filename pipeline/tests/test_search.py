@@ -28,7 +28,16 @@ def test_most_searched_scores_count_one_filer_per_keyword():
         (4, "Big companies"): 27.25,
         (5, "Value"): None,
     }
-    assert all(r["search"] is None for r in top_funds([big, lone], "3y", famous)["famous"])
+    # `fame` is the keyword's score on every row of it, for ordering each list by popularity
+    assert {(r["fund_id"], r["group"]): r["fame"] for r in rows} == {
+        (1, "Venture capital"): 9.5,
+        (2, "Venture capital"): 9.5,
+        (3, "Venture capital"): 9.5,
+        (4, "Value"): 27.25,
+        (4, "Big companies"): 27.25,
+        (5, "Value"): None,
+    }
+    assert all(r["search"] is None and r["fame"] is None for r in top_funds([big, lone], "3y", famous)["famous"])
 
 
 def test_load_search_reads_scores_and_the_snapshot_date(tmp_path):
