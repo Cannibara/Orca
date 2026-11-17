@@ -5,6 +5,14 @@ Last verified: 2026-11-16
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-17 — Sector return series: decisions recorded, nothing built
+
+| What changed | Why | Files |
+|---|---|---|
+| Decisions recorded: market-cap weighted with no cap (R5), total return with dividends from the start, an existing cap-weighted ETF as a node's index where a good one exists, our own index for the 12 broad sectors, for nodes with no ETF and for back-filling short ETF histories, industry level (tier 2) as the scoring level with sector and vertical toggles | Owner's answers in chat | `docs/DECISIONS.md`, `docs/ROADMAP.md` (S4), `make_review_page.py` (R5) |
+| Analysis (read-only): existing ETFs give 31 of our 327 nodes (11 of 12 sectors, 8 of 71 industries, 12 of 244 verticals) an ETF of their own, counting only ETFs the 100 funds held; about 25% of our Technology value sits in names XLK does not hold; the funds' buying that predates an ETF is 62% for memory (DRAM, Apr 2026), 22% for airlines, 9% for cybersecurity; the engine's `quarter_px` already gives quarterly closes and dividends per share | Sizes the build and shows where ETFs stand in and where our own index is needed | none |
+| Not done: no index code, no table, no contract change. The first real numbers need a pipeline run because dividends and share counts are in the private lake | | |
+
 ## 2026-11-16 — ETF mapping restored, fund 66 dropped, data refreshed to quarter 54, rules decided
 
 | What changed | Why | Files |

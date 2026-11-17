@@ -109,5 +109,5 @@ Nothing below is committed.
 
 ## Next steps
 1. The owner reviews stocks per industry vertical on the Browse tab (sorted by what the top funds bought) and the Not labelled tab, and answers R2–R8.
-2. Prototype the sector indices (hierarchy node → total-return series, with dividends from the lake) for the 12 sectors and compare them with the Select Sector ETFs (XLK, XLF and the rest) to see how closely they track. Then settle the licence question (R10) before anything is shown on the site.
+2. Build the sector return table (ROADMAP S4) in the pipeline: per node and quarter, a market-cap weighted (no cap, rebalanced each quarter) total return from the engine's `quarter_px` closes and dividends per share and the SEC share counts, for all three tiers; an ETF stands in where a good one exists, and our own series back-fills an ETF's history where it is too short (DECISIONS 2026-11-17). Then settle the licence question (R10) before anything is shown on the site.
 3. Change `pipeline/contract.md` (`securities.json` has one `sector` string from SIC today), then the pipeline, then the benchmark table (ROADMAP S4) that F4 and F5 share.

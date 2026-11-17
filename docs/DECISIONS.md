@@ -6,6 +6,13 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-17 — Sector return series: market-cap weighted, no cap, with dividends (owner)
+- Decision (chat): the sector, industry and industry-vertical indices are market-cap weighted with no cap on any stock (R5), rebalanced each quarter. They are a measurement benchmark like the S&P 500 or MSCI, whose indices carry no cap; sector ETFs cap their biggest holdings to meet fund diversification rules, which does not apply here. Consequence: Apple, NVIDIA, Microsoft, Alphabet and Amazon are 58% of our Technology index.
+- Decision (chat): total return with dividends from the start, no price-only first look. So the build lives in the pipeline, where the lake holds daily dividends and SEC share counts. The engine's `quarter_px` already gives each stock's quarterly close and dividends per share.
+- Decision (chat): use an existing ETF as a node's index where a good cap-weighted one exists (semiconductors: SOXX or SMH, no test against our own). Build our own for the 12 broad sectors (our definitions differ from GICS: about 25% of our Technology value sits in names XLK does not hold), for nodes with no ETF, and to back-fill an ETF's history before its launch where more than about 15% of the funds' buying predates it (memory ETF: 62%; cybersecurity 9%; airlines 22%).
+- Confirmed (chat): scoring is at industry level (tier 2, 71 industries, R9); sector (12) and industry vertical (244) are toggles, and all three are computed in one pass. Verticals are thin (188 of 244 have under 10 stocks above $1bn), so they widen to the industry (R4). Assumed: a node's index holds the stocks whose main label is in it, so the nodes partition the market; extra labels only choose which index a pick is compared with.
+- Open: not built. Dividends and share counts live in the private lake, so the first real numbers come from a pipeline run.
+
 ## 2026-11-16 — How a fund's sector picks are scored (owner)
 - Decision (chat): a fund's ETF buy is a sector pick. A single-sector or single-industry ETF is placed on its node of the hierarchy (SOXX → Technology › Semiconductors); broad-market, international, bond, commodity, leveraged and cross-sector theme ETFs have no sector and count as neutral (R12). ETF-heavy funds stay in the top 100.
 - Decision (chat): the sector score is about IRR (R13). Each buy and sell is replayed through every other sector's return series (total return, with dividends) and the IRRs are compared. It needs one return series per sector and no benchmark weights.
