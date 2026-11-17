@@ -28,7 +28,7 @@ from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.home import ConvictionQuarter, FundSnapshot
 from orca.http import Client, FetchError, FigiClient
-from orca.prices import DAILY_SCHEMA, FixtureSource
+from orca.prices import DAILY_SCHEMA, HISTORY_START, FixtureSource
 from orca.publish import FundMeta, FundOutput, read_json
 from orca.quarter_px import QuarterPx, close_on
 from orca.quarters import q_end, q_index
@@ -984,7 +984,7 @@ def test_budget_spent_in_bulk_ingest_publishes_nothing_and_the_next_run_goes_on(
     assert {
         "type": "time_budget",
         "minutes": 1.0,
-        "stages": ["bulk", "live", "securities", "prices", "rf", "compute"],
+        "stages": ["bulk", "live", "securities", "prices", "price history", "rf", "compute"],
     } in stats.flags
     assert len(downloads) == 2
     assert len(json.loads((tmp_path / "lake" / "ingested.json").read_text())) == 2
@@ -1191,7 +1191,7 @@ def test_a_repaired_ticker_fetches_the_history_under_the_vendors_one(fixtures, t
 
     stats = run(tmp_path, sources, WEEK2)
 
-    assert (ticker, date(2013, 1, 1)) in source.asked  # the whole history, under its ticker
+    assert (ticker, HISTORY_START) in source.asked  # the whole history, under its ticker
     assert not any(t == ticker + "EUR" for t, _ in source.asked)
     assert stats.staging is not None
     vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
@@ -1252,7 +1252,7 @@ def test_a_stock_found_by_its_sec_name_is_priced_under_that_ticker(fixtures, tmp
 
     vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
     assert vendor[stock_id] == ticker
-    assert (ticker, date(2013, 1, 1)) in source.asked  # its whole history, under the SEC ticker
+    assert (ticker, HISTORY_START) in source.asked  # its whole history, under the SEC ticker
     assert stats.staging is not None
 
 
@@ -1685,7 +1685,7 @@ def test_a_ticker_change_is_picked_up_and_the_history_fetched_again(tmp_path):
     lake = Lake(tmp_path / "lake")
     assert lake.read("securities").filter(stock_id=1)["ticker"].to_list() == ["WDGT"]
     assert lake.read("securities").filter(stock_id=1)["figi"].to_list() == ["BBG0TEST0001"]
-    assert ("WDGT", date(2013, 1, 1)) in asked  # the whole history, under the new ticker
+    assert ("WDGT", HISTORY_START) in asked  # the whole history, under the new ticker
     assert {"type": "ticker_changed", "stock_id": 1, "old": "WIDG", "new": "WDGT"} in health(
         tmp_path
     )["flags"]
@@ -1696,7 +1696,7 @@ def test_a_ticker_change_is_picked_up_and_the_history_fetched_again(tmp_path):
 
     asked.clear()
     run(tmp_path, sources, SMALL_TODAY + timedelta(days=35))
-    assert ("WDGT", date(2013, 1, 1)) not in asked  # fetched in full once
+    assert ("WDGT", HISTORY_START) not in asked  # fetched in full once
 
 
 def test_a_security_whose_figi_now_names_another_company_is_flagged(tmp_path):

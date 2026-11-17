@@ -8,7 +8,8 @@ import polars as pl
 ORIGINAL_FORM = "13F-HR"
 AMENDMENT_FORM = "13F-HR/A"
 ORIGINAL, RESTATEMENT, NEW_HOLDINGS = "original", "restatement", "new_holdings"
-BULK, LIVE = "bulk", "live"
+BULK, LIVE, LEGACY = "bulk", "live", "legacy"
+SOURCE_RANK = {BULK: 0, LIVE: 1, LEGACY: 2}  # who wins when one accession comes from two
 
 
 HOLDINGS_SCHEMA = pl.Schema(
@@ -35,15 +36,17 @@ STATUS_SCHEMA = pl.Schema(
 
 
 def _bulk_first_unique(filings: pl.DataFrame) -> pl.DataFrame:
-    """One row per accession. The same filing can arrive from both sources (live first, bulk
-    later), even under a different CIK for a multi-filer accession: the bulk row wins."""
+    """One row per accession. The same filing can arrive from two sources (live first, bulk
+    later), even under a different CIK for a multi-filer accession: bulk beats live, and live
+    beats legacy (a pre-2013 text reading)."""
     if "source" not in filings.columns:
         filings = filings.with_columns(source=pl.lit(BULK))
+    rank = pl.col("source").replace_strict(SOURCE_RANK, default=len(SOURCE_RANK), return_dtype=pl.Int8)
     return (
-        filings.with_columns(_not_bulk=(pl.col("source") != BULK))
-        .sort("_not_bulk", maintain_order=True)
+        filings.with_columns(_rank=rank)
+        .sort("_rank", maintain_order=True)
         .unique(subset="accession", keep="first", maintain_order=True)
-        .drop("_not_bulk")
+        .drop("_rank")
     )
 
 
@@ -92,7 +95,7 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
 def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dict | None = None) -> pl.DataFrame:
     """Positions per (cik, q, cusip, kind) from the chosen report of every fund-quarter.
 
-    `raw_holdings` may carry a `source` column ("bulk" / "live"); only rows whose (accession,
+    `raw_holdings` may carry a `source` column ("bulk" / "live" / "legacy"); only rows whose (accession,
     source) is that of a chosen filing are used. Without the column every row counts as bulk, so
     ValueError is raised if `filings` has a live row: untagged live holdings would be dropped.
 
@@ -101,8 +104,8 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     then rows are summed by key. `filed` is the date the quarter's last chosen report was filed.
     """
     if "source" not in raw_holdings.columns:
-        if "source" in filings.columns and (filings["source"] == LIVE).any():
-            raise ValueError('filings has live rows but raw_holdings has no "source" column to match them')
+        if "source" in filings.columns and (filings["source"] != BULK).any():
+            raise ValueError('filings has non-bulk rows but raw_holdings has no "source" column to match them')
         raw_holdings = raw_holdings.with_columns(source=pl.lit(BULK))
     chosen = select_reports(filings)
     quarter_filed = chosen.group_by("cik", "period").agg(filed=pl.col("filed").max())

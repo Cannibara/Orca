@@ -2,6 +2,7 @@
 
 import math
 import os
+import threading
 import time
 from collections.abc import Callable
 
@@ -59,6 +60,7 @@ class Client:
         # wait until a token has refilled, so requests are spaced 1 / rate apart.
         self._tokens = 1.0
         self._last = clock()
+        self._lock = threading.Lock()  # threads sharing one client share its rate limit
         self._http = httpx.Client(headers=headers, transport=transport, timeout=REQUEST_TIMEOUT)
 
     def get(self, url: str, **params) -> httpx.Response:
@@ -70,11 +72,12 @@ class Client:
         return self._request("POST", url, json=body)
 
     def _wait_for_token(self) -> None:
-        self._refill()
-        if self._tokens < 1.0:
-            self._sleep((1.0 - self._tokens) / self._rate)
+        with self._lock:
             self._refill()
-        self._tokens -= 1.0
+            if self._tokens < 1.0:
+                self._sleep((1.0 - self._tokens) / self._rate)
+                self._refill()
+            self._tokens -= 1.0
 
     def _refill(self) -> None:
         now = self._clock()

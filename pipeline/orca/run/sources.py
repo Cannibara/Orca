@@ -22,7 +22,8 @@ class Sources:
     `shares_outstanding` take a company CIK; `tbill()` is `rf.fetch_tbill`; `price_universe()`
     is `vendor.load_universe` (None: no universe, every held stock is asked for); `famous()` is
 the Famous funds list (famous.csv; the demo lists its own funds) and `search()` their Google
-Trends scores (famous_search.csv, a snapshot; the demo has its own)."""
+Trends scores (famous_search.csv, a snapshot; the demo has its own). `legacy_quarter(key, skip,
+stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-2013 source)."""
 
     list_bulk_zips: Callable[[], list[str]]
     download_bulk_zip: Callable[[str, Path], None]
@@ -36,6 +37,9 @@ Trends scores (famous_search.csv, a snapshot; the demo has its own)."""
     price_universe: Callable[[], pl.DataFrame] | None = None
     famous: Callable[[], tuple[Famous, ...]] = load_famous
     search: Callable[[], SearchScores] = load_search
+    legacy_quarter: (
+        Callable[[str, set[str], dict], tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]] | None
+    ) = None
 
 
 def production_sources() -> Sources:
@@ -45,6 +49,7 @@ def production_sources() -> Sources:
     from orca.prices import TiingoSource
     from orca.rf import fetch_tbill
     from orca.sec.bulk import list_bulk_zips
+    from orca.sec.legacy import fetch_quarter
     from orca.sec.live import fetch_new_filings
     from orca.securities import fetch_shares_outstanding, fetch_sic, load_sec_tickers
     from orca.vendor import load_universe
@@ -65,4 +70,5 @@ def production_sources() -> Sources:
         prices=TiingoSource(tiingo_client()),
         tbill=lambda: fetch_tbill(fred),
         price_universe=lambda: load_universe(Client(1.0, {})),  # a public file: no key
+        legacy_quarter=lambda key, skip, stats: fetch_quarter(sec, key, skip, stats),
     )

@@ -20,6 +20,8 @@ SHARES_CONCEPT_URL = (
 SIC_TO_SECTOR_CSV = Path(__file__).with_name("sic_to_sector.csv")
 
 OPENFIGI, NAME, UNMAPPED = "openfigi", "name", "unmapped"
+UNLISTED = "unlisted"  # found only with delisted securities included (a company gone since)
+_EXCHANGE_TICKER = re.compile(r"[A-Z]{1,6}(?:-[A-Z]{1,3})?")
 ERROR = "error"  # OpenFIGI answered the job with an error: no answer yet, ask again later
 ETF_SECTOR, OTHER_SECTOR = "ETF/Fund", "Other"
 
@@ -107,10 +109,35 @@ def map_cusips(
     return pl.DataFrame(rows, schema=MAPPED_SCHEMA, orient="row")
 
 
-def _openfigi_batch(client: FigiClient, cusips: list[str]) -> list[_Match | str | None]:
+def map_unlisted(cusips: list[str], figi: FigiClient) -> pl.DataFrame:
+    """Ask OpenFIGI again about CUSIPs its ordinary mapping did not find, delisted securities
+    included (`includeUnlistedEquities`): a company that has died since (Enron, Lehman) is only
+    found this way. Rows in MAPPED_SCHEMA with method UNLISTED, UNMAPPED or ERROR."""
+    rows = []
+    for start in range(0, len(cusips), figi.jobs_per_request):
+        batch = cusips[start : start + figi.jobs_per_request]
+        for cusip, match in zip(batch, _openfigi_batch(figi, batch, unlisted=True)):
+            if match == ERROR:
+                rows.append((cusip, None, None, None, False, ERROR))
+            elif match is None:
+                rows.append((cusip, None, None, None, False, UNMAPPED))
+            else:
+                figi_id, ticker, name, is_etf = match
+                # Delisted listings often carry a vendor code ("8181760Q"), not a ticker.
+                ticker = ticker if ticker and _EXCHANGE_TICKER.fullmatch(ticker) else None
+                rows.append((cusip, figi_id, ticker, name, is_etf, UNLISTED))
+    return pl.DataFrame(rows, schema=MAPPED_SCHEMA, orient="row")
+
+
+def _openfigi_batch(
+    client: FigiClient, cusips: list[str], unlisted: bool = False
+) -> list[_Match | str | None]:
     """Each job's listing, None when OpenFIGI found nothing, or ERROR when it answered with an
     error."""
-    jobs = [{"idType": "ID_CUSIP", "idValue": cusip} for cusip in cusips]
+    jobs = [
+        {"idType": "ID_CUSIP", "idValue": cusip, **({"includeUnlistedEquities": True} if unlisted else {})}
+        for cusip in cusips
+    ]
     results = client.post_json(FIGI_URL, jobs).json()
     if not isinstance(results, list) or len(results) != len(jobs):
         raise ValueError(f"OpenFIGI answered {len(jobs)} jobs with an unaligned response")
