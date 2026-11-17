@@ -93,6 +93,10 @@ def test_most_searched_views_count_one_filer_per_set_of_titles():
 def test_famous_csv_wiki_titles_are_canonical_looking():
     from orca.famous import load_famous
 
-    for f in load_famous():
+    famous = load_famous()
+    assert sum(bool(f.wiki) for f in famous) >= 150
+    # company pages are read for the company, not its investing: Big companies are not ranked
+    assert not any(f.wiki for f in famous if f.group == "Big companies")
+    for f in famous:
         for t in f.wiki:
-            assert t == t.strip() and "_" not in t and t[:1].isupper(), (f.fund_id, t)
+            assert t == t.strip() and "_" not in t and not t[:1].islower(), (f.fund_id, t)
