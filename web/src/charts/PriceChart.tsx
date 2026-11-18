@@ -1,7 +1,7 @@
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import type { Trade } from "../data/types";
 import { useGrowOnce } from "../fund/hooks";
-import { px, qLabel, sgn } from "../lib/format";
+import { px, qLabel, qOfYear, sgn } from "../lib/format";
 import { tradeMove } from "../lib/live";
 import { Legend, type LegendItem } from "./Legend";
 import { compact, linePath, markerPath, niceTicks } from "./scale";
@@ -31,8 +31,8 @@ const LEGEND: LegendItem[] = [
   { label: "Quarter low–high", color: "var(--rng)", kind: "sw" },
 ];
 
-// Quarter q covers calendar quarter q % 4 of year 2013 + floor(q / 4).
-const qStartMs = (q: number) => Date.UTC(2013 + Math.floor(q / 4), (q % 4) * 3, 1);
+// Quarter q covers calendar quarter qOfYear(q) of year 2013 + floor(q / 4).
+const qStartMs = (q: number) => Date.UTC(2013 + Math.floor(q / 4), qOfYear(q) * 3, 1);
 const qMidMs = (q: number) => (qStartMs(q) + qStartMs(q + 1)) / 2;
 
 const dollars = (t: number) => "$" + +t.toFixed(2);
@@ -61,7 +61,7 @@ export function PriceChart({ closes, start, trades, latest, label = "Weekly pric
   if (trades.length) {
     const qs = trades.map((t) => t.q);
     const first = Math.min(...qs);
-    xi0 = Math.min(Math.max(weekOf(qStartMs(Math.max(0, first - 2))), 0), weekOf(qStartMs(first)));
+    xi0 = Math.min(Math.max(weekOf(qStartMs(first - 2)), 0), weekOf(qStartMs(first)));
     xi1 = Math.max(xi1, weekOf(qMidMs(Math.max(...qs))));
   }
   const X = (w: number) => M.l + ((w - xi0) / Math.max(1, xi1 - xi0)) * iw;

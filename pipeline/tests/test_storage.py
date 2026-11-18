@@ -110,3 +110,11 @@ def test_manifest_knows_names_whatever_the_checksum(tmp_path):
 
     assert "2024q1_form13f.zip" in manifest
     assert "2024q2_form13f.zip" not in manifest
+
+
+def test_sink_streams_a_lazy_frame_over_the_table_it_reads(tmp_path):
+    lake = Lake(tmp_path)
+    lake.write("t", pl.DataFrame({"a": [1, 2, 3]}))
+    lake.sink("t", pl.scan_parquet(tmp_path / "t.parquet").filter(pl.col("a") != 2))
+    assert lake.read("t")["a"].to_list() == [1, 3]
+    assert [p.name for p in tmp_path.iterdir()] == ["t.parquet"]  # no temporary file left

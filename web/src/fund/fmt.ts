@@ -2,7 +2,7 @@
 // artifact (app.js), so the page prints exactly what the artifact printed. Money is in
 // dollars here (the artifact drew billions) and goes through lib/format's money().
 
-import { MINUS, money, qLabel } from "../lib/format";
+import { MINUS, money, qLabel, qOfYear } from "../lib/format";
 
 export { MINUS };
 
@@ -47,9 +47,9 @@ export function shortYear(c: string): string {
   return c.replace(/^\d\d(\d\d)(.*)$/, "’$1$2");
 }
 
-/** Quarter index counted from Q1 2013: 53 → "Q2 ’26". */
+/** Quarter index counted from Q1 2013: 53 → "Q2 ’26", −56 → "Q1 ’99". */
 export function qShort(q: number): string {
-  return "Q" + ((q % 4) + 1) + " ’" + String(2013 + Math.floor(q / 4)).slice(2);
+  return "Q" + (qOfYear(q) + 1) + " ’" + String(2013 + Math.floor(q / 4)).slice(2);
 }
 
 /** "Q2 2026". */

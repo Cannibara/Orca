@@ -15,6 +15,7 @@ from orca.workbook.layout import (
     DATE,
     GENERAL,
     PCT,
+    Q_OFFSET,
     RATIO,
     SCI,
     SUMMARY_CHECKED,
@@ -81,8 +82,8 @@ def _ann(n: str, growth: str) -> Formula:
 
 
 def _last_in_range(s: Refs) -> str:
-    last = f"SUMPRODUCT(MAX(({s.q('in_range')}=1)*({s.q('quarter')}+1)))"
-    return f'=IF({last}=0,"",{last}-1)'
+    last = f"SUMPRODUCT(MAX(({s.q('in_range')}=1)*({s.q('quarter')}+{Q_OFFSET})))"
+    return f'=IF({last}=0,"",{last}-{Q_OFFSET})'
 
 
 def _range_growth(s: Refs) -> str:
@@ -148,8 +149,9 @@ def _hold_all(s: Refs) -> str:
 
 def _hold_sold(s: Refs) -> str:
     hold, to = s.out("hold"), s.out("to_q")
-    n = f'COUNTIF({to},">=0"){s.plus("hold_n_sold")}'
-    total = f'SUMIF({to},">=0",{hold}){s.plus("hold_sum_sold")}'
+    sold = f'">-{Q_OFFSET}"'  # to_q is blank while held, and negative before 2013
+    n = f"COUNTIF({to},{sold}){s.plus('hold_n_sold')}"
+    total = f"SUMIF({to},{sold},{hold}){s.plus('hold_sum_sold')}"
     return _mean_with_other(total, n, '""')
 
 

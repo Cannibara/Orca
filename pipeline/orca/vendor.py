@@ -8,7 +8,7 @@ already reaches the vendor's last date (a delisted stock is then never asked aga
 import io
 import re
 import zipfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from datetime import date, timedelta
 
 import polars as pl
@@ -97,6 +97,7 @@ def resolve(
     held: Mapping[int, tuple[date, date]],
     universe: pl.DataFrame,
     alternates: Mapping[int, Sequence[str]] | None = None,
+    gone: Set[int] = frozenset(),
 ) -> pl.DataFrame:
     """VENDOR_SCHEMA rows: for each stock of `tickers` (stock_id -> ticker), the first of its
     `candidates` (with its `alternates`, stock_id -> other tickers) whose current line at the
@@ -105,12 +106,15 @@ def resolve(
     line counts: the vendor serves a ticker's prices for whoever trades under it today, so an
     older line of a reused ticker ("APC" for Anadarko, 1986-2019, now another company) would
     bring another company's prices. Nor does a current line when the stock was also held during
-an older line that ended over a month before it began (`_held_before_reuse`). A stock with no
-such candidate is left out."""
+an older line that ended over a month before it began (`_held_before_reuse`). A stock of
+`gone` (a company that no longer trades, found by OpenFIGI only among delisted securities) takes
+only a line that has ended: one still trading is someone else's (the vendor's "T" runs from 1984
+under today's AT&T, not old AT&T Corp). A stock with no such candidate is left out."""
     alternates = alternates or {}
     lines: dict[str, list[tuple[date, date]]] = {}
     for ticker, start, end in universe.iter_rows():
         lines.setdefault(ticker, []).append((start, end))
+    trading_after = (universe["end"].max() or date.max) - timedelta(days=REUSE_GAP.days)
     # The line that ends last; of two ending the same day, the longer (a one-day line on a
     # listing's last day is the same listing).
     current = {t: min(ls, key=lambda line: (-line[1].toordinal(), line[0])) for t, ls in lines.items()}
@@ -120,6 +124,8 @@ such candidate is left out."""
         for name in candidates(ticker, alternates.get(stock_id, ())):
             line = current.get(name)
             if line is None or line[0] > last or line[1] < first:
+                continue
+            if stock_id in gone and line[1] >= trading_after:
                 continue
             if _held_before_reuse(lines[name], line, first, last):
                 continue

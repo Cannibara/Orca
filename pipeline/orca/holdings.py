@@ -8,7 +8,8 @@ import polars as pl
 ORIGINAL_FORM = "13F-HR"
 AMENDMENT_FORM = "13F-HR/A"
 ORIGINAL, RESTATEMENT, NEW_HOLDINGS = "original", "restatement", "new_holdings"
-BULK, LIVE = "bulk", "live"
+BULK, LIVE, LEGACY = "bulk", "live", "legacy"
+SOURCE_RANK = {BULK: 0, LIVE: 1, LEGACY: 2}  # who wins when one accession comes from two
 
 
 HOLDINGS_SCHEMA = pl.Schema(
@@ -35,15 +36,17 @@ STATUS_SCHEMA = pl.Schema(
 
 
 def _bulk_first_unique(filings: pl.DataFrame) -> pl.DataFrame:
-    """One row per accession. The same filing can arrive from both sources (live first, bulk
-    later), even under a different CIK for a multi-filer accession: the bulk row wins."""
+    """One row per accession. The same filing can arrive from two sources (live first, bulk
+    later), even under a different CIK for a multi-filer accession: bulk beats live, and live
+    beats legacy (a pre-2013 text reading)."""
     if "source" not in filings.columns:
         filings = filings.with_columns(source=pl.lit(BULK))
+    rank = pl.col("source").replace_strict(SOURCE_RANK, default=len(SOURCE_RANK), return_dtype=pl.Int8)
     return (
-        filings.with_columns(_not_bulk=(pl.col("source") != BULK))
-        .sort("_not_bulk", maintain_order=True)
+        filings.with_columns(_rank=rank)
+        .sort("_rank", maintain_order=True)
         .unique(subset="accession", keep="first", maintain_order=True)
-        .drop("_not_bulk")
+        .drop("_rank")
     )
 
 
@@ -53,7 +56,9 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
     Base: the latest original 13F-HR, or, if the fund-quarter has any restatement, the latest
     restatement. On top of it go all new-holdings amendments filed after the base. "Latest" and
     "after" order filings by (filed, accession), so same-day filings are decided
-    deterministically. An amendment of unknown type is ignored, and so are new-holdings
+    deterministically. An amendment of unknown type is ignored, unless it is a pre-2013 text
+    filing (source legacy) and its fund-quarter has no original or restatement (then it is taken
+    as a restatement), and so are new-holdings
     amendments of a fund-quarter with no base report in the data: a partial set of positions
     would read as a near-total sale.
 
@@ -69,7 +74,16 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
         .when(pl.col("form") == AMENDMENT_FORM)
         .then(pl.col("amendment_type"))
     )
-    classified = filings.with_columns(role=role).filter(pl.col("role").is_in([ORIGINAL, RESTATEMENT, NEW_HOLDINGS]))
+    filings = filings.with_columns(role=role)
+    # Some filers sent every quarterly report as an amendment with neither box checked (Kahn
+    # Brothers before 2013): in a fund-quarter with no other report, such a pre-2013 text
+    # amendment is it. (An XML amendment always states its type.)
+    based = filings.filter(pl.col("role").is_in([ORIGINAL, RESTATEMENT])).select("cik", "period").unique()
+    lone = (pl.col("form") == AMENDMENT_FORM) & pl.col("role").is_null() & (pl.col("source") == LEGACY)
+    filings = filings.join(based.with_columns(_based=pl.lit(True)), on=["cik", "period"], how="left").with_columns(
+        role=pl.when(lone & pl.col("_based").is_null()).then(pl.lit(RESTATEMENT)).otherwise(pl.col("role"))
+    ).drop("_based")
+    classified = filings.filter(pl.col("role").is_in([ORIGINAL, RESTATEMENT, NEW_HOLDINGS]))
     base = (
         classified.filter(pl.col("role") != NEW_HOLDINGS)
         .with_columns(_restated=(pl.col("role") == RESTATEMENT))
@@ -92,7 +106,7 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
 def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dict | None = None) -> pl.DataFrame:
     """Positions per (cik, q, cusip, kind) from the chosen report of every fund-quarter.
 
-    `raw_holdings` may carry a `source` column ("bulk" / "live"); only rows whose (accession,
+    `raw_holdings` may carry a `source` column ("bulk" / "live" / "legacy"); only rows whose (accession,
     source) is that of a chosen filing are used. Without the column every row counts as bulk, so
     ValueError is raised if `filings` has a live row: untagged live holdings would be dropped.
 
@@ -101,8 +115,8 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     then rows are summed by key. `filed` is the date the quarter's last chosen report was filed.
     """
     if "source" not in raw_holdings.columns:
-        if "source" in filings.columns and (filings["source"] == LIVE).any():
-            raise ValueError('filings has live rows but raw_holdings has no "source" column to match them')
+        if "source" in filings.columns and (filings["source"] != BULK).any():
+            raise ValueError('filings has non-bulk rows but raw_holdings has no "source" column to match them')
         raw_holdings = raw_holdings.with_columns(source=pl.lit(BULK))
     chosen = select_reports(filings)
     quarter_filed = chosen.group_by("cik", "period").agg(filed=pl.col("filed").max())
@@ -124,8 +138,14 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     )
 
 
+MAX_BRIDGED = 2  # unreadable filings in a row carried over before a fund's history is cut
+
+
 def fill_gaps(
-    holdings: pl.DataFrame, last_q: int, filed_quarters: pl.DataFrame | None = None
+    holdings: pl.DataFrame,
+    last_q: int,
+    filed_quarters: pl.DataFrame | None = None,
+    unreadable: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """(filled holdings, fund_status): carry a single missing quarter, split tracking at longer gaps.
 
@@ -139,14 +159,21 @@ def fill_gaps(
     `holdings`. Pass the chosen reports of select_reports (period as q) so that a filed report
     with no usable rows (a liquidated fund, all shares <= 0) counts as filed, not as a gap.
 
+    `unreadable` (cik, q) lists fund-quarters the fund did file but whose table could not be read
+    (pre-2013 text filings, `sec.legacy`). Between two readable quarters, up to MAX_BRIDGED of
+    them in a row are carried like a single gap (copied from the last readable quarter) instead
+    of ending the segment: the fund kept filing, so its history goes on.
+
     fund_status has one row per cik: first_q, last_filed_q, inactive (last_filed_q < last_q - 1,
     i.e. nothing filed in the latest two quarters) and segments, the (start, end) of each run of
     filed quarters, ends included, carried quarters inside.
     """
     filed = holdings if filed_quarters is None else filed_quarters
-    quarters = (
+    readable = (
         filed.select(pl.col("cik").cast(pl.Int64), pl.col("q").cast(pl.Int16)).unique().sort("cik", "q")
     )
+    bridged = _bridged(readable, unreadable)
+    quarters = pl.concat([readable, bridged]).unique().sort("cik", "q")
     # One unfiled quarter in a row is carried forward (not tunable); two or more end a segment.
     missing_before = pl.col("q") - pl.col("q").shift(1).over("cik") - 1  # null for a fund's first quarter
     starts_segment = missing_before.is_null() | (missing_before > 1)
@@ -167,14 +194,28 @@ def fill_gaps(
         .sort("cik")
     )
 
-    # Quarters to copy forward: (cik, source q, target q). A source without rows copies nothing.
+    # Quarters to copy forward: (cik, target q), each from the last readable quarter before it.
+    # A source without rows copies nothing.
     missing_after = pl.col("q").shift(-1).over("cik") - pl.col("q") - 1
-    interior = quarters.filter(missing_after == 1).select("cik", source_q="q", q=pl.col("q") + 1)
+    interior = quarters.filter(missing_after == 1).select("cik", q=pl.col("q") + 1)
     tail = status.filter(pl.col("last_filed_q") == last_q - 1).select(
-        "cik", source_q="last_filed_q", q=pl.lit(last_q, dtype=pl.Int16)
+        "cik", q=pl.lit(last_q, dtype=pl.Int16)
+    )
+    targets = pl.concat([interior, tail, bridged]).unique().sort("cik", "q")
+    sources = (
+        targets.join_asof(
+            readable.with_columns(source_q=pl.col("q")).sort("cik", "q"),
+            on="q",
+            by="cik",
+            strategy="backward",
+            allow_exact_matches=False,
+            check_sortedness=False,
+        )
+        .filter(pl.col("source_q").is_not_null())
+        .select("cik", "source_q", "q")
     )
     carried = (
-        holdings.join(pl.concat([interior, tail]), left_on=["cik", "q"], right_on=["cik", "source_q"])
+        holdings.join(sources, left_on=["cik", "q"], right_on=["cik", "source_q"])
         .drop("q")
         .rename({"q_right": "q"})
         .select(holdings.columns)
@@ -184,3 +225,26 @@ def fill_gaps(
     )
     filled = filled.select(*(pl.col(name).cast(dtype) for name, dtype in FILLED_SCHEMA.items()))
     return filled.sort("cik", "q", "cusip", "kind"), status
+
+
+def _bridged(readable: pl.DataFrame, unreadable: pl.DataFrame | None) -> pl.DataFrame:
+    """The unreadable fund-quarters that are carried: between two readable quarters of the fund,
+    in runs of at most MAX_BRIDGED."""
+    if unreadable is None or unreadable.is_empty():
+        return readable.clear()
+    span = readable.group_by("cik").agg(lo=pl.col("q").min(), hi=pl.col("q").max())
+    inside = (
+        unreadable.select(pl.col("cik").cast(pl.Int64), pl.col("q").cast(pl.Int16))
+        .unique()
+        .join(readable, on=["cik", "q"], how="anti")
+        .join(span, on="cik")
+        .filter((pl.col("q") > pl.col("lo")) & (pl.col("q") < pl.col("hi")))
+        .sort("cik", "q")
+    )
+    run = (pl.col("q") - pl.col("q").shift(1).over("cik") != 1).fill_null(True).cum_sum().over("cik")
+    return (
+        inside.with_columns(run=run)
+        .with_columns(length=pl.len().over("cik", "run"))
+        .filter(pl.col("length") <= MAX_BRIDGED)
+        .select("cik", "q")
+    )

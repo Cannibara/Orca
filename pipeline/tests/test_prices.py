@@ -9,6 +9,7 @@ import pytest
 from orca.http import FetchError, tiingo_client
 from orca.prices import (
     DAILY_SCHEMA,
+    HISTORY_START,
     PRICES_SCHEMA,
     FixtureSource,
     TiingoSource,
@@ -378,7 +379,7 @@ def test_update_fetches_only_new_days(tmp_path):
     second = update_prices(lake, source, {1: "AAA"}, today=D(2024, 5, 17))
 
     assert source.calls == [
-        ("AAA", D(2013, 1, 1), D(2024, 5, 10)),  # no rows yet: from the start of the history
+        ("AAA", HISTORY_START, D(2024, 5, 10)),  # no rows yet: from the start of the history
         ("AAA", D(2024, 5, 5), D(2024, 5, 17)),  # last stored date (10 May) - 5 days
     ]
     assert first == [1]  # a stock new to the store counts as changed
@@ -489,7 +490,7 @@ def test_update_without_any_rows_for_a_stock_stores_nothing_and_reports_nothing(
 
     assert update_prices(lake, source, {1: "AAA", 9: "GONE"}, today=D(2024, 5, 10)) == [1]
     assert update_prices(lake, source, {1: "AAA", 9: "GONE"}, today=D(2024, 5, 17)) == []
-    assert source.calls[-1] == ("GONE", D(2013, 1, 1), D(2024, 5, 17))  # still a stock with no rows
+    assert source.calls[-1] == ("GONE", HISTORY_START, D(2024, 5, 17))  # still a stock with no rows
     assert read_prices(lake)["stock_id"].unique().to_list() == [1]
 
 
@@ -659,7 +660,7 @@ def test_a_failed_new_ticker_is_retried_from_the_start_of_the_history(tmp_path):
 
     up = Recording(FixtureSource(frames))
     assert update_prices(lake, up, {1: "AAA"}, today=D(2024, 5, 17)) == [1]
-    assert up.calls == [("AAA", D(2013, 1, 1), D(2024, 5, 17))]
+    assert up.calls == [("AAA", HISTORY_START, D(2024, 5, 17))]
 
 
 @pytest.mark.parametrize("status", [401, 403, 429])

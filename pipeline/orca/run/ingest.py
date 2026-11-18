@@ -1,5 +1,5 @@
-"""Ingest: bulk ZIPs and live filings into the per-quarter filings, raw holdings, chosen reports and
-holdings tables."""
+"""Ingest: bulk ZIPs, live filings and pre-2013 (legacy) filings into the per-quarter filings, raw
+holdings, chosen reports and holdings tables."""
 
 import logging
 import tempfile
@@ -17,8 +17,17 @@ from orca.holdings import build_holdings, select_reports
 from orca.http import FetchError
 from orca.run.budget import Budget
 from orca.run.sources import Sources
-from orca.run.state import RAW_SCHEMA, REPORTS_SCHEMA, State, part_name, scan, strip_query
+from orca.run.state import (
+    RAW_SCHEMA,
+    REPORTS_SCHEMA,
+    State,
+    part_name,
+    scan,
+    scan_parts,
+    strip_query,
+)
 from orca.sec.bulk import parse_bulk_zip
+from orca.sec.legacy import CHECKS_SCHEMA, FAILED, SOURCE as LEGACY, STORED, index_quarters
 from orca.sec.live import FILINGS_SCHEMA
 from orca.storage import Lake, Manifest, sha256_file
 
@@ -27,6 +36,7 @@ log = logging.getLogger(__name__)
 LIVE_RECENT_BUSINESS_DAYS = 3  # a missing daily index this recent may only be late
 LIVE_FIRST_LOOKBACK_DAYS = 7  # first live read when there is no bulk data to start after
 LIVE_RETRY_DAYS = 28  # a day with a failed filing download is read again for four weeks
+LEGACY_CHECKS = "legacy_checks"  # one part per full-index quarter: each filing read and its check
 
 
 def live_watermark(since: date, until: date, no_index_days: Iterable[date]) -> date:
@@ -202,3 +212,123 @@ def ingest_live(
     counts.filings_parsed += filings.height
     counts.add("live", stats)
     return {"filings": filings.height, "failed": stats.get("failed_filings", 0)}
+
+
+def _originals(checks: pl.DataFrame) -> pl.DataFrame:
+    """(cik, period) of the original 13F-HR reports among `checks`, readable or not."""
+    return (
+        checks.filter((pl.col("form") == "13F-HR") & pl.col("period").is_not_null())
+        .select("cik", "period")
+        .unique()
+    )
+
+
+def _mark_unmarked(filings: pl.DataFrame, originals: pl.DataFrame) -> pl.DataFrame:
+    """Amendments with neither box checked, of a fund-quarter that also has an original report
+    (readable or not), get the type "unmarked", which `select_reports` ignores: only an unmarked
+    amendment with no original at all is the quarter's report (a filer that sent every report as
+    an amendment). Otherwise a partial amendment next to an unreadable original would read as the
+    whole book, and as a near-total sale."""
+    hit = originals.with_columns(_original=pl.lit(True))
+    return (
+        filings.join(hit, on=["cik", "period"], how="left")
+        .with_columns(
+            amendment_type=pl.when(
+                (pl.col("form") == "13F-HR/A")
+                & pl.col("amendment_type").is_null()
+                & pl.col("_original").fill_null(False)
+            )
+            .then(pl.lit("unmarked"))
+            .otherwise(pl.col("amendment_type"))
+        )
+        .drop("_original")
+    )
+
+
+def ingest_legacy(
+    lake: Lake,
+    sources: Sources,
+    state: State,
+    flags: list,
+    counts: Counts,
+    budget: Budget,
+    reserve: float = 0.0,
+) -> dict | None:
+    """Ingest the pre-2013 full-index quarters not read yet (`state.legacy_done`), oldest first,
+    until only `reserve` minutes of the time budget are left; a quarter is recorded only once its
+    rows and checks are stored, so one cut short is read again whole next run (its legacy rows are
+    replaced). Filings already stored from the bulk data sets or the live feed are not downloaded.
+    A quarter with failed downloads is listed in `state.legacy_retry`, and the next run asks for
+    those filings once more (only those), after the quarters not read yet. A failed index or SEC
+    throttling stops the stage for this run and is flagged. Returns the counts to log."""
+    if sources.legacy_quarter is None:
+        return None
+    todo = [key for key in index_quarters() if key not in state.legacy_done]
+    todo += sorted(state.legacy_retry & state.legacy_done)
+    if not todo:
+        return None
+    known = {
+        a
+        for frame in scan_parts(
+            lake,
+            "filings",
+            lambda f: f.filter(pl.col("source") != LEGACY).select("accession"),
+        )
+        for a in frame["accession"].to_list()
+    }
+    # Fund-quarters with an original 13F-HR read (stored or not), for `_mark_unmarked`.
+    originals = _originals(
+        pl.concat([lake.read(LEGACY_CHECKS, part=p).cast(CHECKS_SCHEMA) for p in lake.parts(LEGACY_CHECKS)])
+        if lake.parts(LEGACY_CHECKS)
+        else pl.DataFrame(schema=CHECKS_SCHEMA)
+    )
+    done = {"quarters": 0, "read": 0, "stored": 0, "failed": 0}
+    for key in todo:
+        if budget.minutes_left() <= reserve:
+            budget.cut("legacy")
+            break
+        stats: dict = {}
+        retry = key in state.legacy_done
+        old = lake.read(LEGACY_CHECKS, part=key) if retry else pl.DataFrame(schema=CHECKS_SCHEMA)
+        read_before = set(old.filter(pl.col("status") != FAILED)["accession"].to_list())
+        try:
+            filings, raw, checks = sources.legacy_quarter(key, known | read_before, stats)
+        except FetchError as err:
+            flags.append(
+                {"type": "legacy_failed", "quarter": key, "url": strip_query(err.url), "status": err.status}
+            )
+            break
+        checks = checks.cast(CHECKS_SCHEMA)
+        originals = pl.concat([originals, _originals(checks)]).unique()
+        filings = _mark_unmarked(filings, originals)
+        state.pending_funds |= ingest(lake, filings, raw, LEGACY, counts)
+        statuses = checks["status"]
+        if retry:  # this read's rows replace the failed ones
+            read_now = checks["accession"].to_list()
+            keep = old.cast(CHECKS_SCHEMA).filter(~pl.col("accession").is_in(read_now))
+            lake.write(LEGACY_CHECKS, pl.concat([keep, checks]), part=key)
+        else:
+            lake.write(LEGACY_CHECKS, checks, part=key)
+        state.legacy_done.add(key)
+        if retry or not (statuses == FAILED).any():
+            state.legacy_retry.discard(key)  # one retry only: a filing refused twice is let go
+        else:
+            state.legacy_retry.add(key)
+        state.save(lake)  # only now: a crash before re-reads the quarter
+        counts.filings_parsed += filings.height
+        done["quarters"] += 1
+        done["read"] += checks.height
+        done["stored"] += int(statuses.is_in(list(STORED)).sum())
+        done["failed"] += int((statuses == FAILED).sum())
+        log.info(
+            "legacy %s: %d filings, %d already stored, %d read, %d stored; %s",
+            key,
+            stats.get("entries", 0),
+            stats.get("skipped", 0),
+            checks.height,
+            filings.height,
+            dict(sorted(statuses.value_counts().iter_rows())),
+        )
+    if done["failed"]:
+        flags.append({"type": "legacy_downloads_failed", "count": done["failed"]})
+    return done

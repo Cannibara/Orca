@@ -30,8 +30,9 @@ from orca.quarters import q_end, q_of_date
 from orca.run.budget import Budget
 from orca.run.compute import Context, compute_batch
 from orca.run.gates import check_health
-from orca.run.ingest import Counts, ingest_bulk, ingest_live
+from orca.run.ingest import Counts, ingest_bulk, ingest_legacy, ingest_live
 from orca.run.market import (
+    backfill_price_heads,
     map_new_cusips,
     refresh_prices,
     remap_held_cusips,
@@ -63,6 +64,7 @@ from orca.run.state import (
     drop_parts,
     dump,
     load_published,
+    part_paths,
     published_path,
     read_table,
     scan,
@@ -70,6 +72,7 @@ from orca.run.state import (
     undump,
     write_json_atomic,
 )
+from orca.sec.legacy import index_quarters
 from orca.sec.live import FILINGS_SCHEMA
 from orca.storage import Lake
 
@@ -77,6 +80,7 @@ log = logging.getLogger(__name__)
 
 DEADLINE_DAYS = 45  # a 13F is due 45 days after the quarter ends
 FUND_BATCH = 250  # funds computed and published per batch: only one fund's output is held at once
+FLOWS_ORDER = ("cik", "stock_id", "q")  # the order of `fund_flows` and of each of its run parts
 
 
 @dataclass(frozen=True)
@@ -249,7 +253,9 @@ def _publish_batch(
         done.metas[meta.fund_id], done.snaps[meta.fund_id] = meta, result.snapshot
         rows.append((meta.fund_id, dump(meta), dump(result.snapshot)))
         flows += [(meta.fund_id, p.stock_id, t.q, t.delta, t.px, t.shares_after) for p in result.output.positions for t in p.trades]
-    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row")
+    # Sorted, so the parts (batches follow the fund order) merge into `fund_flows` without a sort.
+    flows = pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row").sort(FLOWS_ORDER)
+    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), flows
 
 
 def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
@@ -261,9 +267,17 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     lake.write("fund_state", pl.concat([stored, fresh]).sort("cik"))
     drop_parts(lake, FUND_STATE_RUN)
     # The same for each fund's trades, which the sector scores replay (`run/sectors_step.score_funds`).
-    stored = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
-    stored = stored.clear() if clear else stored.filter(~pl.col("cik").is_in(sorted(replaced)))
-    lake.write("fund_flows", pl.concat([stored, scan(lake, FUND_FLOWS_RUN, FUND_FLOWS_SCHEMA)]).sort("cik", "stock_id", "q"))
+    # Streamed through disk: with the history from 1999 the table is ~85M rows, and merging it in
+    # memory took 10.6 GB of the runner's 16 (0.8 GB streamed). The stored table and the run's parts
+    # are each in FLOWS_ORDER and share no fund, so a sorted merge on the fund keeps that order.
+    fresh = [pl.scan_parquet(p).cast(FUND_FLOWS_SCHEMA) for p in part_paths(lake, FUND_FLOWS_RUN)]
+    merged = pl.concat(fresh) if fresh else pl.LazyFrame(schema=FUND_FLOWS_SCHEMA)
+    stored = lake.root / "fund_flows.parquet"
+    if stored.exists() and not clear:
+        kept = pl.scan_parquet(stored).cast(FUND_FLOWS_SCHEMA)
+        kept = kept.filter(~pl.col("cik").is_in(sorted(replaced)))
+        merged = kept.merge_sorted(merged, key="cik")
+    lake.sink("fund_flows", merged)
     drop_parts(lake, FUND_FLOWS_RUN)
 
 
@@ -347,6 +361,11 @@ def run_weekly(
         budget,
         lambda: refresh_prices(lake, sources, state, today, last_q, run_id, flags, budget),
     )
+    _stage(
+        "price history",
+        budget,
+        lambda: backfill_price_heads(lake, sources, state, run_id, flags, budget),
+    )
     _stage("rf", budget, lambda: update_rf(lake, sources, state, last_q, full, flags))
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
@@ -402,10 +421,12 @@ def run_weekly(
     )
 
     cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
-    priced = [metas[c].priced_pct for c in order]
+    # Active funds only: a fund that stopped filing before 2013 holds mostly companies gone since
+    # (valued at their reported value, so unpriced), and thousands of them would sink the median.
+    priced = [metas[c].priced_pct for c in order if not metas[c].inactive]
     if priced:
         log.info(
-            "health: median fund priced %.1f%% of its book, %d of %d funds under 90%%",
+            "health: median active fund priced %.1f%% of its book, %d of %d active funds under 90%%",
             100 * statistics.median(priced),
             sum(p < 0.9 for p in priced),
             len(priced),
@@ -474,6 +495,47 @@ def run_weekly(
         funds_recomputed=len(computed),
         flags=flags,
     )
+
+
+BACKFILL_RESERVE_MIN = 40.0  # left by the filings for the securities and price history after them
+SAVE_RESERVE_MIN = 5.0
+
+
+def run_backfill(
+    lake: Lake, sources: Sources, today: date, budget: Budget | None = None
+) -> tuple[dict, list]:
+    """The pre-2013 history, without computing or publishing anything: read the pre-2013 13F
+    filings (`ingest_legacy`) until BACKFILL_RESERVE_MIN minutes of the budget are left, map
+    their new CUSIPs and vendor tickers, then fetch the older prices of stocks stored since 2013
+    (`backfill_price_heads`) with what is left. Run it until it reports nothing left; the funds
+    it touches wait in `state.pending_funds` for the next ordinary run. Returns (counts, flags)."""
+    budget = Budget.from_env() if budget is None else budget
+    lake.root.mkdir(parents=True, exist_ok=True)
+    state = State.load(lake)
+    flags: list = []
+    counts = Counts()
+    done = ingest_legacy(
+        lake, sources, state, flags, counts, budget, reserve=BACKFILL_RESERVE_MIN
+    ) or {}
+    if not budget.spent():
+        done |= map_new_cusips(lake, sources, state, today, flags, budget) or {}
+        done |= resolve_vendor_tickers(lake, sources, state, today, flags, budget) or {}
+    run_id = today.strftime("%Y%m%d")
+    heads = backfill_price_heads(
+        lake, sources, state, run_id, flags, budget, reserve=SAVE_RESERVE_MIN
+    )
+    heads = heads or {"owed": 0, "fetched": 0, "empty": 0, "failed": 0}
+    done["price_history"] = heads
+    done["left"] = {  # what the next backfill would still do (the run is done at zero)
+        "quarters": len(set(index_quarters()) - state.legacy_done) + len(state.legacy_retry),
+        "price_histories": heads["owed"] - heads["fetched"] - heads["empty"],
+    }
+    state.save(lake)
+    for source, drops in sorted(counts.drops.items()):
+        flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
+    if budget.flag():
+        flags.append(budget.flag())
+    return done, flags
 
 
 def run_home(
@@ -551,12 +613,16 @@ def verify(
 ) -> list[str]:
     """Rebuild `sample` random published funds from the lake's raw filings (holdings rebuilt from
     scratch, not read from the incremental tables) into a temporary folder and return the paths
-    whose bytes differ from the published ones (or are missing either side)."""
+    whose bytes differ from the published ones (or are missing either side). Funds owed a
+    recompute (new filings or prices since their publish, such as a history backfill) are left
+    out: they differ until the next run publishes them."""
     state = State.load(lake)
     published = load_published(lake, out_root, compress)
     if state.last_q is None or not published:
         return []
-    ids = sorted({int(p.split("/")[1]) for p in published if p.startswith("fund/")})
+    ctx = Context.build(lake, state.last_q)
+    owed = _recompute_set(lake, ctx, state, state.last_q)
+    ids = sorted({int(p.split("/")[1]) for p in published if p.startswith("fund/")} - owed)
     chosen = sorted(random.Random(seed).sample(ids, min(sample, len(ids))))
     holdings, reports = [], []
     for part in lake.parts("filings"):
@@ -572,7 +638,6 @@ def verify(
         )
     rebuilt: dict[str, str] = {}
     if reports:
-        ctx = Context.build(lake, state.last_q)
         with tempfile.TemporaryDirectory() as tmp:
             for result in compute_batch(ctx, pl.concat(holdings), pl.concat(reports)):
                 rebuilt.update(publish_fund(Path(tmp), result.output, compress))

@@ -113,6 +113,22 @@ describe("position figures come from the as-of model at the newest quarter", () 
     expect(none.base.pos.trades).toEqual([]); // a stand-in position for the opened row
   });
 
+  it("keeps the position of a stock sold out before 2013 (negative quarters)", () => {
+    // bought 100 at $10 in Q1 1999 (q −56), sold all at $20 in Q3 2010 (q −10)
+    const old = sold(1, 1000, { from_q: -56, to_q: -10, last_q: -10, trades: [trade(-56, 100, 10, 100), trade(-10, -100, 20, 0)] });
+    const row = build({
+      positions: [old],
+      exits: exitsOf([{ stock_id: 1, sold_shares: 100, sold_usd: 2000 }]),
+      summary: summaryOf({ tracked_since_q: -56 }),
+      prices: pricesOf({ 1: 40 }),
+    })[0];
+    expect(row.hasPos).toBe(true);
+    expect([row.ac, row.ax, row.ret]).toEqual([10, 20, 1]);
+    const days = (Date.UTC(2010, 7, 15) - Date.UTC(1999, 1, 14)) / 86_400_000; // mid Q1 1999 to mid Q3 2010
+    expect(row.irr()).toBeCloseTo(Math.pow(2, 365 / days) - 1, 9);
+    expect(row.last).toMatchObject({ tag: "exit", q: -10, exact: false });
+  });
+
   it("names a stock the securities file does not know by its id", () => {
     const row = build({ exits: exitsOf([{ stock_id: 77777, sold_shares: 10, sold_usd: 100 }]), stocks: new Map() })[0];
     expect(row.ticker).toBe("#77777");

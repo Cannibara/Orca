@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { niceTicks } from "./geometry";
+import { qOfYear } from "../lib/format";
 import { midQuarterMs, tradeMove } from "../lib/live";
 import { qLabelFull, fM, MINUS } from "./fmt";
 import { useWeekly } from "./usePositionData";
@@ -42,8 +43,8 @@ function Chart({
   const iw = Math.max(120, W - ML - MR);
   const ih = H - MT - MB;
   // From a year before the fund first held the stock.
-  const q0 = Math.max(0, row.from - 4);
-  const i0 = Math.max(0, Math.floor((Date.UTC(2013 + Math.floor(q0 / 4), (q0 % 4) * 3, 1) - t0) / STEP));
+  const q0 = row.from - 4;
+  const i0 = Math.max(0, Math.floor((Date.UTC(2013 + Math.floor(q0 / 4), qOfYear(q0) * 3, 1) - t0) / STEP));
   const i1 = n - 1;
   let lo = Infinity;
   let hi = -Infinity;

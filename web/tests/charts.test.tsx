@@ -297,6 +297,19 @@ describe("StepChart", () => {
     expect(container.querySelectorAll("line.qtick")).toHaveLength(0);
   });
 
+  test("a holding before 2013 (negative quarters) keeps its lead-in and its years", () => {
+    // Bought in Q1 1999 (q −56), sold in Q3 2000 (q −50): lead-in from q −58 (Q3 1998) to endQ −48, 11 quarters.
+    const { container } = withTip(<StepChart quarters={[-56, -50]} shares={[1000, 0]} endQ={-48} />);
+    const axis = Array.from(container.querySelectorAll("text.ax")).map((t) => t.textContent);
+    expect(axis).toEqual(expect.arrayContaining(["1999", "2000", "2001"]));
+    expect(container.querySelectorAll("line.qtick")).toHaveLength(12);
+    const overlay = container.querySelector("rect.overlay")!;
+    fireEvent.pointerMove(overlay, { clientX: SL + ((-56 + 0.5 + 58) / 11) * SW, clientY: 40 });
+    expect(tipEl().querySelector(".t")!.textContent).toBe("Q1 1999");
+    expect(tipEl().querySelector(".v")!.textContent).toBe("shares held1,000");
+    expect(container.innerHTML).not.toContain("NaN");
+  });
+
   test("renders with nothing to draw", () => {
     const { container } = render(<StepChart quarters={[]} shares={[]} />);
     expect(container.innerHTML).not.toContain("NaN");

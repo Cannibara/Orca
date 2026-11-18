@@ -80,7 +80,7 @@ def test_tbill_request_asks_fred_for_dtb3_since_2013_with_the_key_as_a_parameter
     assert dict(request.url.params) == {
         "series_id": "DTB3",
         "file_type": "json",
-        "observation_start": "2013-01-01",
+        "observation_start": "1999-01-01",
         "api_key": KEY,
     }
 

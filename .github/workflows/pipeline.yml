@@ -22,6 +22,10 @@ name: Pipeline
 # gate (orca/run/gates.py) and publishes nothing; run again. Then set ORCA_SCHEDULE_ENABLED to "true":
 # the cron entries below do nothing until it is.
 #
+# Pre-2013 history (1999 to mid-2013, read from the old text filings): run with `backfill` by hand
+# until the run's last line says `"left": {"price_histories": 0, "quarters": 0}` (about two runs), then
+# run once without it, which computes and publishes the funds it touched (maybe over two runs).
+#
 # The R2 credentials can write the private lake (it holds CUSIPs) and the public site, so only the
 # steps that run rclone get them (the restore-r2 action and the two upload steps below): not the
 # third-party actions, the dependency install or the pipeline process. Both jobs run in the
@@ -50,6 +54,10 @@ on:
         default: false
       sectors_only:
         description: Sector indices and fund scores only (share counts, indices, scores; nothing published)
+        type: boolean
+        default: false
+      backfill:
+        description: Pre-2013 history only (read old 13F filings and older prices into the lake; publishes nothing)
         type: boolean
         default: false
 
@@ -123,7 +131,8 @@ jobs:
       - name: Run the pipeline
         timeout-minutes: 300
         env:
-          ORCA_COMMAND: ${{ inputs.sectors_only && 'sectors' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly')) }}
+          ORCA_COMMAND: ${{ inputs.backfill && 'backfill' || (inputs.sectors_only && 'sectors' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly'))) }}
+          ORCA_INPUTS: ${{ format('{0}{1}{2}{3}', inputs.backfill && 'b' || '', inputs.sectors_only && 's' || '', inputs.home_only && 'h' || '', inputs.full && 'f' || '') }}
           ORCA_TIME_BUDGET_MIN: ${{ vars.ORCA_TIME_BUDGET_MIN || '270' }}
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
@@ -131,6 +140,11 @@ jobs:
           TIINGO_RATE_PER_SEC: ${{ vars.TIINGO_RATE_PER_SEC }}
           FRED_KEY: ${{ secrets.FRED_KEY }}
         run: |
+          # The inputs choose one command: two at once would silently run only one of them.
+          if [ "${#ORCA_INPUTS}" -gt 1 ]; then
+            echo "::error::choose at most one of full, home_only, sectors_only and backfill"
+            exit 1
+          fi
           # If memory runs out, the kernel kills the pipeline rather than the runner, so the lake
           # is still saved (a runner that dies takes the save step with it).
           echo 1000 > /proc/self/oom_score_adj
@@ -144,6 +158,8 @@ jobs:
           trap 'kill "$monitor"' EXIT
           uv run --locked --no-dev python -m orca.run "$ORCA_COMMAND"
       - name: Upload the changed files, then the manifest
+        # A backfill publishes nothing: its funds are computed by the next ordinary run.
+        if: ${{ !inputs.backfill }}
         env:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -189,6 +205,7 @@ jobs:
       - name: Clear the Cloudflare cache
         # Only after the upload succeeded (a failed upload leaves the cache holding the old, consistent
         # files). A failure here fails the run, but the next step runs whatever happens to this one.
+        if: ${{ !inputs.backfill }}
         env:
           CF_PURGE_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
           CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
@@ -328,8 +345,8 @@ jobs:
         # After the monthly run is published and saved, so these draft steps can never cost that run: they may
         # fail (continue-on-error) and only their own tables are saved. Run 27 lost its runner with them inside
         # the monthly run; run 28 lost it seconds into scoring, before anything was saved, so the indices are
-        # now saved before the scores start. The sectors_only input runs the whole job as the main command.
-        if: steps.save.outcome == 'success' && !inputs.home_only && !inputs.sectors_only
+        # now saved before the scores start. Skipped after a backfill. The sectors_only input runs the whole job as the main command.
+        if: steps.save.outcome == 'success' && !inputs.home_only && !inputs.sectors_only && !inputs.backfill
         continue-on-error: true
         timeout-minutes: 60
         env:

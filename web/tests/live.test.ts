@@ -134,6 +134,12 @@ test("mid-quarter dates follow the workbook's rule", () => {
   expect([iso(4), iso(5), iso(6), iso(7), iso(12)]).toEqual(["2014-02-14", "2014-05-16", "2014-08-15", "2014-11-15", "2016-02-15"]);
 });
 
+test("mid-quarter dates before 2013 (negative quarter index) fall in the right quarter", () => {
+  const iso = (q: number) => new Date(midQuarterMs(q)).toISOString().slice(0, 10);
+  expect([iso(-56), iso(-4), iso(-3), iso(-2), iso(-1)]).toEqual(["1999-02-14", "2012-02-15", "2012-05-16", "2012-08-15", "2012-11-15"]);
+  expect(tradeYears(-1)).toBeCloseTo(-47 / 365, 12); // 2012-11-15 is 47 days before 2013-01-01
+});
+
 test("IRR counts days ÷ 365 like XIRR", () => {
   // buy 100 on 2014-02-14 (q=4), worth 110 on 2015-02-14: exactly 365 days
   const t1 = (Date.UTC(2015, 1, 14) - Date.UTC(2013, 0, 1)) / (365 * 86_400_000);

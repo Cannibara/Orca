@@ -171,6 +171,16 @@ def test_amendment_of_unknown_type_is_ignored():
     assert rows_of(build_holdings(filings, raws), "cusip") == [("AAA",)]
 
 
+def test_a_lone_text_amendment_of_unknown_type_is_the_quarters_report():
+    lone = filing(B, date(2012, 3, 1), form="13F-HR/A", amendment_type=None, source="legacy")
+    raws = raw_frame(raw(B, "BBB", 2)).with_columns(source=pl.lit("legacy"))
+    assert rows_of(build_holdings(filings_frame(lone), raws), "cusip") == [("BBB",)]
+
+    # An XML amendment always states its type: one that does not is still ignored.
+    xml = filing(B, date(2024, 3, 1), form="13F-HR/A", amendment_type=None)
+    assert build_holdings(filings_frame(xml), raw_frame(raw(B, "BBB", 2))).height == 0
+
+
 @pytest.mark.parametrize("reverse", [False, True])
 def test_latest_original_wins_when_refiled(reverse):
     rows = [filing(A, date(2024, 2, 10)), filing(B, date(2024, 2, 20))]
@@ -582,3 +592,22 @@ def test_without_filed_quarters_a_quarter_without_rows_counts_as_unfiled():
     filled, _ = fill_gaps(holdings, last_q=12)  # same as before: q11 carried
 
     assert filled.filter(pl.col("carried"))["q"].to_list() == [11]
+
+
+def test_unreadable_filings_are_carried_two_at_most():
+    # Read in q10 and q14; q11-q12 filed but unreadable, q13 a real gap: one history, carried.
+    holdings = held_frame(held(CIK, 10), held(CIK, 14))
+    unreadable = pl.DataFrame({"cik": [CIK, CIK], "q": [11, 12]}, schema={"cik": pl.Int64, "q": pl.Int16})
+    filled, status = fill_gaps(holdings, last_q=14, unreadable=unreadable)
+    assert status["segments"].to_list() == [[{"start": 10, "end": 14}]]
+    assert sorted(filled.filter(pl.col("carried"))["q"].to_list()) == [11, 12, 13]
+
+    # Three unreadable in a row cut the history, as a gap of two does.
+    three = pl.DataFrame({"cik": [CIK] * 3, "q": [11, 12, 13]}, schema={"cik": pl.Int64, "q": pl.Int16})
+    _, status = fill_gaps(holdings, last_q=14, unreadable=three)
+    assert status["segments"].to_list() == [[{"start": 10, "end": 10}, {"start": 14, "end": 14}]]
+
+    # Unreadable quarters before the first readable one are not carried (nothing to carry).
+    before = pl.DataFrame({"cik": [CIK], "q": [9]}, schema={"cik": pl.Int64, "q": pl.Int16})
+    filled, status = fill_gaps(holdings, last_q=14, unreadable=before)
+    assert 9 not in filled["q"].to_list()
