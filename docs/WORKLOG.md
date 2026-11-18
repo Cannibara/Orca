@@ -5,6 +5,16 @@ Last verified: 2026-11-18
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-18 — Pre-2013 backfill done and live; SEC CUSIP-list check tested and dropped
+
+| What changed | Why | Files |
+|---|---|---|
+| PR #42 merged (12b40b8). Three `backfill` runs (29, 32, 33): 163,150 legacy filings read, 148,221 stored (91%), 39,975 securities added, every price history fetched; peak memory ~2.6 GB. Ordinary run 34 recomputed all 16,117 funds in one run; Berkshire's published history starts Q4 1998 (q −57) | Owner: merge and start the backfill | — |
+| Tested the SEC's Official List of Section 13(f) Securities (1999–2013, ~25,000 CUSIPs; 2002–2003 scans partly unreadable) on sample filings the reader rejects: rescuing codes the list confirms turns 10 of 181 famous-fund and 2 of 153 random-fund rejects into checked filings (+0.4 / +0.1 pts stored) and leaves 296 good filings unchanged; dropping codes not on the list broke 10 of 300 good filings. Not adopted | Owner: too small a change. Most rejects have the right codes; their numbers do not match the filer's own totals | — |
+| Researched how others handle pre-2013 13Fs: WhaleWisdom (from 2001, automated, user error reports), Dataroma (~80 managers, from 2006), GuruFocus (from 2008), 13f.info (from Q4 2013), Thomson/LSEG S34 (from 1980; WRDS, academic only, no commercial use), free academic parses (Backus–Conlon–Sinkinson 1999–2017, elsaifym 1999–2020, no licence) | Owner asked whether anyone cleaned the data | — |
+
+- Open: hand-curated fixes for famous funds' rejected filings (~180 filings for 40 funds; Harris, Renaissance, Kahn Brothers, Markel) if the owner wants them.
+
 ## 2026-11-18 — Run 28: monthly run fine, sector scores lost the runner; chunks by trades
 
 | What changed | Why | Files |

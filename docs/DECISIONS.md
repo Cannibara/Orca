@@ -6,6 +6,10 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-18 — No SEC 13(f)-list check on pre-2013 CUSIPs (owner)
+- Decision (chat): the SEC's quarterly list of 13(f) securities is not used to rescue or filter legacy CUSIPs. Measured on 140 sample funds: +0.4 points of famous-fund filings stored, +0.1 for random funds; filtering by the list breaks good filings (the list has gaps).
+- Context: no cleaned public version of pre-2013 13F data exists; the SEC never converted the text filings (XML from 20 May 2013) and, per its Inspector General (2010, report 480), did not review 13F filings. Thomson/LSEG S34 is academic-only via WRDS.
+
 ## 2026-11-17 — Pre-2013 13F history read from the old text filings
 - Decision: read every 13F-HR and 13F-HR/A filed on EDGAR from 1999 to the XML switch in mid-2013 (source `legacy`), find each row by its CUSIP check digit, and store a filing only if its table agrees with the filer's own declared entry count or value total (or declares none); prices and T-bills go back to 1999 (owner: "fully utilise pre-2013 SEC 13F data"; spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`) (chat)(code).
 - Context: the bulk data sets start with 2013 Q2 filings, so even Q1 2013 was missing (Berkshire's history began Q2 2013). On a 607-filing sample, 89.8% of text filings are stored: 77.3% agree with the filer's totals and 12.5% declare none to check (code `sec/legacy.py`).
