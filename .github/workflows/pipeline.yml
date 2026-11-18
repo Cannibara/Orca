@@ -341,28 +341,30 @@ jobs:
             exit 1
           fi
       - id: sectors
-        name: Sector indices and fund scores (draft, lake only)
-        # After the monthly run is published and saved, so this draft step can never cost that run: it may
-        # fail (continue-on-error) and only its own tables are saved below. Run 27 (2026-11-17) lost its
-        # runner with these steps inside the monthly run. The sectors_only input runs it as the main command.
+        name: Sector indices (draft, lake only)
+        # After the monthly run is published and saved, so these draft steps can never cost that run: they may
+        # fail (continue-on-error) and only their own tables are saved. Run 27 lost its runner with them inside
+        # the monthly run; run 28 lost it seconds into scoring, before anything was saved, so the indices are
+        # now saved before the scores start. Skipped after a backfill. The sectors_only input runs the whole job as the main command.
         if: steps.save.outcome == 'success' && !inputs.home_only && !inputs.sectors_only && !inputs.backfill
         continue-on-error: true
-        timeout-minutes: 120
+        timeout-minutes: 60
         env:
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
           TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
           FRED_KEY: ${{ secrets.FRED_KEY }}
+          PART: indices
         run: |
           echo 1000 > /proc/self/oom_score_adj
           (
-            while sleep 60; do
+            while sleep 30; do
               echo "resources: memory $(free -m | awk 'NR==2 {print $3 " of " $2 " MB"}'), disk $(df -h --output=used,avail . | tail -n 1 | xargs) used/free"
             done
           ) &
           monitor=$!
           trap 'kill "$monitor"' EXIT
-          uv run --locked --no-dev python -m orca.run sectors
+          uv run --locked --no-dev python -m orca.run sectors --part "$PART"
       - name: Save the sector tables
         if: steps.sectors.outcome == 'success'
         env:
@@ -373,10 +375,37 @@ jobs:
           for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
             export "$v=${!v//[[:space:]]/}"
           done
-          # Only the tables the step writes: copy, never sync, so nothing else in the bucket changes.
+          # Only the tables these steps write: copy, never sync, so nothing else in the bucket changes.
           rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "shares_hist.parquet" --include "sector_returns.parquet" \
-            --include "stock_quarters.parquet" --include "fund_skill.parquet" --include "etf_ranks.parquet"
-
+            --include "stock_quarters.parquet"
+      - id: scores
+        name: Fund scores (draft, lake only)
+        if: steps.sectors.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 60
+        env:
+          PART: scores
+        run: |
+          echo 1000 > /proc/self/oom_score_adj
+          (
+            while sleep 30; do
+              echo "resources: memory $(free -m | awk 'NR==2 {print $3 " of " $2 " MB"}'), disk $(df -h --output=used,avail . | tail -n 1 | xargs) used/free"
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor"' EXIT
+          uv run --locked --no-dev python -m orca.run sectors --part "$PART"
+      - name: Save the score tables
+        if: steps.scores.outcome == 'success'
+        env:
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
+          rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "fund_skill.parquet" --include "etf_ranks.parquet"
   verify:
     # These strings must equal the cron entries above.
     if: github.event.schedule == '41 7 1 * *' && vars.ORCA_SCHEDULE_ENABLED == 'true'

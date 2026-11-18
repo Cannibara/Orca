@@ -138,13 +138,19 @@ def fund_scores(
     nosector: set[str],
     spy_id: int | None,
     last_q: int,
+    series: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """(scores: cik, tier, irr_fund, irr_label, irr_mkt, picking, allocation, coverage, n; dropped positions)."""
+    """(scores: cik, tier, irr_fund, irr_label, irr_mkt, picking, allocation, coverage, n; dropped positions).
+
+    `series` (own and label series) can be passed in when scoring many chunks; one tier is replayed at a time."""
     trades = trades.filter(pl.col("q") <= last_q)
     bought = trades.filter(pl.col("delta") > 0).group_by("cik").agg((pl.col("delta") * pl.col("px")).sum().alias("bought"))
     spy_key = f"s{spy_id}" if spy_id is not None else MARKET
-    keyed = []
+    if series is None:
+        series = pl.concat([own_series(sq), label_series(sector_returns)])
+    all_flows, all_bad = [], []
     for tier in TIERS:
+        keyed = []
         label = {}
         for sid, path in stock_paths.items():
             label[sid] = spy_key if path in nosector else _label_at(path, tier)
@@ -156,10 +162,14 @@ def fund_scores(
         picks = picks.join(lab, on="stock_id").with_columns(tier=pl.lit(tier, pl.Int8))
         for variant, key in (("fund", "s" + pl.col("stock_id").cast(pl.String)), ("label", pl.col("_label")), ("mkt", pl.lit(MARKET))):
             keyed.append(picks.with_columns(key=key, variant=pl.lit(variant)).drop("_label"))
-    series = pl.concat([own_series(sq), label_series(sector_returns)])
-    flows, dropped = replay(pl.concat(keyed), series, last_q, by=("tier", "variant"))
-    bad = dropped.select("cik", "stock_id", "tier").unique()
-    flows = flows.join(bad, on=["cik", "stock_id", "tier"], how="anti")
+        tier_flows, dropped = replay(pl.concat(keyed), series, last_q, by=("tier", "variant"))
+        bad = dropped.select("cik", "stock_id", "tier").unique()
+        # collapse to one row per (fund, tier, variant, time) at once: the IRR needs no more
+        all_flows.append(
+            tier_flows.join(bad, on=["cik", "stock_id", "tier"], how="anti").group_by("cik", "stock_id", "tier", "variant", "t").agg(pl.col("cf").sum())
+        )
+        all_bad.append(bad)
+    flows, bad = pl.concat(all_flows), pl.concat(all_bad)
     irr = irr_by(flows, ["cik", "tier", "variant"]).pivot("variant", index=["cik", "tier"], values="irr")
     for v in ("fund", "label", "mkt"):
         if v not in irr.columns:

@@ -136,7 +136,9 @@ def build_sector_returns(
     sq = pl.concat(parts)
     lake.write("stock_quarters", sq.select("stock_id", "q", "close", "div", "vwap"))
     sq = sq.filter(pl.col("stock_id").is_in(stocks["stock_id"].to_list()))
-    caps, fallback = market_caps(sq, read_table(lake, "shares_hist", SHARES_SCHEMA), securities, adr)
+    hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
+    caps, fallback = market_caps(sq, hist, securities, adr)
+    _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr)  # the health figure: today only
     sq = sq.join(caps, on=["stock_id", "q"], how="left").select(*QUARTER_SCHEMA.names()).cast(QUARTER_SCHEMA)
     out = index_returns(sq, paths, last_q)
     lake.write("sector_returns", out)
@@ -149,15 +151,29 @@ def build_sector_returns(
         "by_how": dict(sorted(Counter(how[s] for s in used).items())),
         "labels": out["label"].n_unique(),
         "unlabelled_cap_share": round(unlabelled / total, 4),
-        "fallback_caps": len(fallback & used),
-        "fallback_cap_share": round(latest.filter(pl.col("stock_id").is_in(list(fallback)))["cap"].sum() / total, 4),
+        "fallback_caps": len(fallback & used),  # used today's count in at least one quarter
+        "fallback_cap_share": round(latest.filter(pl.col("stock_id").is_in(list(fallback_now)))["cap"].sum() / total, 4),  # in the last quarter
     }
     flags.append({"type": "sector_returns", **{k: v for k, v in stats.items() if k != "by_how"}})
     log.info("sector_returns: %s", stats)
     return stats
 
 
-SKILL_CHUNK = 200  # funds per replay: bounds memory
+SKILL_TRADES = 300_000  # trades per replay chunk: a few giant funds hold millions, so chunk by trades, not funds
+
+
+def trade_chunks(counts: dict[int, int], max_trades: int = SKILL_TRADES) -> list[list[int]]:
+    """CIKs (in order) grouped so each group holds at most `max_trades` trades; a bigger fund is a group alone.
+    Run 28 lost its runner seconds into scoring with chunks of 200 funds each."""
+    chunks: list[list[int]] = []
+    size = 0
+    for cik, n in counts.items():
+        if not chunks or size + n > max_trades:
+            chunks.append([])
+            size = 0
+        chunks[-1].append(cik)
+        size += n
+    return chunks
 
 
 def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
@@ -184,11 +200,14 @@ def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
     paths, _, _ = stock_paths(stocks, labels, sic)
     spy = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)).get(BENCHMARK_CUSIP)
     nosector = {n.path for n in h.nosector}
-    ciks = flows["cik"].unique().sort().to_list()
+    counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
+    series = pl.concat([skill.own_series(sq), skill.label_series(sector)])
     scores, ranks, dropped = [], [], 0
-    for i in range(0, len(ciks), SKILL_CHUNK):
-        part = flows.filter(pl.col("cik").is_in(ciks[i : i + SKILL_CHUNK]))
-        got, bad = skill.fund_scores(part, sq, sector, paths, etfs, nosector, spy, last_q)
+    for n, chunk in enumerate(trade_chunks(counts)):
+        part = flows.filter(pl.col("cik").is_in(chunk))
+        got, bad = skill.fund_scores(part, sq, sector, paths, etfs, nosector, spy, last_q, series=series)
+        if n % 10 == 0:
+            log.info("skill: chunk %d, %d funds, %d trades, peak %d MB", n, len(chunk), part.height, peak_mb())
         scores.append(got)
         ranks.append(skill.etf_ranks(part, sector, etfs, last_q))
         dropped += bad.height
@@ -210,11 +229,12 @@ def peak_mb() -> int:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
 
-def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90) -> dict:
+def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90, part: str = "all") -> dict:
     """`orca.run sectors`: share-count history (when `fetch_shares` is given), the indices and the scores, from
     the lake. Its own workflow step after the monthly run's lake is saved (so it can never cost that run), and
-    the whole job after a relabel (`sectors_only`). No fund compute, nothing published; it uses the quarter of
-    the last run."""
+    the whole job after a relabel (`sectors_only`). `part` = "indices" (share counts and indices) or "scores"
+    (fund scores) runs one half, so the workflow saves the indices before scoring starts. No fund compute,
+    nothing published; it uses the quarter of the last run."""
     import gc
 
     from orca.run.state import State
@@ -225,6 +245,10 @@ def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, min
     flags: list = []
     budget = Budget(minutes)
     out: dict = {"flags": flags}
+    if part == "scores":
+        out["skill"] = score_funds(lake, last_q, flags)
+        log.info("skill: peak %d MB", peak_mb())
+        return out
     if fetch_shares is not None:
         securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
         out["shares"] = update_share_history(lake, fetch_shares, securities, flags, budget, date.today())
@@ -233,6 +257,8 @@ def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, min
     out["sectors"] = build_sector_returns(lake, last_q, flags)
     gc.collect()
     log.info("sectors: peak %d MB", peak_mb())
+    if part == "indices":
+        return out
     out["skill"] = score_funds(lake, last_q, flags)
     log.info("skill: peak %d MB", peak_mb())
     return out
