@@ -9,7 +9,9 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `null` means missing (unknown, not applicable, or not computable). NaN and infinity are never published.
 - Arrays are column-oriented: `{"col": [...]}`, and all columns of one block have the same length, row `i`
   being the `i`-th entry of each. The home lists are the exception: small row-oriented lists (see Home).
-- Quarters are integers: `q = (year − 2013) × 4 + (quarter − 1)`, so Q1 2013 is 0 and Q2 2026 is 53.
+- Quarters are integers: `q = (year − 2013) × 4 + (quarter − 1)`, so Q1 2013 is 0 and Q2 2026 is 53. Quarters
+  before 2013 are negative: the history starts at Q1 1999 (−56), from the SEC's pre-2013 text filings. A
+  reader must use floor division and a non-negative remainder (`((q % 4) + 4) % 4` in JavaScript).
 - Dates are ISO `YYYY-MM-DD` strings. Returns and percentages are fractions (`0.12` is 12%), except
   `points` (percentage points of the fund's book) and `change_pts` / `headline_change_pts` (percentage points).
 - Funds are identified by `fund_id`, stocks by `stock_id`. No CUSIP appears in any file.
@@ -174,5 +176,5 @@ fund's name.
   maps the path of every published file (except `manifest.json`) to the sha256 of its bytes as stored.
 - `health.json`: `filings_parsed` and `funds_recomputed` are counts for the run, `unmapped_cusips` is a count of
   securities that could not be mapped (the CUSIPs themselves are never published), `coverage_median` is the
-  median `priced_pct` (or `null`), and `flags` is a list of strings or objects describing data-quality
+  median `priced_pct` of the active funds (or `null`), and `flags` is a list of strings or objects describing data-quality
   findings; each names funds and stocks by id.

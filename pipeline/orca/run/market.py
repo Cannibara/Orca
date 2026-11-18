@@ -12,8 +12,11 @@ import polars as pl
 from orca.http import FetchError
 from orca.prices import TABLE as PRICES_TABLE
 from orca.prices import (
+    HISTORY_START,
     drop_stocks,
     compact_prices,
+    fetch_heads,
+    first_dates,
     last_dates,
     part_stocks,
     price_runs,
@@ -22,6 +25,7 @@ from orca.prices import (
     update_prices,
 )
 from orca.quarters import q_end, q_of_date, q_start
+from orca.rf import FIRST_YEAR
 from orca.run.budget import Budget
 from orca.run.sources import Sources
 from orca.run.state import (
@@ -38,8 +42,11 @@ from orca.securities import (
     ERROR,
     OPENFIGI,
     SEC_TICKERS_SCHEMA,
+    UNLISTED,
+    UNMAPPED,
     assign_stock_ids,
     map_cusips,
+    map_unlisted,
     normalise_name,
     normalise_ticker,
     sector_for_sic,
@@ -60,7 +67,7 @@ REMAP_PER_RUN = 2000  # ... at most this many a run (20 requests with a key)
 # asked of OpenFIGI once (lake table US_TICKERS_TABLE), at most this many a run.
 US_TICKERS_TABLE = "figi_us_tickers"
 US_TICKERS_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "tried": pl.Date})
-US_TICKERS_PER_RUN = 1000
+US_TICKERS_PER_RUN = 10_000  # 100 requests with a key; the pre-2013 history brings thousands
 # More stocks than this losing their vendor ticker in one run means the vendor's list is broken,
 # not that tickers were corrected: nothing is dropped and the stored table is kept (flagged).
 MAX_VENDOR_LOST = 2000
@@ -122,10 +129,20 @@ def map_new_cusips(
     new += due
     if not new:
         return
+    # A CUSIP first held before 2013 that OpenFIGI does not find is usually a company gone since:
+    # it is asked again with delisted securities included, never matched by name (old General
+    # Motors' name is new GM's, and would merge the two).
+    before = set(held.filter(pl.col("q") < 0)["cusip"].to_list())
+    unlisted_figis: set[str] = set()
     try:
         tickers = sources.sec_tickers()
-        issuers = issuer_names(lake, new)
+        issuers = issuer_names(lake, [c for c in new if c not in before])
         mapped = map_cusips(new, issuers, sources.figi, tickers)
+        gone = mapped.filter((pl.col("method") == UNMAPPED) & pl.col("cusip").is_in(before))
+        if gone.height:
+            again = map_unlisted(gone["cusip"].to_list(), sources.figi)
+            mapped = pl.concat([mapped.filter(~pl.col("cusip").is_in(gone["cusip"].to_list())), again])
+            unlisted_figis = set(again.filter(pl.col("method") == UNLISTED)["figi"].to_list())
     except FetchError as err:
         flags.append(
             {
@@ -151,7 +168,7 @@ def map_new_cusips(
     securities = pl.concat(
         [
             securities.filter(pl.col("stock_id") <= old_max),
-            enrich(added, sources, tickers, state, flags, budget),
+            enrich(added, sources, tickers, state, flags, budget, unlisted_figis),
         ]
     )
 
@@ -198,14 +215,18 @@ def enrich(
     state: State,
     flags: list,
     budget: Budget,
+    no_cik: frozenset[str] | set[str] = frozenset(),
 ) -> pl.DataFrame:
     """Company CIK (from the SEC ticker list), SIC code, sector and shares outstanding of new
     securities. A failed lookup is flagged and left empty, and so is every lookup once the time
-    budget is spent; those securities go to `state.lookup_retry` for a later run."""
+    budget is spent; those securities go to `state.lookup_retry` for a later run. Securities whose
+    FIGI is in `no_cik` (companies gone since: today's holder of their old ticker is someone
+    else) get no CIK and so no lookups."""
     cik_of = {t: c for t, c in tickers.select("ticker", "cik").iter_rows()}
     rows = []
     for row in added.iter_rows(named=True):
-        cik = cik_of.get(normalise_ticker(row["ticker"])) if row["ticker"] else None
+        known = row["ticker"] and row["figi"] not in no_cik
+        cik = cik_of.get(normalise_ticker(row["ticker"])) if known else None
         sic = shares = None
         if cik is not None and budget.spent():
             budget.cut("securities")
@@ -444,22 +465,33 @@ def held_stocks(lake: Lake, stocks: dict[str, int], since_q: int) -> set[int]:
 
 def held_spans(lake: Lake, stocks: dict[str, int]) -> dict[int, tuple[date, date]]:
     """Each held stock's first and last day held: from the start of the first quarter it was
-    held in (SH rows) to the end of the last."""
+    held in (SH rows) to the end of the last. A stock also held from 2013 on counts from 2013
+    only: the pre-2013 history must not cost a stock today's ticker (a ticker's current line
+    often begins after a company's first 13F quarters), and before its line began a stock has
+    no vendor prices anyway. A stock held only before 2013 counts over all of it."""
     frames = scan_parts(
         lake,
         "holdings",
         lambda f: f.filter(pl.col("kind") == "SH")
         .group_by("cusip")
-        .agg(first=pl.col("q").min(), last=pl.col("q").max()),
+        .agg(
+            first=pl.col("q").min(),
+            first_recent=pl.col("q").filter(pl.col("q") >= 0).min(),
+            last=pl.col("q").max(),
+        ),
     )
-    spans: dict[int, tuple[int, int]] = {}
+    spans: dict[int, tuple[int, int | None, int]] = {}
     for frame in frames:
-        for cusip, first, last in frame.iter_rows():
+        for cusip, first, first_recent, last in frame.iter_rows():
             if (stock_id := stocks.get(cusip)) is None:
                 continue
-            old = spans.get(stock_id, (first, last))
-            spans[stock_id] = (min(old[0], first), max(old[1], last))
-    return {sid: (q_start(first), q_end(last)) for sid, (first, last) in spans.items()}
+            old = spans.get(stock_id, (first, first_recent, last))
+            recent = [q for q in (old[1], first_recent) if q is not None]
+            spans[stock_id] = (min(old[0], first), min(recent, default=None), max(old[2], last))
+    return {
+        sid: (q_start(first if recent is None else recent), q_end(last))
+        for sid, (first, recent, last) in spans.items()
+    }
 
 
 def resolve_vendor_tickers(
@@ -493,13 +525,15 @@ def resolve_vendor_tickers(
     stocks = stock_of(cusip_map)
     tickers = dict(securities.select("stock_id", "ticker").iter_rows())
     spans = held_spans(lake, stocks)
-    resolved = resolve(tickers, spans, universe)
+    gone = set(cusip_map.filter(pl.col("method") == UNLISTED)["stock_id"].drop_nulls().to_list())
+    resolved = resolve(tickers, spans, universe, gone=gone)
     missing = set(tickers) - set(resolved["stock_id"].to_list())
+    old_only = {sid for sid, (_, last) in spans.items() if last < q_start(0)}
     alternates, counts = alternate_tickers(
-        lake, sources, securities, cusip_map, missing, today, flags, budget
+        lake, sources, securities, cusip_map, missing, today, flags, budget, old_only
     )
     if alternates:
-        resolved = resolve(tickers, spans, universe, alternates)
+        resolved = resolve(tickers, spans, universe, alternates, gone=gone)
     # The ticker each stock's stored prices were fetched under: its vendor ticker of the last
     # run, else (a stock new to the table, or the first run with one) the security's own.
     stored = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)
@@ -549,6 +583,7 @@ def alternate_tickers(
     today: date,
     flags: list,
     budget: Budget,
+    old_only: set[int] = frozenset(),
 ) -> tuple[dict[int, list[str]], dict]:
     """Other tickers for the `missing` stocks (no vendor ticker from their own): the hand-checked
     `ticker_overrides`, then, for those that look like shares: stock_id -> [SEC ticker of the same normalised name (exactly one SEC row; not for
@@ -576,8 +611,14 @@ def alternate_tickers(
     if not shares:
         return alternates, counts
     # By name only for a plain common share: a warrant, unit or preferred ("XYZ-WS", "XYZ-PA")
-    # carries its company's name too, and would take the common stock's prices.
-    named = {sid: name for sid, name in shares.items() if "-" not in tickers_of[sid]}
+    # carries its company's name too, and would take the common stock's prices. Never for a
+    # company gone since (UNLISTED) or one held only before 2013 (`old_only`): its name may be
+    # today's namesake's (old GM and new GM; "AT&T Corp" and "AT&T Inc" both read "AT T").
+    gone = set(cusip_map.filter(pl.col("method") == UNLISTED)["stock_id"].drop_nulls().to_list())
+    gone |= old_only
+    named = {
+        sid: name for sid, name in shares.items() if "-" not in tickers_of[sid] and sid not in gone
+    }
     try:
         by_name = tickers_by_name(named, sources.sec_tickers()) if named else {}
     except FetchError as err:
@@ -591,7 +632,7 @@ def alternate_tickers(
     known = set(asked["stock_id"].to_list())
     cusip_of: dict[int, str] = {}
     for cusip, sid, method in cusip_map.sort("cusip").select("cusip", "stock_id", "method").iter_rows():
-        if sid is not None and method == OPENFIGI:
+        if sid is not None and method in (OPENFIGI, UNLISTED):
             cusip_of.setdefault(sid, cusip)
     due = sorted(sid for sid in shares if sid not in known and sid in cusip_of)[:US_TICKERS_PER_RUN]
     if due and not budget.spent():
@@ -731,6 +772,86 @@ def refresh_prices(
     }
 
 
+def backfill_price_heads(
+    lake: Lake,
+    sources: Sources,
+    state: State,
+    run_id: str,
+    flags: list,
+    budget: Budget,
+    reserve: float | None = None,
+) -> dict | None:
+    """Fetch the older bars of the stocks held before 2013 whose stored history begins after
+    they were first held (histories began in 2013 until the 13F history reached back to 1999):
+    only the missing range, each stock once (`state.price_backfilled`), until `reserve` minutes
+    of the budget are left (default: the price stage's). Their funds and weekly files are owed a
+    recompute; today's share counts are unchanged (a split before 2013 is in them already).
+    Returns the counts to log."""
+    recover_prices_in_flight(lake, state)  # a run that died mid-fetch: its stocks are owed first
+    stocks = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
+    firsts = scan_parts(
+        lake,
+        "holdings",
+        lambda f: f.filter((pl.col("kind") == "SH") & (pl.col("q") < 0))
+        .group_by("cusip")
+        .agg(pl.col("q").min()),
+    )
+    first_held: dict[int, int] = {}
+    for frame in firsts:
+        for cusip, q in frame.iter_rows():
+            if (sid := stocks.get(cusip)) is not None:
+                first_held[sid] = min(q, first_held.get(sid, q))
+    vendor = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)
+    ticker_of = dict(vendor.select("stock_id", "ticker").iter_rows())
+    stored = first_dates(lake)
+    slack = timedelta(days=7)  # a quarter's first trading day can be a few days in
+    heads = {
+        sid: (ticker_of[sid], stored[sid])
+        for sid in sorted(first_held)
+        if sid in ticker_of
+        and sid in stored
+        and sid not in state.price_backfilled
+        and stored[sid] > max(HISTORY_START, q_start(first_held[sid])) + slack
+    }
+    if not heads:
+        return None
+    if reserve is None:
+        reserve = min(PRICES_RESERVE_MIN, budget.minutes / 3)
+    stats: dict = {}
+    state.prices_in_flight = run_id  # its parts hold changes until they are recorded below
+    state.save(lake)
+    changed = fetch_heads(
+        lake,
+        sources.prices,
+        heads,
+        run_id,
+        stats=stats,
+        should_stop=lambda: budget.minutes_left() <= reserve,
+    )
+    if stats["stopped"] == "time budget":
+        budget.cut("price history")
+    state.pending_stocks |= set(changed)
+    state.pending_weekly |= set(changed)
+    state.price_backfilled |= set(stats["answered"])
+    state.prices_in_flight = None
+    state.save(lake)
+    if stats["failed"] or (stats["stopped"] and stats["stopped"] != "time budget"):
+        flags.append(
+            {
+                "type": "price_history",
+                "failed": sorted(sid for sid, _, _ in stats["failed"])[:MAX_FLAGS_PER_KIND],
+                "failed_count": len(stats["failed"]),
+                "stopped": stats["stopped"],
+            }
+        )
+    return {
+        "owed": len(heads),
+        "fetched": stats["fetched"],
+        "empty": stats["empty"],
+        "failed": len(stats["failed"]),
+    }
+
+
 def recover_prices_in_flight(lake: Lake, state: State) -> None:
     if state.prices_in_flight is None:
         return
@@ -846,11 +967,13 @@ def latest_closes(lake: Lake) -> dict[int, tuple[date, float]]:
 def update_rf(
     lake: Lake, sources: Sources, state: State, last_q: int, full: bool, flags: list
 ) -> None:
-    """The T-bill table, refetched when the latest quarter moves on (or on a full run, or after a
-    failure): Sharpe and Sortino of every fund depend on it, so a new table is written only
-    after a recompute of every fund is recorded as owed (`pending_all`)."""
+    """The T-bill table, refetched when the latest quarter moves on (or on a full run, after a
+    failure, or when the stored table starts after `rf.FIRST_YEAR`): Sharpe and Sortino of every
+    fund depend on it, so a new table is written only after a recompute of every fund is recorded
+    as owed (`pending_all`)."""
     stored = rf_table(lake)
-    if stored and not (full or state.rf_stale or state.last_q != last_q):
+    short = bool(stored) and min(stored) > FIRST_YEAR  # a table from before the history began in 1999
+    if stored and not (full or short or state.rf_stale or state.last_q != last_q):
         return
     try:
         fetched = sources.tbill()

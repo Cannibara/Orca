@@ -32,7 +32,7 @@ export function StepChart({ quarters, shares, endQ, label = "Shares held by quar
 
   const changes = quarters.map((q, i) => ({ q, v: shares[i] })).sort((a, b) => a.q - b.q);
   // Two quarters of lead-in before the first change, as in the mockup.
-  const qa = changes.length ? Math.max(0, changes[0].q - 2) : 0;
+  const qa = changes.length ? changes[0].q - 2 : 0;
   const qb = Math.max(endQ ?? (changes.length ? changes[changes.length - 1].q : 0), qa);
   const slots = qb + 1 - qa;
   const levelAt = (q: number) => changes.reduce((v, c) => (c.q <= q ? c.v : v), 0);

@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTooltip, type TipContent, type TipRow } from "../charts/Tooltip";
+import { qOfYear } from "../lib/format";
 import { axisPct, f1, fMoney, fPct } from "./fmt";
 import { endRound, stepFor, textW, xLabelItems, xLabels } from "./geometry";
 import { ChartSlot } from "./ChartSlot";
@@ -91,7 +92,7 @@ export function ReturnsPanel({ series, win, range, onRange, sel, onSelect, br, o
       { label: "Volatility", value: yd.vol == null ? "–" : f1(yd.vol).replace("+", "") + "%" },
       ...yd.qs.map((p) => ({
         color: p.ret >= 0 ? "var(--gain)" : "var(--loss)",
-        label: "Q" + ((((p.q % 4) + 4) % 4) + 1),
+        label: "Q" + (qOfYear(p.q) + 1),
         value: fPct(p.ret * 100),
       })),
     ];

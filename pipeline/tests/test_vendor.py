@@ -132,3 +132,21 @@ def test_resolve_refuses_a_ticker_reused_after_the_stock_was_held():
     }
     out = resolve({1: "APC", 2: "APC", 3: "WOLF"}, held, u)
     assert out.rows() == [(2, "APC", date(2026, 11, 13)), (3, "WOLF", date(2026, 11, 13))]
+
+
+
+def test_a_company_gone_since_takes_only_a_line_that_has_ended():
+    # The vendor's "T" is today's AT&T back to 1984; old AT&T Corp (delisted) must not take it.
+    universe = pl.DataFrame(
+        {
+            "ticker": ["T", "LEHMQ"],
+            "start": [date(1984, 7, 19), date(2008, 9, 17)],
+            "end": [date(2026, 11, 16), date(2012, 3, 1)],
+        },
+        schema=UNIVERSE_SCHEMA,
+    )
+    held = {1: (date(1999, 1, 1), date(2005, 12, 31)), 2: (date(2005, 1, 1), date(2010, 12, 31))}
+    tickers = {1: "T", 2: "LEHMQ"}
+    assert resolve(tickers, held, universe)["stock_id"].to_list() == [1, 2]
+    gone = resolve(tickers, held, universe, gone={1, 2})
+    assert gone["ticker"].to_list() == ["LEHMQ"]

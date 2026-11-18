@@ -118,6 +118,16 @@ describe("periods", () => {
     expect(yearLabel(2014, { ...TL, qmin: 7 })).toBe("2014 Q4");
   });
 
+  test("years and quarter ends before 2013 (negative quarter index)", () => {
+    const old: Timeline = { ...TL, qmin: -56 }; // tracked from Q1 1999
+    expect(yearRange(old)).toEqual({ lo: 1999, hi: 2026 });
+    expect(yearSpan(2012, old)).toEqual({ qs: -4, qe: -1 });
+    expect(yearLabel(1999, old)).toBe("1999");
+    expect(yearLabel(1999, { ...old, qmin: -54 })).toBe("1999 H2");
+    expect([endDate(old, -56), endDate(old, -2), endDate(old, -1)]).toEqual(["1999-03-31", "2012-09-30", "2012-12-31"]);
+    expect(tEnd(old, -1)).toBeCloseTo(-1 / 365, 12);
+  });
+
   test("a year's span is clamped to the tracked range", () => {
     expect(yearSpan(2025, TL)).toEqual({ qs: 48, qe: 51 });
     expect(yearSpan(2026, TL)).toEqual({ qs: 52, qe: 53 });

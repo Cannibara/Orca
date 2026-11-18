@@ -4,7 +4,7 @@ from its holdings and the stocks' prices, checked against the engine's invariant
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 
@@ -33,12 +33,15 @@ from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
 from orca.holdings import fill_gaps
 from orca.home import ConvictionQuarter, FundSnapshot
-from orca.prices import ShareFactors, split_factors_by_quarter
+from orca.prices import HISTORY_START, ShareFactors, first_dates, split_factors_by_quarter
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_end
 from orca.run.market import BENCHMARK_CUSIP, load_daily, rf_table, stock_of
 from orca.run.state import CUSIP_MAP_SCHEMA, chunks, read_table
+from orca.run.ingest import LEGACY_CHECKS
+from orca.sec.legacy import STORED
+from orca.splits import infer_splits
 from orca.storage import Lake
 
 SPLIT_RATIOS = (2.0, 3.0, 4.0, 5.0, 10.0, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 10)
@@ -153,6 +156,12 @@ class Context:
     px: dict[int, dict[int, QuarterPx]] = field(default_factory=dict)
     splits: dict[int, pl.DataFrame] = field(default_factory=dict)
     share_factors: dict[int, ShareFactors] = field(default_factory=dict)
+    # Splits read from the filings, for days the vendor has no bars for (`splits.infer_splits`);
+    # worked out on the first `load`.
+    inferred: dict[int, list[tuple[date, float]]] | None = None
+    # Fund-quarters filed before 2013 whose table could not be read (lake table legacy_checks);
+    # read on first use.
+    unreadable: pl.DataFrame | None = None
 
     @classmethod
     def build(cls, lake: Lake, last_q: int) -> "Context":
@@ -160,7 +169,10 @@ class Context:
         return cls(lake, last_q, stocks, rf_table(lake), stocks.get(BENCHMARK_CUSIP))
 
     def load(self, stock_ids: Iterable[int]) -> None:
-        """Quarter prices and split days of the stocks of `stock_ids` not loaded yet."""
+        """Quarter prices and split days of the stocks of `stock_ids` not loaded yet: the vendor's
+        splits, and before a stock's first bar the splits its holders' filings show."""
+        if self.inferred is None:
+            self.inferred = self._inferred_splits()
         missing = sorted(set(stock_ids) - self.px.keys())
         no_splits = pl.DataFrame(schema={"date": pl.Date, "split_factor": pl.Float64})
         for chunk in chunks(missing, PRICE_LOAD_CHUNK):
@@ -169,14 +181,45 @@ class Context:
             del daily
             for stock_id in chunk:
                 rows = by_stock.pop((stock_id,), None)
-                if rows is None:
-                    self.px[stock_id], self.splits[stock_id] = {}, no_splits
-                    self.share_factors[stock_id] = ShareFactors()
-                    continue
-                self.px[stock_id] = quarter_px(rows)
-                splits = rows.filter(pl.col("split_factor") != 1.0).select("date", "split_factor")
+                first_bar = rows["date"].min() if rows is not None else None
+                read = [
+                    (day, factor)
+                    for day, factor in self.inferred.get(stock_id, [])
+                    if first_bar is None or day < first_bar
+                ]
+                splits = (
+                    rows.filter(pl.col("split_factor") != 1.0).select("date", "split_factor")
+                    if rows is not None
+                    else no_splits
+                )
+                if read:
+                    splits = pl.concat(
+                        [pl.DataFrame(read, schema=no_splits.schema, orient="row"), splits.cast(no_splits.schema)]
+                    ).sort("date")
+                self.px[stock_id] = quarter_px(rows) if rows is not None else {}
                 self.splits[stock_id] = splits
-                self.share_factors[stock_id] = split_factors_by_quarter(splits)
+                self.share_factors[stock_id] = (
+                    split_factors_by_quarter(splits) if splits.height else ShareFactors()
+                )
+
+    def _inferred_splits(self) -> dict[int, list[tuple[date, float]]]:
+        """The filings' splits of the stocks whose stored bars do not reach back to the first
+        day prices are fetched from (no bars, or a history that begins later)."""
+        first = first_dates(self.lake)
+        cusips_of: dict[int, list[str]] = defaultdict(list)
+        for cusip, stock_id in self.stock_of.items():
+            if stock_id not in first or first[stock_id] > HISTORY_START + timedelta(days=7):
+                cusips_of[stock_id].append(cusip)
+        by_cusip = infer_splits(self.lake, {c for cs in cusips_of.values() for c in cs})
+        out: dict[int, list[tuple[date, float]]] = {}
+        for stock_id, cusips in cusips_of.items():
+            days: dict[date, float] = {}
+            for cusip in sorted(cusips):  # share classes of one stock split together
+                for day, factor in by_cusip.get(cusip, []):
+                    days.setdefault(day, factor)
+            if days:
+                out[stock_id] = sorted(days.items())
+        return out
 
     def iter_closes(self, stock_ids: Iterable[int]) -> Iterator[dict[int, pl.DataFrame]]:
         """The stocks' daily (date, close) on today's share basis, PRICE_LOAD_CHUNK stocks at a
@@ -328,12 +371,30 @@ def compute_fund(
     return compute_prepared(ctx, prepare_fund(ctx, status, rows, reports))
 
 
+def unreadable_quarters(lake: Lake) -> pl.DataFrame:
+    """(cik, q) of the pre-2013 filings that were read but not stored (`legacy_checks`): the fund
+    filed that quarter, the table could not be read. `fill_gaps` carries them over."""
+    frames = [
+        f.filter(~pl.col("status").is_in(list(STORED)) & pl.col("period").is_not_null()).select(
+            pl.col("cik").cast(pl.Int64), q=pl.col("period").cast(pl.Int16)
+        )
+        for f in (lake.read(LEGACY_CHECKS, part=part) for part in lake.parts(LEGACY_CHECKS))
+    ]
+    if not frames:
+        return pl.DataFrame(schema={"cik": pl.Int64, "q": pl.Int16})
+    return pl.concat(frames).unique()
+
+
 def prepare_batch(
     ctx: Context, holdings: pl.DataFrame, reports: pl.DataFrame
 ) -> Iterator[tuple[Prepared, FundResult]]:
     """`compute_batch`, also yielding each fund's inputs."""
     filed_quarters = reports.select("cik", q="period").unique()
-    filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters)
+    if ctx.unreadable is None:
+        ctx.unreadable = unreadable_quarters(ctx.lake)
+    ciks = reports["cik"].unique().to_list()
+    unreadable = ctx.unreadable.filter(pl.col("cik").is_in(ciks))
+    filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters, unreadable)
     ctx.load(_stock_ids(ctx, filled).to_list() + ([ctx.spy_id] if ctx.spy_id is not None else []))
     rows_of = filled.partition_by("cik", as_dict=True) if filled.height else {}
     reports_of = reports.partition_by("cik", as_dict=True) if reports.height else {}

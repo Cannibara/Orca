@@ -10,7 +10,7 @@ TOP_MIN_QUARTERS = 12  # quarters filed
 TOP_MIN_POSITIONS = 4
 TOP_MIN_PRICED = 0.80  # share of book that must be priced
 GIANT_MIN_POSITIONS = 1000  # index giants are listed separately
-# Quarters per period. The SEC's 13F data starts in 2013: no fund has 15 years until 2028.
+# Quarters per period. Holdings go back to Q1 1999 (pre-2013 text filings, `sec/legacy.py`).
 PERIODS = {"1y": 4, "3y": 12, "5y": 20, "10y": 40, "15y": 60, "max": None}
 
 # Funds excluded by name: banks, insurers, brokers (pensions and endowments are managed: they count)

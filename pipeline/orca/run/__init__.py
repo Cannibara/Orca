@@ -11,20 +11,23 @@ Every run has a time budget (`budget`): when it is spent, the long stages stop c
 next run carries on from the state.
 
 Modules: `state` (lake tables, state.json, stored fund state), `sources` (what a run fetches),
-`budget` (the time budget), `ingest` (bulk and live filings), `market` (securities, prices,
+`budget` (the time budget), `ingest` (bulk, live and pre-2013 legacy filings), `market` (securities, prices,
 T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `gates`
-(health gates), `weekly` (the run and `verify`), `cli`.
+(health gates), `weekly` (the run, `run_backfill` and `verify`), `cli`.
 
 Lake layout (all under `lake.root`):
 - `filings/qNNN`, `raw_holdings/qNNN`: every filing of report period NNN and its raw rows, one
-  copy per (accession, source); a re-read filing replaces its earlier copy.
+  copy per (accession, source: bulk, live or legacy); a re-read filing replaces its earlier copy.
+  Before 2013 NNN is negative (`q-56` is Q1 1999).
+- `legacy_checks/<YYYYQn>`: each pre-2013 filing read from that full-index quarter and how its
+  table checked against the filer's declared totals (`sec.legacy.CHECKS_SCHEMA`).
 - `reports/qNNN`, `holdings/qNNN`: the chosen reports and the collapsed holdings of the quarter,
   rebuilt whenever the quarter gets a filing.
 - `securities`, `cusip_map`, `prices_daily/...`, `rf`, `fund_state` (each fund's header and home
   snapshot as JSON, for the funds a run does not recompute) and `fund_state_run/bNNNNN` (the
   running publish's fund state, merged into `fund_state` after the manifest).
 - `ingested.json` (bulk ZIPs ingested, name -> sha256), `state.json` (live watermark, last
-  quarter, pending recomputes, lookups and price histories still owed), `published.json` (the
+  quarter, pending recomputes, lookups and price histories still owed, legacy quarters read), `published.json` (the
   last manifest's files).
 
 A fund is identified by its CIK (`fund_id` = CIK), so ids never depend on ingestion order.
@@ -37,7 +40,7 @@ from orca.run.ingest import live_watermark
 from orca.run.publish_step import CusipLeakError, copy_published, cusip_check_digit
 from orca.run.sources import Sources, production_sources
 from orca.run.state import strip_query
-from orca.run.weekly import RunStats, deadline_quarter, run_home, run_weekly, verify
+from orca.run.weekly import RunStats, deadline_quarter, run_backfill, run_home, run_weekly, verify
 
 __all__ = [
     "CusipLeakError",
@@ -54,6 +57,7 @@ __all__ = [
     "main",
     "price_flags",
     "production_sources",
+    "run_backfill",
     "run_home",
     "run_weekly",
     "split_suspects",

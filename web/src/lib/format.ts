@@ -67,9 +67,12 @@ export const HOME_TITLE = "Orca: Hedge fund holdings";
 /** A fund page's title: the pre-rendered file and the app use this one text, so the tab does not change when the app loads. */
 export const fundTitle = (name: string): string => `${name} 13F holdings and returns · Orca`;
 
-/** Quarter index counted from Q1 2013: 53 → "Q2 2026". */
+/** Quarter of the year, 0–3, of quarter index q. Pre-2013 quarters are negative and JS `%` keeps the sign. */
+export const qOfYear = (q: number): number => ((q % 4) + 4) % 4;
+
+/** Quarter index counted from Q1 2013: 53 → "Q2 2026", −56 → "Q1 1999". */
 export function qLabel(q: number): string {
-  return "Q" + ((q % 4) + 1) + " " + (2013 + Math.floor(q / 4));
+  return "Q" + (qOfYear(q) + 1) + " " + (2013 + Math.floor(q / 4));
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

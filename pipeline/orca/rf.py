@@ -9,11 +9,12 @@ from orca.http import Client, FetchError
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 SERIES = "DTB3"  # 3-month Treasury bill, secondary market rate, daily, in percent
-START = "2013-01-01"
+START = "1999-01-01"  # the first 13F quarter Orca reads (Q1 1999)
+FIRST_YEAR = int(START[:4])
 
 
 def fetch_tbill(client: Client) -> dict[int, float]:
-    """The average DTB3 rate of each year since 2013, as a decimal (4.5 percent is 0.045), keyed
+    """The average DTB3 rate of each year since 1999, as a decimal (4.5 percent is 0.045), keyed
     by year. Days without a rate (FRED marks them ".") are skipped, and a year with none is
     absent. `client` comes from `fred_client()`; the key is read from FRED_KEY here.
 

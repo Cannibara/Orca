@@ -1,4 +1,4 @@
-"""Command line: `python -m orca.run weekly | rebuild | home | sectors | verify | workbook | demo`."""
+"""Command line: `python -m orca.run weekly | rebuild | backfill | home | sectors | verify | workbook | demo`."""
 
 import argparse
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from orca import config
 from orca.run.sources import production_sources
-from orca.run.weekly import run_home, run_weekly, verify
+from orca.run.weekly import run_backfill, run_home, run_weekly, verify
 from orca.storage import Lake
 
 DESCRIPTION = (
@@ -21,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("weekly", help="ingest new data, recompute affected funds, publish changes")
     commands.add_parser("rebuild", help="recompute and republish every fund")
+    commands.add_parser(
+        "backfill", help="read the pre-2013 13F filings into the lake (no prices, compute or publish)"
+    )
     commands.add_parser(
         "home", help="republish the home lists from the stored fund state (no fetch, no recompute)"
     )
@@ -94,6 +97,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"staging: {stats.staging}")
         print(f"changed: {len(stats.changed)} files, funds recomputed: {stats.funds_recomputed}")
+        return 0
+    if args.command == "backfill":
+        done, flags = run_backfill(Lake(config.LAKE_DIR), production_sources(), date.today())
+        for flag in flags:
+            print(f"flag: {json.dumps(flag, sort_keys=True)}")
+        print(f"backfill: {json.dumps(done, sort_keys=True)}")
         return 0
     if args.command == "verify":
         diffs = verify(Lake(config.LAKE_DIR), config.OUT_DIR, args.sample, args.seed)

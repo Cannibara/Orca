@@ -18,14 +18,16 @@ from urllib.parse import quote
 import polars as pl
 
 from orca.http import Client, FetchError
-from orca.quarters import q_end, q_of_date, q_start
+from orca.quarters import q_end, q_index, q_of_date, q_start
 from orca.storage import Lake
 
 log = logging.getLogger(__name__)
 
 TABLE = "prices_daily"
 TIINGO_URL = "https://api.tiingo.com/tiingo/daily/{ticker}/prices"
-HISTORY_START = q_start(0)  # first day fetched for a stock with no rows: 2013-01-01
+# First day fetched for a stock with no rows: 1999-01-01, the first 13F quarter Orca reads. Until
+# 2026-11 it was 2013-01-01; `fetch_heads` fetches the years before for stocks stored since then.
+HISTORY_START = q_start(q_index(1999, 1))
 OVERLAP_DAYS = 5  # days before the last stored one that every update fetches again
 FLUSH_EVERY = 500  # tickers between writes of the run's part
 STOP_STATUSES = frozenset({401, 403, 429})  # a bad key or a rate limit: no ticker will work
@@ -245,7 +247,7 @@ def update_prices(
     and revised bars to new parts `z<run_id>-0001`, `-0002`, ... (run_id default: today as
     YYYYMMDD; a run id already in the lake goes on from its last part number).
 
-    A stock is fetched from 5 days before its last stored date, or from 2013-01-01 when it has no
+    A stock is fetched from 5 days before its last stored date, or from HISTORY_START when it has no
     rows or is in `refetch` (its ticker changed: the whole history is fetched again, and counts as
     changed). Returns the sorted stock_ids whose history changed: stocks that got their first rows,
     stocks whose stored bars were revised (a price correction, or a split recorded late) or
@@ -328,6 +330,78 @@ def update_prices(
             flush()
             log.info("prices: %d of %d tickers asked", done, len(tickers))
     flush()
+    return sorted(changed)
+
+
+def first_dates(lake: Lake) -> dict[int, date]:
+    """The first stored date of each stock that has bars."""
+    paths = [_part_path(lake, part) for part in lake.parts(TABLE)]
+    if not paths:
+        return {}
+    first = (
+        pl.scan_parquet(paths)
+        .group_by("stock_id")
+        .agg(pl.col("date").min())
+        .collect(engine="streaming")
+    )
+    return dict(first.iter_rows())
+
+
+def fetch_heads(
+    lake: Lake,
+    source: PriceSource,
+    heads: dict[int, tuple[str, date]],
+    run_id: str,
+    stats: dict | None = None,
+    flush_every: int = FLUSH_EVERY,
+    should_stop: Callable[[], bool] | None = None,
+) -> list[int]:
+    """Fetch the bars each stock lacks before its first stored day (`heads`: stock_id -> (ticker,
+    first stored date)), from HISTORY_START to the day before, in order, and append them to new
+    parts of run `run_id` as `update_prices` does. Only the missing range is asked for, so nothing
+    already stored is fetched or written again. Returns the sorted stock_ids that got rows (their
+    history changed: older closes, dividends and splits). Stops like `update_prices` (401, 403 or
+    429; 25 failures in a row; `should_stop()`), and fills `stats` with the same keys."""
+    stats = {} if stats is None else stats
+    failed: list[tuple[int, str, int | None]] = []
+    answered: list[int] = []
+    stats.update(fetched=0, empty=0, answered=answered, failed=failed, stopped=None)
+    numbers = [int(p.rpartition("-")[2]) for p in run_parts(lake, run_id) if p != f"z{run_id}"]
+    next_number = max(numbers, default=0) + 1
+    changed: list[int] = []
+    pending: list[pl.DataFrame] = []
+    in_a_row = 0
+    for done, (stock_id, (ticker, first_stored)) in enumerate(heads.items(), start=1):
+        if should_stop is not None and should_stop():
+            stats["stopped"] = "time budget"
+            break
+        try:
+            bars = source.daily(ticker, HISTORY_START, first_stored - timedelta(days=1))
+        except FetchError as err:
+            log.warning("prices: %s (stock %d) history skipped: %s", ticker, stock_id, err)
+            failed.append((stock_id, ticker, err.status))
+            in_a_row += 1
+            if err.status in STOP_STATUSES:
+                stats["stopped"] = f"HTTP {err.status} on {ticker}"
+            elif in_a_row >= MAX_CONSECUTIVE_FAILURES:
+                stats["stopped"] = f"{in_a_row} consecutive failures"
+            if stats["stopped"]:
+                log.error("prices: stopping the history backfill: %s", stats["stopped"])
+                break
+            continue
+        in_a_row = 0
+        answered.append(stock_id)
+        rows = _as_stored(bars, stock_id).filter(pl.col("date") < first_stored)
+        stats["empty" if rows.is_empty() else "fetched"] += 1
+        if not rows.is_empty():
+            pending.append(rows)
+            changed.append(stock_id)
+        if pending and (done % flush_every == 0):
+            lake.write(TABLE, pl.concat(pending), part=f"z{run_id}-{next_number:04d}")
+            pending.clear()
+            next_number += 1
+    if pending:
+        lake.write(TABLE, pl.concat(pending), part=f"z{run_id}-{next_number:04d}")
     return sorted(changed)
 
 

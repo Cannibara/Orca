@@ -184,8 +184,10 @@ export function buildSaleRows(input: WhatIfInput): SaleRow[] {
   const wanted = new Set(sales.map((e) => e.stock_id));
   const mine = positions.filter((p) => wanted.has(p.stock_id));
   // Every figure of a position as of the newest quarter. The start of the period only matters for tag and
-  // weight change, which are not read from here.
-  const asOfNow = new Map(buildRows(mine, 0, tl.latest, src, stocks).map((r) => [r.id, r]));
+  // weight change, which are not read from here, but it must reach back to the first trade, or a position
+  // sold out before it (pre-2013 quarters are negative) gets no row.
+  const q0 = mine.reduce((m, p) => (p.trades.length > 0 ? Math.min(m, p.trades[0].q) : m), tl.latest);
+  const asOfNow = new Map(buildRows(mine, q0, tl.latest, src, stocks).map((r) => [r.id, r]));
 
   // A stock the fund traded in the newest quarter: its weight change is the Positions table's own figure,
   // which needs the whole book at the newest prices (no weekly files).

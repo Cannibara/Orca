@@ -146,7 +146,10 @@ class State:
     names a price run that has not finished: its parts may hold changes nobody has recorded.
     `lookup_retry` holds securities whose SIC code or shares outstanding are still to be fetched
     (a lookup that failed or that the time budget cut off); `price_refetch` the stocks whose
-    whole price history is to be fetched again (their ticker changed)."""
+    whole price history is to be fetched again (their ticker changed, or their stored history
+    starts at the old 2013 start); `price_backfilled` the stocks already put there for their
+    pre-2013 history (never twice); `legacy_done` the pre-2013 full-index quarters read
+    ("1999Q1", ...) and `legacy_retry` those of them with downloads to try once more."""
 
     live_watermark: date | None = None
     last_q: int | None = None
@@ -159,6 +162,9 @@ class State:
     prices_in_flight: str | None = None
     lookup_retry: set[int] = field(default_factory=set)
     price_refetch: set[int] = field(default_factory=set)
+    price_backfilled: set[int] = field(default_factory=set)
+    legacy_done: set[str] = field(default_factory=set)
+    legacy_retry: set[str] = field(default_factory=set)
 
     @staticmethod
     def path(lake: Lake) -> Path:
@@ -183,6 +189,9 @@ class State:
             prices_in_flight=raw.get("prices_in_flight"),
             lookup_retry=set(raw.get("lookup_retry", [])),
             price_refetch=set(raw.get("price_refetch", [])),
+            price_backfilled=set(raw.get("price_backfilled", [])),
+            legacy_done=set(raw.get("legacy_done", [])),
+            legacy_retry=set(raw.get("legacy_retry", [])),
         )
 
     def save(self, lake: Lake) -> None:
@@ -200,6 +209,9 @@ class State:
                 "prices_in_flight": self.prices_in_flight,
                 "lookup_retry": sorted(self.lookup_retry),
                 "price_refetch": sorted(self.price_refetch),
+                "price_backfilled": sorted(self.price_backfilled),
+                "legacy_done": sorted(self.legacy_done),
+                "legacy_retry": sorted(self.legacy_retry),
             },
         )
 

@@ -1,4 +1,4 @@
-import { count, fmtDate, money, pct, pp, printsZero, px, qLabel, ratio, sgn, shareCount, signClass, tidyName } from "../src/lib/format";
+import { count, fmtDate, money, pct, pp, printsZero, px, qLabel, qOfYear, ratio, sgn, shareCount, signClass, tidyName } from "../src/lib/format";
 
 test("money", () => {
   expect(money(1_234_000_000)).toBe("$1.23B");
@@ -102,6 +102,14 @@ test("qLabel at year edges", () => {
   expect(qLabel(0)).toBe("Q1 2013");
   expect(qLabel(3)).toBe("Q4 2013");
   expect(qLabel(4)).toBe("Q1 2014");
+});
+
+test("qLabel before 2013: the quarter index is negative", () => {
+  expect(qLabel(-1)).toBe("Q4 2012");
+  expect(qLabel(-3)).toBe("Q2 2012");
+  expect(qLabel(-4)).toBe("Q1 2012");
+  expect(qLabel(-56)).toBe("Q1 1999");
+  expect([-56, -5, -4, -1, 0, 3].map(qOfYear)).toEqual([0, 3, 0, 3, 0, 3]);
 });
 
 test("null input gives a dash for every formatter", () => {

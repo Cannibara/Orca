@@ -41,7 +41,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Backlog (F3) | Weekly popularity list | `docs/ROADMAP.md` (proposal) |
 | Backlog (F4) | Sector momentum and volume | `docs/ROADMAP.md` (proposal) |
 | Backlog (F5) | Manager rankings, with benchmarks | `docs/ROADMAP.md` (proposal) |
-| Backlog | Spec 2 skill scores, spec 3 sector rotation, stock pages "who holds X", alerts, pre-2013 history | (spec) |
+| Backlog | Spec 2 skill scores, spec 3 sector rotation, stock pages "who holds X", alerts | (spec) |
 
 ## Home list rules
 Thresholds in `pipeline/orca/config.py`, applied in `pipeline/orca/home.py` (code).
@@ -54,7 +54,7 @@ Thresholds in `pipeline/orca/config.py`, applied in `pipeline/orca/home.py` (cod
 | Best & worst calls | top funds (not giants) or concentrated funds (4–60 positions, ≥ $500M); new or add ≥ 1% of book; market cap ≥ $300M; price ≥ $1; 50 best + 50 worst cut at build time, re-ranked live (R7) |
 | Crowded buys | new or add by ≥ 3 distinct concentrated active funds (4–60 positions, ≥ $500M) in the latest quarter |
 
-The 15y tab stays empty until 2028: SEC bulk 13F data starts in 2013 (chat).
+Holdings go back to Q1 1999 (the SEC's pre-2013 text filings, read since 2026-11-17), so the 15y and Since start tabs cover funds with a long unbroken record. Until the first backfill runs, the 15y tab lists only funds with back-filed reports (spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`).
 
 ## Views
 | View | Shows |
@@ -96,7 +96,7 @@ See `docs/DECISIONS.md`. Key points: quarterly returns are the source of truth; 
 - Not a fund's real return: no claims beyond 13F estimates; "Not investment advice" in the site footer (code `App.tsx`).
 - No SPY benchmark columns on fund pages (ruling R23); SPY appears only in what-if comparisons (code).
 - No always-on server, database server, or competitor data sources (spec §1).
-- No real-time or intra-quarter data; pre-2013 history is out of scope (spec).
+- No real-time or intra-quarter data; nothing before Q1 1999 (no electronic 13F tables) (spec).
 - No user accounts or paid gating yet (chat).
 - No market-flow or retail-share estimates at launch: 13F net buying is only a lower bound on institutional volume, and FINRA's retail-proxy data likely needs a commercial licence (chat).
 - No CUSIPs shown anywhere (licensing risk; code `CusipLeakError`) (chat)(code).
