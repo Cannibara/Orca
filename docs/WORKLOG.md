@@ -5,6 +5,13 @@ Last verified: 2026-11-18
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-18 — Run 28: monthly run fine, sector scores lost the runner; chunks by trades
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 28 (`main` e5c8b58): the monthly run published and saved (pipeline 2 h 14 min). The sector step fetched share counts for 5,903 companies (16 min, 156 MB) and built the indices in 12 s (peak 1.25 GB): 6,765 stocks in 323 labels, 0.01% of market value unlabelled. 20 s into the scores the runner got a shutdown signal, before any save, so the tables were lost | Owner asked for the run | — |
+| Scores are chunked by trades (300,000 a chunk; was 200 funds, and a few giant funds hold most trades) and one tier is replayed at a time. A local test with 720,000 trades peaks at 1.7 GB in 8 s. The workflow saves the indices before the scores start (two steps, two saves). The fallback health figure counted a stock that used today's count in any quarter (it read 50%); it now counts the last quarter only | The likely cause: one chunk of giant funds replayed 9 ways | `run/sectors_step.py`, `engine/skill.py`, `run/cli.py` (`sectors --part`), `pipeline.yml` |
+
 ## 2026-11-18 — Pipeline run 27 lost its runner; sector steps moved out of the monthly run
 
 | What changed | Why | Files |

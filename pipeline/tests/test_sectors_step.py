@@ -36,3 +36,10 @@ def test_the_step_writes_one_series_per_label_from_stocks_only(tmp_path):
     assert abs(ret[(MEMORY.path, 11)] - 0.1) < 1e-12 and ret[(LOGIC.path, 11)] == 0.0
     assert abs(ret[("Market", 11)] - 0.05) < 1e-12  # the ETF and the bond doubled and are left out
     assert stats["stocks"] == 2 and stats["by_how"] == {"placed": 1, "sic": 1} and stats["fallback_caps"] == 2
+
+
+def test_funds_are_scored_in_chunks_of_about_the_same_number_of_trades():
+    from orca.run.sectors_step import trade_chunks
+
+    counts = {1: 5, 2: 5, 3: 12, 4: 3, 5: 3, 6: 3}
+    assert trade_chunks(counts, max_trades=10) == [[1, 2], [3], [4, 5, 6]]  # a fund bigger than a chunk gets its own
