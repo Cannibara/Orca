@@ -984,7 +984,7 @@ def test_budget_spent_in_bulk_ingest_publishes_nothing_and_the_next_run_goes_on(
     assert {
         "type": "time_budget",
         "minutes": 1.0,
-        "stages": ["bulk", "live", "securities", "prices", "rf", "sectors", "compute"],
+        "stages": ["bulk", "live", "securities", "prices", "rf", "compute"],
     } in stats.flags
     assert len(downloads) == 2
     assert len(json.loads((tmp_path / "lake" / "ingested.json").read_text())) == 2
@@ -1963,7 +1963,7 @@ def test_each_stage_logs_its_time_and_counts_and_no_url_query(fixtures, tmp_path
     assert not [r for r in caplog.records if "?" in r.getMessage() and "://" in r.getMessage()]
 
 
-def test_a_run_keeps_every_funds_trades_and_scores_them_against_the_sector_indices(fixtures, tmp_path):
+def test_a_run_keeps_every_funds_trades_and_the_sectors_command_scores_them(fixtures, tmp_path):
     stats = run(tmp_path, fixture_sources(fixtures), WEEK1)
     lake = Lake(tmp_path / "lake")
     flows = lake.read("fund_flows")
@@ -1972,12 +1972,15 @@ def test_a_run_keeps_every_funds_trades_and_scores_them_against_the_sector_indic
     for fund in (stats.staging / "fund").iterdir():
         published = read_json(fund / "positions.json")
         assert flows.filter(pl.col("cik") == int(fund.name)).height == sum(len(t) for t in published["trades"])
+    # The monthly run only keeps the trades; `orca.run sectors` (its own workflow step, after the lake is saved)
+    # builds the indices and scores, and again after a relabel, with no ingest or fund compute.
+    from orca.run.sectors_step import recompute
+
+    assert not (tmp_path / "lake" / "sector_returns.parquet").exists()
+    recompute(lake)
     assert lake.read("sector_returns").height > 0 and lake.read("stock_quarters").height > 0
     skill = lake.read("fund_skill")
     assert set(skill["tier"].to_list()) <= {1, 2, 3}
-
-    # A relabel needs no ingest or fund compute: `orca.run sectors` rebuilds the indices and scores from the lake.
-    from orca.run.sectors_step import recompute
 
     (tmp_path / "lake" / "fund_skill.parquet").unlink()
     stats = recompute(lake)

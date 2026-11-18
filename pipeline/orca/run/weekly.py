@@ -49,7 +49,6 @@ from orca.run.publish_step import (
     prune_staging,
     publish_shared_files,
 )
-from orca.run.sectors_step import build_sector_returns, score_funds, update_share_history
 from orca.run.sources import Sources
 from orca.run.state import (
     CUSIP_MAP_SCHEMA,
@@ -59,7 +58,6 @@ from orca.run.state import (
     FUND_STATE_SCHEMA,
     RAW_SCHEMA,
     REPORTS_SCHEMA,
-    SECURITIES_TABLE_SCHEMA,
     State,
     chunks,
     drop_parts,
@@ -181,16 +179,6 @@ def _stage(name: str, budget: Budget, work: Callable[[], dict | None]) -> None:
     log.info("%s: starting (%.0f minutes of the budget left)", name, budget.minutes_left())
     started = time.monotonic()
     _log_stage(name, started, work())
-
-
-def _guarded(name: str, flags: list, work: Callable[[], dict | None]) -> dict | None:
-    """A draft step (sector indices, scores; lake only): a failure is flagged and never stops the run."""
-    try:
-        return work()
-    except Exception as err:  # noqa: BLE001 - a draft feature must not cost the month's run
-        log.exception("%s: failed", name)
-        flags.append({"type": f"{name}_failed", "error": type(err).__name__})
-        return None
 
 
 def _log_stage(name: str, started: float, counts: dict | None) -> None:
@@ -354,21 +342,12 @@ def run_weekly(
     _stage("bulk", budget, lambda: ingest_bulk(lake, sources, state, flags, counts, budget))
     _stage("live", budget, lambda: ingest_live(lake, sources, state, today, flags, counts))
     _stage("securities", budget, securities)
-    if sources.shares_history is not None:
-        _stage(
-            "shares",
-            budget,
-            lambda: update_share_history(
-                lake, sources.shares_history, read_table(lake, "securities", SECURITIES_TABLE_SCHEMA), flags, budget, today
-            ),
-        )
     _stage(
         "prices",
         budget,
         lambda: refresh_prices(lake, sources, state, today, last_q, run_id, flags, budget),
     )
     _stage("rf", budget, lambda: update_rf(lake, sources, state, last_q, full, flags))
-    _stage("sectors", budget, lambda: _guarded("sectors", flags, lambda: build_sector_returns(lake, last_q, flags)))
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
         flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
@@ -476,7 +455,6 @@ def run_weekly(
 
     # Recomputed funds replaced, dropped ones gone.
     _merge_fund_state(lake, funds.attempted, clear=rebuild)
-    _stage("skill", budget, lambda: _guarded("skill", flags, lambda: score_funds(lake, last_q, flags)))
     write_json_atomic(published_path(lake), merged)
     state.pending_funds = remaining  # what the price and filing changes still owe
     state.pending_stocks.clear()
