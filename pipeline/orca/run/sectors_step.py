@@ -97,7 +97,7 @@ def stock_paths(stocks: pl.DataFrame, labels: dict, sic: SicTable) -> tuple[dict
     return paths, how, moved
 
 
-SECTOR_CHUNK = 2000  # stocks per price read: bounds memory
+SECTOR_CHUNK = 1000  # stocks per price read: bounds memory
 
 
 def build_sector_returns(
@@ -157,7 +157,7 @@ def build_sector_returns(
     return stats
 
 
-SKILL_CHUNK = 500  # funds per replay: bounds memory
+SKILL_CHUNK = 200  # funds per replay: bounds memory
 
 
 def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
@@ -203,13 +203,36 @@ def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
     return stats
 
 
-def recompute(lake: Lake) -> dict:
-    """`orca.run sectors`: rebuild the indices and the scores from the lake, for a relabel. No fetch, no fund
-    compute, nothing published; it uses the quarter of the last run."""
+def peak_mb() -> int:
+    """The process's peak memory so far (MB): logged by each step, so a run that dies shows which step grew."""
+    import resource
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
+
+
+def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90) -> dict:
+    """`orca.run sectors`: share-count history (when `fetch_shares` is given), the indices and the scores, from
+    the lake. Its own workflow step after the monthly run's lake is saved (so it can never cost that run), and
+    the whole job after a relabel (`sectors_only`). No fund compute, nothing published; it uses the quarter of
+    the last run."""
+    import gc
+
     from orca.run.state import State
 
     last_q = State.load(lake).last_q
     if last_q is None:
         raise SystemExit("no run has completed on this lake yet")
     flags: list = []
-    return {"sectors": build_sector_returns(lake, last_q, flags), "skill": score_funds(lake, last_q, flags), "flags": flags}
+    budget = Budget(minutes)
+    out: dict = {"flags": flags}
+    if fetch_shares is not None:
+        securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
+        out["shares"] = update_share_history(lake, fetch_shares, securities, flags, budget, date.today())
+        del securities
+        log.info("shares: peak %d MB", peak_mb())
+    out["sectors"] = build_sector_returns(lake, last_q, flags)
+    gc.collect()
+    log.info("sectors: peak %d MB", peak_mb())
+    out["skill"] = score_funds(lake, last_q, flags)
+    log.info("skill: peak %d MB", peak_mb())
+    return out

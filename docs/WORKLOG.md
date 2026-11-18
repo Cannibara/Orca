@@ -5,6 +5,13 @@ Last verified: 2026-11-18
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-18 — Pipeline run 27 lost its runner; sector steps moved out of the monthly run
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 27 (manual, `main` at 33a9869, the first with the sector steps inside the monthly run) failed at 00:56 UTC, 1 h 49 min in, during "Run the pipeline". GitHub kept no log (404) and no later step ran, not even "Save the lake" (`always()`): the runner itself died, most likely out of memory. Nothing was saved or uploaded, so the lake and the site are as before; the share counts it fetched are lost | Owner asked for the run | — |
+| The monthly run now only keeps each fund's trades (`fund_flows`). Share counts, indices and scores run in `orca.run sectors`, a separate workflow step after the lake is saved (`continue-on-error`, then "Save the sector tables" copies only its tables), and the whole job with `sectors_only`. Each part logs its peak memory; chunks are smaller (1,000 stocks, 200 funds) | A draft step must never cost the month's run, and the next failure must say where it grew | `run/weekly.py`, `run/sectors_step.recompute`, `run/cli.py`, `pipeline.yml` |
+
 ## 2026-11-18 — Famous funds: every list opens by popularity
 
 | What changed | Why | Files |

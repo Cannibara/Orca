@@ -155,7 +155,7 @@ web: shows the numbers; tier toggle sector | industry | vertical; thin-vertical 
 - Phase 5: the fund side replays each stock through its own total-return series (dividends reinvested), so it differs slightly from the site's live IRR, which runs to today's price and leaves dividends out.
 - Per-position label ranks are for single-sector ETF positions only (`etf_ranks`); stock positions would need 71 replays each.
 - KS-PME is not built yet; a score is null where the IRR has no root in [−0.99, 10] (e.g. a position bought in the last quarter).
-- The recompute mode runs both steps from the lake; the indices also rebuild in each monthly run (`sectors` stage), and the scores after the fund-state merge (`skill` stage).
+- The monthly run only keeps the trades (`fund_flows`). `orca.run sectors` does share counts, indices and scores: a workflow step after the lake is saved (run 27 lost its runner with them inside the monthly run), or the whole job with `sectors_only`.
 
 ## 10. Defaults chosen (the owner can override)
 - Unlabelled stocks: a SIC → industry "Other" vertical, tagged `sic`.
