@@ -5,6 +5,12 @@ Last verified: 2026-11-18
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-18 — Run 31: sector indices and fund scores built and saved
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 31 (`sectors_only`, `main` 591984a, 27 min after waiting behind backfill run 29) succeeded and saved the lake. Shares: 5,908 companies, none owed (13 min, 163 MB). Indices: 6,765 stocks in 323 labels (default 3,829, placed 1,293, model 798, sic 748, rule 97), 0.01% of last-quarter market value unlabelled and 0.01% on today's share count (2,791 stocks used it in some quarter); peak 2.1 GB. Scores: 2,771 of 2,773 funds scored in 160 chunks of ≤300,000 trades (14 min, peak 4.3 GB of 16 GB), 45,741 ETF positions, 268,056 positions dropped (no label or series), median coverage 78%. Nothing published; phase 6 (contract, publish, web) waits for the owner | Owner: "Ensure the run occurs" | — |
+
 ## 2026-11-18 — Run 28: monthly run fine, sector scores lost the runner; chunks by trades
 
 | What changed | Why | Files |
