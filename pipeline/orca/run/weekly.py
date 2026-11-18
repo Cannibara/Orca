@@ -64,6 +64,7 @@ from orca.run.state import (
     drop_parts,
     dump,
     load_published,
+    part_paths,
     published_path,
     read_table,
     scan,
@@ -79,6 +80,7 @@ log = logging.getLogger(__name__)
 
 DEADLINE_DAYS = 45  # a 13F is due 45 days after the quarter ends
 FUND_BATCH = 250  # funds computed and published per batch: only one fund's output is held at once
+FLOWS_ORDER = ("cik", "stock_id", "q")  # the order of `fund_flows` and of each of its run parts
 
 
 @dataclass(frozen=True)
@@ -251,7 +253,9 @@ def _publish_batch(
         done.metas[meta.fund_id], done.snaps[meta.fund_id] = meta, result.snapshot
         rows.append((meta.fund_id, dump(meta), dump(result.snapshot)))
         flows += [(meta.fund_id, p.stock_id, t.q, t.delta, t.px, t.shares_after) for p in result.output.positions for t in p.trades]
-    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row")
+    # Sorted, so the parts (batches follow the fund order) merge into `fund_flows` without a sort.
+    flows = pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row").sort(FLOWS_ORDER)
+    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), flows
 
 
 def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
@@ -263,9 +267,17 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     lake.write("fund_state", pl.concat([stored, fresh]).sort("cik"))
     drop_parts(lake, FUND_STATE_RUN)
     # The same for each fund's trades, which the sector scores replay (`run/sectors_step.score_funds`).
-    stored = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
-    stored = stored.clear() if clear else stored.filter(~pl.col("cik").is_in(sorted(replaced)))
-    lake.write("fund_flows", pl.concat([stored, scan(lake, FUND_FLOWS_RUN, FUND_FLOWS_SCHEMA)]).sort("cik", "stock_id", "q"))
+    # Streamed through disk: with the history from 1999 the table is ~85M rows, and merging it in
+    # memory took 10.6 GB of the runner's 16 (0.8 GB streamed). The stored table and the run's parts
+    # are each in FLOWS_ORDER and share no fund, so a sorted merge on the fund keeps that order.
+    fresh = [pl.scan_parquet(p).cast(FUND_FLOWS_SCHEMA) for p in part_paths(lake, FUND_FLOWS_RUN)]
+    merged = pl.concat(fresh) if fresh else pl.LazyFrame(schema=FUND_FLOWS_SCHEMA)
+    stored = lake.root / "fund_flows.parquet"
+    if stored.exists() and not clear:
+        kept = pl.scan_parquet(stored).cast(FUND_FLOWS_SCHEMA)
+        kept = kept.filter(~pl.col("cik").is_in(sorted(replaced)))
+        merged = kept.merge_sorted(merged, key="cik")
+    lake.sink("fund_flows", merged)
     drop_parts(lake, FUND_FLOWS_RUN)
 
 

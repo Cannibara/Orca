@@ -21,20 +21,15 @@ class Lake:
             path = self.root / f"{table}.parquet"
         else:
             path = self.root / table / f"{part}.parquet"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Write a temporary file next to the target, then rename it over the target: a table or
-        # part that is rewritten in place (a quarter's filings when new ones arrive, a year of
-        # prices when runs are compacted, the security master) is never left half written by a
-        # crash.
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
-        os.close(fd)
-        try:
-            df.write_parquet(tmp, compression="zstd")
-            os.replace(tmp, path)
-        except BaseException:
-            Path(tmp).unlink(missing_ok=True)
-            raise
-        return path
+        return _atomic(path, lambda tmp: df.write_parquet(tmp, compression="zstd"))
+
+    def sink(self, table: str, frame: pl.LazyFrame) -> Path:
+        """`write` of a lazy frame, streamed to disk rather than collected: for a table too big to
+        hold in memory while it is rebuilt. `frame` may read the table it replaces."""
+        return _atomic(
+            self.root / f"{table}.parquet",
+            lambda tmp: frame.sink_parquet(tmp, compression="zstd"),
+        )
 
     def read(self, table: str, part: str | None = None) -> pl.DataFrame:
         if part is not None:
@@ -52,6 +47,22 @@ class Lake:
         if not directory.is_dir():
             return []
         return sorted(p.stem for p in directory.glob("*.parquet"))
+
+
+def _atomic(path: Path, write) -> Path:
+    """`write(tmp)` to a temporary file next to `path`, then renamed over it: a table or part that
+    is rewritten in place (a quarter's filings when new ones arrive, a year of prices when runs are
+    compacted, the security master) is never left half written by a crash."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
+    os.close(fd)
+    try:
+        write(tmp)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    return path
 
 
 class Manifest:

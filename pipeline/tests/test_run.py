@@ -1987,3 +1987,28 @@ def test_a_run_keeps_every_funds_trades_and_the_sectors_command_scores_them(fixt
     again = lake.read("fund_skill")
     assert stats["skill"]["funds"] == 12 and again.select("cik", "tier", "n").equals(skill.select("cik", "tier", "n"))
     assert (again["picking"] - skill["picking"]).abs().max() < 1e-9  # sums in another order: float noise only
+
+
+def test_the_trades_merge_replaces_the_recomputed_funds_and_keeps_the_order(tmp_path):
+    from orca.run.state import FUND_FLOWS_RUN, FUND_FLOWS_SCHEMA
+    from orca.run.weekly import _merge_fund_state
+
+    lake = Lake(tmp_path)
+
+    def flows(rows):
+        return pl.DataFrame(
+            [(cik, sid, q, 1.0, 2.0, 3.0) for cik, sid, q in rows], schema=FUND_FLOWS_SCHEMA, orient="row"
+        )
+
+    lake.write("fund_flows", flows([(1, 5, -3), (1, 7, 2), (2, 5, 0), (3, 1, 9)]))
+    # This run recomputed fund 2 and added fund 4; fund 5 was tried and has no output any more.
+    lake.write(FUND_FLOWS_RUN, flows([(2, 4, -40), (2, 4, 1)]), part="b00000")
+    lake.write(FUND_FLOWS_RUN, flows([(4, 2, 3)]), part="b00001")
+    _merge_fund_state(lake, {2, 4, 5}, clear=False)
+    got = lake.read("fund_flows").select("cik", "stock_id", "q").rows()
+    assert got == [(1, 5, -3), (1, 7, 2), (2, 4, -40), (2, 4, 1), (3, 1, 9), (4, 2, 3)]
+    assert not lake.parts(FUND_FLOWS_RUN)
+
+    lake.write(FUND_FLOWS_RUN, flows([(9, 1, 1)]), part="b00000")
+    _merge_fund_state(lake, {9}, clear=True)  # a rebuild keeps only this run's funds
+    assert lake.read("fund_flows")["cik"].to_list() == [9]
