@@ -46,9 +46,8 @@ FIRST_INDEX = (
 )  # electronic 13F-HR filings start in 1999 (13F-E before: no tables)
 LAST_INDEX = (2013, 3)  # filings from mid-2013 are XML, read from the bulk data sets
 WORKERS = 4  # downloads at once, so the client's rate limit sets the pace, not latency
-CHUNK = (
-    64  # downloads handed to the workers at a time (throttling stops within one chunk)
-)
+CHUNK = 64  # downloads handed to the workers at a time (throttling stops within one chunk)
+ROWS_PER_FRAME = 200_000  # holdings rows kept as dicts before they become a frame
 
 # Same columns and dtypes as the lake's raw_holdings (without `source`).
 RAW_COLUMNS = pl.Schema(
@@ -81,14 +80,16 @@ CHECKS_SCHEMA = pl.Schema(
 
 # Check statuses. Only STORED ones are ingested.
 OK, CLOSE, UNVERIFIED = "ok", "close", "unverified"
-MISMATCH, NO_ROWS, EMPTY, PAPER, NO_PERIOD, FAILED = (
+MISMATCH, NO_ROWS, EMPTY, PAPER, NO_PERIOD, FAILED, UNREADABLE = (
     "mismatch",
     "no_rows",
     "empty",
     "paper",
     "no_period",
     "download_failed",
+    "read_failed",
 )
+EARLIEST_PERIOD = date(1998, 1, 1)  # a header period before this, or after the filing, is a typo
 STORED = frozenset({OK, CLOSE, UNVERIFIED})
 EXACT, NEAR = 0.005, 0.02  # value total tolerances of OK and CLOSE
 UNIT_SCALES = (
@@ -653,12 +654,13 @@ def read_submission(
         return None, [], check
     period = _HEADER_PERIOD.search(text)
     try:
-        period_q = q_of_date(
-            date(int(period[1][:4]), int(period[1][4:6]), int(period[1][6:]))
-        )
+        period_day = date(int(period[1][:4]), int(period[1][4:6]), int(period[1][6:]))
     except (TypeError, ValueError):
+        period_day = None
+    if period_day is None or not EARLIEST_PERIOD <= period_day <= entry.filed:
         check["status"] = NO_PERIOD
         return None, [], check
+    period_q = q_of_date(period_day)
     texts = document_texts(text)
     table, status, value, entries = read_holdings(texts)
     check.update(
@@ -738,6 +740,7 @@ def fetch_quarter(
 
     filings: list[dict] = []
     rows: list[dict] = []
+    frames: list[pl.DataFrame] = []
     checks: list[dict] = []
     refused = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -768,13 +771,23 @@ def fetch_quarter(
                 )
                 continue
             refused = 0
-            filing, holdings, check = read_submission(got, entry)
+            try:
+                filing, holdings, check = read_submission(got, entry)
+            except Exception:  # one odd filing must not stop every later backfill on it
+                log.exception("legacy %s: could not read %s", key, entry.accession)
+                filing, holdings = None, []
+                check = {"accession": entry.accession, "cik": entry.cik, "filed": entry.filed,
+                         "form": entry.form, "status": UNREADABLE}
             checks.append(check)
             if filing is not None:
                 filings.append(filing)
                 rows.extend(holdings)
+            if len(rows) >= ROWS_PER_FRAME:  # dicts are heavy: a 2012 quarter has ~2.5M rows
+                frames.append(pl.DataFrame(rows, schema=RAW_COLUMNS))
+                rows = []
+    frames.append(pl.DataFrame(rows, schema=RAW_COLUMNS))
     return (
         pl.DataFrame(filings, schema=FILINGS_SCHEMA),
-        pl.DataFrame(rows, schema=RAW_COLUMNS),
+        pl.concat(frames),
         pl.DataFrame(checks, schema=CHECKS_SCHEMA),
     )

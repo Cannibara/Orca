@@ -525,13 +525,15 @@ def resolve_vendor_tickers(
     stocks = stock_of(cusip_map)
     tickers = dict(securities.select("stock_id", "ticker").iter_rows())
     spans = held_spans(lake, stocks)
-    resolved = resolve(tickers, spans, universe)
+    gone = set(cusip_map.filter(pl.col("method") == UNLISTED)["stock_id"].drop_nulls().to_list())
+    resolved = resolve(tickers, spans, universe, gone=gone)
     missing = set(tickers) - set(resolved["stock_id"].to_list())
+    old_only = {sid for sid, (_, last) in spans.items() if last < q_start(0)}
     alternates, counts = alternate_tickers(
-        lake, sources, securities, cusip_map, missing, today, flags, budget
+        lake, sources, securities, cusip_map, missing, today, flags, budget, old_only
     )
     if alternates:
-        resolved = resolve(tickers, spans, universe, alternates)
+        resolved = resolve(tickers, spans, universe, alternates, gone=gone)
     # The ticker each stock's stored prices were fetched under: its vendor ticker of the last
     # run, else (a stock new to the table, or the first run with one) the security's own.
     stored = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)
@@ -581,6 +583,7 @@ def alternate_tickers(
     today: date,
     flags: list,
     budget: Budget,
+    old_only: set[int] = frozenset(),
 ) -> tuple[dict[int, list[str]], dict]:
     """Other tickers for the `missing` stocks (no vendor ticker from their own): the hand-checked
     `ticker_overrides`, then, for those that look like shares: stock_id -> [SEC ticker of the same normalised name (exactly one SEC row; not for
@@ -609,8 +612,10 @@ def alternate_tickers(
         return alternates, counts
     # By name only for a plain common share: a warrant, unit or preferred ("XYZ-WS", "XYZ-PA")
     # carries its company's name too, and would take the common stock's prices. Never for a
-    # company gone since (UNLISTED): its name may be today's namesake's (old GM, new GM).
+    # company gone since (UNLISTED) or one held only before 2013 (`old_only`): its name may be
+    # today's namesake's (old GM and new GM; "AT&T Corp" and "AT&T Inc" both read "AT T").
     gone = set(cusip_map.filter(pl.col("method") == UNLISTED)["stock_id"].drop_nulls().to_list())
+    gone |= old_only
     named = {
         sid: name for sid, name in shares.items() if "-" not in tickers_of[sid] and sid not in gone
     }
@@ -782,6 +787,7 @@ def backfill_price_heads(
     of the budget are left (default: the price stage's). Their funds and weekly files are owed a
     recompute; today's share counts are unchanged (a split before 2013 is in them already).
     Returns the counts to log."""
+    recover_prices_in_flight(lake, state)  # a run that died mid-fetch: its stocks are owed first
     stocks = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
     firsts = scan_parts(
         lake,

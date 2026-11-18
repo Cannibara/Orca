@@ -171,11 +171,14 @@ def test_amendment_of_unknown_type_is_ignored():
     assert rows_of(build_holdings(filings, raws), "cusip") == [("AAA",)]
 
 
-def test_a_lone_amendment_of_unknown_type_is_the_quarters_report():
-    filings = filings_frame(filing(B, date(2024, 3, 1), form="13F-HR/A", amendment_type=None))
-    raws = raw_frame(raw(B, "BBB", 2))
+def test_a_lone_text_amendment_of_unknown_type_is_the_quarters_report():
+    lone = filing(B, date(2012, 3, 1), form="13F-HR/A", amendment_type=None, source="legacy")
+    raws = raw_frame(raw(B, "BBB", 2)).with_columns(source=pl.lit("legacy"))
+    assert rows_of(build_holdings(filings_frame(lone), raws), "cusip") == [("BBB",)]
 
-    assert rows_of(build_holdings(filings, raws), "cusip") == [("BBB",)]
+    # An XML amendment always states its type: one that does not is still ignored.
+    xml = filing(B, date(2024, 3, 1), form="13F-HR/A", amendment_type=None)
+    assert build_holdings(filings_frame(xml), raw_frame(raw(B, "BBB", 2))).height == 0
 
 
 @pytest.mark.parametrize("reverse", [False, True])

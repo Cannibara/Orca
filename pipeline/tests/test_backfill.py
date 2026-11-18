@@ -360,3 +360,20 @@ def test_an_unreadable_filing_does_not_cut_the_funds_history(tmp_path):
     # they are carried from Q3 2012.
     assert summary["tracked_since_q"] == -2
     assert summary["quarters"]["q"] == [-2, -1, 0, 1, 2]
+
+
+def test_an_unmarked_amendment_next_to_an_unreadable_original_is_not_the_book(tmp_path):
+    from orca.run.ingest import _mark_unmarked, _originals
+
+    checks = pl.DataFrame(
+        [{"accession": "A", "cik": 1, "period": -5, "filed": date(2012, 2, 1), "form": "13F-HR", "status": "mismatch"}],
+        schema=CHECKS_SCHEMA,
+    )
+    base = {"cik": 1, "filed": date(2012, 3, 1), "form": "13F-HR/A", "amendment_type": None,
+            "manager_name": None, "source": "legacy"}
+    filings = pl.DataFrame(
+        [{**base, "accession": "B", "period": -5}, {**base, "accession": "C", "period": -4}],
+        schema=FILINGS_SCHEMA,
+    )
+    marked = dict(_mark_unmarked(filings, _originals(checks)).select("accession", "amendment_type").iter_rows())
+    assert marked == {"B": "unmarked", "C": None}  # C: no original that quarter, it is the report

@@ -411,3 +411,31 @@ AEGIS GROUP             COM       0965756      300 10000 SH       OTHER   02    
     filing, rows, check = read_submission(submission(text), ENTRY)
     assert [(r["cusip"], r["shares"]) for r in rows] == [("88579Y101", 1000.0), ("88579Y101", 5000.0)]
     assert check["status"] == OK and check["invalid_rows"] == 2
+
+
+
+def test_a_period_after_the_filing_or_before_1998_is_a_typo():
+    late = read_submission(submission(FIXED, period="20151231"), ENTRY)  # filed 2005
+    assert late[2]["status"] == NO_PERIOD and late[0] is None
+    early = read_submission(submission(FIXED, period="19901231"), ENTRY)
+    assert early[2]["status"] == NO_PERIOD
+
+
+def test_one_filing_that_cannot_be_read_does_not_stop_the_quarter(monkeypatch):
+    good, bad = "0001111111-05-000001", "0003333333-05-000003"
+    routes = {
+        INDEX_URL: index_text(("13F-HR", 1111111, good), ("13F-HR", 3333333, bad)),
+        filing_url(1111111, good): submission(SUMMARY.format(entries=3, value="1,500") + FIXED),
+        filing_url(3333333, bad): b"<SEC-DOCUMENT>odd",
+    }
+    real = legacy.read_submission
+
+    def flaky(body, entry):
+        if entry.cik == 3333333:
+            raise RuntimeError("an odd filing")
+        return real(body, entry)
+
+    monkeypatch.setattr(legacy, "read_submission", flaky)
+    filings, raw, checks = fetch_quarter(make_client(routes), "2005Q1", set())
+    assert filings["accession"].to_list() == [good]
+    assert dict(checks.select("accession", "status").iter_rows())[bad] == legacy.UNREADABLE

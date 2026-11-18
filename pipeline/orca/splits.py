@@ -15,11 +15,14 @@ import polars as pl
 from orca.quarters import q_start
 from orca.storage import Lake
 
-# Split ratios looked for, reverse splits included.
-FACTORS = (2.0, 3.0, 1.5, 4.0, 5.0, 10.0, 1.25, 4 / 3, 0.5, 0.25, 0.2, 0.1)
+# Split ratios looked for, reverse splits included. Not 5-for-4 or 4-for-3: a 25% or 33% add
+# at a lower price looks the same in one fund's filing.
+FACTORS = (2.0, 3.0, 1.5, 4.0, 5.0, 10.0, 0.5, 0.25, 0.2, 0.1)
 SHARE_TOLERANCE = 0.01  # a holder's share count is within 1% of k times the quarter before
 PRICE_TOLERANCE = 0.25  # and its reported price within 25% of 1/k times (prices move)
 MIN_AGREEING = 0.5  # of the holders reporting the stock in both quarters
+MIN_HOLDERS = 2  # and at least this many of them: one fund doubling a position is no split
+LAST_QUARTER = 0  # read up to Q1 2013: the years without vendor prices for many stocks
 
 
 def _part_quarter(part: str) -> int:
@@ -29,13 +32,17 @@ def _part_quarter(part: str) -> int:
 def infer_splits(lake: Lake, cusips: set[str]) -> dict[str, list[tuple[date, float]]]:
     """For each CUSIP of `cusips`, the splits its holders' filings show: (first day of the quarter
     in which the share counts changed, factor). A split is read in quarter q when at least
-    MIN_AGREEING of the funds holding the stock in q - 1 and q report exactly k times the
-    shares (SHARE_TOLERANCE) at about 1/k of the reported price (PRICE_TOLERANCE), the same k
-    for all of them. Reads two quarters' holdings at a time, only the rows of `cusips`."""
+    MIN_AGREEING of the funds holding the stock in q - 1 and q, and at least MIN_HOLDERS,
+    report exactly k times the shares (SHARE_TOLERANCE) at about 1/k of the reported price
+    (PRICE_TOLERANCE), the same k for all of them. Only quarters up to LAST_QUARTER: the 13F
+    data from then on is unchanged by the pre-2013 history. Reads two quarters' holdings at a
+    time, only the rows of `cusips`."""
     if not cusips:
         return {}
     wanted = sorted(cusips)
-    parts = sorted(lake.parts("holdings"), key=_part_quarter)
+    parts = sorted(
+        (p for p in lake.parts("holdings") if _part_quarter(p) <= LAST_QUARTER), key=_part_quarter
+    )
     found: dict[str, list[tuple[date, float]]] = {}
     before, before_q = None, None
     for part in parts:
@@ -80,7 +87,10 @@ def _splits_between(before: pl.DataFrame, after: pl.DataFrame) -> list[tuple[str
         .group_by("cusip", "factor")
         .agg(agreeing=pl.len())
         .join(holders, on="cusip")
-        .filter(pl.col("agreeing") >= MIN_AGREEING * pl.col("holders"))
+        .filter(
+            (pl.col("agreeing") >= MIN_AGREEING * pl.col("holders"))
+            & (pl.col("agreeing") >= MIN_HOLDERS)
+        )
         .sort("cusip", "agreeing", descending=[False, True])
         .unique("cusip", keep="first", maintain_order=True)
     )

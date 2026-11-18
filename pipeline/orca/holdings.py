@@ -56,8 +56,9 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
     Base: the latest original 13F-HR, or, if the fund-quarter has any restatement, the latest
     restatement. On top of it go all new-holdings amendments filed after the base. "Latest" and
     "after" order filings by (filed, accession), so same-day filings are decided
-    deterministically. An amendment of unknown type is ignored, unless its fund-quarter has no
-    original or restatement (then it is taken as a restatement), and so are new-holdings
+    deterministically. An amendment of unknown type is ignored, unless it is a pre-2013 text
+    filing (source legacy) and its fund-quarter has no original or restatement (then it is taken
+    as a restatement), and so are new-holdings
     amendments of a fund-quarter with no base report in the data: a partial set of positions
     would read as a near-total sale.
 
@@ -75,9 +76,10 @@ def select_reports(filings: pl.DataFrame) -> pl.DataFrame:
     )
     filings = filings.with_columns(role=role)
     # Some filers sent every quarterly report as an amendment with neither box checked (Kahn
-    # Brothers before 2013): in a fund-quarter with no other report, such an amendment is it.
+    # Brothers before 2013): in a fund-quarter with no other report, such a pre-2013 text
+    # amendment is it. (An XML amendment always states its type.)
     based = filings.filter(pl.col("role").is_in([ORIGINAL, RESTATEMENT])).select("cik", "period").unique()
-    lone = (pl.col("form") == AMENDMENT_FORM) & pl.col("role").is_null()
+    lone = (pl.col("form") == AMENDMENT_FORM) & pl.col("role").is_null() & (pl.col("source") == LEGACY)
     filings = filings.join(based.with_columns(_based=pl.lit(True)), on=["cik", "period"], how="left").with_columns(
         role=pl.when(lone & pl.col("_based").is_null()).then(pl.lit(RESTATEMENT)).otherwise(pl.col("role"))
     ).drop("_based")
