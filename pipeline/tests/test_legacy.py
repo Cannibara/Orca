@@ -397,3 +397,17 @@ MICROSOFT CORP    COM     594918104     300       5,000  SH
     _, rows, check = read_submission(submission(text), ENTRY)
     assert [r["cusip"] for r in rows] == ["037833100", "594918104"]
     assert check["invalid_rows"] == 1
+
+
+def test_repeats_indented_their_own_way_and_uncoded_rows_with_repeats():
+    # Harris from 2011: repeated rows do not line up under the row above; a SEDOL row's repeats
+    # are uncoded too, not more of the US stock above it.
+    text = SUMMARY.format(entries=5, value="1,100") + """
+3M               COM       88579Y101      100  1000.00 SH       SOLE        1000.00
+                                 600 5000.00SH       OTHER   02            5000.00
+AEGIS GROUP             COM       0965756      300 10000 SH       OTHER   02    10000
+                                 100 3000 SH       DEFINED 01                3000
+"""
+    filing, rows, check = read_submission(submission(text), ENTRY)
+    assert [(r["cusip"], r["shares"]) for r in rows] == [("88579Y101", 1000.0), ("88579Y101", 5000.0)]
+    assert check["status"] == OK and check["invalid_rows"] == 2

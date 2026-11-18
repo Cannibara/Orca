@@ -126,6 +126,12 @@ _CUSIP8 = re.compile(
     r"(?<![0-9A-Z.,$])([0-9]{3}[0-9A-Z]{3})([ -]?)([0-9A-Z]{2})(?![0-9A-Z.,])"
 )
 _TOKEN = re.compile(r"\S+")
+# A code-like token (6 to 9 letters and digits, at least one digit), then a value and a share
+# count with its share type: an uncoded holdings row.
+_UNCODED_ROW = re.compile(
+    r"(?<![0-9A-Z])(?=[0-9A-Z]{6,9}\s)[0-9A-Z]*[0-9][0-9A-Z]*\s+"
+    r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+[0-9][0-9,]*(?:\.[0-9]*)?\s*(?:SH|PRN)\b"
+)
 _NUMBER = re.compile(r"^\$?\(?([0-9][0-9,]*(?:\.[0-9]*)?)\)?(SH|PRN)?$")  # "74,650,000.PRN" too
 # A value with cents run into a grouped share count: "4,530.0010,100,000" is 4,530.00 and 10,100,000.
 _GLUED_PAIR = re.compile(
@@ -320,6 +326,17 @@ def _aligned_numbers(
     return None
 
 
+def _unaligned_repeat(line: str) -> tuple[float, float] | None:
+    """(value, shares) of a line that starts with two numbers, the second followed by its share
+    type (SH or PRN, glued or not), and has nothing before them."""
+    numbers, words = _numbers(line)
+    if len(numbers) < 2 or line[: numbers[0][1]].strip() or "TOTAL" in line:
+        return None
+    if not words or words[0] not in ("SH", "PRN"):
+        return None
+    return numbers[0][0], numbers[1][0]
+
+
 def _cusip(line: str, mode: str) -> tuple[str, int, int] | None:
     """The first CUSIP on the line: (code, start column, end column). In mode EIGHT, 8-character
     codes (three digits first) take their computed check digit; in mode PADDED, a 7- or
@@ -424,9 +441,27 @@ def read_table(texts: list[str], mode: str = NINE) -> Table:
                 continue
             if _TOTAL_WORD.search(line):  # the check's fallback when no summary page has totals
                 totals += [value for value, _, _ in _all_numbers(line)]
-            numbers = _aligned_numbers(line, columns) if columns else None
+            repeat = _unaligned_repeat(line) if above is not None or above_invalid else None
+            numbers = None if repeat else _aligned_numbers(line, columns) if columns else None
             if numbers is None:
-                if _SEPARATOR.match(line) or not _numbers(line)[0]:
+                if repeat is not None:
+                    # Some filers indent repeated rows their own way (Harris from 2011): a line of
+                    # just a value, a share count and its share type repeats the row above.
+                    value, shares = (repeat[1], repeat[0]) if swapped else repeat
+                    if above is not None:
+                        rows.append(
+                            Row(above.cusip, value, shares, above.sh_type, above.put_call, above.issuer)
+                        )
+                        since_total += value
+                        text_total += value
+                    else:
+                        invalid.append(value)
+                elif (uncoded := _UNCODED_ROW.search(line)) and "TOTAL" not in line:
+                    # A row with a code that is no CUSIP (a SEDOL: "B59VNG5"), wherever its
+                    # columns sit: it counts towards the check, and so do its repeats.
+                    invalid.append(float(uncoded[1].replace(",", "")))
+                    above, above_invalid = None, True
+                elif _SEPARATOR.match(line) or not _numbers(line)[0]:
                     above, above_invalid = None, False
                 i += 1
                 continue
