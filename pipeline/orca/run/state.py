@@ -51,6 +51,12 @@ CUSIP_MAP_SCHEMA = pl.Schema(
 REPORTS_SCHEMA = FILINGS_SCHEMA
 FUND_STATE_SCHEMA = pl.Schema({"cik": pl.Int64, "meta": pl.String, "snap": pl.String})
 FUND_STATE_RUN = "fund_state_run"  # this run's fund state, one part per batch, until merged
+# Each fund's trades over its tracking segment (q, signed share change, trade price, shares after; today's
+# share basis), merged like fund_state; the sector scores replay them.
+FUND_FLOWS_SCHEMA = pl.Schema(
+    {"cik": pl.Int64, "stock_id": pl.Int32, "q": pl.Int32, "delta": pl.Float64, "px": pl.Float64, "shares_after": pl.Float64}
+)
+FUND_FLOWS_RUN = "fund_flows_run"
 RF_SCHEMA = pl.Schema({"year": pl.Int32, "rate": pl.Float64})
 
 

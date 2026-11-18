@@ -1,0 +1,411 @@
+<title>Subsector Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky header (tabs + progress); each tab is a single column; browse view = cascading level selects + one table. */
+:root{--bg:#f4f5f7;--surface:#fff;--ink:#14171c;--muted:#5b6571;--line:#dde1e7;--accent:#2b62d9;--accent-weak:#e5edfc;--warn:#bf5a0c;--warn-weak:#fbeee2;--ok:#1d7a4b;--ok-weak:#e1f2e9;--bad:#a8362d;--bad-weak:#f9e6e4;--head:#fafbfc;
+ --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--surface:#171b22;--ink:#e7eaef;--muted:#98a2af;--line:#2a313b;--accent:#7aa5ff;--accent-weak:#1b2a47;--warn:#f29a55;--warn-weak:#3a2615;--ok:#5cc58f;--ok-weak:#14301f;--bad:#f08a80;--bad-weak:#3a1c19;--head:#1b2029;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1116;--surface:#171b22;--ink:#e7eaef;--muted:#98a2af;--line:#2a313b;--accent:#7aa5ff;--accent-weak:#1b2a47;--warn:#f29a55;--warn-weak:#3a2615;--ok:#5cc58f;--ok-weak:#14301f;--bad:#f08a80;--bad-weak:#3a1c19;--head:#1b2029;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30}
+a{color:var(--accent)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:12px 0;border-bottom:1px solid var(--line);margin-inline:-4px;padding-inline:4px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.01em}.brand h1 span{color:var(--muted);font-weight:500}
+#status{font-size:12px;color:var(--muted)}#status.err{color:var(--bad)}
+.tabs{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.tabs a{padding:8px 12px;border-radius:8px 8px 0 0;text-decoration:none;color:var(--muted);font-weight:600;border-bottom:2px solid transparent}
+.tabs a.on{color:var(--ink);border-color:var(--accent)}.tabs .newbtn{margin-left:auto}
+.prog{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:6px 0 8px}.prog b{color:var(--ink);font-variant-numeric:tabular-nums}
+.intro{margin:14px 0;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--muted);max-width:92ch}.intro b{color:var(--ink)}
+.intro ul{margin:6px 0 0;padding-left:18px}.intro li{margin:2px 0}
+h2{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}h3{margin:18px 0 8px}
+.meta{color:var(--muted);margin-bottom:12px}.meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px;max-width:980px}
+.box h4{margin:0 0 6px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.warn{color:var(--warn)}.dl{color:var(--muted);font-size:12px}
+.chip{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600;white-space:nowrap;background:var(--accent-weak);color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--surface);color:var(--ink);padding:6px 12px;font:600 13px var(--font);cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--accent);color:#fff}.seg button.on.neg{background:var(--bad)}.seg button.on.neu{background:var(--warn)}
+.seg.sm button{padding:4px 9px;font-size:12px}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+textarea,input[type=text],select{font:13px var(--font);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+textarea{width:100%;min-height:54px;margin-top:8px;resize:vertical}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:6px 12px;font:600 13px var(--font);cursor:pointer}
+.btn.sm{padding:3px 9px;font-size:12px}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.btn[disabled]{opacity:.5;cursor:default}
+.navrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}.navrow select{min-width:150px;max-width:100%}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th{background:var(--head);text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+tr.s-ok td:first-child{box-shadow:inset 3px 0 var(--ok)}tr.s-move td:first-child{box-shadow:inset 3px 0 var(--warn)}tr.s-unsure td:first-child{box-shadow:inset 3px 0 var(--bad)}
+.n,.num{font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}.num{color:var(--ink)}.thin{color:var(--warn)!important;font-weight:600}
+.tk{font-family:var(--mono);font-weight:600;white-space:nowrap}.nm{min-width:170px}.nm small{display:block;color:var(--muted);font-size:11px}
+.lab{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:600;margin:2px 4px 2px 0}
+.lab.m{background:var(--accent-weak);color:var(--accent);border:1px solid var(--accent-weak)}.lab.m.inf{border:1px dashed var(--accent)}.lab.m.mod{border:1px dotted var(--warn);background:var(--warn-weak);color:var(--warn)}.num.held{font-variant-numeric:tabular-nums}
+.lab.x{background:transparent;border:1px solid var(--line);color:var(--ink)}.lab.ghost{opacity:.55;text-decoration:line-through}
+.lab button.lx{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
+.call{min-width:230px}.call>*{margin-bottom:5px}.call input,.call select{display:block;width:100%;max-width:250px}
+select.need{border-color:var(--warn);background:var(--warn-weak)}
+details.sector{margin:0 0 14px;max-width:980px}details.sector>summary{cursor:pointer;font-size:17px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ind{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0}
+.indh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}.indh h4{margin:0;font-size:15px}
+.ind table{min-width:560px}
+.cards{display:grid;gap:12px;max-width:980px}.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px}
+.card header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.card h3{margin:0;font-size:16px;flex:1 1 220px;min-width:0}.card p{margin:8px 0;max-width:80ch}
+.m{display:inline-block;font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin:2px 3px 2px 0}.m i{font-style:normal;color:var(--muted)}
+.peers .lvl{margin:6px 0}.peers .lvl b{font-size:13px}
+.find{display:flex;gap:8px;margin:0 0 10px;max-width:520px}.find input{flex:1}
+.hits{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:18px;width:min(440px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.45)}dialog h3{margin:0 0 4px}
+dialog label{display:block;margin:10px 0 0;font-weight:600;font-size:13px}dialog input,dialog select,dialog textarea{width:100%;margin-top:4px}
+dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+@media (max-width:820px){.top{position:static}}
+@media (prefers-reduced-motion:no-preference){.btn{transition:background .12s}}
+</style>
+
+<div class="top">
+ <div class="brand"><h1>Orca <span>hierarchy review</span></h1><span id="status">Loading saved calls…</span></div>
+ <div class="tabs" id="tabs"></div>
+ <div class="prog" id="prog"></div>
+</div>
+<main id="main"></main>
+<dialog id="dlg"><form id="dlgform"><h3 id="dtitle">New label</h3><div class="dl" id="dhelp"></div>
+<label for="ds">Sector</label><select id="ds"></select><input type="text" id="dsn" maxlength="40" placeholder="New sector name" hidden>
+<label for="di">Industry</label><select id="di"></select><input type="text" id="din" maxlength="50" placeholder="New industry name" hidden>
+<label for="dn" id="dnl">Industry vertical</label><input type="text" id="dn" maxlength="60" required placeholder="e.g. Memory">
+<label for="dd">Why it should exist (optional)</label><textarea id="dd" placeholder="Which stocks, and what drives them"></textarea>
+<p class="dl" id="dmsg"></p><div class="row"><button type="button" class="btn" id="dcancel">Cancel</button><button type="submit" class="btn pri">Create</button></div></form></dialog>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(()=>{
+const D=JSON.parse(document.getElementById('data').textContent);
+const L3=D.L3,L3l=L3.toLowerCase(),L3P=D.L3p,L3p=L3P.toLowerCase();
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s);
+let S={},tab='h',sortBy=D.top?'held':'cap',nlMore=0,view={s:null,i:null,n:null,more:0},findQ='',findT=null,db=null,col=null,loaded=false,ctx=null,T,EFF,CNT,OPTS;
+const timers={};
+const sid=t=>'s_'+t.replace(/[^A-Za-z0-9]/g,'_');
+const slug=p=>'h_'+p.replace(/[^A-Za-z0-9]+/g,'_').slice(0,150);
+const vOf=id=>(S[id]&&S[id].v)||'',tOf=id=>(S[id]&&S[id].t)||'',cOf=id=>(S[id]&&S[id].c)||'';
+function status(msg,err){const e=$('#status');e.textContent=msg;e.className=err?'err':''}
+
+/* ---------- persistence ---------- */
+function put(id,patch,debounce){
+  S[id]=Object.assign({},S[id],patch);status('Saving…');clearTimeout(timers[id]);
+  timers[id]=setTimeout(()=>flush(id),debounce?700:0);
+}
+async function flush(id){
+  delete timers[id];
+  if(!col){status('Not signed in: calls are not being saved',true);return}
+  try{const s=S[id]||{};await col.doc(id).set({v:s.v||'',t:s.t||'',c:s.c||'',x:s.x||[],rx:s.rx||[],at:Date.now()});if(!Object.keys(timers).length)status('Saved')}
+  catch(e){status('Could not save: '+(e&&e.message||e),true)}
+}
+async function createNode(sector,industry,sub,note){
+  const id='n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  S[id]={k:'node',sector,industry,sub,note,at:Date.now()};timers[id]=1;status('Saving…');
+  try{if(!col)throw new Error('not signed in');await col.doc(id).set(S[id]);delete timers[id];if(!Object.keys(timers).length)status('Saved')}
+  catch(e){delete timers[id];status('Could not save: '+(e&&e.message||e),true)}
+  return id;
+}
+async function delNode(id){delete S[id];try{if(col)await col.doc(id).delete()}catch(e){status('Could not delete: '+(e&&e.message||e),true)}}
+async function boot(){
+  try{
+    const c=window.claude&&await window.claude.use('db');
+    if(!c){status('Not signed in: calls are not being saved',true);return}
+    db=c;col=db.collection('review');
+    const t=setTimeout(()=>{if(!loaded)status('Could not load saved calls',true)},10000);
+    col.onSnapshot(snap=>{
+      clearTimeout(t);loaded=true;const seen=new Set();
+      snap.docs.forEach(d=>{seen.add(d.id);if(!timers[d.id])S[d.id]=d.data()});
+      Object.keys(S).forEach(k=>{if(k.indexOf('n_')===0&&!seen.has(k)&&!timers[k])delete S[k]});
+      if(!Object.keys(timers).length)status('Saved');
+      rebuild();chrome();if(!document.activeElement||!document.activeElement.closest('#main'))main();
+    },e=>status('Could not load saved calls: '+(e&&e.message||e),true));
+  }catch(e){status('Saving unavailable: '+(e&&e.message||e),true)}
+}
+
+/* ---------- taxonomy, effective labels, counts ---------- */
+const pathOf=k=>`${T.sec[T.ind[T.sub[k][0]][0]]} > ${T.ind[T.sub[k][0]][1]} > ${T.sub[k][1]}`;
+const indPath=i=>`${T.sec[T.ind[i][0]]} > ${T.ind[i][1]}`;
+const short=k=>`${T.ind[T.sub[k][0]][1]} › ${T.sub[k][1]}`;
+function rebuild(){
+  T={sec:D.sec.slice(),ind:D.ind.map(x=>x.slice()),sub:D.sub.map(x=>x.concat([null])),by:{}};
+  Object.keys(S).filter(k=>k.indexOf('n_')===0&&S[k]&&S[k].k==='node').map(k=>Object.assign({id:k},S[k])).sort((a,b)=>a.at-b.at).forEach(n=>{
+    let si=T.sec.indexOf(n.sector);if(si<0){T.sec.push(n.sector);si=T.sec.length-1}
+    let ii=T.ind.findIndex(x=>x[0]===si&&x[1]===n.industry);if(ii<0){T.ind.push([si,n.industry]);ii=T.ind.length-1}
+    if(!T.sub.some(x=>x[0]===ii&&x[1]===n.sub))T.sub.push([ii,n.sub,0,n.id]);
+  });
+  T.sub.forEach((x,k)=>{T.by[pathOf(k)]=k});
+  EFF=D.st.map(st=>{
+    const s=S[sid(st[0])]||{};let m=st[6];
+    if(s.v==='move'&&s.t&&T.by[s.t]!=null)m=T.by[s.t];
+    const ex=new Set(st[7]);(s.x||[]).forEach(p=>{if(T.by[p]!=null)ex.add(T.by[p])});(s.rx||[]).forEach(p=>{if(T.by[p]!=null)ex.delete(T.by[p])});ex.delete(m);
+    return {m,ex:[...ex]};
+  });
+  CNT={sub:{},ind:{},sec:{}};
+  const bump=(o,k,big,isM,isX,si)=>{const c=o[k]||(o[k]={n:0,big:0,m:0,x:0,top:[]});c.n++;if(big)c.big++;if(isM)c.m++;if(isX)c.x++;if(c.top.length<6&&D.st[si][2]>0)c.top.push(si)};
+  D.st.forEach((st,si)=>{
+    const e=EFF[si],big=st[2]>=1,labs=[e.m].concat(e.ex);
+    new Set(labs).forEach(k=>bump(CNT.sub,k,big,k===e.m,k!==e.m,si));
+    const inds=new Set(labs.map(l=>T.sub[l][0]));inds.forEach(i=>bump(CNT.ind,i,big,false,false,si));
+    new Set([...inds].map(i=>T.ind[i][0])).forEach(s=>bump(CNT.sec,s,big,false,false,si));
+  });
+  const grp={};T.sub.forEach((x,k)=>{(grp[x[0]]||(grp[x[0]]=[])).push(k)});
+  OPTS=T.ind.map((x,ii)=>({label:indPath(ii).replace(' > ',' › '),subs:(grp[ii]||[]).map(k=>[pathOf(k),T.sub[k][1]])}));
+}
+function subOpts(sel,ph){
+  let h=`<option value="">${esc(ph||'Choose…')}</option><option value="__new__">＋ New ${L3l}…</option>`;
+  if(sel&&T.by[sel]==null)h+=`<option value="${esc(sel)}" selected>${esc(sel)}</option>`;
+  OPTS.forEach(g=>{if(g.subs.length)h+=`<optgroup label="${esc(g.label)}">${g.subs.map(([p,n])=>`<option value="${esc(p)}" ${p===sel?'selected':''}>${esc(n)}</option>`).join('')}</optgroup>`});
+  return h;
+}
+function nodeSubs(){
+  const r=new Set();T.sub.forEach((x,k)=>{
+    if(view.n!=null?k===view.n:view.i!=null?x[0]===view.i:view.s!=null?T.ind[x[0]][0]===view.s:true)r.add(k)});
+  return r;
+}
+
+/* ---------- chrome ---------- */
+function chrome(){
+  const yours=Object.keys(S).filter(k=>(k.indexOf('s_')===0&&(S[k].v==='move'||(S[k].x||[]).length||(S[k].rx||[]).length))||(k.indexOf('n_')===0&&S[k].k==='node')).length;
+  const tabs=[['h','Hierarchy','hierarchy'],['v','Browse stocks','v-'+(view.s==null?'x':view.s)+'-'+(view.i==null?'x':view.i)+'-'+(view.n==null?'x':view.n)],['f','Find a stock','find'],['r','Rules to confirm','rules'],...(D.nl?[['n',`Not labelled (${D.nl.length.toLocaleString('en-US')})`,'notlabelled']]:[]),['y','Your changes'+(yours?` (${yours})`:''),'yours']];
+  $('#tabs').innerHTML=tabs.map(([k,l,h])=>`<a href="#${h}" class="${tab===k?'on':''}">${l}</a>`).join('')+`<button type="button" class="btn sm newbtn" data-act="newnode">＋ New label</button>`;
+  const stock=Object.keys(S).filter(k=>k.indexOf('s_')===0&&S[k].v).length;
+  const subDone=T.sub.filter((x,k)=>vOf(slug(pathOf(k)))).length;
+  const rd=D.rules.filter(r=>vOf('r_'+r.id)).length;
+  $('#prog').innerHTML=`<span>${T.sec.length} sectors · ${T.ind.length} industries · ${T.sub.length} ${L3p}</span><span>${L3P} reviewed <b>${subDone}/${T.sub.length}</b></span><span>Stock calls <b>${stock}</b></span><span>Rules decided <b>${rd}/${D.rules.length}</b></span>`;
+}
+function seg(id,opts){const v=vOf(id);return `<div class="seg" role="group">${opts.map(([k,l,c])=>`<button type="button" class="${v===k?'on':''} ${c||''}" data-act="seg" data-id="${id}" data-v="${k}" aria-pressed="${v===k}">${l}</button>`).join('')}</div>`}
+
+/* ---------- stock rows ---------- */
+function chipsHtml(si,withX){
+  const st=D.st[si],e=EFF[si],id=sid(st[0]);
+  const mod=st[8]===3,inf=st[8]===0&&e.m===st[6];
+  let h=`<span class="lab m ${mod?'mod':inf?'inf':''}" title="${esc(pathOf(e.m))}${mod?' (first pass by a model from the company name, confidence '+st[12]+' of 3)':inf?' (default from the Damodaran group, not checked by name)':''}">${esc(short(e.m))}</span>`;
+  e.ex.forEach(k=>{h+=`<span class="lab x" title="${esc(pathOf(k))}">${esc(short(k))}${withX?`<button type="button" class="lx" data-act="rmx" data-id="${id}" data-p="${esc(pathOf(k))}" aria-label="Remove label ${esc(T.sub[k][1])}">✕</button>`:''}</span>`});
+  const s=S[id]||{};(s.rx||[]).forEach(p=>{if(T.by[p]!=null)h+=`<span class="lab x ghost" title="You removed this label">${esc(short(T.by[p]))}</span>`});
+  if(e.m!==st[6])h+=`<div class="dl">was ${esc(short(st[6]))}</div>`;
+  return h;
+}
+function callHtml(si){
+  const st=D.st[si],id=sid(st[0]),v=vOf(id);
+  const b=(k,l,c,tip)=>`<button type="button" class="${v===k?'on':''} ${c||''}" data-act="rv" data-id="${id}" data-v="${k}" aria-pressed="${v===k}" title="${tip}">${l}</button>`;
+  let h=`<div class="seg sm" role="group" aria-label="Call on ${esc(st[0])}">${b('ok','✓ Approve','','These labels are right')}${b('move','→ Change main','neu','Pick a different main label')}${b('unsure','?','neg','Not sure')}</div>`;
+  if(v==='move')h+=`<select class="${tOf(id)?'':'need'}" data-id="${id}" data-f="tgt" aria-label="Main label for ${esc(st[0])}">${subOpts(tOf(id),'Choose main label…')}</select>`;
+  h+=`<select data-id="${id}" data-f="addx" aria-label="Add an extra label to ${esc(st[0])}">${subOpts('','＋ Add extra label…')}</select>`;
+  h+=`<input type="text" data-id="${id}" data-f="c" value="${esc(cOf(id))}" placeholder="comment" aria-label="Comment on ${esc(st[0])}">`;
+  return h;
+}
+function rowHtml(si,rank){
+  const st=D.st[si],id=sid(st[0]),v=vOf(id);
+  const src=st[11]===2?'first pass by a model':st[11]===1?'matched to a company listed elsewhere':'';
+  const sub=[D.groups[st[3]]||'no Damodaran group',st[4]?'SIC '+st[4]:'',st[5]?'FF '+st[5]:'',src,st[14]?'group default was '+st[14]:'',st[13]?'Orca also lists '+st[13]:''].filter(Boolean).join(' · ');
+  const held=D.top?`<td class="num held">${st[9]?st[9].toLocaleString('en-US',{maximumFractionDigits:st[9]<10?1:0}):'–'}</td><td class="num">${st[10]||'–'}</td>`:'';
+  return `<tr class="s-${v||'none'}"><td class="n">${rank}</td><td class="tk"><a href="#t-${esc(normT(st[0]))}">${esc(st[0])}</a></td><td class="nm">${esc(st[1])}<small>${esc(sub)}</small></td><td class="num">${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:st[2]<10?1:0}):'–'}</td>${held}<td>${chipsHtml(si,true)}</td><td class="call">${callHtml(si)}</td></tr>`;
+}
+const THEAD=()=>`<thead><tr><th>#</th><th>Ticker</th><th>Company</th><th style="text-align:right">Cap $bn</th>${D.top?'<th style="text-align:right" title="Dollars the top 100 funds bought of it, since 2013">Top funds bought $m</th><th style="text-align:right" title="How many of the 100 funds ever held it">Funds</th>':''}<th>Labels (main first)</th><th>Your call</th></tr></thead>`;
+
+/* ---------- browse tab ---------- */
+function nodeLevel(){return view.n!=null?'n':view.i!=null?'i':view.s!=null?'s':'a'}
+function nodeKey(){const l=nodeLevel();return l==='n'?pathOf(view.n):l==='i'?indPath(view.i):l==='s'?T.sec[view.s]:'All stocks'}
+function siblings(){const l=nodeLevel();return l==='n'?T.sub.map((x,k)=>['v-'+T.ind[x[0]][0]+'-'+x[0]+'-'+k]):l==='i'?T.ind.map((x,i)=>['v-'+x[0]+'-'+i+'-x']):l==='s'?T.sec.map((x,s)=>['v-'+s+'-x-x']):[]}
+function browseTab(){
+  const sel=nodeSubs();
+  const base=D.st.map((st,si)=>si).filter(si=>{const st=D.st[si],e=EFF[si];if(sel.has(e.m)||e.ex.some(k=>sel.has(k)))return true;return sel.has(st[6])||st[7].some(k=>sel.has(k))});
+  if(D.top&&sortBy==='held')base.sort((a,b)=>D.st[b][9]-D.st[a][9]||D.st[b][2]-D.st[a][2]);
+  const lim=20+view.more,rows=base.slice(0,lim);
+  const so=['<option value="x">All sectors</option>'].concat(T.sec.map((s,i)=>`<option value="${i}" ${view.s===i?'selected':''}>${esc(s)}</option>`)).join('');
+  const inds=T.ind.map((x,i)=>[x,i]).filter(([x])=>view.s==null||x[0]===view.s);
+  const io=['<option value="x">All industries</option>'].concat(inds.map(([x,i])=>`<option value="${i}" ${view.i===i?'selected':''}>${esc(x[1])}</option>`)).join('');
+  const subs=T.sub.map((x,k)=>[x,k]).filter(([x])=>view.i!=null?x[0]===view.i:false);
+  const no=['<option value="x">All '+L3p+'</option>'].concat(subs.map(([x,k])=>`<option value="${k}" ${view.n===k?'selected':''}>${esc(x[1])}</option>`)).join('');
+  const key=nodeKey(),hid=slug(key),lv=nodeLevel();
+  const c=lv==='n'?CNT.sub[view.n]:lv==='i'?CNT.ind[view.i]:lv==='s'?CNT.sec[view.s]:{n:D.st.length,big:D.st.filter(s=>s[2]>=1).length,m:0,x:0};
+  const cc=c||{n:0,big:0,m:0,x:0};
+  const pn=lv==='n'?(CNT.ind[T.sub[view.n][0]]||{big:0}):null;
+  const thin=lv==='n'&&cc.big<10?`<div class="note warn">Only ${cc.big} stocks above $1bn here, so a stock picker's peers would come from the industry (${pn.big} above $1bn). Rule R4.</div>`:'';
+  const indD=lv==='n'?T.ind[T.sub[view.n][0]][2]:lv==='i'?T.ind[view.i][2]:'';
+  const um=lv==='n'?D.um.find(u=>u[0]===view.n):null;
+  const umNote=um?`<div class="note">Umbrella label: every stock in ${um[1].map(k=>esc(T.sub[k][1])).join(' and ')} also carries it, so you can compare a pick with the whole group.</div>`:'';
+  const noSec=lv==='n'&&T.sub[view.n][2]?`<div class="note">No sector call: these stocks are scored against the whole market (rule R6).</div>`:'';
+  const sibs=siblings().map(x=>x[0]),cur='v-'+(view.s==null?'x':view.s)+'-'+(view.i==null?'x':view.i)+'-'+(view.n==null?'x':view.n);
+  const at=sibs.indexOf(cur),prev=at>0?sibs[at-1]:null,next=at>=0&&at<sibs.length-1?sibs[at+1]:null;
+  const nav=sibs.length?`<a class="btn sm" href="${prev?'#'+prev:'#'+cur}" ${prev?'':'aria-disabled="true"'}>← Previous</a> <a class="btn sm" href="${next?'#'+next:'#'+cur}" ${next?'':'aria-disabled="true"'}>Next →</a>`:'';
+  return `<div class="navrow"><select id="selS" aria-label="Sector">${so}</select><select id="selI" aria-label="Industry">${io}</select><select id="selN" aria-label="${L3}" ${view.i==null?'disabled':''}>${no}</select>${D.top?`<select id="selSort" aria-label="Sort"><option value="held" ${sortBy==='held'?'selected':''}>Sort: bought by top funds</option><option value="cap" ${sortBy==='cap'?'selected':''}>Sort: market cap</option></select>`:''}${nav}</div>
+  <h2>${esc(key.replace(/ > /g,' › '))}</h2><div class="meta"><b>${cc.n}</b> stocks with a label here${lv==='n'?` (<b>${cc.m}</b> main, <b>${cc.x}</b> extra)`:''} · <b>${cc.big}</b> above $1bn · showing the ${sortBy==='held'&&D.top?'most bought by top funds':'biggest'} ${rows.length}</div>
+  ${indD?`<div class="meta">${esc(indD)}</div>`:''}${thin}${noSec}${umNote}
+  ${lv==='a'?'':`<div class="box"><h4>Your call on this ${lv==='n'?L3l:lv==='i'?'industry':'sector'}</h4>${seg(hid,[['ok','✓ Looks right'],['change','Change','neu'],['unsure','?','neg']])}<textarea data-id="${hid}" data-f="t" placeholder="Rename it, split it, merge it, move it…" aria-label="Note on ${esc(key)}">${esc(tOf(hid))}</textarea></div>`}
+  <div class="tbl"><table>${THEAD()}<tbody>${rows.map((si,i)=>rowHtml(si,i+1)).join('')}</tbody></table></div>
+  ${base.length>lim?`<p><button type="button" class="btn" data-act="more">Show 30 more (${base.length-lim} left)</button></p>`:''}
+  <p class="dl">Caps: Nasdaq screener (Nov 2026). Group, SIC: Damodaran (Jan 2026); FF = Fama-French 48 label from SIC. Dashed main label = default from the Damodaran group, not checked by name. Dotted orange = a model's first pass from the company name (confidence in the hover text). "Top funds bought" is dollars bought since 2013 by the top 100 funds: a size guide, not a market value.</p>`;
+}
+
+/* ---------- hierarchy tab ---------- */
+function hierTab(){
+  const body=T.sec.map((sec,si)=>{
+    const inds=T.ind.map((x,ii)=>[x,ii]).filter(([x])=>x[0]===si),c=CNT.sec[si]||{n:0,big:0};
+    return `<details open class="sector" id="sec-${si}"><summary><a href="#v-${si}-x-x"><b>${esc(sec)}</b></a> <span class="dl">${inds.length} industries · ${c.n} stocks · ${c.big} above $1bn ${vOf(slug(sec))?'· ✓':''}</span></summary>${inds.map(([x,ii])=>{
+      const ci=CNT.ind[ii]||{n:0,big:0};
+      const rows=T.sub.map((s,k)=>[s,k]).filter(([s])=>s[0]===ii).map(([s,k])=>{const k2=CNT.sub[k]||{n:0,big:0,m:0,x:0};
+        return `<tr><td><a href="#v-${si}-${ii}-${k}">${esc(s[1])}</a>${s[2]===1?' <span class="chip" title="No sector call: scored against the whole market">no sector</span>':''}${D.um.some(u=>u[0]===k)?' <span class="chip" title="Every stock in the groups under it also carries this label">umbrella</span>':''}${s[3]?' <span class="chip">yours</span>':''}</td><td class="num">${k2.m}</td><td class="num">${k2.x}</td><td class="num ${k2.big<10?'thin':''}">${k2.big}</td><td class="tk" style="font-size:11px;font-weight:500">${(k2.top||[]).slice(0,4).map(si=>esc(D.st[si][0])).join(' ')}</td><td>${vOf(slug(pathOf(k)))?'✓':''}</td></tr>`}).join('');
+      return `<div class="ind"><div class="indh"><h4><a href="#v-${si}-${ii}-x">${esc(x[1])}</a></h4><span class="dl">${ci.n} stocks · ${ci.big} above $1bn ${vOf(slug(indPath(ii)))?'· ✓':''}</span></div>${x[2]?`<div class="dl" style="margin:-2px 0 6px">${esc(x[2])}</div>`:''}<div class="tbl"><table class="sub" style="min-width:520px"><thead><tr><th>${L3}</th><th style="text-align:right">Main</th><th style="text-align:right">Extra</th><th style="text-align:right">Above $1bn</th><th>Largest</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`}).join('')}</details>`;
+  }).join('');
+  const jump=T.sec.map((s,i)=>`<a class="btn sm" href="#sec-${i}">${esc(s)}</a>`).join(' ');
+  const changes=D.changes&&D.changes.length?`<b>What changed this round:</b><ul>${D.changes.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:'';
+  return `<div class="intro"><b>The hierarchy so far:</b> ${T.sec.length} sectors → ${T.ind.length} industries → ${T.sub.length} ${L3p}, with every one of the ${D.st.filter(x=>!x[11]).length.toLocaleString('en-US')} US-listed stocks labelled. ${D.top?`It also holds the stocks the top ${D.top.funds.length} funds (ranked ${esc(D.top.period)}) ever owned: ${D.st.filter(x=>x[9]>0).length.toLocaleString('en-US')} labelled here (${D.st.filter(x=>x[11]).length.toLocaleString('en-US')} of them not on Damodaran's US list), ${D.nl.length.toLocaleString('en-US')} on the Not labelled tab. <details><summary>The ${D.top.funds.length} funds</summary><div class="dl">${D.top.funds.map(f=>esc(f[1])+' '+(f[2]*100).toFixed(1)+'%').join(' · ')}</div></details> `:''}Click any name to see its stocks. Orange counts: fewer than 10 stocks above $1bn, so a stock picker's peers widen to the industry (R4). "Largest" shows the biggest stocks carrying each label. ${changes}<div style="margin-top:8px"><b>Jump to:</b> ${jump}</div></div>${body}`;
+}
+
+/* ---------- find a stock ---------- */
+const normT=t=>t.replace(/[^A-Za-z0-9]/g,'-');
+function peerSets(si){
+  const e=EFF[si],out=[];
+  [e.m].concat(e.ex).forEach(k=>{
+    const ii=T.sub[k][0],s=T.ind[ii][0],a=[],b=[],c=[];
+    for(let j=0;j<D.st.length;j++){if(j===si)continue;const f=EFF[j],labs=[f.m].concat(f.ex);
+      if(labs.indexOf(k)>=0)a.push(j);
+      if(labs.some(l=>T.sub[l][0]===ii))b.push(j);
+      if(labs.some(l=>T.ind[T.sub[l][0]][0]===s))c.push(j)}
+    out.push({k,ii,s,a,b,c});
+  });
+  return out;
+}
+const peerChips=(arr,n)=>arr.slice(0,n).map(j=>`<span class="m" title="${esc(D.st[j][1])}">${esc(D.st[j][0])} <i>${D.st[j][2]?Math.round(D.st[j][2]):'–'}</i></span>`).join('')+(arr.length>n?`<span class="dl"> +${arr.length-n} more</span>`:'');
+function findTab(){
+  let h=`<div class="intro"><b>Compare one pick against different peer sets.</b> Type a ticker or name. Each label a stock carries gives three peer sets (its ${L3l}, its industry, its sector), so you can ask how a fund's Micron pick did against all Semiconductors or just Memory, or Vistra against Nuclear Power Producers and against Natural Gas Power Producers. Numbers beside tickers are market cap in $bn.</div>
+  <div class="find"><input type="text" id="fq" value="${esc(findQ)}" placeholder="e.g. MU, VST, GOOGL, Micron" aria-label="Find a stock" autocomplete="off"></div><div class="hits" id="hits">${hitsHtml()}</div><div id="card">${cardHtml()}</div>`;
+  return h;
+}
+function hitsHtml(){
+  const q=findQ.trim().toUpperCase();if(!q)return '';
+  const r=[];for(let i=0;i<D.st.length&&r.length<10;i++){const s=D.st[i];if(s[0].toUpperCase()===q||s[0].toUpperCase().indexOf(q)===0||s[1].toUpperCase().indexOf(q)>=0)r.push(i)}
+  return r.map(i=>`<a class="btn sm" href="#t-${esc(normT(D.st[i][0]))}">${esc(D.st[i][0])} · ${esc(D.st[i][1].slice(0,26))}</a>`).join('')||'<span class="dl">No match.</span>';
+}
+function cardHtml(){
+  if(findT==null)return '';
+  const st=D.st[findT],ps=peerSets(findT);
+  return `<div class="box"><h2>${esc(st[0])} <span class="dl">${esc(st[1])}</span></h2><div class="meta">$${st[2]?st[2].toLocaleString('en-US',{maximumFractionDigits:1}):'–'}bn · ${esc(D.groups[st[3]]||'no Damodaran group')}${st[4]?' · SIC '+esc(st[4]):''}${st[5]?' · FF '+esc(st[5]):''}</div>
+  <div class="call" style="min-width:0"><div>${chipsHtml(findT,true)}</div><div style="margin-top:8px">${callHtml(findT)}</div></div></div>
+  <div class="cards peers">${ps.map((p,i)=>`<div class="card"><header><h3>${i===0?'Main label: ':'Extra label: '}${esc(pathOf(p.k).replace(/ > /g,' › '))}</h3></header>
+    <div class="lvl"><b>${esc(L3)} (${esc(T.sub[p.k][1])})</b> <span class="dl ${CNT.sub[p.k]&&CNT.sub[p.k].big<10?'thin':''}">${p.a.length} peers</span><div>${peerChips(p.a,14)||'<span class="dl">none</span>'}</div></div>
+    <div class="lvl"><b>Industry (${esc(T.ind[p.ii][1])})</b> <span class="dl">${p.b.length} peers</span><div>${peerChips(p.b,14)}</div></div>
+    <div class="lvl"><b>Sector (${esc(T.sec[p.s])})</b> <span class="dl">${p.c.length} peers</span><div>${peerChips(p.c,10)}</div></div></div>`).join('')}</div>`;
+}
+
+/* ---------- stocks without a label ---------- */
+const KIND={etf:'ETF',fund:'Fund',bond:'Bond',spac:'SPAC',other:'Other',stock:'Business unclear'};
+function notLabelledTab(){
+  const by={};D.nl.forEach(r=>{const c=by[r[5]]||(by[r[5]]={n:0,m:0});c.n++;c.m+=r[3]});
+  const sum=Object.keys(by).sort((a,b)=>by[b].m-by[a].m).map(k=>`<b>${esc(KIND[k]||k)}</b> ${by[k].n.toLocaleString('en-US')} (${Math.round(by[k].m).toLocaleString('en-US')}m)`).join(' · ');
+  const ec=D.etf&&Object.keys(D.etf).length?`<br><b>What the ETFs are</b> (the biggest ${Object.keys(D.etf).reduce((a,k)=>a+D.etf[k][0],0)}, by a model): `+Object.keys(D.etf).sort((a,b)=>D.etf[b][1]-D.etf[a][1]).map(k=>`${esc(k)} ${D.etf[k][0]} (${Math.round(D.etf[k][1]/1000).toLocaleString('en-US')}bn)`).join(' · ')+'.':'';
+  const lim=100+nlMore,rows=D.nl.slice(0,lim);
+  return `<div class="intro"><b>Held by the top funds, but with no label.</b> An ETF is a sector pick, not a stock pick. A single-sector ETF counts as a bet on its sector, industry or vertical; any other ETF has no sector and counts as neutral (rule R12, decided). Funds, bonds, SPACs and unidentifiable lines have no business to score. Biggest first, in dollars bought since 2013. ${sum}.${ec}</div>
+  <div class="tbl"><table><thead><tr><th>Ticker</th><th>Name</th><th style="text-align:right">Bought $m</th><th style="text-align:right">Funds</th><th>What it is</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="tk">${esc(r[1])}</td><td class="nm">${esc(r[2])}</td><td class="num">${r[3].toLocaleString('en-US',{maximumFractionDigits:r[3]<10?1:0})}</td><td class="num">${r[4]}</td><td>${esc(KIND[r[5]]||r[5])}</td><td>${esc(r[7]||'')}</td></tr>`).join('')}</tbody></table></div>
+  ${D.nl.length>lim?`<p><button type="button" class="btn" data-act="nlmore">Show 100 more (${D.nl.length-lim} left)</button></p>`:''}`;
+}
+
+/* ---------- rules + your changes ---------- */
+function rulesTab(){
+  return `<div class="intro"><b>${D.rules.length} rules and open questions.</b> These decide how the hierarchy is used for scoring. My recommendation is in each card; disagree and say why.</div><div class="cards">${D.rules.map(r=>{const id='r_'+r.id;return `<article class="card"><header><h3>${r.id} · ${esc(r.q)}</h3></header><p><b>My recommendation:</b> ${esc(r.rec)}</p>${r.ev?`<p class="dl">${esc(r.ev)}</p>`:''}<div>${seg(id,[['agree','Agree'],['discuss','Discuss','neu'],['disagree','Disagree','neg']])}</div><textarea data-id="${id}" data-f="t" placeholder="Your answer or change…" aria-label="Note on ${r.id}">${esc(tOf(id))}</textarea></article>`}).join('')}</div>`;
+}
+function yoursTab(){
+  const nodes=Object.keys(S).filter(k=>k.indexOf('n_')===0&&S[k]&&S[k].k==='node').map(k=>Object.assign({id:k},S[k])).sort((a,b)=>a.at-b.at);
+  const ch=[];D.st.forEach((st,si)=>{const id=sid(st[0]),s=S[id];if(!s)return;
+    const parts=[];if(s.v==='move')parts.push(`Main → ${T.by[s.t]!=null?esc(short(T.by[s.t])):(s.t?esc(s.t):'<span class="warn">none chosen</span>')}`);
+    (s.x||[]).forEach(p=>parts.push('+ '+esc(T.by[p]!=null?short(T.by[p]):p)));(s.rx||[]).forEach(p=>parts.push('− '+esc(T.by[p]!=null?short(T.by[p]):p)));
+    if(parts.length||(s.c&&s.v))ch.push(`<tr><td class="tk"><a href="#t-${esc(normT(st[0]))}">${esc(st[0])}</a></td><td class="nm">${esc(st[1])}</td><td>${esc(short(st[6]))}</td><td>${parts.join('<br>')}</td><td>${esc(s.c||'')}</td></tr>`)});
+  const used=p=>Object.keys(S).some(k=>k.indexOf('s_')===0&&(S[k].t===p||(S[k].x||[]).indexOf(p)>=0));
+  return `<div class="intro"><b>Everything you changed.</b> New labels you created and every stock whose labels you edited. Review this before telling me you're done.</div>
+  <h3>Your new labels (${nodes.length})</h3><div class="cards">${nodes.map(n=>{const p=`${n.sector} > ${n.industry} > ${n.sub}`;return `<article class="card"><header><span class="chip">New</span><h3>${esc(n.sector)} › ${esc(n.industry)} › ${esc(n.sub)}</h3><button type="button" class="btn sm" data-act="delnode" data-id="${n.id}" ${used(p)?'disabled title="Remove its stocks first"':''}>Delete</button></header>${n.note?`<p>${esc(n.note)}</p>`:''}</article>`}).join('')||'<p class="dl">None yet.</p>'}</div>
+  <h3>Stocks you changed (${ch.length})</h3>${ch.length?`<div class="tbl"><table style="min-width:680px"><thead><tr><th>Ticker</th><th>Company</th><th>My main label</th><th>Your change</th><th>Comment</th></tr></thead><tbody>${ch.join('')}</tbody></table></div>`:'<p class="dl">None yet.</p>'}`;
+}
+
+/* ---------- dialog ---------- */
+function fillDlg(){
+  const ds=$('#ds'),sv=ds.value;ds.innerHTML=T.sec.map((s,i)=>`<option value="${i}">${esc(s)}</option>`).join('')+'<option value="__new__">＋ New sector…</option>';
+  if(sv)ds.value=sv;$('#dsn').hidden=ds.value!=='__new__';
+  const di=$('#di');const iv=di.value;const si=ds.value==='__new__'?-1:+ds.value;
+  di.innerHTML=T.ind.map((x,i)=>[x,i]).filter(([x])=>x[0]===si).map(([x,i])=>`<option value="${i}">${esc(x[1])}</option>`).join('')+'<option value="__new__">＋ New industry…</option>';
+  if(iv&&[...di.options].some(o=>o.value===iv))di.value=iv;$('#din').hidden=di.value!=='__new__';
+}
+function openDlg(c){
+  ctx=c||null;fillDlg();
+  const s=view.s!=null?view.s:0;$('#ds').value=String(s);fillDlg();
+  if(view.i!=null&&T.ind[view.i]&&T.ind[view.i][0]===+$('#ds').value){$('#di').value=String(view.i);fillDlg()}
+  $('#dn').value='';$('#dd').value='';$('#dsn').value='';$('#din').value='';$('#dmsg').textContent='';
+  $('#dtitle').textContent=ctx?(ctx.mode==='extra'?'New extra label':'New main label'):'New label';
+  $('#dhelp').textContent=ctx?`For ${ctx.tk}. It is added to every menu.`:'Add a sector, industry or '+L3l+'. It appears in every menu.';
+  $('#dnl').textContent=L3;
+  const d=$('#dlg');if(d.showModal)d.showModal();else d.setAttribute('open','');$('#dn').focus();
+}
+function closeDlg(){const d=$('#dlg');if(d.close)d.close();else d.removeAttribute('open');ctx=null;refresh()}
+$('#dcancel').addEventListener('click',closeDlg);
+$('#dlg').addEventListener('cancel',()=>{ctx=null});
+$('#ds').addEventListener('change',fillDlg);$('#di').addEventListener('change',()=>{$('#din').hidden=$('#di').value!=='__new__'});
+$('#dlgform').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const sec=$('#ds').value==='__new__'?$('#dsn').value.trim():T.sec[+$('#ds').value];
+  const ind=$('#di').value==='__new__'?$('#din').value.trim():(T.ind[+$('#di').value]||[])[1];
+  const sub=$('#dn').value.trim().replace(/\s+/g,' ');
+  if(!sec||!ind||!sub){$('#dmsg').textContent='Fill in sector, industry and '+L3l+'.';return}
+  const path=`${sec} > ${ind} > ${sub}`;
+  const hit=Object.keys(T.by).find(p=>p.toLowerCase()===path.toLowerCase());
+  const row=ctx;let final=hit||path;
+  if(!hit){await createNode(sec,ind,sub,$('#dd').value.trim());rebuild()}
+  if(row){row.mode==='extra'?addExtra(row.id,final):put(row.id,{v:'move',t:final})}
+  closeDlg();
+});
+
+/* ---------- label edits ---------- */
+function addExtra(id,p){const s=S[id]||{};const x=new Set(s.x||[]);x.add(p);put(id,{x:[...x],rx:(s.rx||[]).filter(q=>q!==p)})}
+function removeExtra(id,p){const s=S[id]||{};if((s.x||[]).indexOf(p)>=0)put(id,{x:s.x.filter(q=>q!==p)});else put(id,{rx:[...new Set((s.rx||[]).concat([p]))]})}
+
+/* ---------- routing + events ---------- */
+function main(){
+  const y=window.scrollY;
+  $('#main').innerHTML=tab==='h'?hierTab():tab==='v'?browseTab():tab==='f'?findTab():tab==='r'?rulesTab():tab==='n'?notLabelledTab():yoursTab();
+  window.scrollTo(0,y);
+}
+function refresh(){rebuild();chrome();main()}
+function route(){
+  const h=location.hash.slice(1);let m;
+  if(h==='rules')tab='r';else if(h==='yours')tab='y';else if(h==='notlabelled'&&D.nl)tab='n';else if(h==='find'){tab='f';findT=null}
+  else if((m=/^t-(.+)$/.exec(h))){tab='f';const i=D.st.findIndex(s=>normT(s[0])===m[1]);findT=i>=0?i:null;if(i>=0)findQ=D.st[i][0]}
+  else if((m=/^v-(x|\d+)-(x|\d+)-(x|\d+)$/.exec(h))){tab='v';const f=v=>v==='x'?null:+v;view={s:f(m[1]),i:f(m[2]),n:f(m[3]),more:0}}
+  else tab='h';
+  rebuild();chrome();main();if(tab!=='h')window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+document.addEventListener('input',e=>{
+  const el=e.target,id=el.dataset&&el.dataset.id;
+  if(el.id==='fq'){findQ=el.value;$('#hits').innerHTML=hitsHtml();return}
+  if(!id)return;if(el.dataset.f==='t')put(id,{t:el.value},true);else if(el.dataset.f==='c')put(id,{c:el.value},true);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='fq'){const a=$('#hits a');if(a)location.hash=a.getAttribute('href').slice(1)}});
+document.addEventListener('change',e=>{
+  const el=e.target,f=el.dataset&&el.dataset.f;
+  if(el.id==='selSort'){sortBy=el.value;main();return}
+  if(el.id==='selS'){location.hash=`v-${el.value}-x-x`;return}
+  if(el.id==='selI'){location.hash=`v-${view.s==null?(el.value==='x'?'x':T.ind[+el.value][0]):view.s}-${el.value}-x`;return}
+  if(el.id==='selN'){location.hash=`v-${view.s}-${view.i}-${el.value}`;return}
+  if(f==='tgt'){if(el.value==='__new__'){refresh();openDlg({id:el.dataset.id,mode:'main',tk:el.dataset.id.slice(2)});return}put(el.dataset.id,{v:'move',t:el.value});refresh()}
+  else if(f==='addx'){if(el.value==='__new__'){refresh();openDlg({id:el.dataset.id,mode:'extra',tk:el.dataset.id.slice(2)});return}if(el.value)addExtra(el.dataset.id,el.value);refresh()}
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  const act=b.dataset.act,id=b.dataset.id;
+  if(act==='seg'){put(id,{v:vOf(id)===b.dataset.v?'':b.dataset.v});refresh()}
+  else if(act==='rv'){const v=b.dataset.v;put(id,vOf(id)===v?{v:''}:{v});refresh()}
+  else if(act==='rmx'){removeExtra(id,b.dataset.p);refresh()}
+  else if(act==='more'){view.more+=30;main()}
+  else if(act==='nlmore'){nlMore+=100;main()}
+  else if(act==='newnode')openDlg(null);
+  else if(act==='delnode'){delNode(id).then(refresh)}
+});
+route();boot();
+})();
+</script>

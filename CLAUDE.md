@@ -20,6 +20,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | Domain, DNS, cache, CORS, secrets/variables, rollback | `docs/domain-and-data-hosting.md` (owner runbook) |
 | What happened recently, open issues | `docs/WORKLOG.md` |
 | The logo, favicon or app icons | `docs/brand/README.md` (files, colours, rules; `brand-sheet.png` is the guide) |
+| The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
@@ -33,6 +34,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 ```
 pipeline/            Python package `orca` (ingest → lake → engine → publish), tests/, contract.md
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
+pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
 web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css
@@ -57,6 +59,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Web e2e | `cd web && npx playwright test` (cloud sessions: prefix `PW_CHROMIUM=/opt/pw-browsers/chromium`) |
 | Pipeline install / tests | `cd pipeline && uv sync --locked && uv run pytest -m "not network"` |
 | Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`, `backfill`); locally `uv run python -m orca.run {weekly\|rebuild\|backfill\|home\|check-keys\|verify}` (needs the API key env vars) |
+| Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only, nothing published). Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |

@@ -319,6 +319,13 @@ def fetch_shares_outstanding(client: Client, cik: int) -> float | None:
     return float(sum(val for val, *_ in distinct))
 
 
+def fetch_shares_history(client: Client, cik: int) -> list:
+    """Every period end's count of the same concept: (end, filed, shares), oldest first (`shares_hist`)."""
+    from orca.shares_hist import history
+
+    return history(_get_json_or_none(client, SHARES_CONCEPT_URL.format(cik=cik)))
+
+
 def _get_json_or_none(client: Client, url: str):
     """The JSON body of a GET; None when the SEC answers 404 (unknown CIK)."""
     try:

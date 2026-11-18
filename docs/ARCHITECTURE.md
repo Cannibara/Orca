@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-17 (pre-2013 history from text filings; vendor-ticker repair; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-18 (pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -54,6 +54,7 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `home.py` | home lists (`top_funds` with its `famous` rows, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
+| `hierarchy/` | sector → industry → industry vertical labels for the stock-picker / sector-picker metric: `labels.txt` (source of truth), `model.py` (parser and labeller), `matching.py` (Orca security names to Damodaran's company list), `tools/` (labelling, model batches, review page). Draft, not read by the pipeline yet; see its `README.md` |
 | `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
 | `demo.py` | synthetic offline dataset for `web/public/demo-data` |
 
@@ -148,6 +149,12 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `prices_daily/{y<year>, z<run>-NNNN}` | raw unadjusted OHLC f32, volume f64, split_factor f32, dividend f32 |
 | `vendor_tickers` | stock_id, ticker, end |
 | `rf` | year i32, rate f64 (decimal); from 1999 (`rf.START`), fetched again when the stored table starts later |
+| `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history` |
+| `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; draft, not published) |
+| `stock_quarters` | stock_id, q, close, div, vwap (split-adjusted; stocks and ETFs), written with `sector_returns` |
+| `fund_flows`, `fund_flows_run/bNNNNN` | cik, stock_id, q, delta, px, shares_after: each fund's trades over its tracking segment, merged like `fund_state` |
+| `fund_skill` | cik, tier (1–3), irr_fund, irr_label, irr_mkt, picking, allocation, coverage, n (`engine/skill.py`; draft, not published) |
+| `etf_ranks` | cik, stock_id, label, irr, rank, of, best, best_irr: each single-sector ETF position's label ranked by IRR against every label at its tier |
 | `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`, `price_backfilled`, `legacy_done`, `legacy_retry`), `published.json` |
 

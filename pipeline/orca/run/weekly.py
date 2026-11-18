@@ -53,6 +53,8 @@ from orca.run.publish_step import (
 from orca.run.sources import Sources
 from orca.run.state import (
     CUSIP_MAP_SCHEMA,
+    FUND_FLOWS_RUN,
+    FUND_FLOWS_SCHEMA,
     FUND_STATE_RUN,
     FUND_STATE_SCHEMA,
     RAW_SCHEMA,
@@ -211,6 +213,7 @@ def _publish_funds(
     once the time budget is spent."""
     lake = ctx.lake
     drop_parts(lake, FUND_STATE_RUN)
+    drop_parts(lake, FUND_FLOWS_RUN)
     done = _Funds()
     for number, batch in enumerate(chunks(sorted(ciks), FUND_BATCH)):
         if number and budget.spent():
@@ -225,8 +228,9 @@ def _publish_funds(
         reports = scan(lake, "reports", REPORTS_SCHEMA, where)
         if reports.height:
             done.with_reports |= set(reports["cik"].to_list())
-            rows = _publish_batch(ctx, holdings, reports, staging, compress, done)
+            rows, flows = _publish_batch(ctx, holdings, reports, staging, compress, done)
             lake.write(FUND_STATE_RUN, rows, part=f"b{number:05d}")
+            lake.write(FUND_FLOWS_RUN, flows, part=f"b{number:05d}")
     return done
 
 
@@ -237,16 +241,17 @@ def _publish_batch(
     staging: Path,
     compress: bool,
     done: _Funds,
-) -> pl.DataFrame:
-    """One batch of `_publish_funds`; its fund state rows."""
-    rows = []
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """One batch of `_publish_funds`; its fund state rows and its funds' trades (`fund_flows`)."""
+    rows, flows = [], []
     for result in compute_batch(ctx, holdings, reports):
         meta = result.output.meta
         done.files.update(publish_fund(staging, result.output, compress))
         done.flags += result.flags
         done.metas[meta.fund_id], done.snaps[meta.fund_id] = meta, result.snapshot
         rows.append((meta.fund_id, dump(meta), dump(result.snapshot)))
-    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row")
+        flows += [(meta.fund_id, p.stock_id, t.q, t.delta, t.px, t.shares_after) for p in result.output.positions for t in p.trades]
+    return pl.DataFrame(rows, schema=FUND_STATE_SCHEMA, orient="row"), pl.DataFrame(flows, schema=FUND_FLOWS_SCHEMA, orient="row")
 
 
 def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
@@ -257,6 +262,11 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     fresh = scan(lake, FUND_STATE_RUN, FUND_STATE_SCHEMA)
     lake.write("fund_state", pl.concat([stored, fresh]).sort("cik"))
     drop_parts(lake, FUND_STATE_RUN)
+    # The same for each fund's trades, which the sector scores replay (`run/sectors_step.score_funds`).
+    stored = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
+    stored = stored.clear() if clear else stored.filter(~pl.col("cik").is_in(sorted(replaced)))
+    lake.write("fund_flows", pl.concat([stored, scan(lake, FUND_FLOWS_RUN, FUND_FLOWS_SCHEMA)]).sort("cik", "stock_id", "q"))
+    drop_parts(lake, FUND_FLOWS_RUN)
 
 
 _WEEKLY_PATH = re.compile(r"^stock/(\d+)/weekly\.json$")

@@ -1,0 +1,462 @@
+# Orca hierarchy. Sector > Industry > Industry vertical. First 'Sub: tickers' = main label; '+Sub: tickers' = extra label.
+# A full path ('+ A > B > C: TICKERS') puts an extra label in another branch. '## A > B # text' gives an industry a description.
+# '@umbrella X <= Y ; Z' gives every main-label member of Y and Z the extra label X.
+## Technology > Semiconductors
+Memory: MU SNDK RMBS MRAM SKHY WDC
+GPUs & AI Accelerators: NVDA
++GPUs & AI Accelerators: AMD
+CPUs & Processors: AMD INTC
+Networking & Custom Silicon: AVGO MRVL ALAB MXL SMTC
+Analog & Power: TXN ADI MPWR ON ALGM POWI DIOD AOSL NVTS WOLF INDI CRUS
+Wireless & RF: QCOM SWKS MTSI
+Programmable & Embedded: MCHP LSCC SLAB SYNA AMBA CEVA AMBQ
+Foundry & Manufacturing: GFS
++Foundry & Manufacturing: INTC
+Sensors, Timing & Displays: SITM OLED NVEC KOPN PI
+Other Semiconductors:
+## Technology > Semiconductor Equipment
+Wafer Fabrication Equipment: AMAT LRCX KLAC ACMR ACLS VECO
+Test & Inspection Equipment: TER ONTO COHU FORM AEHR PDFS
++Test & Inspection Equipment: KLAC
+Materials, Components & Packaging: ENTG MKSI Q UCTT ICHR PLAB AXTI AMKR
+## Technology > Software
+Enterprise Applications: MSFT CRM NOW WDAY INTU HUBS PEGA WK APPN INTA FRSH KVYO BRZE AMPL ASAN
+Collaboration & Communications: ZM DOCU BOX DBX RNG FIVN
+Infrastructure & Data Software: ORCL DDOG DT SNOW MDB NTNX CVLT TDC FROG GTLB PATH RBRK AVPT IOT
+Cybersecurity: PANW CRWD FTNT ZS OKTA S QLYS TENB VRNS RPD NTSK SAIL YOU GEN
++Cybersecurity: NET RBRK
+Design & Engineering Software: ADSK PTC BSY CDNS SNPS ADBE FIG U
+Vertical Software: ROP TYL MANH GWRE PCOR APPF VERX BLKB AGYS SPSC CCC TTAN ALRM CSGS VIA
+Autonomous Driving Software: AUR
+Defence Systems Software: PLTR BBAI
+Search & Advertising: GOOGL
++Search & Advertising: META AMZN
+Cloud Infrastructure Provider: AMZN CRWV APLD DOCN RXT BLZE WYFI
++Cloud Infrastructure Provider: MSFT GOOGL ORCL
+Web Infrastructure & Developer Platforms: NET AKAM FSLY VRSN GDDY TWLO
+Consumer Services: DUOL
++Consumer Services: GOOGL AAPL INTU GEN
+Entertainment:
++Entertainment: GOOGL
+IP & Technology Licensing: IDCC DLB
++ Technology > Software > Infrastructure & Data Software: AVGO
+## Technology > Payments
+Payment Networks: V MA AXP
+Payment Processors & Merchant Services: FISV FIS GPN CPAY TOST FOUR WEX PAY NATL BILL PAYO MQ EVTC
+Digital Payments & Money Transfer: PYPL XYZ AFRM SEZL DAVE RELY WU EEFT FLYW CHYM
+## Technology > Fintech Software & Digital Assets
+Banking & Financial Software: JKHY ACIW NCNO QTWO BR SSNC ALKT
+Crypto & Digital Assets: COIN MSTR GLXY MARA RIOT CLSK CIFR WULF HUT CORZ BMNR CRCL ASST
+## Technology > Hardware
+Consumer Devices: AAPL
+Computers & Servers: DELL HPQ HPE SMCI PENG
+Data Storage: NTAP PSTG QMCO
+Networking Equipment: CSCO ANET UI FFIV EXTR NTCT DGII CALX HLIT
+Optical & Photonics: LITE CIEN VIAV AAOI COHR IPGP LASR
+Public Safety Technology: MSI AXON
+Components & Connectors: APH GLW LFUS TTMI VSH KN ROG CTS BDC AEIS
+Contract Manufacturing: FLEX JBL SANM PLXS BHE
+Instruments & Test: KEYS TDY ZBRA CGNX TRMB NOVT MIR BMI VNT ITRI CXT OSIS OUST RAL
+Printing, Imaging & Specialty Hardware: XRX KODK DBD PMTS OSS
+## Technology > IT Services
+IT Consulting: IBM CTSH EPAM DOX KD DXC GDYN SAIC CACI
+IT Hardware Distributors: CDW SNX ARW AVT INGM NSIT PLUS CNXN
+## Technology > Internet Platforms
+Online Marketplaces: EBAY ETSY CPNG W CHWY
++Online Marketplaces: AMZN
+Ride-Hailing & Delivery Platforms: UBER LYFT DASH CART
+## Technology > Quantum Computing
+Quantum Hardware & Software: IONQ RGTI QUBT QBTS
+## Communication > Media
+Cable & Broadcasting: CMCSA CHTR FOXA NXST SBGI PSKY OPTU CABO
+Publishing & Newspapers: NWSA NYT
+## Communication > Advertising
+Advertising Agencies: OMC STGW
+Ad Tech: APP TTD MGNI PUBM DV ZETA TBLA IBTA MNTN
+## Communication > Entertainment
+Streaming & Studios: NFLX DIS LION STRZ ANGX WBTN FUBO CURI
++Streaming & Studios: GOOGL
+Video Games: TTWO RBLX MYPS
++Video Games: MSFT U
+Live Events & Sports: LYV TKO MSGE SPHR STUB
+Cinemas: CNK AMC MCS
+Music, Audio & Podcasts: WMG SIRI RSVR PODC
+## Communication > Social Media & Online Communities
+Social Media: META RDDT PINS SNAP DJT RUM
+Online Dating: MTCH BMBL GRND
+Online Reviews & Lead Generation: YELP CARG EVER MAX QNST ZD
+## Communication > Telecom
+Telecom Services: VZ T TMUS TDS AD LUMN
+## Consumer > Clothing # Brands that design and sell clothes, shoes and accessories
+Sportswear: NKE UAA COLM VFC
+Footwear: DECK CROX SHOO WWW RCKY BIRD
++Footwear: NKE
+Fashion & Lifestyle Brands: RL PVH LEVI KTB GIII OXM CRI FIGS
+Luxury & Accessories: TPR FOSL MOV VRA
++Luxury & Accessories: RL
+Workwear & Uniforms: SGC
+## Consumer > Household goods # Things bought for the home: appliances, furniture, housewares, cleaning products and home electronics
+Appliances: WHR SN HELE HBB CRCT ATER
+Furniture & Home Furnishings: SGI LZB ETD FLXS HOFT LOVE PRPL LEG MHK BSET
+Housewares & Consumer Brands: NWL SPB ENR LCUT COOK
+Cleaning & Household Supplies: PG CHD CLX REYN ODC WDFC
+Consumer Electronics: SONO GPRO UEIC KOSS CRSR TBCH MSN RIME
++Consumer Electronics: AAPL
+## Consumer > Personal care # Beauty, grooming, hygiene and wellness products
+Beauty & Cosmetics: EL ELF COTY IPAR
++Beauty & Cosmetics: PG
+Personal Care Products: CL KMB EPC HNST
++Personal Care Products: PG CHD
+Nutrition & Wellness: HLF BRBR
+## Consumer > Food # Companies that grow, process, package and distribute food
+Snacks & Confectionery: MDLZ HSY TR UTZ JJSF
+Packaged Food: KHC GIS SJM MKC CAG CPB POST MZTI
+Meat, Poultry & Eggs: TSN HRL PPC SFD SEB CALM
+Food Processing & Ingredients: ADM BG DAR INGR LW
+Pet Food & Supplies: FRPT CENT
+Agricultural Producers: ALCO LMNR VFF
+Food Distribution: SYY USFD PFGC CHEF UNFI ANDE
+## Consumer > Beverages & Tobacco # Soft drinks, beer, wine, spirits and cigarettes
+Non-Alcoholic Beverages: KO PEP MNST KDP COKE PRMB CELH COCO FIZZ ZVIA REED
+Alcoholic Beverages: STZ TAP SAM WVVI MGPI SBEV BF.B
+Tobacco: PM MO TPB UVV ISPR XXII
+## Consumer > Retail # Stores and online sellers that sell goods to consumers
+Home Improvement Retail: HD LOW FND GRWG
+Home Furnishings Retail: WSM RH ARHS HVT SNBR BBBY
++Home Furnishings Retail: W
+Auto Dealers & Used Cars: CVNA KMX PAG LAD AN ABG GPI SAH CWH
+Auto Parts Retail: ORLY AZO AAP
+Discount & Warehouse Stores: WMT COST TGT DG DLTR BJ OLLI PSMT
+Department Stores: M KSS
+Apparel Retail: TJX ROST BURL GAP URBN ANF AEO BKE BOOT RVLV CAL VSCO
+Specialty Lines: ULTA BBY TSCO DKS GME FIVE BBWI ASO WRBY SBH EYE UPBD REAL HZO WINA WOOF SVV
+Grocery Retail: KR ACI SFM WMK GO NGVC
+Convenience & Fuel Retail: CASY ARKO MUSA
+Pharmacies: CVS
+## Consumer > Leisure # Toys, sports gear, boats and RVs, plus theme parks and gyms
+Toys & Games: HAS MAT JAKK FNKO
+Sporting Goods & Outdoor: YETI GOLF JOUT SWIM PTON
+Boats, RVs & Powersports: BC PII MCFT MBUU THO WGO HOG
+Firearms & Ammunition: SWBI RGR
+Theme Parks & Attractions: PRKS FUN PRSU
++Theme Parks & Attractions: DIS
+Fitness & Recreation Facilities: LTH MTN PLNT LUCK XPOF
+## Consumer > Travel # Hotels, cruise lines and online travel booking
+Hotels & Resorts: MAR HLT H WH CHH VAC TNL HGV
+Cruise Lines: RCL CCL NCLH
+Online Travel: BKNG ABNB EXPE TRIP NAVN
+## Consumer > Gaming # Casinos and online betting
+Casinos & Resorts: LVS WYNN MGM CZR CHDN BYD PENN RRR
+Online Gambling & Sports Betting: DKNG FLUT
+## Consumer > Restaurants # Restaurant chains and food-service companies
+Quick-Service & Fast Casual: MCD SBUX CMG YUM QSR DPZ CAVA BROS WING SHAK WEN SG
+Casual Dining & Other: DRI TXRH EAT CAKE BJRI CBRL ARMK
+## Consumer > Housing # Homebuilders and manufactured-home makers
+Homebuilding: DHI PHM LEN NVR TOL MTH MHO KBH GRBK CCS DFH LGIH HOV BZH
+Manufactured Housing: SKY CVCO LEGH
+## Consumer > Education # Universities, schools, childcare and online learning
+Postsecondary Education: LAUR LOPE PRDO UTI STRA APEI PXED LINC LGCY
+K-12 & Childcare: LRN BFAM GHC
+Online Learning & EdTech: COUR CHGG NRDY MH
++Online Learning & EdTech: DUOL
+## Consumer > Consumer Services # Services sold to households: funerals, home security, tax prep, car servicing
+Funeral & Death Care: SCI CSV MATW
+Home & Security Services: ADT FTDR ROL PRCH
+Personal Services: HRB WW LZ
+Automotive Services: DRVN MNRO VVV
+## Healthcare > Pharma & Biotech
+Biotechnology:
+Pharmaceuticals:
+Animal Health: ZTS ELAN IDXX
+## Healthcare > Medical Devices & Supplies
+Medical Devices:
++Medical Devices: JNJ
+Medical Supplies & Equipment: BDX BAX STE SOLV MDLN GEHC
+## Healthcare > Healthcare Providers
+Hospitals & Facilities:
+Healthcare Services: LH DGX GH BTSG DVA CHE RDNT LFST PRVA AVAH MD ADUS NEO ASTH AGL INNV OPCH CRVL WGS BLLN
+## Healthcare > Managed Care
+Health Insurers: UNH ELV HUM CNC MOH OSCR ALHC CLOV
++Health Insurers: CVS CI
+Pharmacy Benefit Managers: CI
++Pharmacy Benefit Managers: CVS UNH
+## Healthcare > Healthcare Distribution
+Drug & Medical Distribution: MCK COR CAH HSIC
+## Healthcare > Life Sciences & Health Tech
+Life Science Technology: TMO DHR A WAT IQV MTD ILMN WST MEDP RVTY CRL TECH RGEN AVTR BIO BRKR TXG NTRA
+Healthcare IT: VEEV TEM DOCS HQY HIMS HNGE PGNY
+## Financials > Banks
+Money Center Banks:
+Regional Banks: MBIN
+## Financials > Capital Markets
+Brokerage & Investment Banking:
+Exchanges & Financial Data: CME ICE NDAQ SPGI MCO MSCI TW MKTX FDS MORN MIAX
+## Financials > Asset Management
+Traditional Asset Managers & Custody:
+Alternative Asset Managers: BX KKR APO ARES TPG OWL CG STEP HLNE GCMG
+BDCs & Closed-End Funds: MAIN HTGC CET
+## Financials > Consumer Finance & Lending
+Consumer Lenders: COF SYF ALLY OMF SOFI UPST ENVA BFH SLM NNI CACC FCFS
++Consumer Lenders: AFRM
+Mortgage Finance: RKT UWMC PFSI
+Specialty Finance & Other:
+## Financials > Insurance
+Life Insurance: MET AFL PRU PFG UNM GL CNO FG GNW BHF EQH CRBG JXN VOYA
+Property & Casualty Insurance:
+Insurance Brokers:
+Mortgage & Title Insurance: MTG RDN NMIH ACT FNF FAF ORI
+Reinsurance:
+## Business Services > Workforce & HR # Payroll, benefits and staffing for employers
+Payroll & HR Services: ADP PAYX PAYC PCTY TNET NSP BBSI ALIT ASUR
+Staffing & Recruitment: RHI MAN KFY KFRC RGP UPWK AMN TBI HQI RCMT
+## Business Services > Professional Services # Consulting, engineering and testing firms
+Consulting & Advisory: BAH FCN HURN CRAI ICFI EXPO ANDG FC
+Research & Advisory: IT FORR
+Engineering & Technical Services: J PSN KBR AMTM TTEK WLDN ACM
+Testing, Inspection & Certification: ULS TIC MG WFCF
+## Business Services > Data & Analytics # Credit, risk and market data sold to businesses
+Credit & Risk Analytics: EFX TRU FICO VRSK FA
+Market & Business Intelligence: NIQ GTM
+## Business Services > Outsourcing & Customer Experience # Call centres and back-office work done for other companies
+Business Process Outsourcing: CNXC TTEC TASK IBEX CNDT EXLS MMS INOD
+## Business Services > Facility & Security Services # Uniforms, cleaning, cash handling and prisons
+Uniform & Facility Services: CTAS UNF VSTS ABM HCSG CVEO
+Security & Cash Logistics: BCO
+Corrections & Detention: GEO CXW
+## Business Services > Auctions & Remarketing # Online and live auctions for cars and equipment
+Auctions & Remarketing: CPRT RBA OPLN LQDT ACVA 
+## Business Services > Environmental Services # Waste collection, recycling and environmental cleanup
+Waste & Environmental Services: WM RSG CLH CWST NVRI BV VLTO
+## Business Services > Office Products & Services # Office furniture, supplies and mailing
+Office Products & Services: HNI MLKN PBI ACCO NL CIX VIRC
+## Business Services > Other Commercial Services # Small business-service companies not placed yet
+Other Business Services:
+## Industrials > Manufacturing # Companies that build vehicles, ships, trains and machines
+Automotive: # Umbrella: every carmaker and auto-parts maker also carries this label
+Carmakers: TSLA GM F RIVN LCID
+Auto Parts: BWA LEA GNTX DORM PHIN PATK QS LCII DAN VC THRM XPEL SMP FOXF SLDP CPS GT
+Shipbuilding:
++Shipbuilding: HII GD
+Rail Equipment: WAB GBX RAIL FSTR
++Rail Equipment: TRN
+Heavy Machinery & Trucks: CAT CMI PCAR ALSN OSK TEX ASTE MTW BLBD FSS TWI PLOW ATMU
+Farm Machinery: DE AGCO TTC LNN ALG
+Industrial Machinery: PH ITW IR DOV OTIS SYM FTV TKR SPXC ESE JBTM GTES NPO MIDD ALH KAI SXI WOR EPAC AIN GRC HLIO CR RBC
+Flow Control & Pumps: XYL IEX FLS WTS MWA FELE ITT GGG DCI MLI
+Tools & Welding: SNA SWK LECO ESAB KMT HLMN
+3D Printing & Digital Manufacturing: DDD SSYS XMTR PRLB
+## Industrials > Aerospace # Commercial aircraft, engines, parts, space and air-taxi companies (defence is its own sector)
+Aircraft & Engines: GE BA TXT RTX
++Aircraft & Engines: GD
+Aerospace Components & Services: HWM TDG HEI ATI WWD CW CRS HXL LOAR SARO ATRO AIR DCO VSEC
+Space & Satellite: RKLB ASTS GSAT IRDM SATS VSAT PL LUNR RDW BKSY SPCE FLY VOYG SPIR
+Advanced Air Mobility: JOBY ACHR BETA
+## Industrials > Electrical Equipment # Equipment that makes, moves, stores and controls electricity
+Power & Grid Equipment: GEV VRT HUBB POWL GNRC PLPC AMSC
+Automation & Electrical Equipment: EMR ROK AME AYI ST VICR ALNT RRX
+Batteries & Energy Storage: ENS AMPX FLNC
+## Industrials > Construction & Engineering # Contractors, building products and construction materials
+Engineering & Construction:
+HVAC & Building Systems: CARR LII AAON MOD REZI
+Plumbing & Water Products: MAS AOS ZWS WMS HAYW
+Building Materials & Envelope: OC CSL AWI TREX UFPI SSD BLDR FBIN GFF CSW AZZ IBP
+Construction Materials Manufacturing: MLM VMC EXP USLM KNF
+## Industrials > Transportation & Logistics # Airlines, railroads, trucks, ships and parcel delivery
+Airlines:
+Railroads:
+Trucking:
+Marine Shipping: KEX MATX GNK PANL INSW LPG
+Freight & Logistics: UPS FDX EXPD CHRW GXO HUBG FWRD RLGT RXO ARAI
+Vehicle Rental: CAR HTZ UHAL
+## Industrials > Distribution # Wholesalers that supply factories, builders and repair shops
+Industrial & MRO Distributors:
+Building & Specialty Distributors: FERG QXO WSO CNM SITE POOL
+Auto Parts Distribution: GPC LKQ
+## Industrials > Equipment Leasing # Rental and leasing of heavy equipment, railcars and aircraft engines
+Construction Equipment Leasing: URI HRI WSC
+Industrial Equipment Leasing: GATX FTAI TRN AL WLFC
+## Industrials > Conglomerates # Diversified groups with no single main business
+Diversified Conglomerates: BRK.A MMM HON IEP BBUC CODI
+## Defence > Prime Contractors
+Defense Primes: LMT NOC GD LHX
++Defense Primes: RTX BA
+Naval Systems & Shipbuilding: HII BWXT
+## Defence > Technology
+Autonomous Systems: LDOS KTOS AVAV ONDS UAVS
+Electronics & Sensors: MRCY DRS KRMN
++Electronics & Sensors: HEI CW
+## Defence > Support & Equipment
+Defense Services & Equipment: VVX CDRE NPK
+## Materials > Chemicals
+Specialty Chemicals:
+Commodity Chemicals:
+Fertilizers & Crop Protection: CF MOS CTVA FMC SMG
+## Materials > Metals & Mining
+Industrial Metals Mining: SCCO FCX MP USAR IE NB IDR
+Precious Metals Mining:
+Metals Production & Refining: AA CENX KALU MTRN
+## Materials > Paper, Forest & Packaging
+Packaging & Containers:
+Paper & Forest Products:
+## Energy > Oil
+Production:
+Pipelines & Storage: HESM
++Pipelines & Storage: WMB KMI TRGP OKE DTM AM KNTK
+Refining: MPC VLO PSX DINO PBF DK CVI PARR
+Oilfield Services & Equipment: SLB HAL BKR FTI NOV WFRD
+Integrated Oil: XOM CVX OXY
+## Energy > Natural Gas
+Production: EQT EXE RRC AR CNX CRK GPOR
++Production: CTRA
+Pipelines & Storage: WMB KMI TRGP OKE DTM AM KNTK
+LNG & Gas Export: LNG EE NEXT NFE SLNG VG
+Power Producers: VST NRG
+## Energy > Nuclear
+Power Producers: CEG TLN
++Power Producers: VST NRG
+Uranium & Nuclear Fuel: UEC LEU LTBR
+Reactor Technology: SMR OKLO NNE
++Reactor Technology: BWXT
+## Energy > Solar
+Solar Equipment Manufacturer: FSLR ENPH NXT ARRY SHLS
+Solar Energy Production: RUN
++Solar Energy Production: NEE
+## Energy > Alternative Energy
+Fuel Cells & Hydrogen: BE PLUG FCEL
+## Energy > Coal
+Coal Production: CNR BTU NC AREC HCC AMR METC SXC
+## Utilities > Utilities
+Electric Utilities:
+Multi-Utilities:
+Gas Utilities: ATO UGI NFG SWX NJR SR OGS CPK NWN
+Water Utilities:
+Renewable Power Producers: BEPC ORA CWEN.A
+## Property > REITs
+Retail REITs: SPG KIM REG FRT BRX MAC PECO KRG SKT CURB AKR UE IVT CBL ALX
+Net Lease REITs: O WPC NNN ADC EPRT FCPT GTY NTST PINE
+Residential REITs: AVB EQR ESS MAA UDR CPT INVH AMH SUI ELS
+Healthcare REITs: WELL VTR OHI DOC
+Industrial REITs: PLD EGP FR REXR
+Office REITs: BXP ARE KRC VNO
+Digital Infrastructure REITs: EQIX DLR AMT CCI SBAC
+Self-Storage REITs: PSA EXR CUBE NSA
+Hotel REITs: HST PK
+Mortgage REITs: AGNC NLY STWD BXMT
+Specialty & Diversified REITs: VICI GLPI IRM LAMR WY RYN PCH LAND FPI CTO
+## Property > Development
+Greenfield & Master-Planned Communities: HHH FOR JOE FPH TRC STHO AXR AEI
+Commercial & Mixed-Use Development: STRS CHCI
+Residential Homebuilding:
++Residential Homebuilding: DHI PHM LEN NVR TOL MTH MHO KBH GRBK CCS DFH LGIH HOV BZH CVCO SKY LEGH
+## Property > Real Estate Services
+Brokerage & Property Services: CBRE JLL CWK NMRK COMP OPEN MMI RMR
+Property Data & Online Marketplaces: CSGP ZG REAX
+@nosector Industrials > Conglomerates > Diversified Conglomerates
+@umbrella Industrials > Manufacturing > Automotive <= Industrials > Manufacturing > Carmakers ; Industrials > Manufacturing > Auto Parts
+# Defaults for every Damodaran group (the main label of stocks that no line above places)
+@default Advertising => Communication > Advertising > Advertising Agencies
+@default Broadcasting => Communication > Media > Cable & Broadcasting
+@default Cable TV => Communication > Media > Cable & Broadcasting
+@default Entertainment => Communication > Entertainment > Streaming & Studios
+@default Publishing & Newspapers => Communication > Media > Publishing & Newspapers
+@default Software (Entertainment) => Communication > Social Media & Online Communities > Social Media
+@default Telecom (Wireless) => Communication > Telecom > Telecom Services
+@default Telecom. Services => Communication > Telecom > Telecom Services
+@default Apparel => Consumer > Clothing > Fashion & Lifestyle Brands
+@default Shoe => Consumer > Clothing > Footwear
+@default Auto & Truck => Industrials > Manufacturing > Carmakers
+@default Auto Parts => Industrials > Manufacturing > Auto Parts
+@default Rubber& Tires => Industrials > Manufacturing > Auto Parts
+@default Education => Consumer > Education > Postsecondary Education
+@default Electronics (Consumer & Office) => Consumer > Household goods > Consumer Electronics
+@default Furn/Home Furnishings => Consumer > Household goods > Furniture & Home Furnishings
+@default Homebuilding => Consumer > Housing > Homebuilding
+@default Hotel/Gaming => Consumer > Travel > Hotels & Resorts
+@default Recreation => Consumer > Leisure > Sporting Goods & Outdoor
+@default Restaurant/Dining => Consumer > Restaurants > Casual Dining & Other
+@default Retail (Automotive) => Consumer > Retail > Auto Dealers & Used Cars
+@default Retail (Building Supply) => Consumer > Retail > Home Improvement Retail
+@default Retail (General) => Consumer > Retail > Discount & Warehouse Stores
+@default Retail (Special Lines) => Consumer > Retail > Specialty Lines
+@default Beverage (Alcoholic) => Consumer > Beverages & Tobacco > Alcoholic Beverages
+@default Beverage (Soft) => Consumer > Beverages & Tobacco > Non-Alcoholic Beverages
+@default Tobacco => Consumer > Beverages & Tobacco > Tobacco
+@default Food Processing => Consumer > Food > Packaged Food
+@default Food Wholesalers => Consumer > Food > Food Distribution
+@default Household Products => Consumer > Household goods > Cleaning & Household Supplies
+@default Retail (Grocery and Food) => Consumer > Retail > Grocery Retail
+@default Coal & Related Energy => Energy > Coal > Coal Production
+@default Oil/Gas (Integrated) => Energy > Oil > Integrated Oil
+@default Oil/Gas (Production and Exploration) => Energy > Oil > Production
+@default Oil/Gas Distribution => Energy > Oil > Pipelines & Storage
+@default Oilfield Svcs/Equip. => Energy > Oil > Oilfield Services & Equipment
+@default Bank (Money Center) => Financials > Banks > Money Center Banks
+@default Banks (Regional) => Financials > Banks > Regional Banks
+@default Brokerage & Investment Banking => Financials > Capital Markets > Brokerage & Investment Banking
+@default Financial Svcs. (Non-bank & Insurance) => Financials > Consumer Finance & Lending > Specialty Finance & Other
+@default Insurance (General) => Financials > Insurance > Insurance Brokers
+@default Insurance (Life) => Financials > Insurance > Life Insurance
+@default Insurance (Prop/Cas.) => Financials > Insurance > Property & Casualty Insurance
+@default Investments & Asset Management => Financials > Asset Management > Traditional Asset Managers & Custody
+@default Reinsurance => Financials > Insurance > Reinsurance
+@default R.E.I.T. => Property > REITs > Specialty & Diversified REITs
+@default Retail (REITs) => Property > REITs > Retail REITs
+@default Real Estate (Development) => Property > Development > Greenfield & Master-Planned Communities
+@default Real Estate (General/Diversified) => Property > Development > Greenfield & Master-Planned Communities
+@default Real Estate (Operations & Services) => Property > Real Estate Services > Brokerage & Property Services
+@default Drugs (Biotechnology) => Healthcare > Pharma & Biotech > Biotechnology
+@default Drugs (Pharmaceutical) => Healthcare > Pharma & Biotech > Pharmaceuticals
+@default Healthcare Products => Healthcare > Medical Devices & Supplies > Medical Devices
+@default Healthcare Support Services => Healthcare > Healthcare Providers > Healthcare Services
+@default Heathcare Information and Technology => Healthcare > Life Sciences & Health Tech > Life Science Technology
+@default Hospitals/Healthcare Facilities => Healthcare > Healthcare Providers > Hospitals & Facilities
+@default Aerospace/Defense => Industrials > Aerospace > Aerospace Components & Services
+@default Air Transport => Industrials > Transportation & Logistics > Airlines
+@default Building Materials => Industrials > Construction & Engineering > Building Materials & Envelope
+@default Business & Consumer Services => Business Services > Other Commercial Services > Other Business Services
+@default Construction Supplies => Industrials > Manufacturing > Heavy Machinery & Trucks
+@default Diversified => Industrials > Conglomerates > Diversified Conglomerates
+@default Electrical Equipment => Industrials > Electrical Equipment > Automation & Electrical Equipment
+@default Engineering/Construction => Industrials > Construction & Engineering > Engineering & Construction
+@default Environmental & Waste Services => Business Services > Environmental Services > Waste & Environmental Services
+@default Farming/Agriculture => Consumer > Food > Agricultural Producers
+@default Information Services => Business Services > Outsourcing & Customer Experience > Business Process Outsourcing
+@default Machinery => Industrials > Manufacturing > Industrial Machinery
+@default Office Equipment & Services => Business Services > Office Products & Services > Office Products & Services
+@default Retail (Distributors) => Industrials > Distribution > Industrial & MRO Distributors
+@default Shipbuilding & Marine => Industrials > Transportation & Logistics > Marine Shipping
+@default Transportation => Industrials > Transportation & Logistics > Freight & Logistics
+@default Transportation (Railroads) => Industrials > Transportation & Logistics > Railroads
+@default Trucking => Industrials > Transportation & Logistics > Trucking
+@default Computer Services => Technology > IT Services > IT Consulting
+@default Computers/Peripherals => Technology > Hardware > Computers & Servers
+@default Electronics (General) => Technology > Hardware > Components & Connectors
+@default Semiconductor => Technology > Semiconductors > Other Semiconductors
+@default Semiconductor Equip => Technology > Semiconductor Equipment > Wafer Fabrication Equipment
+@default Software (Internet) => Technology > Software > Web Infrastructure & Developer Platforms
+@default Software (System & Application) => Technology > Software > Enterprise Applications
+@default Telecom. Equipment => Technology > Hardware > Networking Equipment
+@default Chemical (Basic) => Materials > Chemicals > Commodity Chemicals
+@default Chemical (Diversified) => Materials > Chemicals > Commodity Chemicals
+@default Chemical (Specialty) => Materials > Chemicals > Specialty Chemicals
+@default Metals & Mining => Materials > Metals & Mining > Industrial Metals Mining
+@default Packaging & Container => Materials > Paper, Forest & Packaging > Packaging & Containers
+@default Paper/Forest Products => Materials > Paper, Forest & Packaging > Paper & Forest Products
+@default Precious Metals => Materials > Metals & Mining > Precious Metals Mining
+@default Steel => Materials > Metals & Mining > Metals Production & Refining
+@default Green & Renewable Energy => Utilities > Utilities > Renewable Power Producers
+@default Power => Utilities > Utilities > Electric Utilities
+@default Utility (General) => Utilities > Utilities > Multi-Utilities
+@default Utility (Water) => Utilities > Utilities > Water Utilities
+# Name rules for the long tail (case-insensitive regex on the company name; first match wins; explicit lines above win over rules)
+@rule R.E.I.T. /mortgage|annaly|agnc|starwood property|ares commercial|ladder capital|arbor realty|ready capital|redwood trust|two harbors|dynex|chimera|rithm|blackstone mortgage|apollo commercial|real estate finance|franklin bsp|claros|granite point|hannon|mfa financial|invesco mortgage|ellington|angel oak|lument|sachem|seven hills|bimini|cherry hill|orchid island|armour residential/ => Property > REITs > Mortgage REITs
+@rule R.E.I.T. /health|medical|senior|caretrust|ltc prop|healthpeak|sabra|omega|nhi\b|welltower|ventas/ => Property > REITs > Healthcare REITs
+@rule R.E.I.T. /apartment|residential|homes\b|communit|mid-america|equity residential|avalonbay|essex|camden|\budr\b|invitation|american homes|lifestyle|elme|independence realty|bluerock|clipper|veris|centerspace/ => Property > REITs > Residential REITs
+@rule R.E.I.T. /industrial|logistics|prologis|rexford|eastgroup|terreno|\bstag\b|lxp|plymouth|americold/ => Property > REITs > Industrial REITs
+@rule R.E.I.T. /data cent|tower|equinix|digital realty|crown castle|sba comm|uniti|landmark infra/ => Property > REITs > Digital Infrastructure REITs
+@rule R.E.I.T. /storage|extra space|public storage|cubesmart/ => Property > REITs > Self-Storage REITs
+@rule R.E.I.T. /office|boston prop|alexandria|kilroy|vornado|paramount group|hudson pacific|cousins|highwoods|piedmont|douglas emmett|sl green|empire state|easterly|brandywine|equity commonwealth|orion|franklin street|peakstone/ => Property > REITs > Office REITs
+@rule R.E.I.T. /hotel|lodging|host hotels|pebblebrook|sunstone|ryman|diamondrock|apple hospitality|xenia|rlj|chatham|braemar|ashford|hersha|sotherly|service properties|hospitality/ => Property > REITs > Hotel REITs
+@rule R.E.I.T. /realty income|national retail|agree realty|essential properties|four corners|getty|netstreit|alpine income|carey|broadstone|net lease|gladstone commercial/ => Property > REITs > Net Lease REITs
+@rule R.E.I.T. /retail|shopping|mall|simon property|kimco|regency|federal realty|brixmor|macerich|tanger|saul|inventrust|whitestone|phillips edison|kite realty|site centers|acadia|urban edge|curbline|seritage|plaza|centers/ => Property > REITs > Retail REITs
+@rule Investments & Asset Management /capital corp|capital corporation|lending|investment corp|investment corporation|\bbdc\b|business development|credit (corp|fund)|income fund|\bfund\b|securities corp|equity fund|closed-end|trust\b/ => Financials > Asset Management > BDCs & Closed-End Funds

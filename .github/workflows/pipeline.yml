@@ -52,6 +52,10 @@ on:
         description: Home lists only (republish them from the stored funds; no fetch, no recompute)
         type: boolean
         default: false
+      sectors_only:
+        description: Sector indices and fund scores only (share counts, indices, scores; nothing published)
+        type: boolean
+        default: false
       backfill:
         description: Pre-2013 history only (read old 13F filings and older prices into the lake; publishes nothing)
         type: boolean
@@ -127,8 +131,8 @@ jobs:
       - name: Run the pipeline
         timeout-minutes: 300
         env:
-          ORCA_COMMAND: ${{ inputs.backfill && 'backfill' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly')) }}
-          ORCA_INPUTS: ${{ format('{0}{1}{2}', inputs.backfill && 'b' || '', inputs.home_only && 'h' || '', inputs.full && 'f' || '') }}
+          ORCA_COMMAND: ${{ inputs.backfill && 'backfill' || (inputs.sectors_only && 'sectors' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly'))) }}
+          ORCA_INPUTS: ${{ format('{0}{1}{2}{3}', inputs.backfill && 'b' || '', inputs.sectors_only && 's' || '', inputs.home_only && 'h' || '', inputs.full && 'f' || '') }}
           ORCA_TIME_BUDGET_MIN: ${{ vars.ORCA_TIME_BUDGET_MIN || '270' }}
           ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
           OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
@@ -138,7 +142,7 @@ jobs:
         run: |
           # The inputs choose one command: two at once would silently run only one of them.
           if [ "${#ORCA_INPUTS}" -gt 1 ]; then
-            echo "::error::choose at most one of full, home_only and backfill"
+            echo "::error::choose at most one of full, home_only, sectors_only and backfill"
             exit 1
           fi
           # If memory runs out, the kernel kills the pipeline rather than the runner, so the lake
@@ -336,6 +340,42 @@ jobs:
             echo "::error::The lake backup failed. The site and the lake are published and saved; only the backup is missing. See the lines above, and docs/domain-and-data-hosting.md."
             exit 1
           fi
+      - id: sectors
+        name: Sector indices and fund scores (draft, lake only)
+        # After the monthly run is published and saved, so this draft step can never cost that run: it may
+        # fail (continue-on-error) and only its own tables are saved below. Run 27 (2026-11-17) lost its
+        # runner with these steps inside the monthly run. The sectors_only input runs it as the main command.
+        if: steps.save.outcome == 'success' && !inputs.home_only && !inputs.sectors_only && !inputs.backfill
+        continue-on-error: true
+        timeout-minutes: 120
+        env:
+          ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }}
+          OPENFIGI_KEY: ${{ secrets.OPENFIGI_KEY }}
+          TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+        run: |
+          echo 1000 > /proc/self/oom_score_adj
+          (
+            while sleep 60; do
+              echo "resources: memory $(free -m | awk 'NR==2 {print $3 " of " $2 " MB"}'), disk $(df -h --output=used,avail . | tail -n 1 | xargs) used/free"
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor"' EXIT
+          uv run --locked --no-dev python -m orca.run sectors
+      - name: Save the sector tables
+        if: steps.sectors.outcome == 'success'
+        env:
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
+          # Only the tables the step writes: copy, never sync, so nothing else in the bucket changes.
+          rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "shares_hist.parquet" --include "sector_returns.parquet" \
+            --include "stock_quarters.parquet" --include "fund_skill.parquet" --include "etf_ranks.parquet"
 
   verify:
     # These strings must equal the cron entries above.

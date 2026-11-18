@@ -1,0 +1,871 @@
+sic,vertical
+00,Financials > Asset Management > Traditional Asset Managers & Custody
+01,Consumer > Food > Agricultural Producers
+02,Consumer > Food > Packaged Food
+07,Business Services > Environmental Services > Waste & Environmental Services
+08,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+09,Consumer > Food > Packaged Food
+10,Materials > Metals & Mining > Industrial Metals Mining
+12,Energy > Coal > Coal Production
+13,Energy > Oil > Production
+14,Materials > Metals & Mining > Industrial Metals Mining
+15,Industrials > Construction & Engineering > Engineering & Construction
+16,Industrials > Construction & Engineering > Engineering & Construction
+17,Industrials > Construction & Engineering > Engineering & Construction
+20,Consumer > Food > Packaged Food
+21,Consumer > Beverages & Tobacco > Tobacco
+22,Consumer > Clothing > Fashion & Lifestyle Brands
+23,Consumer > Clothing > Fashion & Lifestyle Brands
+24,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+25,Consumer > Household goods > Furniture & Home Furnishings
+26,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+27,Communication > Media > Publishing & Newspapers
+28,Healthcare > Pharma & Biotech > Pharmaceuticals
+29,Energy > Oil > Oilfield Services & Equipment
+30,Materials > Chemicals > Commodity Chemicals
+31,Consumer > Clothing > Footwear
+32,Industrials > Manufacturing > Heavy Machinery & Trucks
+33,Materials > Metals & Mining > Metals Production & Refining
+34,Industrials > Manufacturing > Industrial Machinery
+35,Industrials > Manufacturing > Industrial Machinery
+36,Technology > Hardware > Components & Connectors
+37,Industrials > Manufacturing > Auto Parts
+38,Healthcare > Medical Devices & Supplies > Medical Devices
+39,Consumer > Leisure > Sporting Goods & Outdoor
+40,Industrials > Transportation & Logistics > Railroads
+41,Industrials > Transportation & Logistics > Freight & Logistics
+42,Industrials > Transportation & Logistics > Trucking
+44,Industrials > Transportation & Logistics > Marine Shipping
+45,Industrials > Transportation & Logistics > Airlines
+46,Energy > Oil > Pipelines & Storage
+47,Industrials > Transportation & Logistics > Freight & Logistics
+48,Communication > Telecom > Telecom Services
+49,Utilities > Utilities > Electric Utilities
+50,Industrials > Distribution > Industrial & MRO Distributors
+51,Industrials > Distribution > Industrial & MRO Distributors
+52,Consumer > Retail > Home Improvement Retail
+53,Consumer > Retail > Discount & Warehouse Stores
+54,Consumer > Retail > Grocery Retail
+55,Consumer > Retail > Auto Dealers & Used Cars
+56,Consumer > Retail > Specialty Lines
+57,Consumer > Retail > Specialty Lines
+58,Consumer > Restaurants > Casual Dining & Other
+59,Consumer > Retail > Specialty Lines
+60,Financials > Banks > Regional Banks
+61,Financials > Consumer Finance & Lending > Specialty Finance & Other
+62,Financials > Capital Markets > Brokerage & Investment Banking
+63,Financials > Insurance > Property & Casualty Insurance
+64,Financials > Insurance > Insurance Brokers
+65,Property > Development > Greenfield & Master-Planned Communities
+67,Financials > Asset Management > Traditional Asset Managers & Custody
+70,Consumer > Travel > Hotels & Resorts
+72,Business Services > Other Commercial Services > Other Business Services
+73,Technology > Software > Enterprise Applications
+75,Industrials > Transportation & Logistics > Freight & Logistics
+76,Business Services > Other Commercial Services > Other Business Services
+78,Communication > Entertainment > Streaming & Studios
+79,Consumer > Travel > Hotels & Resorts
+80,Healthcare > Healthcare Providers > Hospitals & Facilities
+81,Business Services > Other Commercial Services > Other Business Services
+82,Consumer > Education > Postsecondary Education
+83,Business Services > Other Commercial Services > Other Business Services
+84,Consumer > Leisure > Sporting Goods & Outdoor
+87,Business Services > Other Commercial Services > Other Business Services
+89,Business Services > Other Commercial Services > Other Business Services
+99,Financials > Asset Management > Traditional Asset Managers & Custody
+000,Financials > Asset Management > Traditional Asset Managers & Custody
+010,Consumer > Food > Agricultural Producers
+020,Consumer > Food > Packaged Food
+070,Business Services > Environmental Services > Waste & Environmental Services
+080,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+090,Consumer > Food > Packaged Food
+100,Materials > Metals & Mining > Industrial Metals Mining
+102,Materials > Metals & Mining > Industrial Metals Mining
+104,Materials > Metals & Mining > Precious Metals Mining
+108,Materials > Metals & Mining > Industrial Metals Mining
+109,Materials > Metals & Mining > Industrial Metals Mining
+120,Energy > Coal > Coal Production
+122,Energy > Coal > Coal Production
+130,Energy > Oil > Production
+131,Energy > Oil > Production
+138,Energy > Oil > Oilfield Services & Equipment
+140,Materials > Metals & Mining > Industrial Metals Mining
+147,Materials > Metals & Mining > Industrial Metals Mining
+150,Industrials > Construction & Engineering > Engineering & Construction
+152,Consumer > Housing > Homebuilding
+153,Consumer > Housing > Homebuilding
+154,Industrials > Construction & Engineering > Engineering & Construction
+160,Industrials > Construction & Engineering > Engineering & Construction
+162,Industrials > Construction & Engineering > Engineering & Construction
+170,Industrials > Construction & Engineering > Engineering & Construction
+171,Industrials > Electrical Equipment > Automation & Electrical Equipment
+173,Industrials > Construction & Engineering > Engineering & Construction
+200,Consumer > Food > Packaged Food
+201,Consumer > Food > Packaged Food
+202,Consumer > Food > Packaged Food
+203,Consumer > Food > Packaged Food
+204,Consumer > Food > Packaged Food
+205,Consumer > Food > Packaged Food
+206,Consumer > Food > Packaged Food
+207,Consumer > Food > Packaged Food
+208,Consumer > Beverages & Tobacco > Alcoholic Beverages
+209,Consumer > Food > Packaged Food
+210,Consumer > Beverages & Tobacco > Tobacco
+211,Consumer > Beverages & Tobacco > Tobacco
+220,Consumer > Clothing > Fashion & Lifestyle Brands
+221,Consumer > Clothing > Fashion & Lifestyle Brands
+222,Consumer > Clothing > Fashion & Lifestyle Brands
+225,Consumer > Clothing > Fashion & Lifestyle Brands
+227,Consumer > Household goods > Furniture & Home Furnishings
+230,Consumer > Clothing > Fashion & Lifestyle Brands
+232,Consumer > Clothing > Fashion & Lifestyle Brands
+233,Consumer > Clothing > Fashion & Lifestyle Brands
+234,Consumer > Clothing > Fashion & Lifestyle Brands
+239,Consumer > Clothing > Fashion & Lifestyle Brands
+240,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+242,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+243,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+245,Industrials > Construction & Engineering > Building Materials & Envelope
+251,Consumer > Household goods > Furniture & Home Furnishings
+252,Business Services > Office Products & Services > Office Products & Services
+253,Industrials > Manufacturing > Auto Parts
+254,Business Services > Office Products & Services > Office Products & Services
+259,Consumer > Household goods > Furniture & Home Furnishings
+260,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+261,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+262,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+263,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+265,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+267,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+270,Communication > Media > Publishing & Newspapers
+271,Communication > Media > Publishing & Newspapers
+272,Communication > Media > Publishing & Newspapers
+273,Communication > Media > Publishing & Newspapers
+274,Communication > Media > Publishing & Newspapers
+275,Communication > Media > Publishing & Newspapers
+276,Communication > Media > Publishing & Newspapers
+280,Materials > Chemicals > Commodity Chemicals
+281,Materials > Chemicals > Specialty Chemicals
+282,Materials > Chemicals > Commodity Chemicals
+283,Healthcare > Pharma & Biotech > Pharmaceuticals
+284,Consumer > Household goods > Cleaning & Household Supplies
+285,Materials > Chemicals > Specialty Chemicals
+286,Materials > Chemicals > Specialty Chemicals
+287,Materials > Chemicals > Specialty Chemicals
+289,Materials > Chemicals > Specialty Chemicals
+291,Energy > Oil > Oilfield Services & Equipment
+295,Industrials > Manufacturing > Heavy Machinery & Trucks
+299,Materials > Chemicals > Commodity Chemicals
+301,Industrials > Manufacturing > Auto Parts
+302,Consumer > Clothing > Footwear
+305,Industrials > Manufacturing > Auto Parts
+306,Materials > Chemicals > Commodity Chemicals
+308,Materials > Chemicals > Commodity Chemicals
+310,Consumer > Clothing > Fashion & Lifestyle Brands
+314,Consumer > Clothing > Footwear
+320,Industrials > Manufacturing > Heavy Machinery & Trucks
+321,Industrials > Construction & Engineering > Building Materials & Envelope
+322,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+323,Industrials > Manufacturing > Auto Parts
+324,Industrials > Manufacturing > Heavy Machinery & Trucks
+325,Industrials > Construction & Engineering > Building Materials & Envelope
+326,Industrials > Construction & Engineering > Building Materials & Envelope
+327,Industrials > Manufacturing > Heavy Machinery & Trucks
+328,Industrials > Construction & Engineering > Building Materials & Envelope
+329,Industrials > Manufacturing > Heavy Machinery & Trucks
+330,Materials > Metals & Mining > Metals Production & Refining
+331,Materials > Metals & Mining > Metals Production & Refining
+332,Materials > Metals & Mining > Metals Production & Refining
+333,Materials > Metals & Mining > Industrial Metals Mining
+334,Materials > Metals & Mining > Industrial Metals Mining
+335,Industrials > Electrical Equipment > Automation & Electrical Equipment
+336,Materials > Metals & Mining > Industrial Metals Mining
+339,Materials > Metals & Mining > Industrial Metals Mining
+341,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+342,Industrials > Manufacturing > Industrial Machinery
+343,Industrials > Construction & Engineering > Building Materials & Envelope
+344,Industrials > Construction & Engineering > Building Materials & Envelope
+345,Industrials > Manufacturing > Industrial Machinery
+346,Industrials > Manufacturing > Auto Parts
+347,Industrials > Manufacturing > Industrial Machinery
+348,Industrials > Aerospace > Aerospace Components & Services
+349,Industrials > Manufacturing > Industrial Machinery
+350,Industrials > Manufacturing > Industrial Machinery
+351,Industrials > Electrical Equipment > Automation & Electrical Equipment
+352,Consumer > Food > Agricultural Producers
+353,Industrials > Manufacturing > Heavy Machinery & Trucks
+354,Industrials > Manufacturing > Industrial Machinery
+355,Industrials > Manufacturing > Industrial Machinery
+356,Industrials > Manufacturing > Industrial Machinery
+357,Technology > Hardware > Computers & Servers
+358,Industrials > Manufacturing > Industrial Machinery
+359,Industrials > Manufacturing > Industrial Machinery
+360,Industrials > Electrical Equipment > Automation & Electrical Equipment
+361,Industrials > Electrical Equipment > Automation & Electrical Equipment
+362,Industrials > Electrical Equipment > Automation & Electrical Equipment
+363,Consumer > Household goods > Furniture & Home Furnishings
+364,Industrials > Electrical Equipment > Automation & Electrical Equipment
+365,Consumer > Household goods > Consumer Electronics
+366,Technology > Hardware > Networking Equipment
+367,Technology > Hardware > Components & Connectors
+369,Industrials > Electrical Equipment > Automation & Electrical Equipment
+370,Industrials > Manufacturing > Heavy Machinery & Trucks
+371,Industrials > Manufacturing > Auto Parts
+372,Industrials > Aerospace > Aerospace Components & Services
+373,Industrials > Manufacturing > Heavy Machinery & Trucks
+374,Industrials > Manufacturing > Heavy Machinery & Trucks
+375,Industrials > Manufacturing > Carmakers
+376,Industrials > Aerospace > Aerospace Components & Services
+379,Industrials > Manufacturing > Carmakers
+380,Technology > Hardware > Components & Connectors
+381,Industrials > Aerospace > Aerospace Components & Services
+382,Technology > Hardware > Components & Connectors
+384,Healthcare > Medical Devices & Supplies > Medical Devices
+385,Healthcare > Medical Devices & Supplies > Medical Devices
+386,Consumer > Household goods > Consumer Electronics
+387,Consumer > Clothing > Fashion & Lifestyle Brands
+391,Consumer > Clothing > Fashion & Lifestyle Brands
+393,Consumer > Leisure > Sporting Goods & Outdoor
+394,Consumer > Leisure > Sporting Goods & Outdoor
+395,Business Services > Office Products & Services > Office Products & Services
+396,Consumer > Clothing > Fashion & Lifestyle Brands
+399,Consumer > Household goods > Cleaning & Household Supplies
+401,Industrials > Transportation & Logistics > Railroads
+410,Industrials > Transportation & Logistics > Freight & Logistics
+420,Industrials > Transportation & Logistics > Trucking
+421,Industrials > Transportation & Logistics > Trucking
+422,Business Services > Other Commercial Services > Other Business Services
+440,Industrials > Transportation & Logistics > Marine Shipping
+441,Industrials > Transportation & Logistics > Marine Shipping
+451,Industrials > Transportation & Logistics > Airlines
+452,Industrials > Transportation & Logistics > Airlines
+458,Industrials > Transportation & Logistics > Airlines
+461,Energy > Oil > Pipelines & Storage
+470,Consumer > Travel > Hotels & Resorts
+473,Industrials > Transportation & Logistics > Freight & Logistics
+480,Communication > Telecom > Telecom Services
+481,Communication > Telecom > Telecom Services
+483,Communication > Media > Cable & Broadcasting
+484,Communication > Media > Cable & Broadcasting
+488,Communication > Media > Cable & Broadcasting
+489,Communication > Telecom > Telecom Services
+490,Utilities > Utilities > Water Utilities
+491,Utilities > Utilities > Electric Utilities
+492,Utilities > Utilities > Electric Utilities
+493,Utilities > Utilities > Multi-Utilities
+494,Utilities > Utilities > Water Utilities
+495,Business Services > Environmental Services > Waste & Environmental Services
+496,Utilities > Utilities > Electric Utilities
+499,Utilities > Utilities > Electric Utilities
+500,Industrials > Distribution > Industrial & MRO Distributors
+501,Industrials > Distribution > Industrial & MRO Distributors
+502,Industrials > Distribution > Industrial & MRO Distributors
+503,Industrials > Distribution > Industrial & MRO Distributors
+504,Technology > IT Services > IT Consulting
+505,Industrials > Distribution > Industrial & MRO Distributors
+506,Technology > IT Services > IT Consulting
+507,Industrials > Distribution > Industrial & MRO Distributors
+508,Industrials > Distribution > Industrial & MRO Distributors
+509,Industrials > Distribution > Industrial & MRO Distributors
+510,Industrials > Distribution > Industrial & MRO Distributors
+511,Industrials > Distribution > Industrial & MRO Distributors
+512,Healthcare > Healthcare Providers > Healthcare Services
+513,Industrials > Distribution > Industrial & MRO Distributors
+514,Consumer > Food > Food Distribution
+515,Consumer > Food > Food Distribution
+516,Industrials > Distribution > Industrial & MRO Distributors
+517,Energy > Oil > Oilfield Services & Equipment
+518,Industrials > Distribution > Industrial & MRO Distributors
+519,Industrials > Distribution > Industrial & MRO Distributors
+520,Consumer > Retail > Home Improvement Retail
+521,Consumer > Retail > Home Improvement Retail
+531,Consumer > Retail > Discount & Warehouse Stores
+533,Consumer > Retail > Discount & Warehouse Stores
+539,Consumer > Retail > Discount & Warehouse Stores
+540,Consumer > Retail > Grocery Retail
+541,Consumer > Retail > Grocery Retail
+550,Consumer > Retail > Auto Dealers & Used Cars
+553,Consumer > Retail > Auto Dealers & Used Cars
+560,Consumer > Retail > Specialty Lines
+562,Consumer > Retail > Specialty Lines
+565,Consumer > Retail > Specialty Lines
+566,Consumer > Retail > Specialty Lines
+570,Consumer > Retail > Home Improvement Retail
+571,Consumer > Retail > Home Improvement Retail
+573,Consumer > Retail > Specialty Lines
+581,Consumer > Restaurants > Casual Dining & Other
+590,Energy > Oil > Pipelines & Storage
+591,Consumer > Retail > Specialty Lines
+594,Consumer > Retail > Specialty Lines
+596,Consumer > Retail > Specialty Lines
+599,Consumer > Retail > Specialty Lines
+602,Financials > Banks > Regional Banks
+603,Financials > Banks > Regional Banks
+609,Financials > Consumer Finance & Lending > Specialty Finance & Other
+610,Financials > Consumer Finance & Lending > Specialty Finance & Other
+611,Financials > Consumer Finance & Lending > Specialty Finance & Other
+614,Financials > Consumer Finance & Lending > Specialty Finance & Other
+615,Financials > Consumer Finance & Lending > Specialty Finance & Other
+616,Financials > Consumer Finance & Lending > Specialty Finance & Other
+617,Financials > Consumer Finance & Lending > Specialty Finance & Other
+620,Financials > Capital Markets > Brokerage & Investment Banking
+621,Financials > Capital Markets > Brokerage & Investment Banking
+628,Financials > Asset Management > Traditional Asset Managers & Custody
+630,Financials > Insurance > Insurance Brokers
+631,Financials > Insurance > Life Insurance
+632,Financials > Insurance > Life Insurance
+633,Financials > Insurance > Property & Casualty Insurance
+635,Financials > Insurance > Property & Casualty Insurance
+636,Financials > Insurance > Mortgage & Title Insurance
+639,Financials > Insurance > Insurance Brokers
+641,Financials > Insurance > Insurance Brokers
+650,Property > Development > Greenfield & Master-Planned Communities
+651,Property > Real Estate Services > Brokerage & Property Services
+653,Property > Real Estate Services > Brokerage & Property Services
+655,Property > Development > Greenfield & Master-Planned Communities
+671,Financials > Banks > Regional Banks
+672,Financials > Asset Management > Traditional Asset Managers & Custody
+679,Financials > Asset Management > Traditional Asset Managers & Custody
+700,Consumer > Travel > Hotels & Resorts
+701,Consumer > Travel > Hotels & Resorts
+720,Business Services > Other Commercial Services > Other Business Services
+730,Business Services > Other Commercial Services > Other Business Services
+731,Communication > Advertising > Advertising Agencies
+732,Business Services > Other Commercial Services > Other Business Services
+733,Communication > Advertising > Advertising Agencies
+734,Business Services > Environmental Services > Waste & Environmental Services
+735,Industrials > Distribution > Industrial & MRO Distributors
+736,Business Services > Other Commercial Services > Other Business Services
+737,Technology > Software > Enterprise Applications
+738,Business Services > Other Commercial Services > Other Business Services
+750,Business Services > Other Commercial Services > Other Business Services
+751,Industrials > Transportation & Logistics > Freight & Logistics
+760,Business Services > Other Commercial Services > Other Business Services
+780,Communication > Entertainment > Streaming & Studios
+781,Communication > Entertainment > Streaming & Studios
+782,Communication > Entertainment > Streaming & Studios
+783,Communication > Entertainment > Streaming & Studios
+784,Communication > Entertainment > Streaming & Studios
+790,Communication > Entertainment > Streaming & Studios
+794,Communication > Entertainment > Streaming & Studios
+799,Consumer > Travel > Hotels & Resorts
+800,Healthcare > Healthcare Providers > Healthcare Services
+801,Healthcare > Healthcare Providers > Healthcare Services
+805,Healthcare > Healthcare Providers > Hospitals & Facilities
+806,Healthcare > Healthcare Providers > Hospitals & Facilities
+807,Healthcare > Healthcare Providers > Healthcare Services
+808,Healthcare > Healthcare Providers > Healthcare Services
+809,Healthcare > Healthcare Providers > Healthcare Services
+811,Business Services > Other Commercial Services > Other Business Services
+820,Consumer > Education > Postsecondary Education
+830,Healthcare > Healthcare Providers > Hospitals & Facilities
+835,Business Services > Other Commercial Services > Other Business Services
+840,Consumer > Leisure > Sporting Goods & Outdoor
+870,Business Services > Other Commercial Services > Other Business Services
+871,Industrials > Construction & Engineering > Engineering & Construction
+872,Business Services > Other Commercial Services > Other Business Services
+873,Healthcare > Life Sciences & Health Tech > Life Science Technology
+874,Business Services > Other Commercial Services > Other Business Services
+890,Business Services > Other Commercial Services > Other Business Services
+999,Financials > Asset Management > Traditional Asset Managers & Custody
+0000,Financials > Asset Management > Traditional Asset Managers & Custody
+0100,Consumer > Food > Agricultural Producers
+0200,Consumer > Food > Packaged Food
+0700,Business Services > Environmental Services > Waste & Environmental Services
+0800,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+0900,Consumer > Food > Packaged Food
+1000,Materials > Metals & Mining > Industrial Metals Mining
+1021,Materials > Metals & Mining > Industrial Metals Mining
+1040,Materials > Metals & Mining > Precious Metals Mining
+1041,Materials > Metals & Mining > Precious Metals Mining
+1044,Materials > Metals & Mining > Precious Metals Mining
+1081,Materials > Metals & Mining > Industrial Metals Mining
+1090,Materials > Metals & Mining > Industrial Metals Mining
+1094,Energy > Coal > Coal Production
+1099,Materials > Metals & Mining > Industrial Metals Mining
+1200,Energy > Coal > Coal Production
+1220,Energy > Coal > Coal Production
+1221,Energy > Coal > Coal Production
+1300,Energy > Oil > Production
+1311,Energy > Oil > Production
+1381,Energy > Oil > Production
+1382,Energy > Oil > Oilfield Services & Equipment
+1389,Energy > Oil > Oilfield Services & Equipment
+1400,Materials > Metals & Mining > Industrial Metals Mining
+1479,Materials > Metals & Mining > Industrial Metals Mining
+1500,Industrials > Construction & Engineering > Engineering & Construction
+1520,Consumer > Housing > Homebuilding
+1531,Consumer > Housing > Homebuilding
+1540,Industrials > Construction & Engineering > Engineering & Construction
+1600,Industrials > Construction & Engineering > Engineering & Construction
+1620,Industrials > Construction & Engineering > Engineering & Construction
+1623,Industrials > Construction & Engineering > Engineering & Construction
+1700,Industrials > Construction & Engineering > Engineering & Construction
+1711,Industrials > Electrical Equipment > Automation & Electrical Equipment
+1731,Industrials > Construction & Engineering > Engineering & Construction
+2000,Consumer > Food > Packaged Food
+2010,Consumer > Food > Packaged Food
+2011,Consumer > Food > Packaged Food
+2013,Consumer > Food > Packaged Food
+2015,Consumer > Food > Packaged Food
+2020,Consumer > Food > Packaged Food
+2024,Consumer > Food > Packaged Food
+2030,Consumer > Food > Packaged Food
+2033,Consumer > Food > Packaged Food
+2040,Consumer > Food > Packaged Food
+2050,Consumer > Food > Packaged Food
+2052,Consumer > Food > Packaged Food
+2060,Consumer > Food > Packaged Food
+2070,Consumer > Food > Packaged Food
+2080,Consumer > Beverages & Tobacco > Alcoholic Beverages
+2082,Consumer > Beverages & Tobacco > Alcoholic Beverages
+2084,Consumer > Beverages & Tobacco > Alcoholic Beverages
+2085,Consumer > Beverages & Tobacco > Alcoholic Beverages
+2086,Consumer > Beverages & Tobacco > Non-Alcoholic Beverages
+2090,Consumer > Food > Packaged Food
+2092,Consumer > Food > Packaged Food
+2099,Consumer > Food > Packaged Food
+2100,Consumer > Beverages & Tobacco > Tobacco
+2111,Consumer > Beverages & Tobacco > Tobacco
+2200,Consumer > Clothing > Fashion & Lifestyle Brands
+2211,Consumer > Clothing > Fashion & Lifestyle Brands
+2221,Consumer > Clothing > Fashion & Lifestyle Brands
+2250,Consumer > Clothing > Fashion & Lifestyle Brands
+2273,Consumer > Household goods > Furniture & Home Furnishings
+2300,Consumer > Clothing > Fashion & Lifestyle Brands
+2320,Consumer > Clothing > Fashion & Lifestyle Brands
+2330,Consumer > Clothing > Fashion & Lifestyle Brands
+2340,Consumer > Clothing > Fashion & Lifestyle Brands
+2390,Consumer > Clothing > Fashion & Lifestyle Brands
+2400,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2421,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2430,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2451,Consumer > Housing > Manufactured Housing
+2452,Industrials > Construction & Engineering > Building Materials & Envelope
+2510,Consumer > Household goods > Furniture & Home Furnishings
+2511,Consumer > Household goods > Furniture & Home Furnishings
+2520,Business Services > Office Products & Services > Office Products & Services
+2522,Business Services > Office Products & Services > Office Products & Services
+2531,Industrials > Manufacturing > Auto Parts
+2540,Business Services > Office Products & Services > Office Products & Services
+2590,Consumer > Household goods > Furniture & Home Furnishings
+2600,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2611,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2621,"Materials > Paper, Forest & Packaging > Paper & Forest Products"
+2631,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+2650,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+2670,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+2673,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+2700,Communication > Media > Publishing & Newspapers
+2711,Communication > Media > Publishing & Newspapers
+2721,Communication > Media > Publishing & Newspapers
+2731,Communication > Media > Publishing & Newspapers
+2741,Communication > Media > Publishing & Newspapers
+2750,Communication > Media > Publishing & Newspapers
+2761,Communication > Media > Publishing & Newspapers
+2800,Materials > Chemicals > Commodity Chemicals
+2810,Materials > Chemicals > Specialty Chemicals
+2813,Materials > Chemicals > Specialty Chemicals
+2819,Materials > Chemicals > Commodity Chemicals
+2820,Materials > Chemicals > Commodity Chemicals
+2821,Materials > Chemicals > Commodity Chemicals
+2830,Healthcare > Pharma & Biotech > Biotechnology
+2833,Healthcare > Pharma & Biotech > Pharmaceuticals
+2834,Healthcare > Pharma & Biotech > Pharmaceuticals
+2835,Healthcare > Pharma & Biotech > Biotechnology
+2836,Healthcare > Pharma & Biotech > Biotechnology
+2840,Consumer > Household goods > Cleaning & Household Supplies
+2842,Materials > Chemicals > Specialty Chemicals
+2844,Consumer > Household goods > Cleaning & Household Supplies
+2851,Materials > Chemicals > Specialty Chemicals
+2860,Materials > Chemicals > Specialty Chemicals
+2870,Materials > Chemicals > Specialty Chemicals
+2890,Materials > Chemicals > Specialty Chemicals
+2891,Materials > Chemicals > Specialty Chemicals
+2911,Energy > Oil > Oilfield Services & Equipment
+2950,Industrials > Manufacturing > Heavy Machinery & Trucks
+2990,Materials > Chemicals > Commodity Chemicals
+3011,Industrials > Manufacturing > Auto Parts
+3021,Consumer > Clothing > Footwear
+3050,Industrials > Manufacturing > Auto Parts
+3060,Materials > Chemicals > Commodity Chemicals
+3080,Materials > Chemicals > Commodity Chemicals
+3081,Materials > Chemicals > Commodity Chemicals
+3086,Materials > Chemicals > Commodity Chemicals
+3089,Materials > Chemicals > Commodity Chemicals
+3100,Consumer > Clothing > Fashion & Lifestyle Brands
+3140,Consumer > Clothing > Footwear
+3200,Industrials > Manufacturing > Heavy Machinery & Trucks
+3211,Industrials > Construction & Engineering > Building Materials & Envelope
+3220,Industrials > Construction & Engineering > Building Materials & Envelope
+3221,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+3231,Industrials > Manufacturing > Auto Parts
+3241,Industrials > Manufacturing > Heavy Machinery & Trucks
+3250,Industrials > Construction & Engineering > Building Materials & Envelope
+3260,Industrials > Construction & Engineering > Building Materials & Envelope
+3270,Industrials > Manufacturing > Heavy Machinery & Trucks
+3272,Industrials > Manufacturing > Heavy Machinery & Trucks
+3281,Industrials > Construction & Engineering > Building Materials & Envelope
+3290,Industrials > Manufacturing > Heavy Machinery & Trucks
+3300,Materials > Metals & Mining > Metals Production & Refining
+3310,Materials > Metals & Mining > Metals Production & Refining
+3312,Materials > Metals & Mining > Metals Production & Refining
+3317,Materials > Metals & Mining > Metals Production & Refining
+3320,Materials > Metals & Mining > Metals Production & Refining
+3330,Materials > Metals & Mining > Industrial Metals Mining
+3334,Materials > Metals & Mining > Industrial Metals Mining
+3341,Materials > Metals & Mining > Industrial Metals Mining
+3350,Materials > Metals & Mining > Industrial Metals Mining
+3357,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3360,Materials > Metals & Mining > Industrial Metals Mining
+3390,Materials > Metals & Mining > Industrial Metals Mining
+3411,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+3412,"Materials > Paper, Forest & Packaging > Packaging & Containers"
+3420,Industrials > Manufacturing > Industrial Machinery
+3430,Industrials > Construction & Engineering > Building Materials & Envelope
+3433,Industrials > Manufacturing > Industrial Machinery
+3440,Industrials > Manufacturing > Industrial Machinery
+3442,Industrials > Construction & Engineering > Building Materials & Envelope
+3443,Industrials > Manufacturing > Industrial Machinery
+3444,Industrials > Construction & Engineering > Building Materials & Envelope
+3448,Industrials > Construction & Engineering > Engineering & Construction
+3451,Industrials > Manufacturing > Industrial Machinery
+3452,Industrials > Manufacturing > Industrial Machinery
+3460,Industrials > Manufacturing > Auto Parts
+3470,Industrials > Manufacturing > Industrial Machinery
+3480,Industrials > Aerospace > Aerospace Components & Services
+3490,Industrials > Manufacturing > Industrial Machinery
+3500,Industrials > Manufacturing > Industrial Machinery
+3510,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3523,Consumer > Food > Agricultural Producers
+3524,Consumer > Household goods > Furniture & Home Furnishings
+3530,Industrials > Manufacturing > Industrial Machinery
+3531,Industrials > Manufacturing > Heavy Machinery & Trucks
+3532,Industrials > Manufacturing > Heavy Machinery & Trucks
+3533,Energy > Oil > Oilfield Services & Equipment
+3537,Industrials > Manufacturing > Heavy Machinery & Trucks
+3540,Industrials > Manufacturing > Industrial Machinery
+3541,Industrials > Manufacturing > Industrial Machinery
+3550,Industrials > Manufacturing > Industrial Machinery
+3555,Industrials > Manufacturing > Industrial Machinery
+3559,Technology > Semiconductor Equipment > Wafer Fabrication Equipment
+3560,Industrials > Manufacturing > Industrial Machinery
+3561,Industrials > Manufacturing > Industrial Machinery
+3562,Industrials > Manufacturing > Industrial Machinery
+3564,Industrials > Manufacturing > Industrial Machinery
+3567,Industrials > Manufacturing > Industrial Machinery
+3569,Industrials > Manufacturing > Industrial Machinery
+3570,Technology > Hardware > Computers & Servers
+3571,Technology > Hardware > Computers & Servers
+3572,Technology > Hardware > Computers & Servers
+3575,Industrials > Aerospace > Aerospace Components & Services
+3576,Technology > Hardware > Networking Equipment
+3577,Technology > Hardware > Computers & Servers
+3578,Technology > Hardware > Components & Connectors
+3579,Technology > Hardware > Components & Connectors
+3580,Industrials > Manufacturing > Industrial Machinery
+3585,Industrials > Manufacturing > Industrial Machinery
+3590,Industrials > Manufacturing > Industrial Machinery
+3599,Industrials > Manufacturing > Industrial Machinery
+3600,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3610,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3612,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3613,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3620,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3621,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3630,Consumer > Household goods > Furniture & Home Furnishings
+3634,Consumer > Household goods > Furniture & Home Furnishings
+3640,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3651,Consumer > Household goods > Consumer Electronics
+3652,Communication > Entertainment > Streaming & Studios
+3660,Technology > Hardware > Networking Equipment
+3661,Technology > Hardware > Networking Equipment
+3663,Technology > Hardware > Networking Equipment
+3669,Technology > Hardware > Components & Connectors
+3670,Technology > Hardware > Components & Connectors
+3672,Technology > Hardware > Components & Connectors
+3674,Technology > Semiconductors > Other Semiconductors
+3677,Technology > Hardware > Components & Connectors
+3678,Technology > Hardware > Components & Connectors
+3679,Technology > Hardware > Components & Connectors
+3690,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3691,Industrials > Electrical Equipment > Automation & Electrical Equipment
+3695,Technology > Hardware > Computers & Servers
+3700,Industrials > Manufacturing > Heavy Machinery & Trucks
+3710,Industrials > Manufacturing > Carmakers
+3711,Industrials > Manufacturing > Carmakers
+3713,Industrials > Manufacturing > Heavy Machinery & Trucks
+3714,Industrials > Manufacturing > Auto Parts
+3715,Industrials > Manufacturing > Heavy Machinery & Trucks
+3720,Industrials > Aerospace > Aerospace Components & Services
+3721,Industrials > Aerospace > Aerospace Components & Services
+3724,Industrials > Aerospace > Aerospace Components & Services
+3728,Industrials > Aerospace > Aerospace Components & Services
+3730,Industrials > Manufacturing > Heavy Machinery & Trucks
+3743,Industrials > Manufacturing > Heavy Machinery & Trucks
+3751,Industrials > Manufacturing > Carmakers
+3760,Industrials > Aerospace > Aerospace Components & Services
+3790,Industrials > Manufacturing > Carmakers
+3800,Technology > Hardware > Components & Connectors
+3812,Industrials > Aerospace > Aerospace Components & Services
+3820,Technology > Hardware > Components & Connectors
+3821,Healthcare > Medical Devices & Supplies > Medical Devices
+3822,Technology > Hardware > Components & Connectors
+3823,Technology > Hardware > Components & Connectors
+3824,Technology > Hardware > Components & Connectors
+3825,Technology > Hardware > Components & Connectors
+3826,Healthcare > Life Sciences & Health Tech > Life Science Technology
+3827,Technology > Hardware > Components & Connectors
+3829,Technology > Hardware > Components & Connectors
+3840,Healthcare > Medical Devices & Supplies > Medical Devices
+3841,Healthcare > Medical Devices & Supplies > Medical Devices
+3842,Healthcare > Medical Devices & Supplies > Medical Devices
+3843,Healthcare > Medical Devices & Supplies > Medical Devices
+3844,Healthcare > Medical Devices & Supplies > Medical Devices
+3845,Healthcare > Medical Devices & Supplies > Medical Devices
+3851,Healthcare > Medical Devices & Supplies > Medical Devices
+3861,Consumer > Household goods > Consumer Electronics
+3873,Consumer > Clothing > Fashion & Lifestyle Brands
+3910,Consumer > Clothing > Fashion & Lifestyle Brands
+3911,Consumer > Clothing > Fashion & Lifestyle Brands
+3931,Consumer > Leisure > Sporting Goods & Outdoor
+3940,Consumer > Leisure > Sporting Goods & Outdoor
+3942,Consumer > Leisure > Sporting Goods & Outdoor
+3944,Consumer > Leisure > Sporting Goods & Outdoor
+3949,Consumer > Leisure > Sporting Goods & Outdoor
+3950,Business Services > Office Products & Services > Office Products & Services
+3960,Consumer > Clothing > Fashion & Lifestyle Brands
+3990,Consumer > Household goods > Cleaning & Household Supplies
+4011,Industrials > Transportation & Logistics > Railroads
+4100,Industrials > Transportation & Logistics > Freight & Logistics
+4200,Industrials > Transportation & Logistics > Trucking
+4210,Industrials > Transportation & Logistics > Trucking
+4213,Industrials > Transportation & Logistics > Trucking
+4220,Business Services > Other Commercial Services > Other Business Services
+4400,Industrials > Transportation & Logistics > Marine Shipping
+4412,Industrials > Transportation & Logistics > Marine Shipping
+4512,Industrials > Transportation & Logistics > Airlines
+4513,Industrials > Transportation & Logistics > Freight & Logistics
+4522,Industrials > Transportation & Logistics > Airlines
+4581,Industrials > Transportation & Logistics > Airlines
+4610,Energy > Oil > Pipelines & Storage
+4700,Consumer > Travel > Hotels & Resorts
+4731,Industrials > Transportation & Logistics > Freight & Logistics
+4800,Communication > Telecom > Telecom Services
+4810,Communication > Telecom > Telecom Services
+4812,Communication > Telecom > Telecom Services
+4813,Communication > Telecom > Telecom Services
+4832,Communication > Media > Cable & Broadcasting
+4833,Communication > Media > Cable & Broadcasting
+4841,Communication > Media > Cable & Broadcasting
+4888,Communication > Media > Cable & Broadcasting
+4899,Communication > Telecom > Telecom Services
+4900,Utilities > Utilities > Water Utilities
+4911,Utilities > Utilities > Electric Utilities
+4922,Energy > Oil > Pipelines & Storage
+4923,Utilities > Utilities > Electric Utilities
+4924,Utilities > Utilities > Electric Utilities
+4931,Utilities > Utilities > Multi-Utilities
+4932,Utilities > Utilities > Electric Utilities
+4941,Utilities > Utilities > Water Utilities
+4950,Business Services > Environmental Services > Waste & Environmental Services
+4953,Business Services > Environmental Services > Waste & Environmental Services
+4955,Business Services > Environmental Services > Waste & Environmental Services
+4961,Utilities > Utilities > Electric Utilities
+4991,Utilities > Utilities > Electric Utilities
+5000,Industrials > Distribution > Industrial & MRO Distributors
+5010,Industrials > Distribution > Industrial & MRO Distributors
+5013,Industrials > Distribution > Industrial & MRO Distributors
+5020,Industrials > Distribution > Industrial & MRO Distributors
+5030,Industrials > Distribution > Industrial & MRO Distributors
+5031,Industrials > Distribution > Industrial & MRO Distributors
+5040,Technology > IT Services > IT Consulting
+5045,Technology > IT Services > IT Consulting
+5047,Healthcare > Healthcare Providers > Healthcare Services
+5050,Industrials > Distribution > Industrial & MRO Distributors
+5051,Industrials > Distribution > Industrial & MRO Distributors
+5060,Technology > IT Services > IT Consulting
+5063,Industrials > Distribution > Industrial & MRO Distributors
+5064,Industrials > Distribution > Industrial & MRO Distributors
+5065,Technology > IT Services > IT Consulting
+5070,Industrials > Distribution > Industrial & MRO Distributors
+5072,Industrials > Distribution > Industrial & MRO Distributors
+5080,Industrials > Distribution > Industrial & MRO Distributors
+5082,Industrials > Distribution > Industrial & MRO Distributors
+5084,Industrials > Distribution > Industrial & MRO Distributors
+5090,Industrials > Distribution > Industrial & MRO Distributors
+5093,Business Services > Environmental Services > Waste & Environmental Services
+5094,Industrials > Distribution > Industrial & MRO Distributors
+5099,Industrials > Distribution > Industrial & MRO Distributors
+5100,Industrials > Distribution > Industrial & MRO Distributors
+5110,Industrials > Distribution > Industrial & MRO Distributors
+5122,Healthcare > Healthcare Providers > Healthcare Services
+5130,Industrials > Distribution > Industrial & MRO Distributors
+5140,Consumer > Food > Food Distribution
+5141,Consumer > Food > Food Distribution
+5150,Consumer > Food > Food Distribution
+5159,Healthcare > Pharma & Biotech > Pharmaceuticals
+5160,Industrials > Distribution > Industrial & MRO Distributors
+5171,Energy > Oil > Pipelines & Storage
+5172,Energy > Oil > Oilfield Services & Equipment
+5180,Industrials > Distribution > Industrial & MRO Distributors
+5190,Industrials > Distribution > Industrial & MRO Distributors
+5200,Consumer > Retail > Home Improvement Retail
+5211,Consumer > Retail > Home Improvement Retail
+5311,Consumer > Retail > Discount & Warehouse Stores
+5331,Consumer > Retail > Discount & Warehouse Stores
+5399,Consumer > Retail > Discount & Warehouse Stores
+5400,Consumer > Retail > Grocery Retail
+5411,Consumer > Retail > Grocery Retail
+5412,Consumer > Retail > Grocery Retail
+5500,Consumer > Retail > Auto Dealers & Used Cars
+5531,Consumer > Retail > Auto Dealers & Used Cars
+5600,Consumer > Retail > Specialty Lines
+5621,Consumer > Retail > Specialty Lines
+5651,Consumer > Retail > Specialty Lines
+5661,Consumer > Retail > Specialty Lines
+5700,Consumer > Retail > Home Improvement Retail
+5712,Consumer > Retail > Home Improvement Retail
+5730,Consumer > Retail > Specialty Lines
+5731,Consumer > Retail > Specialty Lines
+5734,Consumer > Retail > Specialty Lines
+5810,Consumer > Restaurants > Casual Dining & Other
+5812,Consumer > Restaurants > Casual Dining & Other
+5900,Energy > Oil > Pipelines & Storage
+5912,Consumer > Retail > Specialty Lines
+5940,Consumer > Retail > Specialty Lines
+5944,Consumer > Retail > Specialty Lines
+5945,Consumer > Retail > Specialty Lines
+5960,Consumer > Retail > Specialty Lines
+5961,Consumer > Retail > Specialty Lines
+5990,Consumer > Retail > Specialty Lines
+5999,Consumer > Retail > Specialty Lines
+6020,Financials > Banks > Regional Banks
+6021,Financials > Banks > Regional Banks
+6022,Financials > Banks > Regional Banks
+6029,Financials > Banks > Regional Banks
+6030,Financials > Banks > Regional Banks
+6035,Financials > Banks > Regional Banks
+6036,Financials > Banks > Regional Banks
+6099,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6100,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6111,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6141,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6150,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6153,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6159,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6160,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6162,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6163,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6172,Financials > Consumer Finance & Lending > Specialty Finance & Other
+6200,Financials > Capital Markets > Brokerage & Investment Banking
+6211,Financials > Capital Markets > Brokerage & Investment Banking
+6282,Financials > Asset Management > Traditional Asset Managers & Custody
+6300,Financials > Insurance > Insurance Brokers
+6311,Financials > Insurance > Life Insurance
+6321,Financials > Insurance > Life Insurance
+6324,Healthcare > Managed Care > Health Insurers
+6331,Financials > Insurance > Property & Casualty Insurance
+6351,Financials > Insurance > Property & Casualty Insurance
+6361,Financials > Insurance > Mortgage & Title Insurance
+6399,Financials > Insurance > Insurance Brokers
+6411,Financials > Insurance > Insurance Brokers
+6500,Property > Development > Greenfield & Master-Planned Communities
+6510,Property > Real Estate Services > Brokerage & Property Services
+6512,Property > Real Estate Services > Brokerage & Property Services
+6513,Property > Real Estate Services > Brokerage & Property Services
+6519,Property > Real Estate Services > Brokerage & Property Services
+6531,Property > Real Estate Services > Brokerage & Property Services
+6532,Property > Development > Greenfield & Master-Planned Communities
+6550,Property > Development > Greenfield & Master-Planned Communities
+6552,Property > Development > Greenfield & Master-Planned Communities
+6712,Financials > Banks > Regional Banks
+6719,Financials > Banks > Regional Banks
+6720,Financials > Asset Management > Traditional Asset Managers & Custody
+6722,Financials > Asset Management > Traditional Asset Managers & Custody
+6726,Financials > Asset Management > Traditional Asset Managers & Custody
+6792,Energy > Oil > Production
+6794,Consumer > Restaurants > Casual Dining & Other
+6795,Materials > Metals & Mining > Industrial Metals Mining
+6797,Financials > Asset Management > Traditional Asset Managers & Custody
+6798,Property > REITs > Specialty & Diversified REITs
+6799,Financials > Asset Management > Traditional Asset Managers & Custody
+7000,Consumer > Travel > Hotels & Resorts
+7011,Consumer > Travel > Hotels & Resorts
+7200,Business Services > Other Commercial Services > Other Business Services
+7300,Business Services > Other Commercial Services > Other Business Services
+7310,Communication > Advertising > Advertising Agencies
+7311,Communication > Advertising > Advertising Agencies
+7319,Communication > Advertising > Advertising Agencies
+7320,Business Services > Other Commercial Services > Other Business Services
+7323,Financials > Consumer Finance & Lending > Specialty Finance & Other
+7330,Communication > Advertising > Advertising Agencies
+7331,Communication > Advertising > Advertising Agencies
+7340,Business Services > Environmental Services > Waste & Environmental Services
+7350,Industrials > Distribution > Industrial & MRO Distributors
+7359,Industrials > Distribution > Industrial & MRO Distributors
+7360,Business Services > Other Commercial Services > Other Business Services
+7361,Business Services > Other Commercial Services > Other Business Services
+7363,Business Services > Other Commercial Services > Other Business Services
+7370,Technology > IT Services > IT Consulting
+7371,Technology > IT Services > IT Consulting
+7372,Technology > Software > Enterprise Applications
+7373,Technology > IT Services > IT Consulting
+7374,Financials > Consumer Finance & Lending > Specialty Finance & Other
+7375,Communication > Social Media & Online Communities > Social Media
+7377,Technology > IT Services > IT Consulting
+7379,Technology > IT Services > IT Consulting
+7380,Business Services > Other Commercial Services > Other Business Services
+7381,Business Services > Other Commercial Services > Other Business Services
+7389,Business Services > Other Commercial Services > Other Business Services
+7500,Business Services > Other Commercial Services > Other Business Services
+7510,Industrials > Transportation & Logistics > Freight & Logistics
+7600,Business Services > Other Commercial Services > Other Business Services
+7800,Communication > Entertainment > Streaming & Studios
+7810,Communication > Entertainment > Streaming & Studios
+7812,Communication > Entertainment > Streaming & Studios
+7819,Communication > Entertainment > Streaming & Studios
+7820,Communication > Entertainment > Streaming & Studios
+7822,Communication > Entertainment > Streaming & Studios
+7830,Communication > Entertainment > Streaming & Studios
+7841,Communication > Entertainment > Streaming & Studios
+7900,Communication > Entertainment > Streaming & Studios
+7941,Communication > Entertainment > Streaming & Studios
+7948,Communication > Entertainment > Streaming & Studios
+7990,Consumer > Travel > Hotels & Resorts
+7996,Consumer > Leisure > Sporting Goods & Outdoor
+7997,Consumer > Leisure > Sporting Goods & Outdoor
+7999,Consumer > Travel > Hotels & Resorts
+8000,Healthcare > Healthcare Providers > Healthcare Services
+8011,Healthcare > Healthcare Providers > Healthcare Services
+8050,Healthcare > Healthcare Providers > Hospitals & Facilities
+8051,Healthcare > Healthcare Providers > Hospitals & Facilities
+8060,Healthcare > Healthcare Providers > Hospitals & Facilities
+8062,Healthcare > Healthcare Providers > Hospitals & Facilities
+8069,Healthcare > Healthcare Providers > Hospitals & Facilities
+8071,Healthcare > Healthcare Providers > Healthcare Services
+8082,Healthcare > Healthcare Providers > Healthcare Services
+8090,Healthcare > Healthcare Providers > Healthcare Services
+8093,Healthcare > Healthcare Providers > Healthcare Services
+8099,Healthcare > Healthcare Providers > Healthcare Services
+8111,Business Services > Other Commercial Services > Other Business Services
+8200,Consumer > Education > Postsecondary Education
+8300,Healthcare > Healthcare Providers > Hospitals & Facilities
+8351,Business Services > Other Commercial Services > Other Business Services
+8400,Consumer > Leisure > Sporting Goods & Outdoor
+8700,Business Services > Other Commercial Services > Other Business Services
+8710,Industrials > Construction & Engineering > Engineering & Construction
+8711,Industrials > Construction & Engineering > Engineering & Construction
+8721,Business Services > Other Commercial Services > Other Business Services
+8730,Business Services > Other Commercial Services > Other Business Services
+8731,Healthcare > Life Sciences & Health Tech > Life Science Technology
+8734,Business Services > Other Commercial Services > Other Business Services
+8741,Industrials > Construction & Engineering > Engineering & Construction
+8742,Business Services > Other Commercial Services > Other Business Services
+8744,Business Services > Other Commercial Services > Other Business Services
+8748,Business Services > Other Commercial Services > Other Business Services
+8900,Business Services > Other Commercial Services > Other Business Services
+9995,Financials > Asset Management > Traditional Asset Managers & Custody
+9997,Industrials > Conglomerates > Diversified Conglomerates
+9998,Industrials > Conglomerates > Diversified Conglomerates
+9999,Consumer > Clothing > Fashion & Lifestyle Brands
