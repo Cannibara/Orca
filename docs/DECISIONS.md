@@ -12,6 +12,7 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Companies that died before today are kept: a CUSIP first held before 2013 that OpenFIGI does not find is asked again with delisted securities included, and is never matched by name (old GM vs new GM); without that, old books lose their losers and old returns read too high (code `run/market.map_new_cusips`).
 - A stock also held since 2013 keeps today's ticker rule over its 2013+ span only, so the older history cannot cost it its prices (code `run/market.held_spans`).
 - Rejected: a full price refetch from 1999 (re-downloads every 2013+ bar); storing near-miss tables (wrong numbers are worse than less history); carrying unreadable quarters as filed (stale books) (chat).
+- Measured before merge (2026-11-18, 140 funds): unreadable filings carried at most two quarters in a row rather than cutting a history; splits of stocks without vendor data read from the filings (two holders agreeing, before 2013 only); a delisted company never takes a vendor line still trading. Share-count typos not repaired: rare (none over 5% of a book in 100 random funds) and present in the XML era too (chat)(code).
 - Consequences: a backfill run (`backfill` input) before the next ordinary run; a fund with two unreadable filings in a row shows only its history after them; run time and lake size grow (chat).
 
 ## 2026-11-10 — Planned features conflict with earlier positions
