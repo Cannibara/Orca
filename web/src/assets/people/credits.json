@@ -1,10 +1,24 @@
 {
+ "andreessen-horowitz": {
+  "name": "Andreessen Horowitz",
+  "author": "TechCrunch",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:TechCrunch_Disrupt_San_Francisco_2018_-_day_2_(42713740520)_(cropped).jpg"
+ },
  "bill-ackman": {
   "name": "Bill Ackman",
   "author": "Senate Democrats",
   "licence": "CC BY 2.0",
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Valeant_Pharmaceuticals%27_Business_Model_(headshot).jpg"
+ },
+ "bill-foley": {
+  "name": "Bill Foley",
+  "author": "U.S. Army Photos by Eric Bartelt/USMA PAO",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Vegas_Goldens_Knights_Bring_the_Stanley_Cup_to_West_Point_(53486672358)_(cropped).jpg"
  },
  "bill-gates": {
   "name": "Bill Gates",
@@ -13,12 +27,26 @@
   "licence_url": "https://creativecommons.org/licenses/by/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Bill_Gates_at_the_European_Commission_-_P067383-987995_(cropped)_5.jpg"
  },
+ "bill-miller": {
+  "name": "Bill Miller",
+  "author": "EricEnfermero",
+  "licence": "CC BY-SA 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Bill_Miller_at_home_plate_at_Minute_Maid_in_Sept_2013.jpg"
+ },
  "brad-gerstner": {
   "name": "Brad Gerstner",
   "author": "The White House",
   "licence": "Public domain",
   "licence_url": "",
   "source": "https://commons.wikimedia.org/wiki/File:Brad_Gerstner_at_the_White_House_2025_(54581192563).jpg"
+ },
+ "bruce-berkowitz": {
+  "name": "Bruce Berkowitz",
+  "author": "Hedge Funds",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Bruce_Berkowitz,_Fairholme_Capital_Management.jpg"
  },
  "carl-icahn": {
   "name": "Carl Icahn",
@@ -48,6 +76,13 @@
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Charlie_Munger_(cropped).jpg"
  },
+ "chris-davis": {
+  "name": "Chris Davis",
+  "author": "Keith Allison from Hanover, MD, USA",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Chris_Davis_(41359990072).jpg"
+ },
  "christopher-hohn": {
   "name": "Christopher Hohn",
   "author": "Foreign, Commonwealth & Development Office",
@@ -68,6 +103,27 @@
   "licence": "CC BY-SA 2.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Daniel_S._Och_-_World_Economic_Forum_Annual_Meeting_Davos_2009.jpg"
+ },
+ "david-einhorn": {
+  "name": "David Einhorn",
+  "author": "unknown, this upload by Concord",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:David_Einhorn.jpg"
+ },
+ "david-greenspan": {
+  "name": "David Greenspan",
+  "author": "While provided by the Bureau of Engraving and Printing, it is a Federal Reserve image.",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Alan_Greenspan_color_photo_portrait.jpg"
+ },
+ "david-rolfe": {
+  "name": "David Rolfe",
+  "author": "©House of Lords / photography by Roger Harris",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Official_portrait_of_Baroness_Neville-Rolfe_crop_2,_2022.jpg"
  },
  "david-tepper": {
   "name": "David Tepper",
@@ -90,6 +146,13 @@
   "licence_url": "https://creativecommons.org/licenses/by/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:George_Soros,_Founder_and_Chairman_of_the_Open_Society_Foundations,_visits_the_EC_(3x4_cropped).jpg"
  },
+ "glenn-greenberg": {
+  "name": "Glenn Greenberg",
+  "author": "Chubb Limited",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Evan_Greenberg_in_2024.jpg"
+ },
  "guy-spier": {
   "name": "Guy Spier",
   "author": "Horasis",
@@ -97,12 +160,33 @@
   "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Guy_Spier,_Chief_Executive_Officer,_Aquamarine_Capital.jpg"
  },
+ "howard-marks": {
+  "name": "Howard Marks",
+  "author": "kellywritershouse",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Howard_Marks_2.17.12_(cropped).jpg"
+ },
  "israel-englander": {
   "name": "Israel Englander",
   "author": "Christian Kozowyk",
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Ienglander_0637_v3_12x8-2-1152x1440_720.jpg"
+ },
+ "jeff-smith": {
+  "name": "Jeff Smith",
+  "author": "Fritz Saalfeld",
+  "licence": "CC BY-SA 2.5",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.5",
+  "source": "https://commons.wikimedia.org/wiki/File:Jeff_Smith.jpg"
+ },
+ "jeffrey-altman": {
+  "name": "Jeffrey Altman",
+  "author": "Steve Jurvetson",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Sam_Altman_speaking_at_TED_(cropped).jpg"
  },
  "jim-simons": {
   "name": "Jim Simons",
@@ -118,12 +202,47 @@
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Joe_Lonsdale.jpg"
  },
+ "john-armitage": {
+  "name": "John Armitage",
+  "author": "National Archives of Australia",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:JohnArmitage1963.jpg"
+ },
+ "john-griffin": {
+  "name": "John Griffin",
+  "author": "Paul Elledge",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Kenneth_C._Griffin_photo.jpg"
+ },
+ "jonathan-auerbach": {
+  "name": "Jonathan Auerbach",
+  "author": "Ggrig97",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Neil_Headshot_2023.jpg"
+ },
  "josh-kushner": {
   "name": "Josh Kushner",
   "author": "SWinxy",
   "licence": "CC BY 4.0",
   "licence_url": "https://creativecommons.org/licenses/by/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Guests_at_the_2026_Met_Gala_289_(Joshua_Kushner).jpg"
+ },
+ "josh-resnick": {
+  "name": "Josh Resnick",
+  "author": "Photo is property of the corporate communications dept of The Wonderful Company and used as an executive bio.",
+  "licence": "CC0",
+  "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "source": "https://commons.wikimedia.org/wiki/File:Stewart_Resnick.jpg"
+ },
+ "ken-fisher": {
+  "name": "Ken Fisher",
+  "author": "DoD News",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Ken_Fisher_(35494854212).jpg"
  },
  "ken-griffin": {
   "name": "Ken Griffin",
@@ -132,12 +251,54 @@
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Kenneth_C._Griffin.jpg"
  },
+ "kleiner-perkins": {
+  "name": "Kleiner Perkins",
+  "author": "TechCrunch",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Thomas_Perkins_at_TechCrunch_SF_2013.jpg"
+ },
+ "kris-jenner": {
+  "name": "Kris Jenner",
+  "author": "Kim_Kardashian_and_Kris_Jenner_examine_wax_figure.jpg: Rubenstein\nderivative work: Tabercil (talk)",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Kris_Jenner.jpg"
+ },
+ "lee-ainslie": {
+  "name": "Lee Ainslie",
+  "author": "Hedge Funds",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Lee_Ainslie,_Maverick_Capital.jpg"
+ },
+ "li-lu": {
+  "name": "Li Lu",
+  "author": "Bibliothèque nationale de France. Bibliothèque de l'Arsenal. Ms-10842\n{{ARK-BNF{{|}}ark:/12148/btv1b530296040}}",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Manuscrits_de_la_biblioth%C3%A8que_de_l%27Arsenal._Archives_de_la_Bastille._DEUXI%C3%88ME_SECTION_%E2%80%94_PRISONNIERS_DOSSIERS_INDIVIDUELS_ET_DOCUMENTS_BIOGRAPHIQUES_(1)._Ann%C3%A9e_1724._Seize_dossiers,_Li-Lu_-_btv1b530296040_(393_of_516).jpg"
+ },
  "louis-bacon": {
   "name": "Louis Bacon",
   "author": "USFWS Mountain-Prairie",
   "licence": "Public domain",
   "licence_url": "",
   "source": "https://commons.wikimedia.org/wiki/File:Louis_Bacon_donating_Historic_Conservation_Easement_in_Sangre_de_Cristo_Mountains,_In_June_2012.jpg"
+ },
+ "mark-arnold": {
+  "name": "Mark Arnold",
+  "author": "Noah Willman",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:John_Arnold,_Arnold_Ventures.jpg"
+ },
+ "mark-kingdon": {
+  "name": "Mark Kingdon",
+  "author": "Hedge Funds",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Mark_Kingdon,_Kingdon_Capital_Mngmnt.jpg"
  },
  "mary-meeker": {
   "name": "Mary Meeker",
@@ -153,12 +314,26 @@
   "licence_url": "https://creativecommons.org/licenses/by/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Masayoshi_Son_(P066533-522034,_cropped).jpg"
  },
+ "michael-platt": {
+  "name": "Michael Platt",
+  "author": "United States Department of Commerce",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Michael_Platt_Jr._official_photo.jpg"
+ },
  "moez-kassam": {
   "name": "Moez Kassam",
   "author": "Mbolz",
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Moez_Kassam_Photograph.jpg"
+ },
+ "neil-mehta": {
+  "name": "Neil Mehta",
+  "author": "Neilmhta",
+  "licence": "CC0",
+  "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "source": "https://commons.wikimedia.org/wiki/File:Neil_Mehta_Journalist_Headshot.jpg"
  },
  "neil-shen": {
   "name": "Neil Shen",
@@ -173,6 +348,20 @@
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:NicolaiTangen.jpg"
+ },
+ "paul-black": {
+  "name": "Paul Black",
+  "author": "John Salmon",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:St_Peter_%5E_St_Paul,_Black_Notley_-_Wall_monument_-_geograph.org.uk_-_4167476.jpg"
+ },
+ "paul-marshall": {
+  "name": "Paul Marshall",
+  "author": "ARC Forum",
+  "licence": "CC0",
+  "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "source": "https://commons.wikimedia.org/wiki/File:Paul_Marshall_speaking_at_ARC_Forum_2023,_30_October_2023_(cropped).jpg"
  },
  "paul-singer": {
   "name": "Paul Singer",
@@ -201,6 +390,55 @@
   "licence": "CC BY 2.0",
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Web_Summit_2018_-_Forum_-_Day_2,_November_7_HM1_7481_(44858045925).jpg"
+ },
+ "ron-baron": {
+  "name": "Ron Baron",
+  "author": "VanessaOkmian",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Ron_Baron.jpg"
+ },
+ "scott-ferguson": {
+  "name": "Scott Ferguson",
+  "author": "Financial Times - Photo credit: Grace Villamil",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Charles_Ferguson_(Representational_Pictures,_Inc.).jpg"
+ },
+ "stephen-mandel": {
+  "name": "Stephen Mandel",
+  "author": "Dave Cournoyer",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:2013-05-21_Stephen_Mandel.jpg"
+ },
+ "steve-cohen": {
+  "name": "Steve Cohen",
+  "author": "Unknown authorUnknown author",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Steve_Cohen.jpg"
+ },
+ "terry-smith": {
+  "name": "Terry Smith",
+  "author": "Smith Studio",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Terry_Smith_Studio.jpg"
+ },
+ "thomas-russo": {
+  "name": "Thomas Russo",
+  "author": "Mdr90",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Thomas_A._Russo.JPG"
+ },
+ "tom-slater": {
+  "name": "Tom Slater",
+  "author": "Mass Communication Specialist 3rd Class Julio Martinez Martinez",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Tom_Slater_(180731-N-AM903-025)_(cropped).jpg"
  },
  "tom-steyer": {
   "name": "Tom Steyer",
