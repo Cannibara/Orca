@@ -63,7 +63,7 @@ jobs:
             echo "### People photos"
             echo
             echo '```'
-            grep -E "photos saved|NOT A PERSON|NO FREE PHOTO" fetch.log || echo "no summary (the run stopped early; see the log)"
+            grep -E "photos saved|^WHY " fetch.log || echo "no summary (the run stopped early; see the log)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Commit the photos to this branch
