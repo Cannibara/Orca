@@ -55,7 +55,8 @@ BAD_LICENCE = re.compile(r"\b(nc|nd|fair use|non-free|gfdl)\b", re.I)
 JOB = re.compile(
     r"investor|businessman|businesswoman|business magnate|financier|entrepreneur|billionaire|economist|"
     r"trader|banker|philanthropist|executive|manager|venture capitalist|capitalist|mathematician|"
-    r"analyst|speculator|chairman|activist|hedge fund|private equity|professor|programmer|computer scientist",
+    r"analyst|speculator|chairman|activist|hedge fund|private equity|professor|programmer|computer scientist|"
+    r"business ?person|advis[eo]r|investment|fund",
     re.I,
 )
 NOT_PERSON = re.compile(r"\b(firm|company|corporation|conglomerate|sovereign|pension|organi[sz]ation)\b", re.I)
@@ -104,14 +105,14 @@ def api(host: str, **params) -> dict:
     return get(f"https://{host}/w/api.php", **base).json()
 
 
-def lead_images(names: list[str]) -> dict[str, dict]:
-    """name -> {file, qid, desc} from each name's English Wikipedia page (redirects followed)."""
+def lookup(titles: list[str]) -> dict[str, dict]:
+    """title asked for -> {file, qid, desc, page} from English Wikipedia (redirects followed); a missing page or a
+    disambiguation page is left out."""
     found: dict[str, dict] = {}
-    for chunk in batches(names):
-        titles = [TITLE.get(n, n) for n in chunk]
+    for chunk in batches(titles):
         d = api(
             "en.wikipedia.org",
-            titles="|".join(titles),
+            titles="|".join(chunk),
             redirects=1,
             prop="pageimages|pageprops|description",
             piprop="name",
@@ -122,20 +123,26 @@ def lead_images(names: list[str]) -> dict[str, dict]:
             for m in d.get(key, []):
                 alias[m["from"]] = m["to"]
         pages = {p["title"]: p for p in d["pages"]}
-        for n, t in zip(chunk, titles):
+        for t in chunk:
             seen = t
             while seen in alias:
                 seen = alias[seen]
             p = pages.get(seen)
             if not p or p.get("missing") or "disambiguation" in p.get("pageprops", {}):
                 continue
-            found[n] = dict(
+            found[t] = dict(
                 file=p.get("pageimage"),
                 qid=p.get("pageprops", {}).get("wikibase_item"),
                 desc=p.get("description", ""),
                 page=p["title"],
             )
     return found
+
+
+def search_titles(name: str) -> list[str]:
+    """Wikipedia pages that may be this person when the plain name is a disambiguation page or another person."""
+    d = api("en.wikipedia.org", list="search", srsearch=f"{name} investor", srlimit=4)["query"]
+    return [h["title"] for h in d["search"]]
 
 
 def claims_of(qid: str) -> dict:
@@ -205,6 +212,17 @@ def category_files(cat: str) -> list[dict]:
     return [i for i in map(parse_info, d.get("pages", [])) if i]
 
 
+def search_files(name: str) -> list[dict]:
+    """Photos on Commons whose file name holds the person's first and last name."""
+    parts = [w.lower() for w in name.replace(".", "").split() if len(w) > 1]
+    if len(parts) < 2:
+        return []
+    d = api("commons.wikimedia.org", list="search", srnamespace=6, srsearch=f'"{name}"', srlimit=30)["query"]
+    names = [h["title"].removeprefix("File:").replace(" ", "_") for h in d["search"]]
+    names = [f for f in names if all(w in f.lower() for w in (parts[0], parts[-1]))]
+    return list(commons_info(names).values())
+
+
 def faces(im: Image.Image) -> list:
     """Frontal faces in the picture as (x, y, w, h), biggest first. Raises ImportError without OpenCV."""
     import cv2
@@ -246,7 +264,8 @@ def square(raw: bytes) -> tuple[bytes | None, str]:
 
 
 def candidates(n: str, page: dict, claims: dict):
-    """Photos to try for a person, best first: Wikipedia's lead image, Wikidata's image, then their Commons category."""
+    """Photos to try for a person, best first: Wikipedia's lead image, Wikidata's image, files in their Commons
+    category and Commons files named after them."""
     seen = set()
     first = [f for f in [page.get("file")] + [v for v in values(claims, "P18")] if f]
     files = [f.replace(" ", "_") for f in first]
@@ -257,7 +276,13 @@ def candidates(n: str, page: dict, claims: dict):
     for cat in values(claims, "P373"):
         # Only files named after them: a category also holds crowd shots and other people, and a
         # wrong face is worse than none.
-        yield from (i for i in category_files(cat) if i["file"] not in seen and surname in i["file"].lower())
+        for i in category_files(cat):
+            if i["file"] not in seen and surname in i["file"].lower():
+                seen.add(i["file"])
+                yield i
+    for i in search_files(n):
+        if i["file"] not in seen:
+            yield i
 
 
 def save(credits: dict) -> None:
@@ -268,7 +293,7 @@ def save(credits: dict) -> None:
     (OUT / "credits.json").write_text(json.dumps(dict(sorted(credits.items())), indent=1, ensure_ascii=False) + "\n")
 
 
-MAX_TRIES = 8  # downloads per person before giving up
+MAX_TRIES = 10  # downloads per person before giving up
 
 
 def main() -> None:
@@ -282,23 +307,29 @@ def main() -> None:
     todo = [n for n in names if refresh or not (OUT / f"{slugify(n)}.jpg").exists()]
     print(f"{len(managers)} manager texts, {len(names)} people, {len(todo)} to look up", flush=True)
 
-    pages = lead_images(todo)
+    pages = lookup([TITLE.get(n, n) for n in todo])
     why: dict[str, str] = {}
     got = 0
     for n in todo:
-        p = pages.get(n)
-        if not p:
-            why[n] = "no Wikipedia page (or a disambiguation page)"
-            continue
-        if not p["qid"]:
-            why[n] = "page has no Wikidata item"
-            continue
-        claims = claims_of(p["qid"])
-        if not any(v.get("id") == "Q5" for v in values(claims, "P31")):
-            why[n] = f"not a person on Wikidata ({p['desc']})"
-            continue
-        if not JOB.search(p["desc"]) or NOT_PERSON.search(p["desc"]):
-            why[n] = f"description does not look like an investor ({p['desc']})"
+        p, claims, note = pages.get(TITLE.get(n, n)), {}, ""
+        tries = [p] if p else []
+        # the plain name is missing, a disambiguation page or another person: search for the right page
+        extra = [t for t in search_titles(n) if n.split()[-1].lower() in t.lower()] if len(n.split()) > 1 else []
+        found = lookup([t for t in extra if not p or t != p["page"]])
+        tries += list(found.values())
+        p = None
+        for cand in tries:
+            if not cand["qid"] or not JOB.search(cand["desc"]) or NOT_PERSON.search(cand["desc"]):
+                note = note or f"page '{cand['page']}' is not an investor ({cand['desc']})"
+                continue
+            c = claims_of(cand["qid"])
+            if not any(v.get("id") == "Q5" for v in values(c, "P31")):
+                note = note or f"page '{cand['page']}' is not a person on Wikidata"
+                continue
+            p, claims = cand, c
+            break
+        if p is None:
+            why[n] = note or "no Wikipedia page"
             continue
         tried, reasons = 0, []
         for i in candidates(n, p, claims):
