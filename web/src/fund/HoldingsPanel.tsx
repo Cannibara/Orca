@@ -44,7 +44,12 @@ function readColours(): Colours {
   const cs = typeof getComputedStyle === "function" ? getComputedStyle(document.documentElement) : null;
   const get = (name: string, fallback: string): RGB => parseColor(cs?.getPropertyValue(name) ?? "") ?? (parseColor(fallback) as RGB);
   return {
-    scale: { gain: get("--tm-gain", "#00A47C"), loss: get("--tm-loss", "#F7172E"), mid: get("--tm-mid", "#AFB4BA") },
+    scale: {
+      gain: get("--tm-gain", "#00875F"),
+      gainLo: get("--tm-gain-lo", "#C4ECDC"),
+      loss: get("--tm-loss", "#D60F25"),
+      lossLo: get("--tm-loss-lo", "#FBCDD1"),
+    },
     ink: get("--ink", "#1B1916"),
     surface: get("--surface", "#FFFCF8"),
     band: get("--band", "#F0E6D8"),
