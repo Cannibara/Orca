@@ -1,9 +1,17 @@
 # Worklog
 
-Last verified: 2026-11-18
+Last verified: 2026-11-19
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-19 — Famous funds: photo of the person before the fund name
+
+| What changed | Why | Files |
+|---|---|---|
+| Each Famous funds row shows a round 52 px photo of the person under the fund name (phone 44 px), before the name; rows in these lists are 68 px tall (phone 60; other tables stay 38). A fund with no photo shows no circle, so its name starts at the left edge | Owner: put the founder's photo before the fund name, bigger than the row, easy to replace by hand | `web/src/components/Face.tsx`, `lib/people.ts`, `pages/Home.tsx` (`famousColumns`, `FAMOUS_FUND_W`), `pages/home.css` |
+| Photos live in `web/src/assets/people/<slug>.jpg` (slug = the name lower case with hyphens). Any jpg/png/webp dropped in with the same name replaces it; `people.json` maps the text under a fund name to a slug when it differs. Bundled by `import.meta.glob`, so no manifest to keep and a replaced file gets a new URL (no stale cache) | Owner wants to swap images manually | `web/src/assets/people/` (+ `README.md`) |
+| `pipeline/scripts/fetch_people_images.py` (by hand, like `google_trends.py`) finds each person's Wikipedia photo on Wikimedia Commons, keeps only public domain, CC0, CC BY and CC BY-SA, crops around the face (OpenCV) to 192 px and writes `credits.json`. Credits show on a new `/photo-credits` page linked from the footer, as CC BY and CC BY-SA require. People with no free photo are skipped. Wikimedia rate-limits the cloud sandbox (HTTP 429), so a run is slow and resumable | Owner: public, copyright-free images; chose CC BY/BY-SA with credits | `pipeline/scripts/fetch_people_images.py`, `web/src/pages/PhotoCredits.tsx`, `App.tsx` |
 
 ## 2026-11-18 — Run 28: monthly run fine, sector scores lost the runner; chunks by trades
 

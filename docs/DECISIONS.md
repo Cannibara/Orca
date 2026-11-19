@@ -1,10 +1,16 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-17
+Last verified: 2026-11-19
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-19 — Photos of the people behind the famous funds
+- Decision (chat): show a round photo before the fund name on the Famous funds lists, from Wikimedia Commons under public domain, CC0, CC BY or CC BY-SA, with credits on `/photo-credits`; a fund with no free photo shows no circle (owner chose "blank space" over an initials badge) (chat)(code).
+- Why files in `src/assets/people/` and not `public/`: the owner replaces photos by hand; bundled files get a new URL when replaced, so no cache serves the old one, and the file name alone is the link (no list to edit) (code).
+- Rejected: strict public domain only (few photos of living people are, so most funds would show none); photos of institutions (logos are trademarks, and the lists show a person) (chat).
+- Consequence: replacing a photo means also editing or deleting its entry in `credits.json`, or the credits page names the old photographer.
 
 ## 2026-11-17 — Pre-2013 13F history read from the old text filings
 - Decision: read every 13F-HR and 13F-HR/A filed on EDGAR from 1999 to the XML switch in mid-2013 (source `legacy`), find each row by its CUSIP check digit, and store a filing only if its table agrees with the filer's own declared entry count or value total (or declares none); prices and T-bills go back to 1999 (owner: "fully utilise pre-2013 SEC 13F data"; spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`) (chat)(code).

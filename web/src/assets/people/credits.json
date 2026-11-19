@@ -1,0 +1,128 @@
+{
+ "bill-ackman": {
+  "name": "Bill Ackman",
+  "author": "Senate Democrats",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Valeant_Pharmaceuticals%27_Business_Model_(headshot).jpg"
+ },
+ "bill-gates": {
+  "name": "Bill Gates",
+  "author": "Bogdan Hoyaux / European Union",
+  "licence": "CC BY 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Bill_Gates_at_the_European_Commission_-_P067383-987995_(cropped)_5.jpg"
+ },
+ "brad-gerstner": {
+  "name": "Brad Gerstner",
+  "author": "The White House",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Brad_Gerstner_at_the_White_House_2025_(54581192563).jpg"
+ },
+ "carl-icahn": {
+  "name": "Carl Icahn",
+  "author": "AviateHistory",
+  "licence": "CC0",
+  "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "source": "https://commons.wikimedia.org/wiki/File:Carl_Icahn,_1980s.jpg"
+ },
+ "cathie-wood": {
+  "name": "Cathie Wood",
+  "author": "Caroline Wood",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Cathie_Wood_ARK_Invest_Photo.jpg"
+ },
+ "chamath-palihapitiya": {
+  "name": "Chamath Palihapitiya",
+  "author": "Cmichel67",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Chamath_Palihapitiya_in_2025.jpg"
+ },
+ "charlie-munger": {
+  "name": "Charlie Munger",
+  "author": "Nick",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Charlie_Munger_(cropped).jpg"
+ },
+ "christopher-hohn": {
+  "name": "Christopher Hohn",
+  "author": "Foreign, Commonwealth & Development Office",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Chris_Hohn_GFSS_2023.jpg"
+ },
+ "daniel-och": {
+  "name": "Daniel Och",
+  "author": "World Economic Forum",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Daniel_S._Och_-_World_Economic_Forum_Annual_Meeting_Davos_2009.jpg"
+ },
+ "david-tepper": {
+  "name": "David Tepper",
+  "author": "Appaloosa Management",
+  "licence": "CC BY-SA 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:David_Tepper_01.jpg"
+ },
+ "gabe-plotkin": {
+  "name": "Gabe Plotkin",
+  "author": "Gabe Plotkin",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Gabe_Plotkin_Headshot.jpg"
+ },
+ "george-soros": {
+  "name": "George Soros",
+  "author": "Aris Oikonomou / European Commission",
+  "licence": "CC BY 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:George_Soros,_Founder_and_Chairman_of_the_Open_Society_Foundations,_visits_the_EC_(3x4_cropped).jpg"
+ },
+ "guy-spier": {
+  "name": "Guy Spier",
+  "author": "Horasis",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Guy_Spier,_Chief_Executive_Officer,_Aquamarine_Capital.jpg"
+ },
+ "israel-englander": {
+  "name": "Israel Englander",
+  "author": "Christian Kozowyk",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Ienglander_0637_v3_12x8-2-1152x1440_720.jpg"
+ },
+ "jim-simons": {
+  "name": "Jim Simons",
+  "author": "Gleuschk",
+  "licence": "CC BY-SA 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Jim_Simons_at_MSRI.jpg"
+ },
+ "joe-lonsdale": {
+  "name": "Joe Lonsdale",
+  "author": "TechCrunch",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Joe_Lonsdale.jpg"
+ },
+ "josh-kushner": {
+  "name": "Josh Kushner",
+  "author": "SWinxy",
+  "licence": "CC BY 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Guests_at_the_2026_Met_Gala_289_(Joshua_Kushner).jpg"
+ },
+ "ken-griffin": {
+  "name": "Ken Griffin",
+  "author": "Paul Elledge",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Kenneth_C._Griffin.jpg"
+ }
+}

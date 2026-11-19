@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-17
+Last verified: 2026-11-19
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -43,6 +43,7 @@ web/src/components/  DataTable, Tabs, Panel, Choice (Seg wrapper), Pager, State,
 web/src/data/        api.ts (cached fetch per URL, loaders), types.ts (mirrors contract.md)
 web/src/lib/         format.ts (money/pct/tidyName), live.ts (IRR, P&L at latest prices), sort, useLoad
 web/scripts/         prerender.mjs (fund pages, _headers, sitemap/robots), dataOrigin.ts, siteUrl.ts
+web/src/assets/people/ photos of the people behind famous funds (<slug>.jpg, people.json, credits.json, README.md; fetch script pipeline/scripts/fetch_people_images.py)
 web/tests/, web/e2e/ vitest suites; Playwright smoke (1280/400 px, light/dark)
 web/public/demo-data synthetic demo data (funds 9100001–9100012) used by dev, tests and CI
 .github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, site-cors.yml, purge-cache.yml

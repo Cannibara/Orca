@@ -1,0 +1,7 @@
+.credits{max-width:760px;padding-block:24px}
+.credits h1{font:600 22px/28px var(--f-sans);letter-spacing:-.015em;margin-bottom:8px}
+.credits p{color:var(--ink2);font-size:13.5px;line-height:20px;margin-bottom:16px}
+.credits ul{list-style:none;padding:0;margin:0}
+.credits li{padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;line-height:18px;color:var(--ink2);overflow-wrap:anywhere}
+.credits li strong{color:var(--ink);font-weight:600}
+.credits a{color:var(--ink);text-underline-offset:2px}
