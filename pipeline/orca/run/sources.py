@@ -10,6 +10,7 @@ import polars as pl
 from orca.famous import Famous, SearchScores, load_famous, load_search
 from orca.http import FigiClient
 from orca.prices import PriceSource
+from orca.sec.about import About
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,8 @@ class Sources:
     is `vendor.load_universe` (None: no universe, every held stock is asked for); `famous()` is
 the Famous funds list (famous.csv; the demo lists its own funds) and `search()` their Google
 Trends scores (famous_search.csv, a snapshot; the demo has its own). `legacy_quarter(key, skip,
-stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-2013 source)."""
+stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-2013 source);
+`fund_about(cik)` is `sec.about.fetch_about` on it (the demo serves its own fictional records)."""
 
     list_bulk_zips: Callable[[], list[str]]
     download_bulk_zip: Callable[[str, Path], None]
@@ -41,6 +43,8 @@ stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-201
         Callable[[str, set[str], dict], tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]] | None
     ) = None
     shares_history: Callable[[int], list] | None = None  # None: the share-count history is not kept
+    # A fund's SEC facts for the About tab (`sec.about.fetch_about`); None: not looked up.
+    fund_about: Callable[[int], About | None] | None = None
 
 
 def production_sources() -> Sources:
@@ -49,6 +53,7 @@ def production_sources() -> Sources:
     from orca.http import Client, figi_client, fred_client, sec_client, tiingo_client
     from orca.prices import TiingoSource
     from orca.rf import fetch_tbill
+    from orca.sec.about import fetch_about
     from orca.sec.bulk import list_bulk_zips
     from orca.sec.legacy import fetch_quarter
     from orca.sec.live import fetch_new_filings
@@ -74,6 +79,7 @@ def production_sources() -> Sources:
         sic=lambda cik: fetch_sic(sec, cik),
         shares_outstanding=lambda cik: fetch_shares_outstanding(sec, cik),
         shares_history=lambda cik: fetch_shares_history(sec, cik),
+        fund_about=lambda cik: fetch_about(sec, cik),
         prices=TiingoSource(tiingo_client()),
         tbill=lambda: fetch_tbill(fred),
         price_universe=lambda: load_universe(Client(1.0, {})),  # a public file: no key

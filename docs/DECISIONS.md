@@ -6,6 +6,10 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-19 — Fund page in three tabs; holdings tree map coloured by the fund's return
+- Decision: the fund page is Holdings | Analysis | About. Holdings = an animated tree map of the holdings plus the Positions table, driven by one Quarter | Year picker (Year = the 12 months to a chosen quarter-end, stepping a year at a time; Custom removed). Tile colour is the fund's own return on each holding over the period (start value at the start quarter-end close, buys and sells at the quarter's VWAP, end at the period-end price, today's prices for the newest quarter), green/red through grey, on the tree map only. Every table prints money as $80.2B. About shows SEC facts only (owner approved draft v4, chat 2026-11-19; spec `docs/superpowers/specs/2026-11-19-fund-tabs-design.md`) (chat)(code).
+- Context: the tiles, the table and the header disagreed by up to ~4% for past quarters because the table priced quarter ends from the Friday close before them; weekly.json now carries each stock's quarter-end close (`q0`/`qclose`), the engine's valuation price, so past quarters equal `summary.quarters.end`. The newest quarter stays at today's prices by the owner's choice, so it differs from the header's filed book and is labelled (code).
+
 ## 2026-11-19 — Photos of the people behind the famous funds
 - Decision (chat): show a round photo before the fund name on the Famous funds lists, from Wikimedia Commons under public domain, CC0, CC BY or CC BY-SA, with credits on `/photo-credits`; a fund with no free photo shows no circle (owner chose "blank space" over an initials badge) (chat)(code).
 - Why files in `src/assets/people/` and not `public/`: the owner replaces photos by hand; bundled files get a new URL when replaced, so no cache serves the old one, and the file name alone is the link (no list to edit) (code).

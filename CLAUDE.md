@@ -36,7 +36,8 @@ pipeline/            Python package `orca` (ingest → lake → engine → publi
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
 pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
-web/src/fund/        fund-page panels and pure models: series.ts (returns/KPIs), positions.ts (as-of model),
+web/src/fund/        fund-page panels (Holdings/Analysis/About tabs) and pure models: series.ts (returns/KPIs), positions.ts (as-of model, periods),
+                     treemap.ts + treemapView.ts (holdings tree map), about.ts,
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css
 web/src/charts/      PriceChart, StepChart, shared Tooltip (one #tip for the app), scale.ts
 web/src/components/  DataTable, Tabs, Panel, Choice (Seg wrapper), Pager, State, Tiles, Signed, StockLabel

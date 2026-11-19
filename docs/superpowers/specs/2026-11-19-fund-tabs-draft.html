@@ -1,0 +1,802 @@
+<title>Orca Fund Tabs</title>
+<style>/*@SITE_CSS@*/</style>
+<style>
+/* ---- draft-only additions: tabs, Holdings tree map, About panel. Everything else is the live site.css. ---- */
+.draft-note{margin:0;padding:6px 16px;font:400 12px/1.45 var(--f-sans);color:var(--ink3);background:var(--page);border-bottom:1px solid var(--line);text-align:center;text-wrap:balance}
+.fp .tp{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+/* captured panels were drawn for 1280px: on a narrow screen they scroll inside their own box, never the page */
+@container app (max-width:719px){.fp .capx{overflow-x:auto;min-width:0}}
+/* the Positions panel lost its picker (it moved up): keep the header off the table's top rule */
+.fp #posPanel>.ph{padding-bottom:14px}
+
+/* Holdings panel */
+.fp .pmodes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fp .tm-pb{padding:0 var(--ppad)}
+.fp .tm-box{position:relative;height:440px;min-width:0}
+.fp .tm-err{padding:24px 0;font-size:13px;color:var(--ink3)}
+.fp .tm{display:block;overflow:visible;font-variant-numeric:tabular-nums;-webkit-user-select:none;user-select:none}
+.fp .tm .tile{outline:none}
+.fp .tm .tile .tr{stroke:none}
+.fp .tm .tile.nul .tr{stroke:var(--control);stroke-width:1px;stroke-dasharray:3 2}
+.fp .tm .tile:hover .tr{stroke:var(--ink);stroke-width:1.5px;stroke-dasharray:none}
+.fp .tm .tile:focus-visible .tr{stroke:var(--focus);stroke-width:4px;stroke-dasharray:none}
+/* an inner light line keeps the ring visible on the strongest blue and orange tiles */
+.fp .tm .tile:focus-visible{outline:2px solid var(--surface);outline-offset:-4px}
+.fp .tm .tile.out{pointer-events:none}
+.fp .tm text{pointer-events:none}
+.fp .tm .l-tk{font:600 13px var(--f-mono);letter-spacing:-.01em}
+.fp .tm .oth .l-tk{font-family:var(--f-sans);letter-spacing:-.005em}
+.fp .tm .l-w{font:500 12px var(--f-sans)}
+.fp .tm .l-n{font:400 11.5px var(--f-sans)}
+.fp .tm .tm-hb{fill:var(--band)}
+.fp .tm .tm-hl{stroke:var(--line2);stroke-width:1.2}
+.fp .tm-leg{gap:8px 20px}
+.fp .tm-lt{font-size:12px;color:var(--ink2)}
+.fp .tm-scale{display:inline-flex;flex-direction:column;align-items:stretch;gap:3px;width:168px}
+.fp .tm-keys{display:inline-flex;flex-wrap:wrap;gap:6px 16px}
+.fp .tm-grad{display:block;height:8px;border-radius:2px}
+.fp .tm-ticks{display:flex;justify-content:space-between;font-size:11px;line-height:1;color:var(--ink3);font-variant-numeric:tabular-nums}
+.fp .lg i.sw-new{background:var(--surface);border:1px dashed var(--control)}
+.fp .lg i.sw-oth{background:repeating-linear-gradient(135deg,var(--line2) 0 1.2px,var(--band) 1.2px 4.2px)}
+.fp .tm-cap{padding-top:8px}
+/* the tree map's colour trial: Green / red vs the site's Blue / orange (tree map only) */
+.fp .tm-pal{display:inline-flex;align-items:center;gap:8px;margin-left:auto}
+.fp .tm-pl{font-size:12px;color:var(--ink2)}
+/* the pill window clips outside rings (overflow:hidden), so pills get an inset one; the selected pill's ring follows its hidden select */
+.fp .stepper .pi:focus-visible,.fp .stepper .pi.on:has(>.psel-o:focus-visible){outline:2px solid var(--focus);outline-offset:-2px;box-shadow:inset 0 0 0 3px var(--surface)}
+
+/* About panel: SEC EDGAR facts as label / value rows */
+.fp .ab{padding:12px var(--ppad) 0;display:flex;flex-direction:column;gap:16px}
+.fp .ab-d{font-size:14px;line-height:1.6;max-width:72ch;text-wrap:pretty}
+.fp .ab-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);margin:0;font-size:13.5px;line-height:1.5}
+.fp .ab-kv dt,.fp .ab-kv dd{margin:0;padding:9px 0;border-top:1px solid var(--line)}
+.fp .ab-kv dt{color:var(--ink3);padding-right:32px}
+.fp .ab-kv dd{color:var(--ink);text-wrap:pretty}
+.fp .ab-kv a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control)}
+.fp .ab-kv a:hover{text-decoration-color:var(--ink)}
+.fp .ab-kv a .ico{display:inline-block;width:12px;height:12px;margin-left:3px;vertical-align:-1px}
+.fp .ab-more{border:0;background:none;padding:0;margin-left:4px;color:var(--ink);font:500 13.5px/1.5 var(--f-sans);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control);cursor:pointer;white-space:nowrap}
+.fp .ab-more:hover{text-decoration-color:var(--ink)}
+.fp .ab-src{padding:10px var(--ppad) 16px;font-size:12px;line-height:1.5;color:var(--ink3);border-top:1px solid var(--line);margin-top:0}
+@container app (max-width:559px){.fp .ab-kv{grid-template-columns:minmax(0,1fr)}.fp .ab-kv dt{padding-bottom:0}.fp .ab-kv dd{border-top:0;padding-top:2px}}
+</style>
+<p class="draft-note">Draft for approval · Berkshire Hathaway, live data from 18 Nov 2026 · The Analysis panels and the AUM chart are static copies of the live ones, so their buttons and tooltips don't work here. · The newest quarter uses today's prices, so it differs from the header's $304.2B (the filing's 30 Sep values). Older quarters will match the header exactly once quarter-end prices are published (planned).</p>
+<!--@TOP@-->
+<main class="wrap">
+<div class="fp">
+<div class="fp-main">
+<!--@FH@-->
+
+<div class="tp" role="tabpanel" id="fund-panel-holdings" aria-labelledby="fund-tab-holdings" data-view="holdings">
+  <section class="panel" id="holdPanel" aria-labelledby="holdTitle">
+    <div class="ph" id="holdPh">
+      <div class="ph-t"><h3 class="pt" id="holdTitle">Holdings</h3></div>
+      <div class="ph-c"><span class="asof" id="holdAsof"></span></div>
+    </div>
+    <div class="ptools" id="holdTools">
+      <div class="pmodes">
+        <div class="seg" role="group" aria-label="Period" id="pSeg"><span class="thumb" aria-hidden="true"></span><button type="button" data-v="quarter" aria-pressed="true">Quarter</button><button type="button" data-v="year" aria-pressed="false">Year</button></div>
+        <div class="seg" role="group" aria-label="Years end in" id="pQ" hidden><span class="thumb" aria-hidden="true"></span><button type="button" data-v="0" aria-pressed="false" title="Years ending in Q1">Q1</button><button type="button" data-v="1" aria-pressed="false" title="Years ending in Q2">Q2</button><button type="button" data-v="2" aria-pressed="false" title="Years ending in Q3">Q3</button><button type="button" data-v="3" aria-pressed="false" title="Years ending in Q4">Q4</button></div>
+      </div>
+      <div class="stepper" role="group" aria-label="Quarter" title="Scroll with the mouse wheel to change quarter" id="pStep">
+        <button type="button" id="pPrev" aria-label="Earlier quarter" aria-disabled="false"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.75 4 5.75 8l4 4"></path></svg></button>
+        <span class="pwin" id="pWin"><span class="ptrack" id="pTrack"></span></span>
+        <button type="button" id="pNext" aria-label="Later quarter" aria-disabled="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.25 4l4 4-4 4"></path></svg></button>
+        <span class="whint" aria-hidden="true"><svg viewBox="0 0 12 18"><rect x="1" y="1" width="10" height="16" rx="5"></rect><path class="wd" d="M6 4.5v3.2"></path></svg></span>
+      </div>
+    </div>
+    <div class="tm-pb"><div class="tm-box" id="tmBox"></div></div>
+    <div class="strip legend tm-leg">
+      <span class="tm-lt" id="tmLt">Colour: the fund's return on each holding</span>
+      <span class="tm-scale" aria-hidden="true"><span class="tm-grad" id="tmGrad"></span><span class="tm-ticks"><span id="tmLo">−25%</span><span>0%</span><span id="tmHi">+25%</span></span></span>
+      <span class="tm-keys"><span class="lg"><i class="sw-new" aria-hidden="true"></i>No price data</span><span class="lg"><i class="sw-oth" aria-hidden="true"></i>Other stocks</span></span>
+      <div class="tm-pal"><span class="tm-pl" id="palLbl">Colours</span><div class="seg" role="group" aria-labelledby="palLbl" id="pPal"><span class="thumb" aria-hidden="true"></span><button type="button" data-v="gr" aria-pressed="true">Green / red</button><button type="button" data-v="bo" aria-pressed="false">Blue / orange</button></div></div>
+    </div>
+    <p class="pf tm-cap" id="tmCap"></p>
+  </section>
+  <section class="panel" id="posPanel" aria-labelledby="posTitle"><!--@POSHEAD@--></section>
+</div>
+
+<div class="tp" role="tabpanel" id="fund-panel-analysis" aria-labelledby="fund-tab-analysis" data-view="analysis" hidden>
+  <div class="capx"><!--@KPICAP@--><!--@KPIS@--></div>
+  <div class="capx"><!--@RET@--></div>
+  <div class="capx"><!--@DRV@--></div>
+  <div class="capx"><!--@WHATIF@--></div>
+</div>
+
+<div class="tp" role="tabpanel" id="fund-panel-about" aria-labelledby="fund-tab-about" data-view="about" hidden>
+  <section class="panel" id="aboutPanel" aria-labelledby="aboutTitle">
+    <div class="ph">
+      <div class="ph-t"><h3 class="pt" id="aboutTitle">About</h3></div>
+    </div>
+    <div class="ab">
+      <p class="ab-d">Berkshire Hathaway Inc is an institutional investment manager based in Omaha, Nebraska. The SEC classes it under Fire, Marine &amp; Casualty Insurance, and its shares trade on the NYSE as BRK-A and BRK-B. Its latest 13F, for the quarter to 30 Sep 2026, reports $304.2B across 30 holdings.</p>
+      <dl class="ab-kv">
+        <dt>Headquarters</dt><dd>Omaha, Nebraska (3555 Farnam Street)</dd>
+        <dt>13F signed by</dt><dd>Marc D. Hamburg, Senior Vice President (16 Nov 2026)</dd>
+        <dt>Other managers in the report</dt>
+        <dd>Warren E. Buffett, GEICO Corp, General Re Corp, National Indemnity Co<span id="abMore" hidden>, Berkshire Hathaway Homestate Insurance Co., Berkshire Hathaway Life Insurance Co of Nebraska, BH Finance LLC, Columbia Insurance Co, Cypress Insurance Co, Medical Protective Corp, National Fire &amp; Marine Insurance Co, National Liability &amp; Fire Insurance Co, Nebraska Furniture Mart, U.S. Investment Corp</span> <button type="button" class="ab-more" id="abMoreBtn" aria-expanded="false" aria-controls="abMore">Show all 14</button></dd>
+        <dt>Incorporated in</dt><dd>Delaware</dd>
+        <dt>Former name</dt><dd>NBH Inc (1998–1999)</dd>
+        <dt>SEC CIK</dt><dd><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=1067983&amp;type=13F-HR" target="_blank" rel="noopener noreferrer">1067983<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5V13h-8.5V4.5H6.5"></path></svg><span class="vh"> (EDGAR filings, opens in a new tab)</span></a></dd>
+      </dl>
+    </div>
+    <p class="ab-src">From SEC EDGAR: the filer's record and its latest 13F cover page.</p>
+  </section>
+  <div class="capx"><!--@AUM@--></div>
+</div>
+
+<!--@FOOT@-->
+</div>
+</div>
+</main>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<!--@SITEFOOT@-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script type="application/json" id="d-hold">/*@HOLD@*/</script>
+<script type="application/json" id="d-tables">/*@TABLES@*/</script>
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const HOLD = JSON.parse($("#d-hold").textContent);
+const TABLES = JSON.parse($("#d-tables").textContent);
+const MINUS = "−";
+const qmin = HOLD[0].q, latest = HOLD[HOLD.length - 1].q;
+const byQ = (q) => HOLD[q - qmin];
+const tblQ = (q) => TABLES[q - qmin];
+
+// ---------- formatting (ports of web/src/lib/format.ts and fund/positions.ts) ----------
+const qOfYear = (q) => ((q % 4) + 4) % 4;
+const yearOf = (q) => 2013 + Math.floor(q / 4);
+const qShort = (q) => "Q" + (qOfYear(q) + 1) + " ’" + String(yearOf(q)).slice(2);
+// Year mode: 12-month periods that all end in the same quarter of the year (yq = 0…3)
+const yRange = (yq) => ({ lo: qmin + ((yq - qOfYear(qmin) + 4) % 4), hi: latest - ((qOfYear(latest) - yq + 4) % 4) });
+const sgn = (x) => (x > 0 ? "+" : x < 0 ? MINUS : "");
+function money(usd) {
+  if (usd == null || !Number.isFinite(usd)) return "—";
+  const a = Math.abs(usd), dollars = Math.round(a), k = Math.round(a / 1e3), m1 = Math.round(a / 1e5) / 10, m = Math.round(a / 1e6), b2 = Math.round(a / 1e7) / 100;
+  let s;
+  if (dollars < 1e4) s = "$" + dollars.toLocaleString("en-US");
+  else if (k < 1e3) s = "$" + k + "K";
+  else if (m1 < 10) s = "$" + m1.toFixed(1) + "M";
+  else if (m < 1e3) s = "$" + m + "M";
+  else if (b2 < 10) s = "$" + b2.toFixed(2) + "B";
+  else s = "$" + (a / 1e9).toFixed(1) + "B";
+  return (usd < 0 && dollars ? MINUS : "") + s;
+}
+function pct(x, digits = 1, signed = true) {
+  if (x == null || !Number.isFinite(x)) return "—";
+  const t = Math.abs(x * 100).toFixed(digits);
+  return (Number(t) === 0 ? "" : signed ? sgn(x) : x < 0 ? MINUS : "") + t + "%";
+}
+const share = (x) => pct(x, 1, false);
+const reduced = () => document.documentElement.getAttribute("data-motion") === "reduce" || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+// CSS cubic-bezier(.2,.7,.2,1) (the site's --ease-out) as an easing function for d3
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx, cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = (t) => ((ax * t + bx) * t + cx) * t, sy = (t) => ((ay * t + by) * t + cy) * t, dx = (t) => (3 * ax * t + 2 * bx) * t + cx;
+  return (x) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) { const e = sx(t) - x; if (Math.abs(e) < 1e-6) return sy(t); const d = dx(t); if (Math.abs(d) < 1e-6) break; t -= e / d; }
+    let lo = 0, hi = 1; t = x;
+    for (let i = 0; i < 40 && hi - lo > 1e-7; i++) { const v = sx(t); if (Math.abs(v - x) < 1e-6) break; if (x > v) lo = t; else hi = t; t = (lo + hi) / 2; }
+    return sy(t);
+  };
+}
+const EASE = bezier(0.2, 0.7, 0.2, 1);
+const DUR = 600;
+
+// ---------- tooltip (the site's #tip.tip; same placement as charts/Tooltip.tsx "above") ----------
+const tip = $("#tip");
+function showTip(c, x, y) {
+  tip.textContent = "";
+  const t = document.createElement("div"); t.className = "t"; t.textContent = c.title; tip.append(t);
+  for (const r of c.rows) {
+    const v = document.createElement("div"); v.className = "v" + (r.big ? " big" : "");
+    if (r.color) { const i = document.createElement("i"); i.style.background = r.color; v.append(i); }
+    const l = document.createElement("span"); l.className = "vl"; l.textContent = r.label; v.append(l);
+    const vv = document.createElement("span"); vv.className = "vv"; vv.textContent = r.value; v.append(vv);
+    tip.append(v);
+  }
+  if (c.note) { const n = document.createElement("div"); n.className = "x"; n.textContent = c.note; tip.append(n); }
+  tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight, vw = innerWidth, E = 8;
+  let left = x + 14, top = y - h - 12;
+  if (left + w > vw - E) left = x - w - 14;
+  if (left < E) left = E;
+  if (top < E) top = y + 16;
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+const hideTip = () => { tip.hidden = true; };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+
+// ---------- tabs (WAI-ARIA, automatic activation; hash routing) ----------
+const TABS = ["holdings", "analysis", "about"];
+const tabsEl = $("#fundTabs");
+const tabBtns = [...tabsEl.querySelectorAll('[role="tab"]')];
+const panels = [...document.querySelectorAll('.tp[role="tabpanel"]')];
+let view = null;
+function placeInd() {
+  const b = tabsEl.querySelector('[aria-selected="true"]'), ind = tabsEl.querySelector(".ind");
+  if (!b || !ind) return;
+  const er = tabsEl.getBoundingClientRect(), br = b.getBoundingClientRect();
+  ind.style.setProperty("--x", br.left - er.left + tabsEl.scrollLeft + "px");
+  ind.style.setProperty("--w", br.width + "px");
+}
+function selectTab(id) {
+  if (!TABS.includes(id)) id = "holdings";
+  if (id === view) return;
+  const first = view === null;
+  view = id;
+  tabBtns.forEach((b) => { const on = b.dataset.view === id; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; });
+  panels.forEach((p) => { p.hidden = p.dataset.view !== id; });
+  placeInd();
+  hideTip();
+  if (id === "holdings") { placeThumb(); renderMap(S.shownQ, false); }
+  // a long tab left the reader far down the page: bring the tab strip back into view
+  if (!first) {
+    const top = $("header.top"), th = top ? top.getBoundingClientRect().height : 0, r = tabsEl.getBoundingClientRect();
+    if (r.top < th) window.scrollTo({ top: scrollY + r.top - th - 8, behavior: "auto" });
+  }
+}
+const fromHash = () => { const h = (location.hash || "").replace(/^#/, ""); return TABS.includes(h) ? h : "holdings"; };
+function go(id) {
+  selectTab(id);
+  try { if (location.hash !== "#" + id) location.hash = id; } catch (e) { /* sandboxed: the tab still switches */ }
+}
+tabBtns.forEach((b) => b.addEventListener("click", () => go(b.dataset.view)));
+tabsEl.addEventListener("keydown", (e) => {
+  const i = TABS.indexOf(view);
+  let n;
+  if (e.key === "ArrowRight") n = (i + 1) % TABS.length;
+  else if (e.key === "ArrowLeft") n = (i - 1 + TABS.length) % TABS.length;
+  else if (e.key === "Home") n = 0;
+  else if (e.key === "End") n = TABS.length - 1;
+  else return;
+  e.preventDefault();
+  go(TABS[n]);
+  tabBtns[n].focus();
+});
+addEventListener("hashchange", () => selectTab(fromHash()));
+
+// the captured logo links to "/", which leaves the draft
+const brand = $("header.top a.brand");
+if (brand) brand.addEventListener("click", (e) => e.preventDefault());
+
+// ---------- theme switch (captured .theme-sw) ----------
+const sw = $(".theme-sw");
+const mqDark = matchMedia("(prefers-color-scheme: dark)");
+const effTheme = () => { const t = document.documentElement.dataset.theme; return t === "dark" || t === "light" ? t : mqDark.matches ? "dark" : "light"; };
+function syncSw() {
+  if (!sw) return;
+  const d = effTheme() === "dark";
+  sw.setAttribute("aria-checked", d);
+  sw.title = d ? "Night: switch to day" : "Day: switch to night";
+}
+if (sw) sw.addEventListener("click", () => { document.documentElement.dataset.theme = effTheme() === "dark" ? "light" : "dark"; });
+let themeSeen = null;
+function onTheme() { syncSw(); const t = effTheme(); if (t !== themeSeen) { themeSeen = t; recolor(); } }
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+mqDark.addEventListener("change", onTheme);
+
+// ---------- period picker (port of fund/PeriodPicker.tsx) ----------
+// Quarter mode: every quarter. Year mode: one pill per 12 months, all ending in quarter S.yq; the pills and
+// arrows step 4 quarters. Both modes work on an index into the list of periods (vals()).
+const S = { mode: "quarter", pq: latest, yq: qOfYear(latest), py: latest, shownQ: null, shownKey: null, pal: "gr" };
+const seg = $("#pSeg"), segBtns = [...seg.querySelectorAll("button")];
+const qseg = $("#pQ"), qBtns = [...qseg.querySelectorAll("button")];
+const palSeg = $("#pPal"), palBtns = [...palSeg.querySelectorAll("button")];
+const stepEl = $("#pStep"), prev = $("#pPrev"), next = $("#pNext"), win = $("#pWin"), track = $("#pTrack");
+const PI_W = 62;
+let lastSt = null, lastKey = null, refocus = false, jig = null;
+function vals() {
+  const a = [];
+  if (S.mode === "year") { const { lo, hi } = yRange(S.yq); for (let v = lo; v <= hi; v += 4) a.push(v); }
+  else for (let v = qmin; v <= latest; v++) a.push(v);
+  return a;
+}
+const curV = () => (S.mode === "year" ? S.py : S.pq);
+const targetQ = curV;
+// the quarter ending in yq in the same calendar year as q, kept inside the range
+const sameYear = (q, yq) => { const { lo, hi } = yRange(yq); return Math.max(lo, Math.min(hi, q - qOfYear(q) + yq)); };
+
+function placeSeg(el) {
+  const b = el.querySelector('button[aria-pressed="true"]'), t = el.querySelector(".thumb");
+  if (!b || !t || !b.offsetWidth) return;
+  t.style.setProperty("--x", b.offsetLeft - 2 + "px");
+  t.style.setProperty("--w", b.offsetWidth + "px");
+}
+const SEGS = [seg, qseg, palSeg];
+function placeThumb() { SEGS.forEach(placeSeg); }
+function jiggle(dir) {
+  if (reduced()) return;
+  const el = track.querySelector(".pi.on");
+  if (!el || typeof el.animate !== "function") return;
+  if (jig && jig.playState === "running") return;
+  const s = dir > 0 ? 1 : -1;
+  jig = el.animate([
+    { transform: "translateX(0)" },
+    { transform: `translateX(${14 * s}px) scaleX(1.06)`, offset: 0.18 },
+    { transform: `translateX(${-6 * s}px)`, offset: 0.42 },
+    { transform: `translateX(${3.5 * s}px)`, offset: 0.62 },
+    { transform: `translateX(${-1.5 * s}px)`, offset: 0.8 },
+    { transform: "translateX(0)" },
+  ], { duration: 640, easing: "cubic-bezier(.25,.8,.35,1)" });
+}
+function pick(v) { if (S.mode === "year") S.py = v; else S.pq = v; update(true); }
+function step(dx) {
+  const V = vals(), ci = V.indexOf(curV());
+  const ni = Math.max(0, Math.min(V.length - 1, ci + dx));
+  if (ni !== ci) pick(V[ni]); else jiggle(dx);
+}
+const svgIco = (d, cls) => `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 16 16" aria-hidden="true"><path d="${d}"></path></svg>`;
+
+function renderPicker() {
+  const ys = S.mode === "year";
+  segBtns.forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === S.mode));
+  qBtns.forEach((b) => b.setAttribute("aria-pressed", ys && Number(b.dataset.v) === S.yq));
+  if (qseg.hidden === ys) {
+    // the Q control appears: place its thumb before it may tween
+    qseg.hidden = !ys;
+    qseg.classList.remove("ready");
+    if (ys) requestAnimationFrame(() => qseg.classList.add("ready"));
+  }
+  placeThumb();
+  const V = vals(), n = V.length, ci = V.indexOf(curV());
+  const lab = qShort;
+  stepEl.setAttribute("aria-label", ys ? "Year" : "Quarter");
+  stepEl.title = ys ? "Scroll with the mouse wheel to change year" : "Scroll with the mouse wheel to change quarter";
+  prev.setAttribute("aria-label", ys ? "Earlier year" : "Earlier quarter");
+  next.setAttribute("aria-label", ys ? "Later year" : "Later quarter");
+  prev.setAttribute("aria-disabled", ci <= 0);
+  next.setAttribute("aria-disabled", ci >= n - 1);
+
+  // remember what had the focus: the pills are rebuilt
+  const ae = document.activeElement;
+  let fv = null;
+  if (ae && track.contains(ae)) fv = ae.classList.contains("psel-o") || refocus ? "on" : ae.dataset.v;
+  refocus = false;
+
+  // three periods in full, the selected one among them, with the edge of the periods either side peeking in
+  const st = Math.max(0, Math.min(n - 3, ci - 1));
+  track.textContent = "";
+  for (let i = st - 1; i <= st + 3; i++) {
+    if (i < 0 || i >= n) { const h = document.createElement("span"); h.className = "pi hole"; h.setAttribute("aria-hidden", "true"); track.append(h); continue; }
+    const v = V[i], on = i === ci, edge = i === st - 1 || i === st + 3;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pi" + (on ? " on" : "") + (edge ? " edge" : "");
+    b.dataset.v = v;
+    b.setAttribute("aria-pressed", on);
+    if (edge) { b.tabIndex = -1; b.setAttribute("aria-label", lab(v)); }
+    if (on) b.tabIndex = -1; // its select is the tab stop; the button itself does nothing
+    const sp = document.createElement("span"); sp.textContent = lab(v); b.append(sp);
+    if (on) {
+      b.insertAdjacentHTML("beforeend", svgIco("M4 6.25 8 10.25l4-4", "caret"));
+      const sel = document.createElement("select");
+      sel.className = "psel-o";
+      sel.setAttribute("aria-label", ys ? "Pick a year" : "Pick a quarter");
+      for (let o = n - 1; o >= 0; o--) { const op = document.createElement("option"); op.value = V[o]; op.textContent = lab(V[o]); sel.append(op); }
+      sel.value = String(v);
+      sel.addEventListener("change", (e) => { refocus = true; pick(Number(e.target.value)); });
+      b.append(sel);
+    }
+    b.addEventListener("click", (e) => { if (on || e.target.tagName === "SELECT") return; pick(v); });
+    track.append(b);
+  }
+  // the track slides by the periods it moved, so the pills travel rather than jump
+  const key = S.mode + S.yq;
+  if (lastSt !== null && lastKey === key && st !== lastSt && Math.abs(st - lastSt) <= 3 && !reduced() && track.animate) {
+    track.animate([{ transform: `translateX(${(st - lastSt) * PI_W}px)` }, { transform: "translateX(0)" }], { duration: 220, easing: "cubic-bezier(.2,.7,.2,1)" });
+  }
+  lastSt = st; lastKey = key;
+  if (fv !== null) {
+    let t = (fv !== "on" && track.querySelector(`.pi[data-v="${fv}"]:not(.edge)`)) || track.querySelector(".pi.on");
+    if (t && t.classList.contains("on")) t = t.querySelector(".psel-o") || t;
+    if (t) t.focus({ preventScroll: true });
+  }
+}
+// switching modes keeps the reader at the same date: Year picks the matching quarter-end in the same calendar year
+segBtns.forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.v === S.mode) return;
+  S.mode = b.dataset.v;
+  if (S.mode === "year") S.py = sameYear(S.pq, S.yq); else S.pq = S.py;
+  update(true);
+}));
+qBtns.forEach((b) => b.addEventListener("click", () => {
+  const yq = Number(b.dataset.v);
+  if (yq === S.yq) return;
+  S.yq = yq;
+  S.py = sameYear(S.py, yq);
+  update(true);
+}));
+palBtns.forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.v === S.pal) return;
+  S.pal = b.dataset.v;
+  palBtns.forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === S.pal));
+  placeSeg(palSeg);
+  if (!TM.svg) return;
+  readColors();
+  if (TM.q !== null) renderMap(TM.q, true); // the colours tween, the tiles stay put
+}));
+prev.addEventListener("click", () => step(-1));
+next.addEventListener("click", () => step(1));
+{
+  // native, non-passive: the page must not scroll under a wheel that steps periods (down = earlier)
+  let acc = 0, last = 0, seen = 0, paged = 0;
+  // the picker now sits right under the tabs: a page scroll that carries the header under the cursor keeps
+  // scrolling the page (like the browser's own scroll latching); the wheel steps periods only from rest
+  addEventListener("scroll", () => { paged = Date.now(); }, { passive: true });
+  const onWheel = (e) => {
+    if (Date.now() - paged < 300) return;
+    e.preventDefault();
+    const now = Date.now();
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    if (now - seen > 250 || (dy > 0) !== (acc > 0)) acc = 0;
+    seen = now;
+    acc += dy;
+    if (Math.abs(acc) < 24) return;
+    if (now - last < 60) { acc = 0; return; }
+    last = now;
+    step(acc > 0 ? -1 : 1);
+    acc = 0;
+  };
+  [$("#holdPh"), $("#holdTools")].forEach((el) => el.addEventListener("wheel", onWheel, { passive: false }));
+}
+
+// ---------- money: the captured panels print "$80,207m"; the site format is money(): "$80.2B" ----------
+// per-share prices ("$39", "$1,092") have no "m" and stay as they are; the sign stays, except on "$0"
+const MM = /([+\u2212-]?)\$(\d{1,3}(?:,\d{3})*|\d+)m(?![A-Za-z])/g;
+const fixText = (t) => t.replace(MM, (_, s, d) => { const txt = money(Number(d.replace(/,/g, "")) * 1e6); return (txt === "$0" ? "" : s) + txt; });
+function fixMoney(root) {
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = tw.nextNode(); node; node = tw.nextNode()) {
+    const v = node.nodeValue;
+    if (v.indexOf("$") >= 0 && v.indexOf("m") >= 0) node.nodeValue = fixText(v);
+  }
+  for (const el of root.querySelectorAll("[aria-label*='$'],[title*='$']")) {
+    for (const at of ["aria-label", "title"]) { const v = el.getAttribute(at); if (v && v.indexOf("$") >= 0) el.setAttribute(at, fixText(v)); }
+  }
+}
+// every captured panel, once at start-up (the Positions table is redone on each quarter change)
+document.querySelectorAll("#fund-panel-analysis .capx, #fund-panel-about .capx").forEach(fixMoney);
+
+// ---------- positions table (captured per quarter) ----------
+const posPanel = $("#posPanel");
+function renderTable(q) {
+  const t = tblQ(q);
+  const ph = posPanel.querySelector(".ph");
+  while (ph.nextSibling) ph.nextSibling.remove();
+  ph.insertAdjacentHTML("afterend", t.html);
+  fixMoney(posPanel.querySelector(".twrap") || posPanel);
+  const a = ph.querySelector(".asof");
+  if (a) a.textContent = t.asof;
+}
+
+// ---------- tree map ----------
+const tmBox = $("#tmBox"), fpEl = $(".fp");
+const PADX = 7, LY = { tk: 18, w: 33, n: 48 };
+const TM = { svg: null, g: null, W: 0, H: 0, q: null, fk: null, basis: "q" };
+let C = null;
+const mcache = new Map();
+let ctx = null, FONTS = null;
+function fonts() {
+  const cs = getComputedStyle(fpEl);
+  const mono = cs.getPropertyValue("--f-mono").trim() || "monospace", sans = cs.getPropertyValue("--f-sans").trim() || "sans-serif";
+  FONTS = { tk: `600 13px ${mono}`, oth: `600 13px ${sans}`, w: `500 12px ${sans}`, n: `400 11.5px ${sans}` };
+}
+function measure(f, s) {
+  const k = f + "|" + s;
+  let w = mcache.get(k);
+  if (w === undefined) {
+    if (!ctx) ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = FONTS[f];
+    w = ctx.measureText(s).width * (f === "tk" ? 0.99 : 1) + 1;
+    mcache.set(k, w);
+  }
+  return w;
+}
+function ellipsize(f, s, aw) {
+  if (measure(f, s) <= aw) return s;
+  let lo = 0, hi = s.length;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (measure(f, s.slice(0, m).trimEnd() + "…") <= aw) lo = m; else hi = m - 1; }
+  return lo >= 4 ? s.slice(0, lo).trimEnd() + "…" : null;
+}
+// what fits in a w × h tile: ticker; then weight; on large tiles also value and name. Nothing is ever clipped.
+function labelSet(d, w, h) {
+  const o = { tk: null, w: null, n: null }, D = d.data, aw = w - 2 * PADX;
+  if (h < 24 || aw < 8) return o;
+  let t1 = D.other ? "Other stocks" : D.r.t;
+  if (D.other && measure("oth", t1) > aw) t1 = "Other";
+  if (measure(D.other ? "oth" : "tk", t1) > aw) return o;
+  o.tk = t1;
+  if (h < 39) return o;
+  if (D.other) {
+    const a = `${D.rows.length} stocks · ${share(D.share)}`;
+    o.w = measure("w", a) <= aw ? a : measure("w", share(D.share)) <= aw ? share(D.share) : null;
+    return o;
+  }
+  const wt = share(D.r.share);
+  if (measure("w", wt) > aw) return o;
+  o.w = wt;
+  if (h >= 54 && w >= 96) {
+    const wv = wt + " · " + money(D.r.v * 1e6);
+    if (measure("w", wv) <= aw) o.w = wv;
+    o.n = ellipsize("n", D.r.n, aw);
+  }
+  return o;
+}
+function readColors() {
+  if (typeof d3 === "undefined") return;
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => d3.color(cs.getPropertyValue(n).trim());
+  // midpoint: --band (one shade off the panel in both themes); no change to show: --sunken (darker than --band in dark mode)
+  // no change to show: a hollow tile (the panel colour inside a dashed outline), so it never reads as a 0% tile
+  // poles: the candle green / red on trial (same in both themes), or the site's --gain / --loss
+  const pal = S.pal === "gr" ? { gain: d3.color(PAL_GR.gain), loss: d3.color(PAL_GR.loss) } : { gain: g("--gain"), loss: g("--loss") };
+  // a true neutral grey at 0% (both palettes), so small moves still read as tinted
+  C = { ...pal, mid: d3.color(effTheme() === "dark" ? MID.dark : MID.light), nul: g("--surface"), ink: g("--ink"), surface: g("--surface"), white: d3.rgb(255, 255, 255), black: d3.rgb(0, 0, 0) };
+  C.iG = d3.interpolateLab(C.mid, C.gain);
+  C.iL = d3.interpolateLab(C.mid, C.loss);
+  const stops = [];
+  for (let i = 0; i <= 10; i++) { const t = -1 + i * 0.2; stops.push((t >= 0 ? C.iG(t) : C.iL(-t)) + " " + i * 10 + "%"); }
+  $("#tmGrad").style.background = `linear-gradient(90deg,${stops.join(",")})`;
+}
+const PAL_GR = { gain: "#00A47C", loss: "#F7172E" }; // candle green / red, a touch more saturated than #089981 / #F23645
+const MID = { light: "#AFB4BA", dark: "#4A4F57" };
+// the change the colours show: over the quarter (q−1 → q) in Quarter mode, over 12 months (q−4 → q) in Year mode
+const basisY = () => TM.basis === "y";
+const chgOf = (r) => (basisY() ? r.chg_y : r.chg); // share-price change: shown in the tooltip for reference
+// the newest quarter is valued at today's prices: its period ends today, not at the quarter end
+const TODAY = byQ(latest).asof.replace(/^.* as of /, "");
+const endLabel = (q) => (q === latest ? TODAY : qShort(q));
+const retOf = (r) => (basisY() ? r.ret_y : r.ret_q); // the fund's return on the holding: the tile colour
+const clampOf = () => (basisY() ? 0.5 : 0.25);
+// diverging: losses towards the loss pole, gains towards the gain pole, through the neutral --band; clamped at ±25% (±50% for 12 months)
+function chgColor(c) {
+  if (c == null) return C.nul.formatRgb();
+  const t = Math.max(-1, Math.min(1, c / clampOf()));
+  return t >= 0 ? C.iG(t) : C.iL(-t);
+}
+function lum(c) {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const r = d3.rgb(c);
+  return 0.2126 * f(r.r) + 0.7152 * f(r.g) + 0.0722 * f(r.b);
+}
+const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const fillFor = (d) => (d.data.other ? null : chgColor(retOf(d.data.r)));
+// label ink: the text token with more contrast; on mid-tone fills, where neither reaches 4.5:1, pure black or
+// white (one of them always does). The name line is softened to 80% only where it still reads at 4.5:1.
+function inkFor(fill) {
+  if (!fill) return { ink: C.ink.formatRgb(), nOp: 0.8 };
+  const f = d3.rgb(fill);
+  let ink = contrast(f, C.ink) >= contrast(f, C.surface) ? C.ink : C.surface;
+  if (contrast(f, ink) < 4.5) ink = contrast(f, C.white) >= contrast(f, C.black) ? C.white : C.black;
+  const soft = d3.rgb(ink.r * 0.8 + f.r * 0.2, ink.g * 0.8 + f.g * 0.2, ink.b * 0.8 + f.b * 0.2);
+  return { ink: ink.formatRgb(), nOp: contrast(f, soft) >= 4.5 ? 0.8 : 1 };
+}
+
+function layout(q, W, H) {
+  const rec = byQ(q);
+  let big = rec.rows.filter((r) => r.share >= 0.01 && r.v > 0), small = rec.rows.filter((r) => r.share < 0.01 && r.v > 0);
+  if (small.length === 1) { big = big.concat(small); small = []; } // one small stock is shown as itself
+  const kids = big.map((r) => ({ key: r.t, r }));
+  if (small.length) kids.push({ key: "__other", other: true, rows: small, v: d3.sum(small, (r) => r.v), share: d3.sum(small, (r) => r.share) });
+  const root = d3.hierarchy({ children: kids })
+    .sum((d) => (d.children ? 0 : d.other ? d.v : d.r.v))
+    .sort((a, b) => (a.data.other ? 1 : 0) - (b.data.other ? 1 : 0) || b.value - a.value); // biggest first, Other stocks last
+  d3.treemap().tile(d3.treemapSquarify).size([W, H]).paddingInner(2).round(true)(root);
+  return { rec, leaves: root.leaves().filter((l) => l.value > 0), nSmall: small.length };
+}
+const geo = (d) => ({ x: d.x0, y: d.y0, w: Math.max(0, d.x1 - d.x0), h: Math.max(0, d.y1 - d.y0) });
+function curGeo(node) {
+  const t = node.transform && node.transform.baseVal.consolidate();
+  const r = node.querySelector("rect.tr");
+  return { x: t ? t.matrix.e : 0, y: t ? t.matrix.f : 0, w: r.width.baseVal.value, h: r.height.baseVal.value };
+}
+function tipFor(d) {
+  const D = d.data, q = TM.q;
+  if (D.other) {
+    const names = D.rows.slice(0, 8).map((r) => r.t).join(", ");
+    return { title: "Other stocks", rows: [
+      { label: "Value", value: money(D.v * 1e6), big: true },
+      { label: "Weight", value: share(D.share) },
+      { label: "Stocks", value: String(D.rows.length) },
+    ], note: `Each under 1% of the book: ${names}${D.rows.length > 8 ? ` and ${D.rows.length - 8} more` : ""}.` };
+  }
+  const r = D.r, f = retOf(r), c = chgOf(r), from = q - (basisY() ? 4 : 1);
+  const note = f != null ? null : from < qmin ? `The data starts at ${qShort(qmin)}: there is no ${qShort(from)} price to compare.` : `No price data for ${qShort(from)} → ${endLabel(q)}.`;
+  return { title: `${r.t} · ${r.n}`, rows: [
+    { label: "Value", value: money(r.v * 1e6), big: true },
+    { label: "Weight", value: share(r.share) },
+    { label: basisY() ? "Fund's return, 12 months" : "Fund's return, quarter", value: pct(f), color: f == null ? null : chgColor(f) },
+    { label: basisY() ? "Share price, 12 months" : "Share price, quarter", value: pct(c) },
+    { label: "Held since", value: r.held },
+  ], note };
+}
+function ariaFor(d) {
+  const D = d.data;
+  if (D.other) return `Other stocks: ${D.rows.length} holdings under 1% each, ${money(D.v * 1e6)}, ${share(D.share)} of the book`;
+  const r = D.r, f = retOf(r);
+  return `${r.t}, ${r.n}: ${money(r.v * 1e6)}, ${share(r.share)} of the book, fund's return ${f == null ? "not available" : pct(f) + (basisY() ? " over 12 months" : " over the quarter")}`;
+}
+function tmInit() {
+  if (typeof d3 === "undefined") {
+    tmBox.innerHTML = '<p class="tm-err">The tree map needs d3 from cdnjs.cloudflare.com, which did not load.</p>';
+    return;
+  }
+  fonts();
+  readColors();
+  const svg = d3.select(tmBox).append("svg").attr("class", "tm").attr("role", "group");
+  const pat = svg.append("defs").append("pattern").attr("id", "tm-hatch").attr("patternUnits", "userSpaceOnUse").attr("width", 6).attr("height", 6).attr("patternTransform", "rotate(45)");
+  pat.append("rect").attr("class", "tm-hb").attr("width", 6).attr("height", 6);
+  pat.append("line").attr("class", "tm-hl").attr("x1", 3).attr("y1", 0).attr("x2", 3).attr("y2", 6);
+  TM.svg = svg;
+  TM.g = svg.append("g");
+  svg.on("keydown", (e) => {
+    const nodes = TM.g.selectAll("g.tile:not(.out)").nodes(), i = nodes.indexOf(document.activeElement);
+    if (i < 0) return;
+    let n;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") n = Math.min(nodes.length - 1, i + 1);
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") n = Math.max(0, i - 1);
+    else if (e.key === "Home") n = 0;
+    else if (e.key === "End") n = nodes.length - 1;
+    else return;
+    e.preventDefault();
+    nodes[n].focus();
+  });
+  new ResizeObserver(() => { if (tmBox.clientWidth && tmBox.clientWidth !== TM.W) renderMap(S.shownQ, false); }).observe(tmBox);
+}
+function setLabels(node, d, ob, nb, anim) {
+  const fin = labelSet(d, nb.w, nb.h);
+  const mid = anim ? labelSet(d, Math.min(ob.w, nb.w), Math.min(ob.h, nb.h)) : fin; // what fits all the way through the move
+  for (const k of ["tk", "w", "n"]) {
+    const el = d3.select(node).select("text.l-" + k);
+    el.interrupt("lab");
+    const f = fin[k] || "";
+    if (!anim) { el.text(f).attr("opacity", f ? 1 : 0); continue; }
+    const op = +el.attr("opacity") || 0;
+    if (op > 0.99 && el.text() && mid[k]) {
+      // it fits before, during and after the move: it rides along with the tile
+      el.text(mid[k]);
+      if (mid[k] !== f) el.transition("lab").delay(DUR).duration(0).text(f);
+    } else if (op > 0) {
+      el.transition("lab").duration(110).attr("opacity", 0)
+        .transition().delay(DUR - 110).duration(220).text(f).attr("opacity", f ? 1 : 0);
+    } else {
+      el.text(f);
+      if (f) el.transition("lab").delay(DUR).duration(220).attr("opacity", 1);
+    }
+  }
+}
+function renderMap(q, animate) {
+  if (!TM.svg || q == null) return;
+  const W = tmBox.clientWidth;
+  if (!W) return; // the tab is hidden: drawn when it opens
+  const H = fpEl.clientWidth < 600 ? 340 : 440;
+  tmBox.style.height = H + "px";
+  TM.basis = S.mode === "year" ? "y" : "q";
+  TM.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`)
+    .attr("aria-label", `Holdings at ${qShort(q)}: each tile's area is the holding's value, its colour the fund's return on it over ${basisY() ? "the 12 months" : "the quarter"}. Arrow keys move between tiles. The Positions table below lists the same figures.`);
+  const anim = animate && TM.q !== null && !reduced();
+  TM.W = W; TM.H = H; TM.q = q;
+  hideTip();
+  const L = layout(q, W, H);
+  const sel = TM.g.selectAll("g.tile").data(L.leaves, (d) => d.data.key);
+
+  sel.exit().each(function () {
+    const g = d3.select(this);
+    if (!anim) { g.interrupt("tm").remove(); return; }
+    if (g.classed("out")) return; // already leaving
+    const c = curGeo(this);
+    g.classed("out", true).attr("tabindex", null).attr("aria-hidden", "true");
+    g.selectAll("text").interrupt("lab").transition("lab").duration(110).attr("opacity", 0);
+    g.transition("tm").duration(DUR).ease(EASE).attr("transform", `translate(${c.x + c.w / 2},${c.y + c.h / 2})`).style("opacity", 0).remove();
+    g.select("rect.tr").transition("tm").duration(DUR).ease(EASE).attr("width", 0).attr("height", 0);
+  });
+
+  const en = sel.enter().append("g").attr("class", "tile").attr("role", "img")
+    .attr("transform", (d) => { const n = geo(d); return `translate(${n.x + n.w / 2},${n.y + n.h / 2})`; })
+    .style("opacity", anim ? 0 : 1);
+  en.append("rect").attr("class", "tr").attr("rx", 2).attr("width", 0).attr("height", 0);
+  for (const k of ["tk", "w", "n"]) en.append("text").attr("class", "l-" + k).attr("x", PADX).attr("y", LY[k]).attr("opacity", 0);
+  en.on("pointerenter pointermove", function (e, d) { showTip(tipFor(d), e.clientX, e.clientY); })
+    .on("pointerleave", hideTip)
+    .on("focus", function (e, d) {
+      const me = this;
+      TM.fk = d.data.key;
+      TM.g.selectAll("g.tile:not(.out)").attr("tabindex", function () { return this === me ? 0 : -1; });
+      const b = this.getBoundingClientRect(); showTip(tipFor(d), b.left + b.width / 2, b.top);
+    })
+    .on("blur", hideTip);
+  const entering = new Set(en.nodes());
+
+  const all = en.merge(sel).order();
+  // a single tab stop: the tile last focused if it is still held, else the biggest
+  if (!L.leaves.some((d) => d.data.key === TM.fk)) TM.fk = L.leaves.length ? L.leaves[0].data.key : null;
+  all.classed("out", false).classed("oth", (d) => !!d.data.other).classed("nul", (d) => !d.data.other && retOf(d.data.r) == null)
+    .attr("tabindex", (d) => (d.data.key === TM.fk ? 0 : -1)).attr("aria-hidden", null).attr("aria-label", ariaFor);
+  all.each(function (d) {
+    const g = d3.select(this), n = geo(d), isNew = entering.has(this);
+    const rect = g.select("rect.tr");
+    const fill = fillFor(d), { ink, nOp } = inkFor(fill);
+    if (d.data.other) rect.style("fill", "url(#tm-hatch)");
+    g.select("text.l-n").style("fill-opacity", nOp);
+    if (!anim) {
+      g.interrupt("tm"); rect.interrupt("tm"); g.selectAll("text").interrupt("tm");
+      g.attr("transform", `translate(${n.x},${n.y})`).style("opacity", 1);
+      rect.attr("width", n.w).attr("height", n.h);
+      if (fill) rect.style("fill", fill);
+      g.selectAll("text").style("fill", ink);
+      setLabels(this, d, n, n, false);
+      return;
+    }
+    const ob = isNew ? { x: n.x + n.w / 2, y: n.y + n.h / 2, w: 0, h: 0 } : curGeo(this);
+    if (isNew) { if (fill) rect.style("fill", fill); g.selectAll("text").style("fill", ink); }
+    g.transition("tm").duration(DUR).ease(EASE).attr("transform", `translate(${n.x},${n.y})`).style("opacity", 1);
+    const rt = rect.transition("tm").duration(DUR).ease(EASE).attr("width", n.w).attr("height", n.h);
+    if (fill && !isNew) rt.style("fill", fill);
+    if (!isNew) g.selectAll("text").transition("tm").duration(DUR).ease(EASE).style("fill", ink);
+    setLabels(this, d, ob, n, true);
+  });
+
+  // the legend names the two quarter-ends the colours compare, and the scale's clamp
+  $("#tmLt").textContent = `Colour: the fund's return on each holding, ${qShort(q - (basisY() ? 4 : 1))} → ${endLabel(q)}`;
+  $("#tmLo").textContent = basisY() ? "−50%" : "−25%";
+  $("#tmHi").textContent = basisY() ? "+50%" : "+25%";
+  const total = money(L.rec.total_m * 1e6), n = L.rec.rows.length;
+  $("#tmCap").textContent = `${total} at ${q === latest ? "prices of " + TODAY : "quarter-end prices"} across ${n} ${n === 1 ? "holding" : "holdings"}` +
+    (L.nSmall ? ` · ${L.nSmall} under 1% grouped as Other stocks` : "");
+}
+function recolor() {
+  if (!TM.svg) return;
+  readColors();
+  if (TM.q !== null) renderMap(TM.q, false);
+}
+
+// ---------- one state change drives the picker, the map and the table ----------
+function update(animate) {
+  renderPicker();
+  const q = targetQ(), key = S.mode + q;
+  if (key === S.shownKey) return;
+  const moved = q !== S.shownQ;
+  S.shownQ = q; S.shownKey = key;
+  // Year mode: "12 months to 30 Sep 2025"; the newest quarter keeps its captured text (its prices are later than the quarter end)
+  const asof = byQ(q).asof;
+  $("#holdAsof").textContent = S.mode === "year" && q !== latest ? "12 months to " + asof.replace(/^.* as of /, "") : asof.replace(/^Positions/, "Holdings");
+  if (moved) renderTable(q);
+  renderMap(q, animate); // a mode switch on the same quarter only recolours (quarter vs 12-month change)
+}
+
+// About: the other managers, first 4 then all 14 in place
+{
+  const more = $("#abMore"), btn = $("#abMoreBtn");
+  btn.addEventListener("click", () => {
+    const open = more.hidden;
+    more.hidden = !open;
+    btn.setAttribute("aria-expanded", open);
+    btn.textContent = open ? "Show fewer" : "Show all 14";
+  });
+}
+
+// ---------- start ----------
+tmInit();
+update(false);
+syncSw();
+themeSeen = effTheme();
+selectTab(fromHash());
+requestAnimationFrame(() => {
+  placeInd(); placeThumb();
+  tabsEl.classList.add("ready"); seg.classList.add("ready"); palSeg.classList.add("ready");
+});
+addEventListener("resize", () => { placeInd(); placeThumb(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
+  mcache.clear(); placeInd(); placeThumb();
+  if (TM.q !== null) renderMap(TM.q, false);
+});
+})();
+</script>

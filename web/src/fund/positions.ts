@@ -1,5 +1,5 @@
-// The Positions panel's model, pure: every figure of every position as it stood at the end of a
-// chosen period (a quarter, a year or a custom run of quarters). Ported from the approved
+// The Holdings tab's model, pure: every figure of every position as it stood at the end of a
+// chosen period (a quarter, or the 12 months to a quarter end). Ported from the approved
 // artifact (app.js: tradeYears/irrOf/sharesAt/priceQ/tEnd/dividendsAsOf/asOf/periodRows and the sort),
 // with the live data behind it: trades come from positions.json, prices from latest_prices.json
 // (the newest quarter) or the weekly series (earlier quarter ends).
@@ -11,7 +11,7 @@ import { yearsSince2013, type Stock } from "../data/api";
 import type { PositionRow, Trade, Weekly } from "../data/types";
 import { qOfYear } from "../lib/format";
 import { irr, positionFlows } from "../lib/live";
-import { qShort } from "./fmt";
+import { fmtLong, qShort } from "./fmt";
 
 // ---- time -------------------------------------------------------------------------------
 
@@ -43,57 +43,70 @@ export const tEnd = (tl: Timeline, qe: number): number =>
 
 // ---- periods ----------------------------------------------------------------------------
 
-export type Mode = "quarter" | "year" | "custom";
+/** Quarter: one quarter. Year: the 12 months ending at a quarter end, every Year pill in the same quarter of its year. */
+export type Mode = "quarter" | "year";
 
 export type PeriodState = {
   mode: Mode;
   /** Selected quarter of the Quarter view. */
   pq: number;
-  /** Selected year of the Year view. */
+  /** Last quarter of the selected 12 months in the Year view: a quarter that is quarter `yq` of its year. */
   py: number;
-  /** Quarters a..b (inclusive) of the Custom view. */
-  pr: { a: number; b: number };
+  /** Which quarter of the year the Year view's periods end in, 0 (Q1) to 3 (Q4). */
+  yq: number;
 };
 
-/** Calendar years the Year picker offers: the year of the first selectable quarter to the year of the newest. */
-export function yearRange(tl: Timeline): { lo: number; hi: number } {
-  return { lo: 2013 + Math.floor(tl.qmin / 4), hi: 2013 + Math.floor(tl.latest / 4) };
+const clampQ = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** The Year pills: the quarter ends that are quarter yq of their year, from the first tracked to the newest. lo > hi = none. */
+export function yearRange(tl: Timeline, yq: number): { lo: number; hi: number } {
+  return { lo: tl.qmin + ((yq - qOfYear(tl.qmin) + 4) % 4), hi: tl.latest - ((qOfYear(tl.latest) - yq + 4) % 4) };
 }
 
-/** First and last quarter a year's view covers (clamped to the tracked range). */
-export function yearSpan(y: number, tl: Timeline): { qs: number; qe: number } {
-  return { qs: Math.max(tl.qmin, (y - 2013) * 4), qe: Math.min(tl.latest, (y - 2013) * 4 + 3) };
+/** The periods the picker offers in its mode, oldest first: every quarter, or every Year pill. */
+export function periodValues(s: PeriodState, tl: Timeline): number[] {
+  const out: number[] = [];
+  if (s.mode === "year") {
+    const { lo, hi } = yearRange(tl, s.yq);
+    for (let v = lo; v <= hi; v += 4) out.push(v);
+  } else for (let v = tl.qmin; v <= tl.latest; v++) out.push(v);
+  return out;
 }
 
-/** The year as the picker names it: a part year says which quarters it covers ("2026 H1", "2026 9M", "2014 H2"). */
-export function yearLabel(y: number, tl: Timeline): string {
-  const { qs, qe } = yearSpan(y, tl);
-  const a = qs - (y - 2013) * 4;
-  const b = qe - (y - 2013) * 4;
-  if (a === 0 && b === 3) return String(y);
-  if (a === 0) return y + (b === 0 ? " Q1" : b === 1 ? " H1" : " 9M");
-  if (a === 2 && b === 3) return y + " H2";
-  if (a === b) return y + " Q" + (a + 1);
-  return y + " Q" + (a + 1) + "–Q" + (b + 1);
+/** The quarter that is quarter yq of q's calendar year, kept inside the Year pills' range. */
+export function sameYear(q: number, yq: number, tl: Timeline): number {
+  const { lo, hi } = yearRange(tl, yq);
+  return clampQ(q - qOfYear(q) + yq, lo, hi);
 }
 
-/** The state a fresh panel starts in: the newest quarter, the last full year, the last four quarters. */
+/** The state a fresh panel starts in: the newest quarter; years end in the newest quarter's Q. */
 export function defaultPeriod(tl: Timeline): PeriodState {
-  const { lo, hi } = yearRange(tl);
-  const fullHi = tl.latest % 4 === 3 ? hi : hi - 1;
-  return {
-    mode: "quarter",
-    pq: tl.latest,
-    py: Math.max(lo, fullHi),
-    pr: { a: Math.max(tl.qmin, tl.latest - 3), b: tl.latest },
-  };
+  return { mode: "quarter", pq: tl.latest, py: tl.latest, yq: qOfYear(tl.latest) };
+}
+
+/** Another mode at the same date: Quarter -> Year picks the same calendar year, Year -> Quarter the pill's quarter. */
+export function withMode(s: PeriodState, mode: Mode, tl: Timeline): PeriodState {
+  if (mode === s.mode) return s;
+  return mode === "year" ? { ...s, mode, py: sameYear(s.pq, s.yq, tl) } : { ...s, mode, pq: s.py };
+}
+
+/** Years ending in another quarter, in the same calendar year; a quarter without any pill leaves the state as it is. */
+export function withYearQuarter(s: PeriodState, yq: number, tl: Timeline): PeriodState {
+  const { lo, hi } = yearRange(tl, yq);
+  if (yq === s.yq || lo > hi) return s;
+  return { ...s, yq, py: sameYear(s.py, yq, tl) };
 }
 
 /** First and last quarter of the chosen period. */
-export function periodOf(s: PeriodState, tl: Timeline): { qs: number; qe: number } {
-  if (s.mode === "year") return yearSpan(s.py, tl);
-  if (s.mode === "custom") return { qs: s.pr.a, qe: s.pr.b };
-  return { qs: s.pq, qe: s.pq };
+export function periodOf(s: PeriodState): { qs: number; qe: number } {
+  return s.mode === "year" ? { qs: s.py - 3, qe: s.py } : { qs: s.pq, qe: s.pq };
+}
+
+/** The Holdings panel's as-of line. The newest quarter is valued at the latest prices, so it names their date. */
+export function periodAsOf(s: PeriodState, tl: Timeline): string {
+  const { qe } = periodOf(s);
+  if (s.mode === "year" && qe < tl.latest) return "12 months to " + fmtLong(qEndIso(qe));
+  return "Holdings and prices as of " + fmtLong(endDate(tl, qe));
 }
 
 // ---- trades -----------------------------------------------------------------------------
@@ -144,10 +157,19 @@ export function dividendsAsOf(pos: PositionRow, qe: number, latest: number): num
 // ---- prices -----------------------------------------------------------------------------
 
 /**
- * Close at the end of quarter q from a weekly series: the last week ending on or before the
- * quarter's last day, walking back over gaps. null when the series has no close that early.
+ * Close at the end of quarter q. A file with quarter-end closes (q0/qclose) gives the one the engine valued
+ * the book with, so the figures add up to the published quarter ends; after the stock's last quarter it is
+ * the last close. An older file has only weekly closes: the last week ending on or before the quarter's last
+ * day, walking back over gaps. null when there is no close that early.
  */
 export function quarterClose(w: Weekly, q: number): number | null {
+  if (w.qclose !== undefined && w.q0 !== undefined) {
+    if (w.q0 === null || q < w.q0) return null;
+    const qc = w.qclose;
+    if (q - w.q0 < qc.length) return qc[q - w.q0];
+    for (let j = qc.length - 1; j >= 0; j--) if (qc[j] != null) return qc[j];
+    return null;
+  }
   let i = Math.floor((qEndMs(q) - Date.parse(w.start)) / (7 * DAY));
   if (i >= w.close.length) i = w.close.length - 1;
   for (; i >= 0; i--) {

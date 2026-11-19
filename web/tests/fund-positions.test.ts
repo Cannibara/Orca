@@ -18,10 +18,14 @@ import {
   sharesAt,
   sortRows,
   tEnd,
+  periodAsOf,
+  periodValues,
+  sameYear,
+  withMode,
   withSortedTrades,
-  yearLabel,
+  withYearQuarter,
   yearRange,
-  yearSpan,
+  type PeriodState,
   type PriceSource,
   type Timeline,
 } from "../src/fund/positions";
@@ -106,47 +110,84 @@ describe("as-of accounting at the newest quarter reproduces positions.json", () 
 // ---------------------------------------------------------------------------------------
 
 describe("periods", () => {
-  test("year range and labels: full years, a part year at the end, one at the start", () => {
-    expect(yearRange(TL)).toEqual({ lo: 2014, hi: 2026 });
-    expect(yearLabel(2025, TL)).toBe("2025");
-    expect(yearLabel(2026, TL)).toBe("2026 H1");
-    expect(yearLabel(2026, { ...TL, latest: 52 })).toBe("2026 Q1");
-    expect(yearLabel(2026, { ...TL, latest: 54 })).toBe("2026 9M");
-    expect(yearLabel(2026, { ...TL, latest: 55 })).toBe("2026");
-    expect(yearLabel(2014, { ...TL, qmin: 6 })).toBe("2014 H2");
-    expect(yearLabel(2014, { ...TL, qmin: 5 })).toBe("2014 Q2–Q4");
-    expect(yearLabel(2014, { ...TL, qmin: 7 })).toBe("2014 Q4");
+  // TL: tracked from Q1 2014 (4) to Q2 2026 (53).
+  test("Year pills are the quarter ends that are quarter yq of their year, from the first tracked to the newest", () => {
+    expect(yearRange(TL, 1)).toEqual({ lo: 5, hi: 53 }); // Q2 '14 .. Q2 '26
+    expect(yearRange(TL, 0)).toEqual({ lo: 4, hi: 52 }); // Q1 '14 .. Q1 '26
+    expect(yearRange(TL, 2)).toEqual({ lo: 6, hi: 50 }); // Q3 '14 .. Q3 '25
+    expect(yearRange(TL, 3)).toEqual({ lo: 7, hi: 51 }); // Q4 '14 .. Q4 '25
+    // a short record: some quarters of the year have no pill at all (lo > hi)
+    const short: Timeline = { qmin: 52, latest: 53, asof: TL.asof };
+    expect(yearRange(short, 0)).toEqual({ lo: 52, hi: 52 });
+    expect(yearRange(short, 1)).toEqual({ lo: 53, hi: 53 });
+    expect(yearRange(short, 2).lo).toBeGreaterThan(yearRange(short, 2).hi);
   });
 
-  test("years and quarter ends before 2013 (negative quarter index)", () => {
+  test("Year pills before 2013 (negative quarter index)", () => {
     const old: Timeline = { ...TL, qmin: -56 }; // tracked from Q1 1999
-    expect(yearRange(old)).toEqual({ lo: 1999, hi: 2026 });
-    expect(yearSpan(2012, old)).toEqual({ qs: -4, qe: -1 });
-    expect(yearLabel(1999, old)).toBe("1999");
-    expect(yearLabel(1999, { ...old, qmin: -54 })).toBe("1999 H2");
+    expect(yearRange(old, 3)).toEqual({ lo: -53, hi: 51 }); // Q4 '99 .. Q4 '25
+    expect(yearRange(old, 0)).toEqual({ lo: -56, hi: 52 });
     expect([endDate(old, -56), endDate(old, -2), endDate(old, -1)]).toEqual(["1999-03-31", "2012-09-30", "2012-12-31"]);
     expect(tEnd(old, -1)).toBeCloseTo(-1 / 365, 12);
   });
 
-  test("a year's span is clamped to the tracked range", () => {
-    expect(yearSpan(2025, TL)).toEqual({ qs: 48, qe: 51 });
-    expect(yearSpan(2026, TL)).toEqual({ qs: 52, qe: 53 });
-    expect(yearSpan(2014, { ...TL, qmin: 6 })).toEqual({ qs: 6, qe: 7 });
+  test("the pills of each mode: every quarter, or every fourth", () => {
+    const d = defaultPeriod(TL);
+    const q = periodValues(d, TL);
+    expect(q[0]).toBe(4);
+    expect(q[q.length - 1]).toBe(53);
+    expect(q).toHaveLength(50);
+    const y = periodValues({ ...d, mode: "year", yq: 3, py: 51 }, TL);
+    expect(y).toEqual([7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51]);
   });
 
-  test("the default period is the newest quarter; the Year view starts on the last full year", () => {
-    const d = defaultPeriod(TL);
-    expect(d).toEqual({ mode: "quarter", pq: 53, py: 2025, pr: { a: 50, b: 53 } });
-    expect(defaultPeriod({ ...TL, latest: 55 }).py).toBe(2026);
-    expect(defaultPeriod({ qmin: 52, latest: 53, asof: TL.asof }).pr).toEqual({ a: 52, b: 53 });
-    expect(defaultPeriod({ qmin: 52, latest: 53, asof: TL.asof }).py).toBe(2026);
+  test("the default period is the newest quarter; years end in the newest quarter's Q", () => {
+    expect(defaultPeriod(TL)).toEqual({ mode: "quarter", pq: 53, py: 53, yq: 1 });
+    expect(defaultPeriod({ ...TL, latest: 55 })).toEqual({ mode: "quarter", pq: 55, py: 55, yq: 3 });
+    expect(defaultPeriod({ ...TL, latest: -2 }).yq).toBe(2); // Q3 2012
   });
 
-  test("periodOf", () => {
+  test("periodOf: one quarter, or the 12 months ending at the Year pill (qs = qe - 3)", () => {
     const d = defaultPeriod(TL);
-    expect(periodOf(d, TL)).toEqual({ qs: 53, qe: 53 });
-    expect(periodOf({ ...d, mode: "year" }, TL)).toEqual({ qs: 48, qe: 51 });
-    expect(periodOf({ ...d, mode: "custom", pr: { a: 40, b: 44 } }, TL)).toEqual({ qs: 40, qe: 44 });
+    expect(periodOf(d)).toEqual({ qs: 53, qe: 53 });
+    expect(periodOf({ ...d, pq: 40 })).toEqual({ qs: 40, qe: 40 });
+    expect(periodOf({ ...d, mode: "year", py: 50, yq: 2 })).toEqual({ qs: 47, qe: 50 });
+    expect(periodOf({ ...d, mode: "year", py: 5, yq: 1 })).toEqual({ qs: 2, qe: 5 }); // may start before the record
+  });
+
+  test("sameYear: the quarter ending in yq in the same calendar year, kept inside the range", () => {
+    expect(sameYear(53, 1, TL)).toBe(53); // Q2 '26 -> Q2 '26
+    expect(sameYear(53, 0, TL)).toBe(52); // -> Q1 '26
+    expect(sameYear(53, 3, TL)).toBe(51); // Q4 '26 is not filed yet: the newest Q4 is '25
+    expect(sameYear(4, 2, TL)).toBe(6); // Q1 '14 -> Q3 '14
+    expect(sameYear(-55, 3, { ...TL, qmin: -56 })).toBe(-53); // Q2 '99 -> Q4 '99
+  });
+
+  test("switching modes keeps the date: Quarter -> Year on the same calendar year, Year -> Quarter on the pill", () => {
+    const d: PeriodState = { ...defaultPeriod(TL), pq: 42 }; // Q3 '23
+    const y = withMode(d, "year", TL);
+    expect(y).toEqual({ mode: "year", pq: 42, py: 41, yq: 1 }); // years end in Q2: Q2 '23
+    const q = withMode({ ...y, py: 37 }, "quarter", TL);
+    expect(q).toEqual({ mode: "quarter", pq: 37, py: 37, yq: 1 });
+    expect(withMode(q, "quarter", TL)).toBe(q);
+  });
+
+  test("changing the Q keeps the calendar year, clamped; a Q with no pill changes nothing", () => {
+    const y: PeriodState = { mode: "year", pq: 53, py: 49, yq: 1 }; // Q2 '25
+    expect(withYearQuarter(y, 3, TL)).toEqual({ ...y, yq: 3, py: 51 }); // Q4 '25
+    expect(withYearQuarter({ ...y, py: 53 }, 3, TL)).toEqual({ ...y, yq: 3, py: 51 }); // Q4 '26 is not there: Q4 '25
+    expect(withYearQuarter({ ...y, py: 5 }, 0, TL)).toEqual({ ...y, yq: 0, py: 4 });
+    const short: Timeline = { qmin: 52, latest: 53, asof: TL.asof };
+    const s: PeriodState = { mode: "year", pq: 53, py: 53, yq: 1 };
+    expect(withYearQuarter(s, 2, short)).toBe(s);
+  });
+
+  test("the as-of line: prices at the period end, or the 12 months; the newest quarter names the latest prices' date", () => {
+    const d = defaultPeriod(TL);
+    expect(periodAsOf(d, TL)).toBe("Holdings and prices as of 30 Oct 2026");
+    expect(periodAsOf({ ...d, pq: 50 }, TL)).toBe("Holdings and prices as of 30 Sep 2025");
+    expect(periodAsOf({ ...d, mode: "year", py: 50, yq: 2 }, TL)).toBe("12 months to 30 Sep 2025");
+    expect(periodAsOf({ ...d, mode: "year", py: 53, yq: 1 }, TL)).toBe("Holdings and prices as of 30 Oct 2026");
   });
 
   test("end dates: the latest prices' date for the newest quarter, else the quarter's last day", () => {
@@ -185,6 +226,31 @@ describe("trades and prices", () => {
     expect(quarterClose({ start: "2013-01-04", close: [null, null] }, 0)).toBeNull();
     expect(quarterClose({ start: "2014-01-03", close: [5, 6] }, 0)).toBeNull(); // before the first week
     expect(quarterClose(w, 40)).toBe(30); // after the last week: the last close
+  });
+
+  test("quarterClose reads the published quarter-end closes when the file has them", () => {
+    // weekly closes say 7 everywhere; the quarter-end closes are what the engine valued the book at
+    const w: Weekly = { start: "2013-01-04", close: Array(300).fill(7), q0: 2, qclose: [21, 22, null, 24] };
+    expect(quarterClose(w, 2)).toBe(21);
+    expect(quarterClose(w, 3)).toBe(22);
+    expect(quarterClose(w, 5)).toBe(24);
+    expect(quarterClose(w, 4)).toBeNull(); // as published
+    expect(quarterClose(w, 1)).toBeNull(); // before the stock's first priced quarter
+    expect(quarterClose(w, 9)).toBe(24); // after its last: the last close before it
+    // a stock without prices: q0 null and no closes
+    expect(quarterClose({ start: "2013-01-04", close: [5, 6], q0: null, qclose: [] }, 0)).toBeNull();
+  });
+
+  test("quarterClose falls back to the weekly closes for an older file without them", () => {
+    const close: (number | null)[] = Array.from({ length: 30 }, (_, i) => i + 1);
+    expect(quarterClose({ start: "2013-01-04", close }, 0)).toBe(13);
+    expect(quarterClose({ start: "2013-01-04", close, q0: undefined }, 0)).toBe(13);
+  });
+
+  test("priceAt reads the quarter-end close for an older quarter", () => {
+    const p = row({ stock_id: 7, trades: t });
+    const weekly = new Map<number, Weekly | null>([[7, { start: "2013-01-04", close: Array(400).fill(33), q0: 0, qclose: Array(60).fill(41) }]]);
+    expect(priceAt(p, 9, { tl: TL, prices: new Map([[7, 99]]), weekly })).toBe(41);
   });
 
   test("priceAt: latest price at the newest quarter, weekly close earlier, last trade price as fallback, else null", () => {

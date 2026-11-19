@@ -12,7 +12,8 @@ Built in: two stocks that split while held (one of them twice), a stock delisted
 and new-holdings amendments (one restating a 2019 quarter, filed in October 2026), a single
 missed quarter, a two-quarter gap, a fund gone inactive, a young fund, a late filer, an early
 filer of the next quarter, options and a bond, a reported value off by 100x and a position that
-triples exactly.
+triples exactly. Each fund but Cobblereef has an invented SEC record and 13F cover pages for the About
+tab (`DEMO_ABOUT`), served in the SEC's shapes to the real `sec.about.fetch_about`.
 """
 
 import io
@@ -23,19 +24,23 @@ import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from functools import partial
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 import httpx
 import polars as pl
 
 from orca.famous import Famous, SearchScores
-from orca.http import FetchError, FigiClient
+from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
 from orca.quarters import q_end, q_index, q_of_date
 from orca.run import Sources, copy_published, cusip_check_digit, run_weekly
+from orca.sec.about import COVER_URL, fetch_about
 from orca.sec.bulk import raw_holdings
 from orca.sec.live import FILINGS_SCHEMA, INFO_SCHEMA
+from orca.securities import SUBMISSIONS_URL
 from orca.storage import Lake
 
 DEMO_TODAY = date(2026, 10, 30)  # the demo is built as of this day
@@ -151,6 +156,81 @@ CROWDED = (
     "Tern Harbor Equity",
     "Undertow Partners",
 )
+
+
+
+@dataclass(frozen=True)
+class _Record:
+    """A demo fund's SEC record and 13F cover: all invented (no real address or person)."""
+
+    street: str
+    city: str
+    state: str  # the SEC's code: a US state, or "X0" (United Kingdom)
+    incorporated: str
+    signer: str
+    title: str
+    former: tuple[tuple[str, str, str], ...] = ()  # (name, from, to)
+    managers: tuple[str, ...] = ()  # the other managers included in the report
+    sic: str = ""
+    tickers: tuple[str, ...] = ()
+    exchanges: tuple[str, ...] = ()
+
+
+# The About tab's facts. Cobblereef has no record: the SEC does not know its CIK, so it has no about.
+DEMO_ABOUT = {
+    "Kelpwood Capital LP": _Record(
+        "200 KELPWOOD WAY, SUITE 400", "SAN FRANCISCO", "CA", "DE", "Iris Kelp", "Managing Member",
+        (("KELPWOOD PARTNERS LP", "2009-03-02", "2013-12-31"),), ("Kelpwood Capital GP LLC",),
+    ),
+    "Halyard Point Partners": _Record(
+        "18 HALYARD POINT ROAD", "GREENWICH", "CT", "DE", "Owen Tate", "Chief Compliance Officer"
+    ),
+    "Lanternfish Capital Management": _Record(
+        "30 LANTERN LANE", "LONDON", "X0", "X0", "Clara Finch", "Head of Operations",
+        (("LANTERNFISH ADVISORS LTD", "2011-05-01", "2015-02-01"),),
+        ("Lanternfish Capital LLP", "Lanternfish Capital (US) LLC"),
+    ),
+    "Tern Harbor Equity": _Record(
+        "9 TERN HARBOR DRIVE", "BOSTON", "MA", "MA", "Marcus Reed", "Chief Financial Officer"
+    ),
+    "Saltglass Advisors": _Record(
+        "77 SALTGLASS AVENUE, 12TH FLOOR", "NEW YORK", "NY", "NY", "Ada Brine",
+        "Founder and Portfolio Manager", sic="Investment Advice",
+    ),
+    "Brinestone Value Partners": _Record(
+        "450 BRINESTONE BOULEVARD", "OMAHA", "NE", "NE", "Hal Morrow", "President",
+        (
+            ("BRINESTONE CAPITAL INC", "2001-06-12", "2008-04-30"),
+            ("BRINESTONE VALUE FUND INC", "2008-04-30", "2014-01-02"),
+        ),
+    ),
+    "Driftwood Capital": _Record(
+        "12 DRIFTWOOD ROW", "AUSTIN", "TX", "DE", "Theo Drift", "Managing Partner"
+    ),
+    "Gullwing Investors": _Record(
+        "5 GULLWING COURT", "CHICAGO", "IL", "IL", "June Abara", "Chief Operating Officer"
+    ),
+    "Seastack Asset Management": _Record(
+        "1 SEASTACK PLAZA", "BALTIMORE", "MD", "MD", "Rafael Ortiz", "Senior Vice President",
+        managers=(
+            "Seastack Trust Co",
+            "Seastack Investment Advisers LLC",
+            "Seastack Asset Management International Ltd",
+            "Seastack & Partners Ltd",
+            "Seastack Private Wealth LLC",
+        ),
+        sic="Investment Advice",
+        tickers=("SSAM",),
+        exchanges=("NYSE",),
+    ),
+    "Orcinus Lane Capital": _Record(
+        "88 ORCINUS LANE", "MIAMI", "FL", "DE", "Wren Orcinus", "Chief Investment Officer"
+    ),
+    "Undertow Partners": _Record(
+        "300 UNDERTOW STREET", "SEATTLE", "WA", "WA", "Lena Park", "Chief Compliance Officer",
+        managers=("Undertow Partners GP LLC",),
+    ),
+}
 
 
 # --- filings in the SEC's shapes ------------------------------------------------------------
@@ -288,6 +368,8 @@ class Fixtures:
     shares_out: dict[int, float]
     prices: dict[str, pl.DataFrame]
     tbill: dict[int, float]
+    # The funds' SEC records and 13F cover documents by URL (JSON as a dict, XML as bytes): `about_pages`.
+    about: dict[str, dict | bytes] = field(default_factory=dict)
 
 
 def listing(figi: str, ticker: str, name: str, etf: bool = False) -> dict:
@@ -362,7 +444,20 @@ def fixture_sources(fx: Fixtures) -> Sources:
         tbill=lambda: dict(fx.tbill),
         famous=lambda: DEMO_FAMOUS,
         search=lambda: DEMO_SEARCH,
+        fund_about=partial(fetch_about, sec_stub(fx.about)),
     )
+
+
+def sec_stub(pages: dict[str, dict | bytes]) -> Client:
+    """A real Client over a mock transport serving `pages` by URL (any other URL: 404)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = pages.get(str(request.url))
+        if page is None:
+            return httpx.Response(404)
+        return httpx.Response(200, json=page) if isinstance(page, dict) else httpx.Response(200, content=page)
+
+    return Client(1e6, {}, transport=httpx.MockTransport(handler), sleep=lambda s: None)
 
 
 # --- synthetic prices -----------------------------------------------------------------------
@@ -684,7 +779,75 @@ def build_fixtures(seed: int = 7) -> Fixtures:
         shares_out={7100001 + i: shares for i, (*_, shares) in enumerate(STOCKS)},
         prices=frames,
         tbill=dict(TBILL),
+        about=about_pages(filings),
     )
+
+
+def about_pages(filings: list[Filing]) -> dict[str, dict | bytes]:
+    """Each demo fund's SEC record (submissions JSON) and the cover document of each of its 13Fs, by
+    URL, in the SEC's shapes: what `sec.about.fetch_about` reads. The record lists every filing."""
+    pages: dict[str, dict | bytes] = {}
+    for index, fund in enumerate(FUNDS):
+        record = DEMO_ABOUT.get(fund.name)
+        if record is None:
+            continue
+        cik = FUND_CIK0 + index
+        own = sorted((f for f in filings if f.cik == cik), key=lambda f: (f.filed, f.accession))
+        own.reverse()  # newest first, as the SEC lists them
+        pages[SUBMISSIONS_URL.format(cik=cik)] = _record_json(fund.name, record, own)
+        for f in own:
+            folder = f.accession.replace("-", "")
+            url = COVER_URL.format(cik=cik, folder=folder, document="primary_doc.xml")
+            pages[url] = _cover_xml(fund.name, record, f)
+    return pages
+
+
+def _record_json(name: str, r: _Record, filings: list[Filing]) -> dict:
+    address = {"street1": r.street, "street2": None, "city": r.city, "stateOrCountry": r.state}
+    return {
+        "cik": str(filings[0].cik),
+        "name": name.upper(),
+        "sicDescription": r.sic,
+        "tickers": list(r.tickers),
+        "exchanges": list(r.exchanges),
+        "stateOfIncorporation": r.incorporated,
+        "addresses": {"mailing": address, "business": address},
+        "formerNames": [
+            {"name": n, "from": f"{start}T00:00:00.000Z", "to": f"{end}T00:00:00.000Z"}
+            for n, start, end in r.former
+        ],
+        "filings": {
+            "recent": {
+                "accessionNumber": [f.accession for f in filings],
+                "filingDate": [f.filed.isoformat() for f in filings],
+                "acceptanceDateTime": [f"{f.filed.isoformat()}T16:00:00.000Z" for f in filings],
+                "form": [f.form for f in filings],
+                "primaryDocument": ["xslForm13F_X02/primary_doc.xml"] * len(filings),
+            },
+            "files": [],
+        },
+    }
+
+
+def _cover_xml(name: str, r: _Record, f: Filing) -> bytes:
+    """A 13F cover document: the signature block, signed the day before filing, and the managers."""
+    signed = (f.filed - timedelta(days=1)).strftime("%m-%d-%Y")
+    managers = "".join(
+        f"<otherManager2><sequenceNumber>{i}</sequenceNumber><otherManager>"
+        f"<name>{xml_escape(m)}</name></otherManager></otherManager2>"
+        for i, m in enumerate(r.managers, start=1)
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler">'
+        f"<headerData><submissionType>{f.form}</submissionType></headerData><formData>"
+        f"<coverPage><filingManager><name>{xml_escape(name)}</name></filingManager></coverPage>"
+        f"<signatureBlock><name>{r.signer}</name><title>{r.title}</title>"
+        f"<signatureDate>{signed}</signatureDate></signatureBlock>"
+        f"<summaryPage><otherIncludedManagersCount>{len(r.managers)}</otherIncludedManagersCount>"
+        f"<otherManagers2Info>{managers}</otherManagers2Info></summaryPage>"
+        "</formData></edgarSubmission>"
+    ).encode()
 
 
 def _amend(filings: list[Filing], original: Filing, fund: _Profile, q: int, accession) -> None:

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A trimmed copy in the shape of Berkshire Hathaway's 13F-HR cover document (accession
+     0001193125-26-463399). The signature block and three of the fourteen other included managers are the
+     filing's; the other eleven names stand in for the rest. Test data only. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:com="http://www.sec.gov/edgar/common" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <headerData>
+    <submissionType>13F-HR</submissionType>
+    <filerInfo>
+      <liveTestFlag>LIVE</liveTestFlag>
+      <flags>
+        <confirmingCopyFlag>false</confirmingCopyFlag>
+        <returnCopyFlag>false</returnCopyFlag>
+        <overrideInternetFlag>false</overrideInternetFlag>
+      </flags>
+      <filer>
+        <credentials>
+          <cik>0001067983</cik>
+          <ccc>XXXXXXXX</ccc>
+        </credentials>
+      </filer>
+      <periodOfReport>09-30-2026</periodOfReport>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPage>
+      <reportCalendarOrQuarter>09-30-2026</reportCalendarOrQuarter>
+      <isAmendment>false</isAmendment>
+      <filingManager>
+        <name>Berkshire Hathaway Inc</name>
+        <address>
+          <com:street1>3555 Farnam Street</com:street1>
+          <com:city>Omaha</com:city>
+          <com:stateOrCountry>NE</com:stateOrCountry>
+          <com:zipCode>68131</com:zipCode>
+        </address>
+      </filingManager>
+      <reportType>13F HOLDINGS REPORT</reportType>
+      <form13FFileNumber>028-04545</form13FFileNumber>
+      <provideInfoForInstruction5>N</provideInfoForInstruction5>
+    </coverPage>
+    <signatureBlock>
+      <name>Marc D. Hamburg</name>
+      <title>Senior Vice President</title>
+      <phone>402-346-1400</phone>
+      <signature>Marc D. Hamburg</signature>
+      <city>Omaha</city>
+      <stateOrCountry>NE</stateOrCountry>
+      <signatureDate>11-16-2026</signatureDate>
+    </signatureBlock>
+    <summaryPage>
+      <otherIncludedManagersCount>14</otherIncludedManagersCount>
+      <tableEntryTotal>121</tableEntryTotal>
+      <tableValueTotal>304214876543</tableValueTotal>
+      <isConfidentialOmitted>false</isConfidentialOmitted>
+      <otherManagers2Info>
+        <otherManager2><sequenceNumber>1</sequenceNumber><otherManager><form13FFileNumber>028-05678</form13FFileNumber><name>Buffett Warren E</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>2</sequenceNumber><otherManager><form13FFileNumber>028-10388</form13FFileNumber><name>Berkshire Hathaway Homestate Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>3</sequenceNumber><otherManager><form13FFileNumber>028-10389</form13FFileNumber><name>Berkshire Hathaway Life Insurance Co of Nebraska</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>4</sequenceNumber><otherManager><form13FFileNumber>028-10390</form13FFileNumber><name>BNSF Master Retirement Trust</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>5</sequenceNumber><otherManager><form13FFileNumber>028-10391</form13FFileNumber><name>Columbia Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>6</sequenceNumber><otherManager><form13FFileNumber>028-10392</form13FFileNumber><name>Cypress Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>7</sequenceNumber><otherManager><form13FFileNumber>028-10393</form13FFileNumber><name>GEICO Corp</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>8</sequenceNumber><otherManager><form13FFileNumber>028-10394</form13FFileNumber><name>General Re Corp</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>9</sequenceNumber><otherManager><form13FFileNumber>028-10395</form13FFileNumber><name>General Reinsurance Corp</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>10</sequenceNumber><otherManager><form13FFileNumber>028-10396</form13FFileNumber><name>Government Employees Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>11</sequenceNumber><otherManager><form13FFileNumber>028-10397</form13FFileNumber><name>National Fire &amp; Marine Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>12</sequenceNumber><otherManager><form13FFileNumber>028-10398</form13FFileNumber><name>National Indemnity Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>13</sequenceNumber><otherManager><form13FFileNumber>028-10399</form13FFileNumber><name>National Liability &amp; Fire Insurance Co</name></otherManager></otherManager2>
+        <otherManager2><sequenceNumber>14</sequenceNumber><otherManager><form13FFileNumber>028-10400</form13FFileNumber><name>New England Asset Management Inc</name></otherManager></otherManager2>
+      </otherManagers2Info>
+    </summaryPage>
+  </formData>
+</edgarSubmission>

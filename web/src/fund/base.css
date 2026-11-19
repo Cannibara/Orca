@@ -38,6 +38,8 @@
 
 /* page column: header, tiles and panels stacked with the page gap (the gap follows the container width) */
 .fp .fp-main{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+/* a fund tab's panels (Fund.tsx): stacked with the same gap */
+.fp .tp{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
 
 /* ---------- buttons ---------- */
 .fp .btn{--h:32px;height:var(--h);padding:0 12px;border-radius:var(--r-2);font:500 13px/1 var(--f-sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;white-space:nowrap;text-decoration:none;user-select:none;position:relative}

@@ -8,7 +8,7 @@ import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { loadWeekly, priceMap, stockMap } from "../src/data/api";
 import type { Exits, LatestPrices, Positions, Securities, Summary, Weekly } from "../src/data/types";
 import { missed, positionRows } from "../src/lib/live";
-import { PositionsPanel } from "../src/fund/PositionsPanel";
+import { TableOnly } from "./holdings-harness";
 import { WhatIfPanel } from "../src/fund/WhatIfPanel";
 import { AUTO_FILL_MAX, CHUNK, INITIAL_ROWS, MORE_STEP } from "../src/fund/loading";
 import { installIdle } from "./idle";
@@ -165,10 +165,10 @@ describe("What if they'd kept it", () => {
     expect(stk.querySelector("span")?.textContent).toBe("Company 4");
   });
 
-  it("default sort is $ missed descending, with signed whole-million amounts and the unpriced last", async () => {
+  it("default sort is $ missed descending, with signed amounts and the unpriced last", async () => {
     renderWhatIf({ exits, prices });
     expect(tickersOf()).toEqual(["S1", "S2", "S4", "S3", "S5"]);
-    expect(rowsOf().map((r) => r["$ missed / dodged"])).toEqual(["+$1,000m", "+$110m", "−$140m", "−$1,000m", "–"]);
+    expect(rowsOf().map((r) => r["$ missed / dodged"])).toEqual(["+$1.00B", "+$110M", "−$140M", "−$1.00B", "–"]);
     expect(screen.getByRole("columnheader", { name: "$ missed / dodged" })).toHaveAttribute("aria-sort", "descending");
     expect(screen.getByRole("columnheader", { name: "Stock" })).toHaveAttribute("aria-sort", "none");
 
@@ -205,10 +205,10 @@ describe("What if they'd kept it", () => {
   it("colours a miss with the loss colour and a dodge with the gain colour, printing the sign", () => {
     renderWhatIf({ exits, prices });
     const figure = (t: string) => trOf(t).querySelector(".mv") as HTMLElement;
-    expect(figure("S1")).toHaveClass("loss"); // missed, "+$1,000m"
-    expect(figure("S1").textContent).toBe("+$1,000m");
-    expect(figure("S4")).toHaveClass("gain"); // dodged, "−$140m"
-    expect(figure("S4").textContent).toBe("−$140m");
+    expect(figure("S1")).toHaveClass("loss"); // missed, "+$1.00B"
+    expect(figure("S1").textContent).toBe("+$1.00B");
+    expect(figure("S4")).toHaveClass("gain"); // dodged, "−$140M"
+    expect(figure("S4").textContent).toBe("−$140M");
     expect(figure("S5")).not.toHaveClass("loss");
     expect(figure("S5")).not.toHaveClass("gain"); // unknown: no colour
     expect(figure("S5").textContent).toBe("–");
@@ -282,13 +282,13 @@ describe("What if they'd kept it", () => {
       renderWhatIf({ positions: [p], exits: e, prices: pricesOf({ 2: 12.5 }) });
       const row = rowOf("S2");
       expect(row["Status"]).toBe("Trimmed");
-      expect(row["Sale proceeds"]).toBe("$12m"); // 1,234,567.4 × 10
+      expect(row["Sale proceeds"]).toBe("$12M"); // 1,234,567.4 × 10
       expect(row["Avg exit"]).toBe("$20"); // the position's own sells, as the Positions table reads them
       expect(row["Price"]).toBe("$13"); // whole dollars
       expect(row["Since sale"]).toBe("+25%");
       expect(row["1y after"]).toBe("+12%");
       expect(row["SPY 1y after"]).toBe("−4%");
-      expect(row["$ missed / dodged"]).toBe("+$3m"); // 1,234,567.4 × (12.5 − 10)
+      expect(row["$ missed / dodged"]).toBe("+$3.1M"); // 1,234,567.4 × (12.5 − 10)
     });
 
     it("labels a position sold out 'Sold all'", () => {
@@ -311,7 +311,7 @@ describe("What if they'd kept it", () => {
       expect(row["IRR actual"]).toBe("+7%"); // 1,000 -> 2,000 over 9.75 years
       expect(row["IRR if held"]).toBe("+13%"); // 1,000 -> 4,000 over 11.2 years
       expect(row["Since sale"]).toBe("+100%");
-      expect(row["$ missed / dodged"]).toBe("$0m"); // 100 shares x $20 is under half a million: no sign, no colour
+      expect(row["$ missed / dodged"]).toBe("+$2,000"); // 100 shares × $20 more
     });
 
     it("shows the last change like the Positions table: a tinted box with the word and the weight change, and its quarter", () => {
@@ -382,7 +382,7 @@ describe("What if they'd kept it", () => {
       for (const header of ["Avg cost", "Return", "IRR actual", "IRR if held", "Last change", "Price"]) {
         expect(noPosition[header], header).toBe("–");
       }
-      expect(noPosition["Sale proceeds"]).toBe("$0m");
+      expect(noPosition["Sale proceeds"]).toBe("$2,000");
       expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
     });
 
@@ -524,7 +524,11 @@ describe("a long list of sales draws its rows in chunks", () => {
     await idle.flushAll();
     expect(bodyRows()).toHaveLength(170);
     expect(tickersOf()[0]).toBe("S99"); // the default order is $ missed descending
-    const values = rowsOf().map((r) => Number(r["$ missed / dodged"].replace(/[+$m,]/g, "").replace("−", "-")));
+    const unit: Record<string, number> = { "": 1, K: 1e3, M: 1e6, B: 1e9 };
+    const values = rowsOf().map((r) => {
+      const m = /^([+−]?)\$([\d.,]+)([KMB]?)$/.exec(r["$ missed / dodged"]) as RegExpExecArray;
+      return (m[1] === "−" ? -1 : 1) * Number(m[2].replace(/,/g, "")) * unit[m[3]];
+    });
     expect(values).toEqual([...values].sort((a, b) => b - a)); // descending from the first row to the last
 
     // a new order starts again from the first rows
@@ -617,7 +621,7 @@ describe("the demo fund", () => {
   function both() {
     return render(
       <MemoryRouter>
-        <PositionsPanel fundId={fundId} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={latest.asof} />
+        <TableOnly fundId={fundId} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={latest.asof} />
         <WhatIfPanel fundId={fundId} positions={positions} exits={exits} prices={prices} stocks={stocks} asof={latest.asof} summary={summary} />
       </MemoryRouter>,
     );

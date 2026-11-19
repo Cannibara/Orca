@@ -1,0 +1,21 @@
+/* About panel: SEC EDGAR facts as a sentence and label / value rows. Ported from the approved draft. */
+
+.fp #aboutPanel.panel{padding:0}
+.fp .ab{padding:12px var(--ppad) 0;display:flex;flex-direction:column;gap:16px}
+.fp .ab-d{font-size:14px;line-height:1.6;max-width:72ch;text-wrap:pretty}
+.fp .ab-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);margin:0;font-size:13.5px;line-height:1.5}
+.fp .ab-kv dt,.fp .ab-kv dd{margin:0;padding:9px 0;border-top:1px solid var(--line)}
+.fp .ab-kv dt{color:var(--ink3);padding-right:32px}
+.fp .ab-kv dd{color:var(--ink);text-wrap:pretty;overflow-wrap:anywhere}
+.fp .ab-kv a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control)}
+.fp .ab-kv a:hover{text-decoration-color:var(--ink)}
+.fp .ab-kv a .ico{display:inline-block;width:12px;height:12px;margin-left:3px;vertical-align:-1px}
+.fp .ab-more{border:0;background:none;padding:0;margin-left:4px;color:var(--ink);font:500 13.5px/1.5 var(--f-sans);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--control);cursor:pointer;white-space:nowrap}
+.fp .ab-more:hover{text-decoration-color:var(--ink)}
+.fp .ab-src{padding:10px var(--ppad) 16px;font-size:12px;line-height:1.5;color:var(--ink3);border-top:1px solid var(--line);margin-top:0}
+.fp .ab-none{padding:12px var(--ppad) 20px;font-size:13px;color:var(--ink3)}
+@container app (max-width:559px){
+  .fp .ab-kv{grid-template-columns:minmax(0,1fr)}
+  .fp .ab-kv dt{padding-bottom:0}
+  .fp .ab-kv dd{border-top:0;padding-top:2px}
+}

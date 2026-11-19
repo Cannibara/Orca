@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import "./base.css";
 
-export type SegOption = { id: string; label: string; icon?: ReactNode; disabled?: boolean };
+export type SegOption = { id: string; label: string; icon?: ReactNode; disabled?: boolean; title?: string };
 
 type SegProps = {
   /** Accessible name of the group. */
@@ -64,6 +64,7 @@ export function Seg({ label, options, value, onChange, className }: SegProps) {
           data-v={o.id}
           aria-pressed={o.id === value}
           disabled={o.disabled}
+          title={o.title}
           onClick={() => {
             if (o.id !== value) onChange(o.id);
           }}

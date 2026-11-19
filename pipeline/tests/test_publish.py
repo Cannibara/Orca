@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import re
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
@@ -18,18 +19,27 @@ from orca.engine.fund import (
     fund_years,
 )
 from orca.engine.metrics import Performance, hold_lengths, performance, turnover
-from orca.engine.position import PositionResult, Trade, compute_position
+from orca.engine.position import (
+    PositionResult,
+    Trade,
+    _valuation_close,
+    compute_position,
+)
 from orca.engine.whatif import ExitRow, beat_spy_pct, buys_vs_sells, exit_rows
 from orca.publish import (
+    _PRICE_DECIMALS,
     ExitsSummary,
     FundMeta,
     FundOutput,
     HomeLists,
+    about_json,
     build_metrics,
     changed_files,
     new_version,
+    publish_about,
     publish_fund,
     publish_shared,
+    publish_weekly,
     read_json,
     read_manifest,
     weekly_closes,
@@ -37,7 +47,8 @@ from orca.publish import (
     write_json,
     write_manifest,
 )
-from orca.quarter_px import QuarterPx
+from orca.quarter_px import QuarterPx, quarter_px
+from orca.quarters import q_index
 
 CUSIP = "037833100"  # the join key of stock 1; it must never reach a published file
 
@@ -274,6 +285,7 @@ def test_summary_has_the_contract_keys(tmp_path):
         "years",
         "quarters",
         "holdings_now",
+        "about",
     }
     assert set(s["metrics"]) == {
         "ann_return",
@@ -681,14 +693,16 @@ def test_weekly_closes_last_close_of_each_week():
             (date(2024, 1, 16), 15.0),  # Tue of week 3, the last row
         ]
     )
-    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0, 14.0, 15.0]}
+    assert weekly_closes(df) == {
+        "start": "2024-01-05", "close": [12.0, 14.0, 15.0], "q0": 44, "qclose": [15.0]
+    }
 
 
 def test_weekly_closes_start_is_the_first_weeks_friday():
     df = daily([(date(2024, 1, 3), 11.0), (date(2024, 1, 4), 12.0), (date(2024, 1, 9), 13.0)])
-    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0, 13.0]}
+    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0, 13.0], "q0": 44, "qclose": [13.0]}
     only_monday = daily([(date(2024, 1, 8), 5.0)])
-    assert weekly_closes(only_monday) == {"start": "2024-01-12", "close": [5.0]}
+    assert weekly_closes(only_monday) == {"start": "2024-01-12", "close": [5.0], "q0": 44, "qclose": [5.0]}
 
 
 def test_weekly_closes_keep_an_empty_week_as_null_and_never_forward_fill():
@@ -699,7 +713,9 @@ def test_weekly_closes_keep_an_empty_week_as_null_and_never_forward_fill():
         (date(2024, 1, 26), 20.0),  # week 3 has no rows at all; week 4 closes at 20
         (date(2024, 1, 4), None),  # a missing close does not hide Wed's or Fri's
     ]
-    assert weekly_closes(daily(rows)) == {"start": "2024-01-05", "close": [12.0, None, None, 20.0]}
+    assert weekly_closes(daily(rows)) == {
+        "start": "2024-01-05", "close": [12.0, None, None, 20.0], "q0": 44, "qclose": [20.0]
+    }
 
 
 def test_weekly_close_i_is_the_week_ending_start_plus_7i_days():
@@ -717,15 +733,87 @@ def test_weekly_close_i_is_the_week_ending_start_plus_7i_days():
 
 
 def test_weekly_closes_of_nothing():
-    assert weekly_closes(daily([])) == {"start": None, "close": []}
-    assert weekly_closes(daily([(date(2024, 1, 5), None)])) == {"start": None, "close": []}
+    nothing = {"start": None, "close": [], "q0": None, "qclose": []}
+    assert weekly_closes(daily([])) == nothing
+    assert weekly_closes(daily([(date(2024, 1, 5), None)])) == nothing
 
 
 def test_weekly_closes_ignore_other_columns():
     df = daily([(date(2024, 1, 5), 12.0)]).with_columns(
         volume=pl.lit(5.0), high=pl.lit(99.0), stock_id=pl.lit(1)
     )
-    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0]}
+    assert weekly_closes(df) == {"start": "2024-01-05", "close": [12.0], "q0": 44, "qclose": [12.0]}
+
+
+def test_quarter_close_is_the_quarters_last_trading_day_not_the_friday_before():
+    # Q3 2026 ends on Wednesday 30 September: its close is that day's, not Friday 25 September's
+    # (the last weekly close inside the quarter) nor Friday 2 October's (the week it ends in).
+    rows = [
+        (date(2026, 9, 25), 10.0),  # Fri
+        (date(2026, 9, 28), 11.0),
+        (date(2026, 9, 30), 12.0),  # Wed, the quarter's last trading day
+        (date(2026, 10, 1), 13.0),
+        (date(2026, 10, 2), 14.0),  # Fri
+    ]
+    result = weekly_closes(daily(rows))
+    assert result["close"] == [10.0, 14.0]
+    assert result["q0"] == q_index(2026, 3)
+    assert result["qclose"] == [12.0, 14.0]  # Q4 so far: its latest close
+
+
+def test_quarter_close_skips_an_unpriced_last_day():
+    rows = [(date(2024, 3, 27), 20.0), (date(2024, 3, 28), 21.0), (date(2024, 3, 29), None)]
+    assert weekly_closes(daily(rows))["qclose"] == [21.0]
+
+
+def test_a_quarter_without_a_priced_day_carries_the_close_before_it():
+    # Nothing in Q2 2024 (a halt), rows without a close in Q3: both carry Q1's last close, as the
+    # engine values them; Q4 has its own.
+    rows = [
+        (date(2024, 2, 1), 30.0),
+        (date(2024, 3, 28), 31.0),
+        (date(2024, 8, 1), None),
+        (date(2024, 11, 4), 35.0),
+    ]
+    result = weekly_closes(daily(rows))
+    assert result["q0"] == q_index(2024, 1)
+    assert result["qclose"] == [31.0, 31.0, 31.0, 35.0]
+
+
+def test_quarter_closes_before_2013_have_negative_quarters():
+    rows = [(date(2012, 12, 31), 8.0), (date(2013, 1, 2), 9.0)]
+    result = weekly_closes(daily(rows))
+    assert (result["q0"], result["qclose"]) == (-1, [8.0, 9.0])
+
+
+def test_quarter_closes_of_nothing():
+    for rows in ([], [(date(2024, 1, 5), None)]):
+        result = weekly_closes(daily(rows))
+        assert (result["q0"], result["qclose"]) == (None, [])
+
+
+def test_quarter_closes_match_the_engines_valuation_close():
+    # The rule the engine values the book with (`position._valuation_close` on `quarter_px`):
+    # every quarter from the first priced one on, with gaps and unpriced days.
+    days = business_days(date(2023, 11, 1), date(2025, 2, 28))
+    rows = [
+        (d, None if d.day % 11 == 0 else 50.0 + n * 0.25)
+        for n, d in enumerate(days)
+        if not date(2024, 4, 1) <= d <= date(2024, 6, 30)  # a quarter with no rows at all
+    ]
+    result = weekly_closes(daily(rows))
+    frame = daily(rows).with_columns(
+        high=pl.col("close"), low=pl.col("close"), volume=pl.lit(1.0), dividend=pl.lit(0.0)
+    )
+    px = quarter_px(frame)
+    for i, close in enumerate(result["qclose"]):
+        assert close == _valuation_close(px, result["q0"] + i, {})
+    assert len(result["qclose"]) == q_index(2025, 1) - q_index(2023, 4) + 1
+
+
+def business_days(start: date, end: date) -> list[date]:
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)
+            if (start + timedelta(days=i)).weekday() < 5]  # fmt: skip
 
 
 # --- publish_shared -------------------------------------------------------------------------
@@ -781,7 +869,8 @@ def shared(out, **kw) -> dict[str, str]:
 
 
 def test_shared_files_follow_the_contract(tmp_path):
-    files = shared(tmp_path, weekly={1: {"start": "2024-01-05", "close": [1.0, 2.0]}})
+    weekly = {1: {"start": "2024-01-05", "close": [1.0, 2.0], "q0": 44, "qclose": [2.0]}}
+    files = shared(tmp_path, weekly=weekly)
     assert sorted(files) == sorted(
         [
             "funds.json",
@@ -818,7 +907,12 @@ def test_shared_files_follow_the_contract(tmp_path):
         "price": [189.95, 410.5],
         "date": ["2025-03-07", "2026-10-29"],  # stock 1 has not been refreshed since March 2025
     }
-    assert decoded(tmp_path, "stock/1/weekly.json") == {"start": "2024-01-05", "close": [1.0, 2.0]}
+    assert decoded(tmp_path, "stock/1/weekly.json") == {
+        "start": "2024-01-05",
+        "close": [1.0, 2.0],
+        "q0": 44,
+        "qclose": [2.0],
+    }
 
 
 def test_home_files_carry_latest_q_and_the_lists(tmp_path):
@@ -874,15 +968,24 @@ def test_prices_are_published_to_four_places(tmp_path):
             1: (date(2026, 10, 29), 189.9499969482422),
             2: (date(2026, 10, 29), 0.00004999),
         },
-        weekly={1: {"start": "2024-01-05", "close": [47.48749923706055, None, 0.1 + 0.2]}},
+        weekly={
+            1: {
+                "start": "2024-01-05",
+                "close": [47.48749923706055, None, 0.1 + 0.2],
+                "q0": -3,
+                "qclose": [47.48749923706055, 0.1 + 0.2],
+            }
+        },
     )
     assert decoded(tmp_path, "latest_prices.json")["price"] == [189.95, 0.0]
     assert decoded(tmp_path, "stock/1/weekly.json")["close"] == [47.4875, None, 0.3]
+    assert decoded(tmp_path, "stock/1/weekly.json")["qclose"] == [47.4875, 0.3]
+    assert decoded(tmp_path, "stock/1/weekly.json")["q0"] == -3
     assert "stock/1/weekly.json" in files
 
 
 def test_weekly_without_closes_is_not_published(tmp_path):
-    files = shared(tmp_path, weekly={4: {"start": None, "close": []}})
+    files = shared(tmp_path, weekly={4: {"start": None, "close": [], "q0": None, "qclose": []}})
     assert "stock/4/weekly.json" not in files
     assert not (tmp_path / "stock").exists()
 
@@ -1058,3 +1161,172 @@ def test_manifest_takes_a_fixed_build_time(tmp_path):
     assert (
         read_json(tmp_path / "manifest.json", compressed=False)["built"] == "2026-10-30T06:23:05Z"
     )
+
+
+# --- quarter-end closes value the book as the summary does -------------------------------------
+
+
+def shares_at(trades: list, q: int) -> float:
+    """Shares held at the end of quarter `q` from positions.json trade rows."""
+    held = 0.0
+    for tq, _delta, _px, _low, _high, after in trades:
+        if tq > q:
+            break
+        held = after
+    return held
+
+
+def qclose_at(weekly: dict, q: int) -> float | None:
+    """The contract's reading of `qclose`: none before `q0`, the last entry after the last."""
+    if weekly["q0"] is None or q < weekly["q0"]:
+        return None
+    closes = weekly["qclose"]
+    return closes[min(q - weekly["q0"], len(closes) - 1)]
+
+
+def book_from_qclose(positions: dict, weekly: dict[int, dict], q: int) -> tuple[float, float]:
+    """(Σ shares × qclose over the fund's holdings at q, the most that rounding the prices to 4
+    places can move it)."""
+    total = slack = 0.0
+    for stock_id, trades in zip(positions["stock_id"], positions["trades"]):
+        shares = shares_at(trades, q)
+        if shares:
+            price = qclose_at(weekly[stock_id], q)
+            assert price is not None, (stock_id, q)
+            total += shares * price
+            slack += shares * 0.5 * 10**-_PRICE_DECIMALS
+    return total, slack
+
+
+def test_quarter_closes_value_a_hand_fund_like_its_summary(tmp_path):
+    # One stock, prices moving every day; Q3 2026 ends on a Wednesday and Q1 2026 has no rows.
+    days = [d for d in business_days(date(2025, 10, 1), date(2026, 12, 18))
+            if not date(2026, 1, 1) <= d <= date(2026, 3, 31)]  # fmt: skip
+    closes = [40.0 + 7.0 * math.sin(n / 9) + n / 50 for n in range(len(days))]
+    bars = pl.DataFrame(
+        {"date": days, "close": closes, "high": closes, "low": closes,
+         "volume": [1e6] * len(days), "dividend": [0.0] * len(days)},
+    )  # fmt: skip
+    q_start, q_end_ = q_index(2025, 4), q_index(2026, 4)
+    shares = {q_start: 1000.0, q_start + 1: 1000.0, q_start + 2: 1500.0, q_start + 3: 600.0}
+    position = compute_position(1, shares, quarter_px(bars), q_start, q_end_, {})
+    quarters = aggregate_fund([position], q_start, q_end_)
+    fund = replace(build_engine_fund(), positions=[position], quarters=quarters, exits=[])
+    fund = replace(fund, meta=replace(fund.meta, n_holdings=0))
+    publish_fund(tmp_path, fund)
+    publish_weekly(tmp_path, {1: weekly_closes(bars.select("date", "close"))})
+
+    summary = decoded(tmp_path, "fund/7/summary.json")
+    positions = decoded(tmp_path, "fund/7/positions.json")
+    weekly = {1: decoded(tmp_path, "stock/1/weekly.json")}
+    assert weekly[1]["qclose"][q_index(2026, 3) - weekly[1]["q0"]] == round(closes[days.index(date(2026, 9, 30))], 4)
+    for q, end in zip(summary["quarters"]["q"], summary["quarters"]["end"]):
+        total, slack = book_from_qclose(positions, weekly, q)
+        assert abs(total - end) <= slack, q
+    assert summary["quarters"]["end"][1] > 0 and summary["quarters"]["end"][-1] == 0.0
+
+
+def test_quarter_closes_value_every_demo_fund_like_its_summary(demo_run):
+    # The site values an older quarter's holdings at qclose (the tree map, the Positions table):
+    # that must be the summary's book. The newest quarter uses the latest prices instead.
+    staging = next((demo_run.root / "out" / "staging").iterdir())
+    weekly = {
+        int(p.parent.name): read_json(p) for p in (staging / "stock").glob("*/weekly.json")
+    }
+    checked = 0
+    for summary_path in sorted((staging / "fund").glob("*/summary.json")):
+        summary = read_json(summary_path)
+        positions = read_json(summary_path.with_name("positions.json"))
+        for q, end in list(zip(summary["quarters"]["q"], summary["quarters"]["end"]))[:-1]:
+            total, slack = book_from_qclose(positions, weekly, q)
+            assert abs(total - end) <= slack, (summary["id"], q, total, end)
+            checked += 1
+    assert checked > 12 * 20
+
+
+# --- the summary's about ------------------------------------------------------------------------
+
+
+def berkshire_row(**kw) -> dict:
+    row = {
+        "cik": 1067983,
+        "name": "BERKSHIRE HATHAWAY INC",
+        "street": "3555 FARNAM STREET",
+        "city": "OMAHA",
+        "state": "NE",
+        "incorporated": "DE",
+        "sic": "Fire, Marine & Casualty Insurance",
+        "tickers": ["BRK-B", "BRK-A"],
+        "exchanges": ["NYSE", "NYSE"],
+        "former_names": [{"name": "NBH INC", "from": date(1998, 8, 10), "to": date(1999, 1, 5)}],
+        "signer": "Marc D. Hamburg",
+        "signer_title": "Senior Vice President",
+        "signed": date(2026, 11, 16),
+        "other_managers": ["Buffett Warren E", "GEICO Corp"],
+        "accession": "0001193125-26-463399",
+        "filed": date(2026, 11, 16),
+        "fetched": date(2026, 11, 16),
+    }
+    return row | kw
+
+
+def test_about_follows_the_contract():
+    assert about_json(berkshire_row()) == {
+        "name": "BERKSHIRE HATHAWAY INC",
+        "street": "3555 Farnam Street",
+        "city": "Omaha",
+        "state": "NE",
+        "signer": "Marc D. Hamburg",
+        "signer_title": "Senior Vice President",
+        "signed": "2026-11-16",
+        "other_managers": ["Buffett Warren E", "GEICO Corp"],
+        "incorporated": "DE",
+        "former_names": [{"name": "NBH INC", "from": "1998-08-10", "to": "1999-01-05"}],
+        "sic": "Fire, Marine & Casualty Insurance",
+        "tickers": ["BRK-B", "BRK-A"],
+        "exchanges": ["NYSE", "NYSE"],
+    }
+
+
+def test_about_is_null_without_a_row_or_a_fact():
+    assert about_json(None) is None
+    empty = {k: ([] if isinstance(v, list) else None) for k, v in berkshire_row().items()}
+    assert about_json(empty | {"cik": 1, "accession": "x", "filed": date(2026, 1, 1)}) is None
+    assert about_json(empty | {"signer": "Ann Lee"})["signer"] == "Ann Lee"
+
+
+@pytest.mark.parametrize(
+    "sec, shown",
+    [
+        ("3555 FARNAM STREET", "3555 Farnam Street"),
+        ("1300 I STREET NW, SUITE 400", "1300 I Street NW, Suite 400"),
+        ("100 N. 3RD AVE, UNIT 4A", "100 N. 3rd Ave, Unit 4A"),
+        ("C/O ACME LLC, P.O. BOX 55", "C/O Acme LLC, P.O. Box 55"),
+        ("O'FALLON", "O'Fallon"),
+        ("MACY'S PLAZA", "Macy's Plaza"),
+        ("WILKES-BARRE", "Wilkes-Barre"),
+        ("ST. LOUIS", "St. Louis"),
+        ("One Market Plaza", "One Market Plaza"),  # mixed case already: left as the SEC gives it
+    ],
+)
+def test_about_street_and_city_in_title_case(sec, shown):
+    assert about_json(berkshire_row(street=sec, city=sec))["street"] == shown
+    assert about_json(berkshire_row(street=sec, city=sec))["city"] == shown
+
+
+def test_summary_carries_the_funds_about(tmp_path):
+    publish_fund(tmp_path, replace(build_engine_fund(fund_id=7), about=berkshire_row()))
+    assert decoded(tmp_path, "fund/7/summary.json")["about"]["city"] == "Omaha"
+    publish_fund(tmp_path / "none", build_engine_fund(fund_id=7))
+    assert decoded(tmp_path / "none", "fund/7/summary.json")["about"] is None
+
+
+def test_publish_about_rewrites_a_staged_summary(tmp_path):
+    publish_fund(tmp_path, build_engine_fund(fund_id=7))
+    before = decoded(tmp_path, "fund/7/summary.json")
+    files = publish_about(tmp_path, 7, about_json(berkshire_row()))
+    after = decoded(tmp_path, "fund/7/summary.json")
+    assert files == {"fund/7/summary.json": sha256(tmp_path / "fund/7/summary.json")}
+    assert after == before | {"about": about_json(berkshire_row())}
+    fresh = publish_fund(tmp_path / "fresh", replace(build_engine_fund(fund_id=7), about=berkshire_row()))
+    assert files["fund/7/summary.json"] == fresh["fund/7/summary.json"]  # the same bytes

@@ -4,7 +4,7 @@
 //
 // Two kinds of load share it:
 //   DEMAND      something on screen needs the file now (the user stepped to an earlier quarter, chose
-//               Year/Custom, or opened a row). Up to `demandLimit` run at once.
+//               Year, a tile's colour needs it, or a row was opened). Up to `demandLimit` run at once.
 //   BACKGROUND  the file is only wanted so a later step is instant. Up to `backgroundLimit` run at once,
 //               in the order they were handed in, and only while the queue is not paused.
 // Demand always starts first, and no new background load starts while demand is waiting for a slot. A

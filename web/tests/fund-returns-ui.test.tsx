@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { useState } from "react";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import type { Summary } from "../src/data/types";
-import { FundHeader } from "../src/fund/FundHeader";
+import { FundHeader, tabOfHash, type FundTab } from "../src/fund/FundHeader";
 import { slots } from "../src/fund/geometry";
 import { KpiStrip } from "../src/fund/KpiStrip";
 import { ReturnsPanel } from "../src/fund/ReturnsPanel";
@@ -43,19 +43,40 @@ const copy = (mutate: (s: Summary) => void): Summary => {
 
 // ---------------------------------------------------------------------- FundHeader
 
+/** The header on the Holdings tab, as the page mounts it. */
+const Header = ({ summary, positionsEver }: { summary: Summary; positionsEver: number }) => (
+  <FundHeader summary={summary} positionsEver={positionsEver} tab="holdings" onTab={() => {}} />
+);
+
+/** The header with the page's tab state: a click or a key opens a tab. */
+function Tabbed({ onTab }: { onTab?: (t: FundTab) => void }) {
+  const [tab, setTab] = useState<FundTab>("holdings");
+  return (
+    <FundHeader
+      summary={demo}
+      positionsEver={18}
+      tab={tab}
+      onTab={(t) => {
+        onTab?.(t);
+        setTab(t);
+      }}
+    />
+  );
+}
+
 describe("FundHeader", () => {
   test("the h1 is the fund's name and nothing else", () => {
-    render(<FundHeader summary={demo} positionsEver={18} />);
+    render(<Header summary={demo} positionsEver={18} />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Halyard Point Partners$/);
   });
 
-  test("the Positions tab counts what the fund holds now, not every position it ever had", () => {
-    const { container } = render(<FundHeader summary={demo} positionsEver={18} />);
-    expect(container.querySelector('[data-view="positions"] .cnt')).toHaveTextContent(/^9$/);
+  test("the Holdings tab counts what the fund holds now, not every position it ever had", () => {
+    const { container } = render(<Header summary={demo} positionsEver={18} />);
+    expect(container.querySelector('[data-view="holdings"] .cnt')).toHaveTextContent(/^9$/);
   });
 
   test("line under it: reported book, holdings now and ever, and the filing pill", () => {
-    const { container } = render(<FundHeader summary={demo} positionsEver={18} />);
+    const { container } = render(<Header summary={demo} positionsEver={18} />);
     const meta = container.querySelector(".meta") as HTMLElement;
     expect(meta).toHaveTextContent("$11.1B reported book");
     expect(meta).toHaveTextContent("9 holdings now, 18 positions ever");
@@ -64,12 +85,12 @@ describe("FundHeader", () => {
   });
 
   test("the quarter in the pill is the quarter of the year of the latest filing", () => {
-    render(<FundHeader summary={copy((s) => ((s.period_q = 52), (s.filed = "2026-05-12")))} positionsEver={18} />);
+    render(<Header summary={copy((s) => ((s.period_q = 52), (s.filed = "2026-05-12")))} positionsEver={18} />);
     expect(screen.getByText("Updated 12 May 2026 · Q1 filing")).toBeInTheDocument();
   });
 
   test("singular forms", () => {
-    const { container } = render(<FundHeader summary={copy((s) => (s.n_holdings = 1))} positionsEver={1} />);
+    const { container } = render(<Header summary={copy((s) => (s.n_holdings = 1))} positionsEver={1} />);
     expect(container.querySelector(".meta")).toHaveTextContent("1 holding now, 1 position ever");
   });
 
@@ -78,65 +99,80 @@ describe("FundHeader", () => {
     [0.57, "57% of book priced"], // 0.57 * 100 is 56.99999999999999
     [0.799, "79% of book priced"], // never rounds up to a "80%" warning
   ])("coverage warning below 80%% (priced_pct %s)", (priced, text) => {
-    render(<FundHeader summary={copy((s) => (s.priced_pct = priced))} positionsEver={18} />);
+    render(<Header summary={copy((s) => (s.priced_pct = priced))} positionsEver={18} />);
     const badge = screen.getByText(text);
     expect(badge).toHaveClass("badge");
     expect(badge).toHaveAttribute("title", expect.stringContaining("no price"));
   });
 
   test("no warning at 80% and above", () => {
-    render(<FundHeader summary={copy((s) => (s.priced_pct = 0.8))} positionsEver={18} />);
+    render(<Header summary={copy((s) => (s.priced_pct = 0.8))} positionsEver={18} />);
     expect(screen.queryByText(/of book priced/)).toBeNull();
   });
 
   test("an inactive fund says its figures stop at its last filing", () => {
-    const { rerender } = render(<FundHeader summary={copy((s) => (s.inactive = true))} positionsEver={18} />);
+    const { rerender } = render(<Header summary={copy((s) => (s.inactive = true))} positionsEver={18} />);
     expect(
       screen.getByText("This fund filed nothing in the latest two quarters, so these figures stop at its last filing."),
     ).toBeInTheDocument();
-    rerender(<FundHeader summary={demo} positionsEver={18} />);
+    rerender(<Header summary={demo} positionsEver={18} />);
     expect(screen.queryByText(/filed nothing/)).toBeNull();
   });
 
-  test("Overview and Positions tabs: no others; Positions scrolls to its panel, Overview to the top", async () => {
-    const scrollTo = vi.fn();
-    vi.stubGlobal("scrollTo", scrollTo);
-    const scrollIntoView = vi.fn();
-    const panel = document.createElement("section");
-    panel.id = "posPanel";
-    panel.scrollIntoView = scrollIntoView;
-    document.body.appendChild(panel);
-    const user = userEvent.setup();
-    render(<FundHeader summary={demo} positionsEver={18} />);
+  test("Holdings, Analysis and About tabs: no others, Holdings open; each tab names its panel", () => {
+    render(<Header summary={demo} positionsEver={18} />);
     const list = screen.getByRole("tablist", { name: "Fund sections" });
     const tabs = within(list).getAllByRole("tab");
-    expect(tabs.map((t) => t.getAttribute("data-view"))).toEqual(["overview", "positions"]);
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[1]).toHaveTextContent("Positions9");
-
-    await user.click(tabs[1]);
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[0]).toHaveAttribute("aria-selected", "false");
-    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
-
-    await user.click(tabs[0]);
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
-    panel.remove();
+    expect(tabs.map((t) => t.getAttribute("data-view"))).toEqual(["holdings", "analysis", "about"]);
+    expect(tabs.map((t) => t.textContent)).toEqual(["Holdings9", "Analysis", "About"]);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
+    expect(tabs.map((t) => t.id)).toEqual(["fund-tab-holdings", "fund-tab-analysis", "fund-tab-about"]);
+    // one Tab stop: the open tab
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
   });
 
-  test("arrow keys move between the tabs and open them", async () => {
-    vi.stubGlobal("scrollTo", vi.fn());
+  test("a click opens a tab", async () => {
+    const onTab = vi.fn();
     const user = userEvent.setup();
-    render(<FundHeader summary={demo} positionsEver={18} />);
-    const [overview, positions] = screen.getAllByRole("tab");
-    act(() => overview.focus());
+    render(<Tabbed onTab={onTab} />);
+    const [, analysis, about] = screen.getAllByRole("tab");
+    await user.click(about);
+    expect(onTab).toHaveBeenLastCalledWith("about");
+    expect(about).toHaveAttribute("aria-selected", "true");
+    expect(about.tabIndex).toBe(0);
+    await user.click(analysis);
+    expect(analysis).toHaveAttribute("aria-selected", "true");
+    expect(about).toHaveAttribute("aria-selected", "false");
+  });
+
+  test("arrow keys move between the tabs round the ends, Home and End to the first and last, and open them", async () => {
+    const user = userEvent.setup();
+    render(<Tabbed />);
+    const [holdings, analysis, about] = screen.getAllByRole("tab");
+    act(() => holdings.focus());
     await user.keyboard("{ArrowRight}");
-    expect(positions).toHaveFocus();
-    expect(positions).toHaveAttribute("aria-selected", "true");
+    expect(analysis).toHaveFocus();
+    expect(analysis).toHaveAttribute("aria-selected", "true");
     await user.keyboard("{ArrowRight}");
-    expect(overview).toHaveFocus();
-    expect(overview).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowRight}");
+    expect(holdings).toHaveFocus();
+    expect(holdings).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowLeft}");
+    expect(about).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(holdings).toHaveFocus();
+    expect(holdings).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{End}");
+    expect(about).toHaveFocus();
+    expect(about).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("the URL hash picks the tab; none, or an unknown one, is Holdings", () => {
+    expect(tabOfHash("")).toBe("holdings");
+    expect(tabOfHash("#holdings")).toBe("holdings");
+    expect(tabOfHash("#analysis")).toBe("analysis");
+    expect(tabOfHash("#about")).toBe("about");
+    expect(tabOfHash("#positions")).toBe("holdings");
   });
 });
 

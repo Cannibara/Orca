@@ -33,6 +33,7 @@ from orca.engine.fund import FundQuarter, FundYear, full_years
 from orca.engine.metrics import Performance
 from orca.engine.position import PositionResult
 from orca.engine.whatif import ExitRow
+from orca.quarters import BASE_YEAR
 
 METRIC_KEYS = (
     "ann_return", "sharpe", "sortino", "vol", "max_dd", "calmar", "best_year", "worst_year",
@@ -93,7 +94,8 @@ class ExitsSummary:
 @dataclass(frozen=True, slots=True)
 class FundOutput:
     """Everything the four files of one fund are made from. `metrics` is `build_metrics`'s
-    result; `contributions` is `engine.fund.contributions`'s."""
+    result; `contributions` is `engine.fund.contributions`'s; `about` is the fund's row of the
+    lake table `fund_about` (`sec.about.SCHEMA`), None when it has none."""
 
     meta: FundMeta
     years: list[FundYear]
@@ -103,6 +105,7 @@ class FundOutput:
     exits: list[ExitRow]
     exits_summary: ExitsSummary
     metrics: dict
+    about: Mapping | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +222,7 @@ def _summary(fund: FundOutput, years: list[FundYear], positions: list[PositionRe
             "shares": [p.shares_now for p in held],
             "cost": [p.cost_now for p in held],
         },
+        "about": about_json(fund.about),
     }
 
 
@@ -300,6 +304,76 @@ def _check_keys(what: str, mapping: Mapping, expected: Sequence[str]) -> None:
         )
 
 
+# --- the summary's about -----------------------------------------------------------------------
+
+_ABOUT_FACTS = (
+    "name", "street", "city", "state", "signer", "signer_title", "signed", "other_managers",
+    "incorporated", "former_names", "sic", "tickers", "exchanges",
+)  # fmt: skip
+# Kept in capitals when a street or city is title-cased: compass points, P.O., company forms.
+_KEEP_UPPER = frozenset({"NE", "NW", "SE", "SW", "PO", "LLC", "LP", "LLP", "US", "USA", "UK"})
+_ORDINAL = re.compile(r"\d+(?:ST|ND|RD|TH)")
+
+
+def about_json(row: Mapping | None) -> dict | None:
+    """The summary's `about` from a fund's `fund_about` row (`sec.about.SCHEMA`): None without a row or
+    when the row holds no fact (the SEC did not know the CIK). Street and city are title-cased when the
+    SEC gives them in capitals; the state stays the SEC's two-letter code (the site prints it in full)."""
+    if row is None:
+        return None
+
+    def day(value: date | None) -> str | None:
+        return None if value is None else value.isoformat()
+
+    about = {
+        "name": row["name"],
+        "street": _title(row["street"]),
+        "city": _title(row["city"]),
+        "state": row["state"],
+        "signer": row["signer"],
+        "signer_title": row["signer_title"],
+        "signed": day(row["signed"]),
+        "other_managers": list(row["other_managers"] or []),
+        "incorporated": row["incorporated"],
+        "former_names": [
+            {"name": f["name"], "from": day(f["from"]), "to": day(f["to"])}
+            for f in row["former_names"] or []
+        ],
+        "sic": row["sic"],
+        "tickers": list(row["tickers"] or []),
+        "exchanges": list(row["exchanges"] or []),
+    }
+    return about if any(about[key] for key in _ABOUT_FACTS) else None
+
+
+def _title(text: str | None) -> str | None:
+    """`text` in title case when it is all capitals ("3555 FARNAM STREET" -> "3555 Farnam Street",
+    "100 N. 3RD AVE" -> "100 N. 3rd Ave", "O'FALLON" -> "O'Fallon"); mixed case is left as it is."""
+    if text is None or any(c.islower() for c in text):
+        return text
+
+    def word(w: str) -> str:
+        if w.strip(",.;:()#").upper() in _KEEP_UPPER:
+            return w
+        if _ORDINAL.fullmatch(w.strip(",.;:")):
+            return w.lower()
+        if any(c.isdigit() for c in w):
+            return w  # a unit or a number ("4A", "#200")
+        w = re.sub(r"(^|[-/.(])([a-z])", lambda m: m[1] + m[2].upper(), w.lower())
+        return re.sub(r"^([A-Z])'([a-z])", lambda m: f"{m[1]}'{m[2].upper()}", w)  # O'Fallon
+
+    return " ".join(word(w) for w in text.split(" "))
+
+
+def publish_about(out: Path, fund_id: int, about: dict | None, compress: bool = True) -> dict[str, str]:
+    """Set the `about` of fund/{fund_id}/summary.json, already written under `out` by `publish_fund`, and
+    write it again; path -> checksum. The bytes are those `publish_fund` writes with that about."""
+    rel = f"fund/{fund_id}/summary.json"
+    summary = read_json(Path(out) / rel, compress)
+    summary["about"] = about
+    return _write_all(out, {rel: summary}, compress)
+
+
 # --- the summary's metrics ----------------------------------------------------------------------
 
 
@@ -351,27 +425,52 @@ def build_metrics(
 
 
 def weekly_closes(daily: pl.DataFrame) -> dict:
-    """{"start": ISO date, "close": [...]}: one entry per calendar week from the first week with
-    a priced day to the last, the entry `i` being the last close of the week (Monday to Sunday)
-    that ends on Friday `start + 7 i` days, from one stock's split-adjusted daily rows (`date`
-    and `close` are used). A day without a close is not priced; a week without a priced day
-    in between gets None (not the previous close). A stock without any priced day gives
-    {"start": None, "close": []}."""
-    weeks = (
-        daily.filter(pl.col("close").is_finite())
-        .sort("date")
-        .group_by(pl.col("date").dt.truncate("1w").alias("week"), maintain_order=True)
-        .agg(pl.col("close").last())
-    )
+    """{"start": ISO date, "close": [...], "q0": quarter, "qclose": [...]} from one stock's
+    split-adjusted daily rows (`date` and `close` are used). A day without a close is not priced.
+
+    `close` has one entry per calendar week from the first week with a priced day to the last,
+    the entry `i` being the last close of the week (Monday to Sunday) that ends on Friday
+    `start + 7 i` days; a week without a priced day in between gets None (not the previous
+    close). `qclose` has one entry per quarter from `q0`, the first with a priced day, to the
+    last: the close of the quarter's last priced day, else the last close before it. That is the
+    engine's valuation close (`engine.position._valuation_close` on `quarter_px`), so the site
+    values a fund's book at a quarter end exactly as its summary does; a quarter can end mid-week,
+    so the weekly closes cannot give it. A stock without any priced day gives
+    {"start": None, "close": [], "q0": None, "qclose": []}."""
+    priced = daily.filter(pl.col("close").is_finite()).sort("date")
+    weeks = priced.group_by(
+        pl.col("date").dt.truncate("1w").alias("week"), maintain_order=True
+    ).agg(pl.col("close").last())
     if weeks.is_empty():
-        return {"start": None, "close": []}
+        return {"start": None, "close": [], "q0": None, "qclose": []}
     close_of = dict(zip(weeks["week"].to_list(), weeks["close"].to_list()))
     first, last = weeks["week"][0], weeks["week"][-1]  # Mondays, oldest first
     count = (last - first).days // 7 + 1
+    q0, qclose = _quarter_closes(priced)
     return {
         "start": (first + timedelta(days=4)).isoformat(),
         "close": [close_of.get(first + timedelta(weeks=i)) for i in range(count)],
+        "q0": q0,
+        "qclose": qclose,
     }
+
+
+def _quarter_closes(priced: pl.DataFrame) -> tuple[int, list[float]]:
+    """(first quarter, closes from it to the last quarter) of date-sorted priced rows: each
+    quarter's last close, carried into the quarters that have none."""
+    quarters = priced.group_by(
+        ((pl.col("date").dt.year() - BASE_YEAR) * 4 + (pl.col("date").dt.month() - 1) // 3)
+        .cast(pl.Int32)
+        .alias("q"),
+        maintain_order=True,
+    ).agg(pl.col("close").last())
+    close_of = dict(zip(quarters["q"].to_list(), quarters["close"].to_list()))
+    q0, q_last = quarters["q"][0], quarters["q"][-1]
+    closes, close = [], None
+    for q in range(q0, q_last + 1):
+        close = close_of.get(q, close)
+        closes.append(close)
+    return q0, closes
 
 
 # --- files shared by all funds ------------------------------------------------------------------
@@ -454,11 +553,14 @@ def publish_shared(
 
 def publish_weekly(out: Path, weekly: Mapping[int, dict], compress: bool = True) -> dict[str, str]:
     """Write stock/{id}/weekly.json under `out` for each stock of `weekly` (stock_id ->
-    `weekly_closes`'s result) that has closes, prices rounded to 4 places; path -> checksum."""
+    `weekly_closes`'s result) that has closes, prices (weekly and quarter-end) rounded to 4 places;
+    path -> checksum."""
     docs = {
         f"stock/{stock_id}/weekly.json": {
             "start": closes["start"],
             "close": [_price(close) for close in closes["close"]],
+            "q0": closes["q0"],
+            "qclose": [_price(close) for close in closes["qclose"]],
         }
         for stock_id, closes in sorted(weekly.items())
         if closes["close"]

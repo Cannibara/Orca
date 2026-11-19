@@ -2,34 +2,42 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { ThemeToggle } from "../components/ThemeToggle";
 import type { Summary } from "../data/types";
 import { fmtDate, money, qOfYear } from "../lib/format";
-import { reducedMotion } from "./hooks";
 import "./returns.css";
 
 /** Below this share of the book priced, the header carries a warning pill. */
 const COVERAGE_WARN = 0.8;
 
-type View = "overview" | "positions";
+export type FundTab = "holdings" | "analysis" | "about";
 
-const TABS: { id: View; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "positions", label: "Positions" },
+export const FUND_TABS: { id: FundTab; label: string }[] = [
+  { id: "holdings", label: "Holdings" },
+  { id: "analysis", label: "Analysis" },
+  { id: "about", label: "About" },
 ];
 
-/** Scroll to the top of the page (Overview) or to the Positions panel; smooth unless motion is reduced. */
-function goTo(view: View) {
-  const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
-  if (view === "positions") document.getElementById("posPanel")?.scrollIntoView?.({ behavior, block: "start" });
-  else if (typeof window.scrollTo === "function") window.scrollTo({ top: 0, behavior });
+/** The tab a URL hash picks: "#analysis", "#about"; anything else (no hash too) is Holdings. */
+export function tabOfHash(hash: string): FundTab {
+  const h = hash.replace(/^#/, "");
+  return FUND_TABS.some((t) => t.id === h) ? (h as FundTab) : "holdings";
 }
 
 /**
- * The fund's name, the line under it (reported book, holdings, last filing), the data-quality
- * warnings and the Overview / Positions tabs. Overview and Positions scroll to a place on this
- * one page; they do not switch views.
+ * The fund's name, the line under it (reported book, holdings, last filing), the data-quality warnings and
+ * the Holdings / Analysis / About tabs (WAI-ARIA tabs: one Tab stop, the arrows, Home and End move and open).
+ * Each tab's panel is `fund-panel-{id}`, labelled by its tab `fund-tab-{id}`.
  */
-export function FundHeader({ summary, positionsEver }: { summary: Summary; positionsEver: number }) {
+export function FundHeader({
+  summary,
+  positionsEver,
+  tab,
+  onTab,
+}: {
+  summary: Summary;
+  positionsEver: number;
+  tab: FundTab;
+  onTab: (t: FundTab) => void;
+}) {
   const s = summary;
-  const [view, setView] = useState<View>("overview");
   const tabs = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
@@ -45,7 +53,7 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
     ind.style.setProperty("--x", br.left - er.left + el!.scrollLeft + "px");
     ind.style.setProperty("--w", br.width + "px");
   }, []);
-  useLayoutEffect(place, [place, view]);
+  useLayoutEffect(place, [place, tab]);
   useEffect(() => {
     const id = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(id);
@@ -68,20 +76,16 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
     };
   }, [place]);
 
-  const pick = (v: View) => {
-    setView(v);
-    goTo(v);
-  };
-  // Left and right arrows move to the neighbouring tab and open it.
+  // The arrows move to the neighbouring tab (round the ends), Home and End to the first and last, and open it.
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const dx = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!dx) return;
-    const i = TABS.findIndex((t) => t.id === (document.activeElement as HTMLElement | null)?.dataset.view);
-    if (i < 0) return;
-    const next = TABS[(i + dx + TABS.length) % TABS.length];
+    const i = FUND_TABS.findIndex((t) => t.id === tab);
+    const n = FUND_TABS.length;
+    const j = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+    if (j < 0) return;
     e.preventDefault();
-    pick(next.id);
-    tabs.current?.querySelector<HTMLElement>(`[data-view="${next.id}"]`)?.focus();
+    const next = FUND_TABS[j].id;
+    onTab(next);
+    tabs.current?.querySelector<HTMLElement>(`[data-view="${next}"]`)?.focus();
   };
 
   // Rounded down, so a book that is not fully priced never reads as 100% and a warning never reads "80%".
@@ -125,11 +129,21 @@ export function FundHeader({ summary, positionsEver }: { summary: Summary; posit
         </p>
       )}
       <div className={"tabs" + (ready ? " ready" : "")} role="tablist" aria-label="Fund sections" ref={tabs} onKeyDown={onKeyDown}>
-        {TABS.map((t) => (
-          <button key={t.id} className="tab" type="button" role="tab" aria-selected={t.id === view} data-view={t.id} onClick={() => pick(t.id)}>
+        {FUND_TABS.map((t) => (
+          <button
+            key={t.id}
+            id={"fund-tab-" + t.id}
+            className="tab"
+            type="button"
+            role="tab"
+            aria-selected={t.id === tab}
+            tabIndex={t.id === tab ? 0 : -1}
+            data-view={t.id}
+            onClick={() => onTab(t.id)}
+          >
             {t.label}
             {/* What the fund holds in its newest quarter, not every position it ever had (that is in the line above). */}
-            {t.id === "positions" && <span className="cnt">{s.n_holdings}</span>}
+            {t.id === "holdings" && <span className="cnt">{s.n_holdings}</span>}
           </button>
         ))}
         <span className="ind" aria-hidden="true" />

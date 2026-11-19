@@ -3,7 +3,8 @@
 A run (`run_weekly`) goes: unseen bulk ZIPs -> live filings since the last run -> per-quarter
 holdings -> new CUSIPs mapped -> prices of held stocks -> affected funds -> those funds
 recomputed (bridge and share invariants checked) and their files staged, a batch at a time -> home
-lists and health -> only the changed files kept -> CUSIP scan -> manifest. Anything that fails
+lists and weekly files -> the About tab's SEC facts (`about_step`: capped, budgeted, never fatal) ->
+health -> only the changed files kept -> CUSIP scan -> manifest. Anything that fails
 before the manifest leaves the published site on the last good version, and what the run still
 owes (funds and stocks to recompute) is kept in the lake's state, so the next run picks it up.
 
@@ -12,8 +13,8 @@ next run carries on from the state.
 
 Modules: `state` (lake tables, state.json, stored fund state), `sources` (what a run fetches),
 `budget` (the time budget), `ingest` (bulk, live and pre-2013 legacy filings), `market` (securities, prices,
-T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `gates`
-(health gates), `weekly` (the run, `run_backfill` and `verify`), `cli`.
+T-bill), `compute` (one fund), `publish_step` (shared files, CUSIP guard, staging), `about_step` (the About
+tab's SEC facts), `gates` (health gates), `weekly` (the run, `run_backfill` and `verify`), `cli`.
 
 Lake layout (all under `lake.root`):
 - `filings/qNNN`, `raw_holdings/qNNN`: every filing of report period NNN and its raw rows, one
@@ -23,6 +24,7 @@ Lake layout (all under `lake.root`):
   table checked against the filer's declared totals (`sec.legacy.CHECKS_SCHEMA`).
 - `reports/qNNN`, `holdings/qNNN`: the chosen reports and the collapsed holdings of the quarter,
   rebuilt whenever the quarter gets a filing.
+- `fund_about`: each fund's SEC facts for the About tab (`sec.about.SCHEMA`), one row per CIK.
 - `securities`, `cusip_map`, `prices_daily/...`, `rf`, `fund_state` (each fund's header and home
   snapshot as JSON, for the funds a run does not recompute) and `fund_state_run/bNNNNN` (the
   running publish's fund state, merged into `fund_state` after the manifest).
@@ -40,7 +42,14 @@ from orca.run.ingest import live_watermark
 from orca.run.publish_step import CusipLeakError, copy_published, cusip_check_digit
 from orca.run.sources import Sources, production_sources
 from orca.run.state import strip_query
-from orca.run.weekly import RunStats, deadline_quarter, run_backfill, run_home, run_weekly, verify
+from orca.run.weekly import (
+    RunStats,
+    deadline_quarter,
+    run_backfill,
+    run_home,
+    run_weekly,
+    verify,
+)
 
 __all__ = [
     "CusipLeakError",
