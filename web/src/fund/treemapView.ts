@@ -44,8 +44,9 @@ type Node = {
   d: TileDatum;
 };
 
-/** 600 ms on the site's --ease-out, cubic-bezier(.2,.7,.2,1). */
-export const DUR = 600;
+/** 900 ms on the site's --ease-std, cubic-bezier(.4,0,.2,1): quarter-to-quarter moves are often a few pixels, and
+ * a fast-out curve spent them in the first 150 ms, so the owner saw no movement. */
+export const DUR = 900;
 const LABEL_OUT = 110;
 const LABEL_IN = 220;
 
@@ -84,7 +85,7 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): (x: numb
     return sy(t);
   };
 }
-const EASE = bezier(0.2, 0.7, 0.2, 1);
+const EASE = bezier(0.4, 0, 0.2, 1);
 
 const SVGNS = "http://www.w3.org/2000/svg";
 const lerp = (a: number, b: number, p: number) => a + (b - a) * p;

@@ -189,7 +189,8 @@ export function priceChange(a: number | null, b: number | null): number | null {
 // ---- colour ---------------------------------------------------------------------------------
 
 export type RGB = [number, number, number];
-export type Scale = { gain: RGB; loss: RGB; mid: RGB };
+/** Two one-hue ramps, no neutral: a gain runs gainLo → gain and a loss lossLo → loss by its size. */
+export type Scale = { gain: RGB; gainLo: RGB; loss: RGB; lossLo: RGB };
 
 /** "#rgb", "#rrggbb" or "rgb(r, g, b)"; null for anything else (an unset token reads ""). */
 export function parseColor(s: string): RGB | null {
@@ -249,18 +250,24 @@ export function lerpLab(a: RGB, b: RGB, t: number): RGB {
   return fromLab([la[0] + (lb[0] - la[0]) * t, la[1] + (lb[1] - la[1]) * t, la[2] + (lb[2] - la[2]) * t]);
 }
 
-/** The diverging scale: loss ← mid → gain, clamped at ±clamp (0.25 for a quarter, 0.5 for 12 months). */
+/** Green for a gain (0 counts as one), red for a loss, deeper the bigger it is, clamped at ±clamp (0.25 for a
+ * quarter, 0.5 for 12 months). No grey: the owner wants every tile to say up or down at a glance. */
 export function returnColor(ret: number, clamp: number, s: Scale): RGB {
   const t = Math.max(-1, Math.min(1, ret / clamp));
-  return t >= 0 ? lerpLab(s.mid, s.gain, t) : lerpLab(s.mid, s.loss, -t);
+  return t >= 0 ? lerpLab(s.gainLo, s.gain, t) : lerpLab(s.lossLo, s.loss, -t);
 }
 
 /** The legend's gradient, loss to gain, as CSS. */
-export function gradientCss(s: Scale, stops = 11): string {
+export function gradientCss(s: Scale, stops = 6): string {
+  // two ramps meeting at 0% with a hard edge: deep red … pale red | pale green … deep green
   const out: string[] = [];
   for (let i = 0; i < stops; i++) {
-    const t = -1 + (2 * i) / (stops - 1);
-    out.push(`${rgbCss(t >= 0 ? lerpLab(s.mid, s.gain, t) : lerpLab(s.mid, s.loss, -t))} ${Math.round((i / (stops - 1)) * 100)}%`);
+    const t = i / (stops - 1);
+    out.push(`${rgbCss(lerpLab(s.loss, s.lossLo, t))} ${Math.round(t * 50)}%`);
+  }
+  for (let i = 0; i < stops; i++) {
+    const t = i / (stops - 1);
+    out.push(`${rgbCss(lerpLab(s.gainLo, s.gain, t))} ${Math.round(50 + t * 50)}%`);
   }
   return `linear-gradient(90deg, ${out.join(", ")})`;
 }

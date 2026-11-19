@@ -228,7 +228,12 @@ describe("heldSince and the share price change", () => {
 });
 
 describe("colour scale", () => {
-  const S = { gain: parseColor("#00A47C")!, loss: parseColor("#F7172E")!, mid: parseColor("#AFB4BA")! };
+  const S = {
+    gain: parseColor("#00875F")!,
+    gainLo: parseColor("#C4ECDC")!,
+    loss: parseColor("#D60F25")!,
+    lossLo: parseColor("#FBCDD1")!,
+  };
 
   test("parses hex and rgb() colours", () => {
     expect(parseColor("#00A47C")).toEqual([0, 164, 124]);
@@ -237,8 +242,9 @@ describe("colour scale", () => {
     expect(parseColor("")).toBeNull();
   });
 
-  test("grey at 0%, the poles at the clamp, and nothing beyond it", () => {
-    expect(returnColor(0, 0.25, S)).toEqual(S.mid);
+  test("pale green at 0%, the poles at the clamp, and nothing beyond it", () => {
+    expect(returnColor(0, 0.25, S)).toEqual(S.gainLo);
+    expect(returnColor(-0.0001, 0.25, S)).not.toEqual(S.gainLo); // a loss is red however small
     expect(returnColor(0.25, 0.25, S)).toEqual(S.gain);
     expect(returnColor(-0.25, 0.25, S)).toEqual(S.loss);
     expect(returnColor(0.9, 0.25, S)).toEqual(S.gain);
@@ -246,11 +252,14 @@ describe("colour scale", () => {
     expect(returnColor(0.25, 0.5, S)).not.toEqual(S.gain); // ±50% for 12 months
   });
 
-  test("a small move is already tinted, and a bigger one more so (Lab steps, not RGB)", () => {
+  test("every return is green or red, deeper the bigger it is (Lab steps, not RGB)", () => {
     const g = (r: number) => returnColor(r, 0.25, S);
     const dist = (a: RGB, b: RGB) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-    expect(dist(g(0.02), S.mid)).toBeGreaterThan(3);
-    expect(dist(g(0.1), S.mid)).toBeGreaterThan(dist(g(0.02), S.mid));
+    const greenish = (c: RGB) => c[1] > c[0];
+    const reddish = (c: RGB) => c[0] > c[1];
+    for (const r of [0.001, 0.02, 0.1, 0.3]) expect(greenish(g(r))).toBe(true);
+    for (const r of [-0.001, -0.02, -0.1, -0.3]) expect(reddish(g(r))).toBe(true);
+    expect(dist(g(0.1), S.gainLo)).toBeGreaterThan(dist(g(0.02), S.gainLo));
     expect(dist(g(0.2), S.gain)).toBeLessThan(dist(g(0.1), S.gain));
   });
 });
