@@ -48,6 +48,15 @@ PERSON = {
     "BOND (Mary Meeker)": "Mary Meeker",
     "Phil Town (Rule #1)": "Phil Town",
 }
+# People checked by eye and found wrong (another person with the same name, a firm, a cartoon): never
+# fetched again. Add a name here when a photo turns out to be the wrong face.
+BLOCK = {
+    "Andreessen Horowitz", "Bill Miller", "Bruce Berkowitz", "Chris Davis", "David Einhorn", "David Greenspan",
+    "David Rolfe", "Glenn Greenberg", "Jeff Smith", "Jeffrey Altman", "Jonathan Auerbach", "Josh Resnick",
+    "John Armitage", "John Griffin", "Kleiner Perkins", "Kris Jenner", "Lee Ainslie", "Li Lu", "Louis Bacon",
+    "Mark Arnold", "Mark Kingdon", "Michael Platt", "Neil Mehta", "Paul Black", "Ron Baron", "Scott Ferguson",
+    "Stephen Mandel", "Steve Cohen", "Terry Smith", "Thomas Russo", "Tom Slater", "Ken Fisher", "Paul Marshall",
+}
 # A Wikipedia page title where the plain name is another person or a disambiguation page.
 TITLE = {}
 OK_LICENCE = re.compile(r"^(public domain|pd\b|pd-|cc0|cc[- ]by\b|cc[- ]by-sa|no restrictions|attribution)", re.I)
@@ -55,8 +64,8 @@ BAD_LICENCE = re.compile(r"\b(nc|nd|fair use|non-free|gfdl)\b", re.I)
 JOB = re.compile(
     r"investor|businessman|businesswoman|business magnate|financier|entrepreneur|billionaire|economist|"
     r"trader|banker|philanthropist|executive|manager|venture capitalist|capitalist|mathematician|"
-    r"analyst|speculator|chairman|activist|hedge fund|private equity|professor|programmer|computer scientist|"
-    r"business ?person|advis[eo]r|investment|fund",
+    r"analyst|speculator|chairman|activist|hedge fund|private equity|"
+    r"business ?person|advis[eo]r",
     re.I,
 )
 NOT_PERSON = re.compile(r"\b(firm|company|corporation|conglomerate|sovereign|pension|organi[sz]ation)\b", re.I)
@@ -212,17 +221,6 @@ def category_files(cat: str) -> list[dict]:
     return [i for i in map(parse_info, d.get("pages", [])) if i]
 
 
-def search_files(name: str) -> list[dict]:
-    """Photos on Commons whose file name holds the person's first and last name."""
-    parts = [w.lower() for w in name.replace(".", "").split() if len(w) > 1]
-    if len(parts) < 2:
-        return []
-    d = api("commons.wikimedia.org", list="search", srnamespace=6, srsearch=f'"{name}"', srlimit=30)["query"]
-    names = [h["title"].removeprefix("File:").replace(" ", "_") for h in d["search"]]
-    names = [f for f in names if all(w in f.lower() for w in (parts[0], parts[-1]))]
-    return list(commons_info(names).values())
-
-
 def faces(im: Image.Image) -> list:
     """Frontal faces in the picture as (x, y, w, h), biggest first. Raises ImportError without OpenCV."""
     import cv2
@@ -265,7 +263,7 @@ def square(raw: bytes) -> tuple[bytes | None, str]:
 
 def candidates(n: str, page: dict, claims: dict):
     """Photos to try for a person, best first: Wikipedia's lead image, Wikidata's image, files in their Commons
-    category and Commons files named after them."""
+    category (only files named after them)."""
     seen = set()
     first = [f for f in [page.get("file")] + [v for v in values(claims, "P18")] if f]
     files = [f.replace(" ", "_") for f in first]
@@ -280,9 +278,6 @@ def candidates(n: str, page: dict, claims: dict):
             if i["file"] not in seen and surname in i["file"].lower():
                 seen.add(i["file"])
                 yield i
-    for i in search_files(n):
-        if i["file"] not in seen:
-            yield i
 
 
 def save(credits: dict) -> None:
@@ -304,7 +299,7 @@ def main() -> None:
     names = sorted(set(who.values()))
     credits_path = OUT / "credits.json"
     credits = json.loads(credits_path.read_text()) if credits_path.exists() else {}
-    todo = [n for n in names if refresh or not (OUT / f"{slugify(n)}.jpg").exists()]
+    todo = [n for n in names if n not in BLOCK and (refresh or not (OUT / f"{slugify(n)}.jpg").exists())]
     print(f"{len(managers)} manager texts, {len(names)} people, {len(todo)} to look up", flush=True)
 
     pages = lookup([TITLE.get(n, n) for n in todo])
