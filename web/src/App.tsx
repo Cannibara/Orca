@@ -5,6 +5,7 @@ import { Logo, Mark } from "./components/Logo";
 import Fund from "./pages/Fund";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
+import PhotoCredits from "./pages/PhotoCredits";
 import Position from "./pages/Position";
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/fund/:id" element={<Fund />} />
               <Route path="/fund/:id/stock/:stockId" element={<Position />} />
+              <Route path="/photo-credits" element={<PhotoCredits />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </ErrorBoundary>
@@ -36,7 +38,8 @@ export default function App() {
         <div className="wrap foot-row">
           <Mark className="foot-mark" />
           <p className="cap">
-            Estimates from SEC 13F filings. Not investment advice.
+            Estimates from SEC 13F filings. Not investment advice.{" "}
+            <Link to="/photo-credits">Photo credits</Link>
           </p>
         </div>
       </footer>

@@ -44,9 +44,10 @@ web/src/components/  DataTable, Tabs, Panel, Choice (Seg wrapper), Pager, State,
 web/src/data/        api.ts (cached fetch per URL, loaders), types.ts (mirrors contract.md)
 web/src/lib/         format.ts (money/pct/tidyName), live.ts (IRR, P&L at latest prices), sort, useLoad
 web/scripts/         prerender.mjs (fund pages, _headers, sitemap/robots), dataOrigin.ts, siteUrl.ts
+web/src/assets/people/ photos of the people behind famous funds (<slug>.jpg, people.json, credits.json, README.md; fetch script pipeline/scripts/fetch_people_images.py)
 web/tests/, web/e2e/ vitest suites; Playwright smoke (1280/400 px, light/dark)
 web/public/demo-data synthetic demo data (funds 9100001–9100012) used by dev, tests and CI
-.github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, site-cors.yml, purge-cache.yml
+.github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, people-photos.yml, site-cors.yml, purge-cache.yml
 docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, brand/ (logo kit), superpowers/ (spec, plans, rulings)
 ```
 
@@ -62,6 +63,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`, `backfill`); locally `uv run python -m orca.run {weekly\|rebuild\|backfill\|home\|check-keys\|verify}` (needs the API key env vars) |
 | Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only, nothing published). Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
+| People photos (famous funds) | Actions > People photos > Run workflow, **choosing a branch, not `main`** (it commits the photos to that branch; merge it after); locally `cd pipeline && uv run --with pillow --with opencv-python-headless==4.10.0.84 python scripts/fetch_people_images.py`; see `web/src/assets/people/README.md` |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |
 | Clear data cache | Actions > Purge cache |
