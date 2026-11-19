@@ -55,6 +55,13 @@
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Chris_Hohn_GFSS_2023.jpg"
  },
+ "cliff-asness": {
+  "name": "Cliff Asness",
+  "author": "BillCramer",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Cliff-asness-by-bill-cramer.jpg"
+ },
  "daniel-och": {
   "name": "Daniel Och",
   "author": "World Economic Forum",
@@ -132,6 +139,13 @@
   "licence_url": "",
   "source": "https://commons.wikimedia.org/wiki/File:Louis_Bacon_donating_Historic_Conservation_Easement_in_Sangre_de_Cristo_Mountains,_In_June_2012.jpg"
  },
+ "mary-meeker": {
+  "name": "Mary Meeker",
+  "author": "Wikimedia Commons contributor",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Mary_Meeker,_Web_2.0_Conference.jpg"
+ },
  "masayoshi-son": {
   "name": "Masayoshi Son",
   "author": "European Communities, 2025 / EC - Audiovisual Service",
@@ -145,6 +159,13 @@
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Moez_Kassam_Photograph.jpg"
+ },
+ "neil-shen": {
+  "name": "Neil Shen",
+  "author": "World Economic Forum",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Neil_Shen.png"
  },
  "nicolai-tangen": {
   "name": "Nicolai Tangen",
@@ -166,6 +187,13 @@
   "licence": "Public domain",
   "licence_url": "",
   "source": "https://commons.wikimedia.org/wiki/File:Paul_Tudor_Jones_2006.jpg"
+ },
+ "phil-town": {
+  "name": "Phil Town",
+  "author": "Collins Grave",
+  "licence": "CC BY 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Phil_Town.jpg"
  },
  "ray-dalio": {
   "name": "Ray Dalio",
