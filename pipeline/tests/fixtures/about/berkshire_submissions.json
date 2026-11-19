@@ -1,0 +1,100 @@
+{
+  "cik": "1067983",
+  "entityType": "operating",
+  "sic": "6331",
+  "sicDescription": "Fire, Marine & Casualty Insurance",
+  "ownerOrg": "02 Finance",
+  "insiderTransactionForOwnerExists": 1,
+  "insiderTransactionForIssuerExists": 1,
+  "name": "BERKSHIRE HATHAWAY INC",
+  "tickers": ["BRK-B", "BRK-A"],
+  "exchanges": ["NYSE", "NYSE"],
+  "ein": "470813844",
+  "lei": null,
+  "description": "",
+  "website": "",
+  "investorWebsite": "",
+  "category": "Large accelerated filer",
+  "fiscalYearEnd": "1231",
+  "stateOfIncorporation": "DE",
+  "stateOfIncorporationDescription": "DE",
+  "addresses": {
+    "mailing": {
+      "street1": "3555 FARNAM STREET",
+      "street2": null,
+      "city": "OMAHA",
+      "stateOrCountry": "NE",
+      "zipCode": "68131",
+      "stateOrCountryDescription": "NE",
+      "isForeignLocation": 0,
+      "foreignStateTerritory": null,
+      "country": null,
+      "countryCode": null
+    },
+    "business": {
+      "street1": "3555 FARNAM STREET",
+      "street2": null,
+      "city": "OMAHA",
+      "stateOrCountry": "NE",
+      "zipCode": "68131",
+      "stateOrCountryDescription": "NE",
+      "isForeignLocation": 0,
+      "foreignStateTerritory": null,
+      "country": null,
+      "countryCode": null
+    }
+  },
+  "phone": "4023461400",
+  "flags": "",
+  "formerNames": [
+    {"name": "NBH INC", "from": "1998-08-10T00:00:00.000Z", "to": "1999-01-05T00:00:00.000Z"}
+  ],
+  "filings": {
+    "recent": {
+      "accessionNumber": [
+        "0001067983-26-000031",
+        "0001193125-26-463399",
+        "0001193125-26-455871",
+        "0000950170-26-118002",
+        "0001193125-26-322014",
+        "0001193125-26-318876"
+      ],
+      "filingDate": ["2026-11-17", "2026-11-16", "2026-11-03", "2026-11-03", "2026-08-14", "2026-08-12"],
+      "reportDate": ["2026-11-13", "2026-09-30", "2026-10-31", "2026-09-30", "2026-06-30", "2025-12-31"],
+      "acceptanceDateTime": [
+        "2026-11-17T16:31:07.000Z",
+        "2026-11-16T16:02:11.000Z",
+        "2026-11-03T17:12:40.000Z",
+        "2026-11-03T08:04:22.000Z",
+        "2026-08-14T16:05:56.000Z",
+        "2026-08-12T16:44:03.000Z"
+      ],
+      "act": ["", "", "34", "34", "", ""],
+      "form": ["4", "13F-HR", "SC 13G/A", "10-Q", "13F-HR", "13F-HR/A"],
+      "fileNumber": ["", "028-04545", "005-12345", "001-14905", "028-04545", "028-04545"],
+      "filmNumber": ["", "261154870", "261098121", "261097330", "261209876", "261200111"],
+      "items": ["", "", "", "", "", ""],
+      "core_type": ["4", "13F-HR", "SC 13G/A", "10-Q", "13F-HR", "13F-HR/A"],
+      "size": [4121, 52388, 12001, 9980013, 51702, 50998],
+      "isXBRL": [0, 0, 0, 1, 0, 0],
+      "isInlineXBRL": [0, 0, 0, 1, 0, 0],
+      "primaryDocument": [
+        "xslF345X05/wk-form4_1763415067.xml",
+        "xslForm13F_X02/primary_doc.xml",
+        "xslSCHEDULE_13G_X01/primary_doc.xml",
+        "brka-20260930.htm",
+        "xslForm13F_X02/primary_doc.xml",
+        "xslForm13F_X02/primary_doc.xml"
+      ],
+      "primaryDocDescription": ["FORM 4", "", "", "10-Q", "", ""]
+    },
+    "files": [
+      {
+        "name": "CIK0001067983-submissions-001.json",
+        "filingCount": 2311,
+        "filingFrom": "1998-08-10",
+        "filingTo": "2019-04-02"
+      }
+    ]
+  }
+}

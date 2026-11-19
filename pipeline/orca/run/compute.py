@@ -40,6 +40,8 @@ from orca.quarters import q_end
 from orca.run.market import BENCHMARK_CUSIP, load_daily, rf_table, stock_of
 from orca.run.state import CUSIP_MAP_SCHEMA, chunks, read_table
 from orca.run.ingest import LEGACY_CHECKS
+from orca.sec.about import SCHEMA as ABOUT_SCHEMA
+from orca.sec.about import TABLE as ABOUT_TABLE
 from orca.sec.legacy import STORED
 from orca.splits import infer_splits
 from orca.storage import Lake
@@ -162,6 +164,8 @@ class Context:
     # Fund-quarters filed before 2013 whose table could not be read (lake table legacy_checks);
     # read on first use.
     unreadable: pl.DataFrame | None = None
+    # Lake table fund_about by CIK (the About tab's SEC facts); read on first use.
+    about: dict[int, dict] | None = None
 
     @classmethod
     def build(cls, lake: Lake, last_q: int) -> "Context":
@@ -220,6 +224,13 @@ class Context:
             if days:
                 out[stock_id] = sorted(days.items())
         return out
+
+    def about_of(self, cik: int) -> dict | None:
+        """The fund's row of lake table fund_about, None without one."""
+        if self.about is None:
+            table = read_table(self.lake, ABOUT_TABLE, ABOUT_SCHEMA)
+            self.about = {row["cik"]: row for row in table.iter_rows(named=True)}
+        return self.about.get(cik)
 
     def iter_closes(self, stock_ids: Iterable[int]) -> Iterator[dict[int, pl.DataFrame]]:
         """The stocks' daily (date, close) on today's share basis, PRICE_LOAD_CHUNK stocks at a
@@ -479,6 +490,7 @@ def compute_prepared(ctx: Context, p: Prepared) -> FundResult:
         exits=exits,
         exits_summary=exits_summary,
         metrics=metrics,
+        about=ctx.about_of(cik),
     )
     filed_quarters = set(reports["period"].to_list())
     snapshot = _snapshot(

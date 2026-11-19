@@ -56,7 +56,8 @@ from orca.run.market import latest_closes, update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
 from orca.sec.live import fetch_new_filings
-from orca.securities import FIGI_URL
+from orca.sec.about import COVER_URL
+from orca.securities import FIGI_URL, SUBMISSIONS_URL
 from orca.storage import Lake
 from orca.vendor import UNIVERSE_SCHEMA
 
@@ -1082,8 +1083,13 @@ def test_budget_spent_in_compute_publishes_the_funds_done_and_owes_the_rest(
     resumed = run(tmp_path, fixture_sources(fixtures), WEEK1)
 
     assert resumed.funds_recomputed == 7
-    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
     assert set(manifest(tmp_path)) == set(manifest(base_runs[WEEK1]))
+    # The cut-short run left no time for the About step, so the 5 funds it computed got their SEC
+    # facts after their compute: they are owed to the next run, which then matches the full run.
+    assert len(State.load(Lake(tmp_path / "lake")).pending_funds) == 5
+    again = run(tmp_path, fixture_sources(fixtures), WEEK1)
+    assert again.funds_recomputed == 5
+    assert fund_and_home_files(tmp_path) == fund_and_home_files(base_runs[WEEK1])
 
 
 def test_price_refresh_leaves_the_reserve_to_compute_and_the_next_run_goes_on(
@@ -2012,3 +2018,113 @@ def test_the_trades_merge_replaces_the_recomputed_funds_and_keeps_the_order(tmp_
     lake.write(FUND_FLOWS_RUN, flows([(9, 1, 1)]), part="b00000")
     _merge_fund_state(lake, {9}, clear=True)  # a rebuild keeps only this run's funds
     assert lake.read("fund_flows")["cik"].to_list() == [9]
+
+
+# --- SEC facts for the About tab ----------------------------------------------------------------
+
+COBBLEREEF = 9100010  # the SEC does not know its CIK in the demo
+DEMO_CIKS = range(demo.FUND_CIK0, demo.FUND_CIK0 + 12)
+
+
+def summaries(root: Path) -> dict[int, dict]:
+    return {cik: read_json(root / "bucket" / "fund" / str(cik) / "summary.json") for cik in DEMO_CIKS}
+
+
+def about_as_of(fixtures: Fixtures, cik: int, day: date) -> Fixtures:
+    """`fixtures` with the SEC record of `cik` as it stood on `day`: later filings not listed yet."""
+    url = SUBMISSIONS_URL.format(cik=cik)
+    record = json.loads(json.dumps(fixtures.about[url]))
+    recent = record["filings"]["recent"]
+    keep = [i for i, filed in enumerate(recent["filingDate"]) if date.fromisoformat(filed) <= day]
+    record["filings"]["recent"] = {k: [v[i] for i in keep] for k, v in recent.items()}
+    return replace(fixtures, about={**fixtures.about, url: record})
+
+
+def newest_cover(fixtures: Fixtures, cik: int) -> str:
+    recent = fixtures.about[SUBMISSIONS_URL.format(cik=cik)]["filings"]["recent"]
+    accession = max(zip(recent["filingDate"], recent["accessionNumber"]))[1]
+    return COVER_URL.format(cik=cik, folder=accession.replace("-", ""), document="primary_doc.xml")
+
+
+def test_the_first_run_publishes_every_funds_about(base_runs):
+    published = summaries(base_runs[WEEK1])
+    assert published[COBBLEREEF]["about"] is None
+    for cik, summary in published.items():
+        if cik != COBBLEREEF:
+            about = summary["about"]
+            assert about["name"] == summary["name"].upper(), cik
+            assert about["city"] and about["state"] and about["signer"] and about["signed"], cik
+    kelpwood = published[KELPWOOD]["about"]
+    assert kelpwood["signed"] <= published[KELPWOOD]["filed"]
+    table = Lake(base_runs[WEEK1] / "lake").read("fund_about")
+    assert sorted(table["cik"].to_list()) == list(DEMO_CIKS)
+
+
+def test_a_new_13f_brings_its_cover_into_the_same_run(fixtures, tmp_path):
+    # Halyard's restatement of 20 October: on 16 October its record lists the Q2 report; a week later
+    # the restatement, signed by someone else. Halyard is recomputed for the restatement, and its
+    # summary carries the new signer at once, byte for byte what a fresh rebuild writes.
+    before = about_as_of(fixtures, HALYARD, WEEK1)
+    cover = newest_cover(fixtures, HALYARD)
+    later = replace(
+        fixtures,
+        about={**fixtures.about, cover: fixtures.about[cover].replace(b"Owen Tate", b"Mina Cole")},
+    )
+    run(tmp_path / "inc", fixture_sources(before), WEEK1)
+    assert summaries(tmp_path / "inc")[HALYARD]["about"]["signer"] == "Owen Tate"
+
+    week2 = run(tmp_path / "inc", fixture_sources(later), WEEK2)
+    fresh = run(tmp_path / "fresh", fixture_sources(later), WEEK2, full=True)
+
+    path = f"fund/{HALYARD}/summary.json"
+    assert path in week2.changed
+    assert summaries(tmp_path / "inc")[HALYARD]["about"]["signer"] == "Mina Cole"
+    assert bucket_files(tmp_path / "inc")[path] == bucket_files(tmp_path / "fresh")[path]
+    assert fresh.files[path] == week2.files[path]
+
+
+def test_an_about_found_for_a_fund_not_recomputed_is_owed_to_the_next_run(fixtures, tmp_path):
+    # A lake from before the About tab: no fund is recomputed in an unchanged week, so the facts found
+    # wait in the state, and the next run recomputes those funds with them.
+    run(tmp_path, replace(fixture_sources(fixtures), fund_about=None), WEEK2)
+    assert all(s["about"] is None for s in summaries(tmp_path).values())
+
+    week3 = run(tmp_path, fixture_sources(fixtures), WEEK3)
+    assert week3.funds_recomputed == 0
+    assert not [p for p in week3.changed if p.startswith("fund/")]
+    owed = set(DEMO_CIKS) - {COBBLEREEF}  # Cobblereef's about stays null: nothing to republish
+    assert State.load(Lake(tmp_path / "lake")).pending_funds == owed
+
+    later = run(tmp_path, fixture_sources(fixtures), WEEK3 + timedelta(days=7))
+    assert later.funds_recomputed == len(owed)
+    published = summaries(tmp_path)
+    assert all(published[cik]["about"] for cik in owed) and published[COBBLEREEF]["about"] is None
+    assert not State.load(Lake(tmp_path / "lake")).pending_funds
+
+
+@pytest.mark.parametrize(
+    "error, flag",
+    [
+        (FetchError("https://data.sec.gov/submissions/x", 503), {"type": "about_failed", "count": 1}),
+        (RuntimeError("boom"), {"type": "about_failed", "error": "RuntimeError"}),
+    ],
+)
+def test_a_failed_about_lookup_never_stops_the_run(tmp_path, error, flag):
+    def lookup(cik):
+        raise error
+
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    small = fixture_sources(small_fixtures({Q1_24: [widget], Q2_24: [widget]}))
+    stats = run(tmp_path, replace(small, fund_about=lookup), SMALL_TODAY)
+    assert stats.funds_recomputed == 1
+    assert flag in health(tmp_path)["flags"]
+    assert read_json(tmp_path / "bucket" / "fund" / str(SMALL_FUND) / "summary.json")["about"] is None
+    assert (tmp_path / "bucket" / "manifest.json").exists()
+
+
+def test_a_fund_the_sec_does_not_know_publishes_no_about(tmp_path):
+    widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
+    run(tmp_path, fixture_sources(small_fixtures({Q1_24: [widget], Q2_24: [widget]})), SMALL_TODAY)
+    assert read_json(tmp_path / "bucket" / "fund" / str(SMALL_FUND) / "summary.json")["about"] is None
+    row = Lake(tmp_path / "lake").read("fund_about").row(0, named=True)
+    assert (row["cik"], row["name"], row["accession"]) == (SMALL_FUND, None, "0000001001-24-000001")

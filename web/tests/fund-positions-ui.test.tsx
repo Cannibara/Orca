@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,9 +7,9 @@ import { NotFoundError, loadWeekly, priceMap, stockMap } from "../src/data/api";
 import type { LatestPrices, PositionRow, Positions, Securities, Summary, Weekly } from "../src/data/types";
 import { positionRows } from "../src/lib/live";
 import { PeriodPicker } from "../src/fund/PeriodPicker";
-import { PositionsPanel } from "../src/fund/PositionsPanel";
 import { PositionsTable } from "../src/fund/PositionsTable";
 import { defaultPeriod, neededStocks, prefetchOrder, withSortedTrades, type PeriodState, type PosRow, type Timeline } from "../src/fund/positions";
+import { TableOnly } from "./holdings-harness";
 import { AUTO_FILL_MAX, CHUNK, INITIAL_ROWS, MORE_STEP, rowsAreFilling } from "../src/fund/loading";
 import { createWeeklyStore, useWeeklyPrices } from "../src/fund/usePositionData";
 import { installIdle } from "./idle";
@@ -62,17 +62,19 @@ beforeEach(() => {
 function panel() {
   return render(
     <MemoryRouter>
-      <PositionsPanel fundId={9100002} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={latest.asof} />
+      <TableOnly fundId={9100002} summary={summary} positions={positions} prices={prices} stocks={stocks} asof={latest.asof} />
     </MemoryRouter>,
   );
 }
 
 const rowsOf = () => Array.from(document.querySelectorAll<HTMLElement>("tbody tr[data-t]"));
 const tickers = () => rowsOf().map((r) => r.getAttribute("data-t"));
-const asOfText = () => document.querySelector(".asof")?.textContent;
+/** The Positions panel's as-of line, and the Holdings panel's (the picker's). */
+const asOfText = () => document.querySelector("#posPanel .asof")?.textContent;
+const holdAsOf = () => document.querySelector("#holdPanel .asof")?.textContent;
 const selected = () => document.querySelector(".pi.on > span")?.textContent;
 
-describe("PositionsPanel at the newest quarter", () => {
+describe("the Positions table at the newest quarter", () => {
   test("title, as-of date, the 12 columns in order, 38px rows' content and Weight descending by default", () => {
     panel();
     expect(screen.getByRole("heading", { name: "Positions" })).toBeInTheDocument();
@@ -101,11 +103,11 @@ describe("PositionsPanel at the newest quarter", () => {
     expect(screen.getByRole("region", { name: "Positions table, scrollable" })).toHaveAttribute("tabindex", "0");
   });
 
-  test("the first row prints the artifact's figures: whole numbers, money in millions, the weight as was → now", () => {
+  test("the first row prints the artifact's figures: whole numbers, money as the site prints it, the weight as was → now", () => {
     panel();
     const cells = Array.from(rowsOf()[0].querySelectorAll("td")).map((td) => td.textContent);
     // Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total
-    expect(cells.slice(1)).toEqual(["Q3 ’20", "25%", "−5%", "−5%", "$2,968m", "$158", "$137", "–", "+$469m", "−$789m", "−$235m"]);
+    expect(cells.slice(1)).toEqual(["Q3 ’20", "25%", "−5%", "−5%", "$2.97B", "$158", "$137", "–", "+$469M", "−$789M", "−$235M"]);
     expect(document.querySelector("td .lc")).toBeNull(); // no Last change box: Weight carries the movement
   });
 
@@ -235,7 +237,7 @@ describe("the period picker", () => {
     expect(selected()).toBe("Q1 ’26");
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     await new Promise((r) => setTimeout(r, 70)); // steps come no faster than every 60ms
-    fireEvent.wheel(document.querySelector("#posPanel > .ph")!, { deltaY: -120 });
+    fireEvent.wheel(document.querySelector("#holdPanel > .ph")!, { deltaY: -120 });
     expect(selected()).toBe("Q2 ’26");
     // up at the newest: no change, a jiggle
     (Element.prototype.animate as unknown as ReturnType<typeof vi.fn>).mockClear();
@@ -255,47 +257,86 @@ describe("the period picker", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
-  test("Year: full years, the part year named by the quarters it covers, the as-of date of the year's last quarter", async () => {
+  test("the wheel right after a page scroll keeps scrolling the page: it steps periods only from rest", async () => {
     panel();
-    fireEvent.click(screen.getByRole("button", { name: "Year" }));
-    expect(selected()).toBe("2025");
-    expect(screen.getByRole("group", { name: "Year" })).toBeVisible();
-    const opts = Array.from(document.querySelectorAll<HTMLOptionElement>(".psel-o option")).map((o) => o.textContent);
-    expect(opts[0]).toBe("2026 H1");
-    expect(opts.at(-1)).toBe("2014");
-    expect(opts).toHaveLength(13);
+    await new Promise((r) => setTimeout(r, 70));
+    fireEvent.scroll(window);
+    const tools = document.querySelector(".ptools")!;
+    const ev = new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    act(() => void tools.dispatchEvent(ev));
+    expect(ev.defaultPrevented).toBe(false);
+    expect(selected()).toBe("Q2 ’26");
+    await new Promise((r) => setTimeout(r, 320)); // at rest again
+    fireEvent.wheel(tools, { deltaY: 120 });
+    expect(selected()).toBe("Q1 ’26");
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
-    expect(asOfText()).toBe("Positions and prices as of 31 Dec 2025");
-    fireEvent.change(screen.getByRole("combobox", { name: "Pick a year" }), { target: { value: "2026" } });
-    expect(selected()).toBe("2026 H1");
-    expect(asOfText()).toBe("Positions and prices as of 30 Oct 2026");
-    expect(screen.getByRole("button", { name: "Later year" })).toHaveAttribute("aria-disabled", "true");
   });
 
-  test("Custom shows the strip of quarters and hides the stepper", () => {
+  test("two modes, Quarter and Year; the years-end-in control only in Year mode", () => {
     panel();
-    expect(screen.queryByRole("columnheader", { name: "Last change" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
-    expect(screen.getByRole("group", { name: /Custom period for the positions table/ })).toBeInTheDocument();
-    expect(document.querySelector(".stepper")).toHaveAttribute("hidden");
-    // the strip starts on the last four quarters: Q3 ’25 .. Q2 ’26
-    expect(screen.getByRole("slider", { name: "Start of the period" })).toHaveAttribute("aria-valuetext", "Q3 ’25");
-    expect(screen.getByRole("slider", { name: "End of the period" })).toHaveAttribute("aria-valuetext", "Q2 ’26");
-    fireEvent.keyDown(screen.getByRole("slider", { name: "Start of the period" }), { key: "ArrowLeft" });
-    expect(screen.getByRole("slider", { name: "Start of the period" })).toHaveAttribute("aria-valuetext", "Q2 ’25");
-    // wheeling over the custom period does nothing
-    fireEvent.wheel(document.querySelector(".ptools")!, { deltaY: 120 });
-    expect(asOfText()).toBe("Positions and prices as of 30 Oct 2026");
+    const modes = screen.getByRole("group", { name: "Period" });
+    expect(Array.from(modes.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Quarter", "Year"]);
+    expect(screen.queryByRole("group", { name: "Years end in" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Custom" })).toBeNull();
+  });
+
+  test("Year: 12 months to a quarter end, the pills four quarters apart, all ending in the newest quarter's Q", async () => {
+    panel();
+    fireEvent.click(screen.getByRole("button", { name: "Year" }));
+    expect(selected()).toBe("Q2 ’26"); // the same calendar year
+    const q = screen.getByRole("group", { name: "Years end in" });
+    expect(within(q).getByRole("button", { name: "Q2" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(q).getByRole("button", { name: "Q1" })).toHaveAttribute("title", "Years ending in Q1");
+    expect(screen.getByRole("group", { name: "Year" })).toHaveAttribute("title", "Scroll with the mouse wheel to change year");
+    const opts = Array.from(document.querySelectorAll<HTMLOptionElement>(".psel-o option")).map((o) => o.textContent);
+    expect(opts[0]).toBe("Q2 ’26");
+    expect(opts[1]).toBe("Q2 ’25");
+    expect(opts.every((o) => o?.startsWith("Q2 ’"))).toBe(true);
+    // the newest keeps its "as of" the latest prices
+    expect(holdAsOf()).toBe("Holdings and prices as of 30 Oct 2026");
+    expect(screen.getByRole("button", { name: "Later year" })).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Earlier year" }));
+    expect(selected()).toBe("Q2 ’25");
+    expect(holdAsOf()).toBe("12 months to 30 Jun 2025");
+    expect(asOfText()).toBe("Positions and prices as of 30 Jun 2025");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+
+    // years ending in Q4: the same calendar year
+    fireEvent.click(within(q).getByRole("button", { name: "Q4" }));
+    expect(selected()).toBe("Q4 ’25");
+    expect(holdAsOf()).toBe("12 months to 31 Dec 2025");
+    expect(screen.getByRole("button", { name: "Later year" })).toHaveAttribute("aria-disabled", "true"); // Q4 ’26 is not filed yet
+    fireEvent.change(screen.getByRole("combobox", { name: "Pick a year" }), { target: { value: String(51 - 8) } });
+    expect(selected()).toBe("Q4 ’23");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+
+    // back to Quarter: on the Year pill's quarter
+    fireEvent.click(screen.getByRole("button", { name: "Quarter" }));
+    expect(selected()).toBe("Q4 ’23");
+    expect(screen.queryByRole("group", { name: "Years end in" })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
+  test("the selected pill's list is its Tab stop, and keeps the focus after a pick", () => {
+    panel();
+    const on = document.querySelector<HTMLElement>(".pi.on")!;
+    expect(on.tabIndex).toBe(-1);
+    const list = screen.getByRole("combobox", { name: "Pick a quarter" });
+    act(() => list.focus());
+    fireEvent.change(list, { target: { value: "50" } });
+    expect(selected()).toBe("Q3 ’25");
+    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Pick a quarter" }));
   });
 
   test("PeriodPicker alone: the select picks a quarter and the pills move", () => {
     const tl: Timeline = { qmin: 4, latest: 53, asof: "2026-10-30" };
     let state: PeriodState = defaultPeriod(tl);
     const onChange = vi.fn((s: PeriodState) => (state = s));
-    const { rerender } = render(<PeriodPicker state={state} onChange={onChange} tl={tl} asOf="30 Oct 2026" />);
+    const { rerender } = render(<PeriodPicker state={state} onChange={onChange} tl={tl} title="Holdings" titleId="t" asOf="30 Oct 2026" />);
     fireEvent.change(screen.getByRole("combobox", { name: "Pick a quarter" }), { target: { value: "40" } });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ pq: 40, mode: "quarter" }));
-    rerender(<PeriodPicker state={state} onChange={onChange} tl={tl} asOf="31 Dec 2023" />);
+    rerender(<PeriodPicker state={state} onChange={onChange} tl={tl} title="Holdings" titleId="t" asOf="31 Dec 2023" />);
     // five slots: the edge of one period, three in full with the selected one in the middle, the edge of the next
     const labels = Array.from(document.querySelectorAll(".ptrack .pi > span")).map((s) => s.textContent);
     expect(labels).toEqual(["Q3 ’22", "Q4 ’22", "Q1 ’23", "Q2 ’23", "Q3 ’23"]);
@@ -636,7 +677,7 @@ describe("background prefetch of every position's weekly file", () => {
     const stocks2 = new Map(many.map((p) => [p.stock_id, { ticker: "X" + p.stock_id, name: "X" + p.stock_id }] as const));
     render(
       <MemoryRouter>
-        <PositionsPanel fundId={9100002} summary={summary} positions={many} prices={prices2} stocks={stocks2} asof={latest.asof} />
+        <TableOnly fundId={9100002} summary={summary} positions={many} prices={prices2} stocks={stocks2} asof={latest.asof} />
       </MemoryRouter>,
     );
     expect(rowsOf()).toHaveLength(INITIAL_ROWS);
@@ -716,14 +757,14 @@ describe("background prefetch of every position's weekly file", () => {
     const props = { summary, positions, prices, stocks, asof: latest.asof };
     const view = render(
       <MemoryRouter>
-        <PositionsPanel fundId={9100002} {...props} />
+        <TableOnly fundId={9100002} {...props} />
       </MemoryRouter>,
     );
     await flushIdle();
     expect(calledIds()).toEqual(plan.slice(0, 3));
     view.rerender(
       <MemoryRouter>
-        <PositionsPanel fundId={9100003} {...props} />
+        <TableOnly fundId={9100003} {...props} />
       </MemoryRouter>,
     );
     expect(idle.pending.size).toBeGreaterThan(0); // the new panel waits for idle
@@ -747,7 +788,8 @@ describe("background prefetch of every position's weekly file", () => {
       expect(rowsOf().length).toBeGreaterThan(0);
     }
     fireEvent.click(screen.getByRole("button", { name: "Year" }));
-    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Earlier year" }));
     expect(screen.queryByRole("status")).toBeNull();
     await flush();
     expect(weeklyMock).toHaveBeenCalledTimes(calls);

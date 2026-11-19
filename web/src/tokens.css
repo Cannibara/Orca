@@ -41,6 +41,10 @@
   --ease-out:cubic-bezier(.2,.7,.2,1);--ease-std:cubic-bezier(.4,0,.2,1);
   --d-instant:0ms;--d-fast:120ms;--d-base:200ms;--d-grow:600ms;--d-label:300ms;--d-ambient:1400ms;
   --ppad:20px;
+  /* the Holdings tree map only: the fund's return on a holding, loss ← grey → gain (the site keeps blue / orange elsewhere) */
+  --tm-gain:#00A47C;
+  --tm-loss:#F7172E;
+  --tm-mid:#AFB4BA;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --page:#181512;
@@ -75,6 +79,9 @@
   --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
   --shimmer:rgba(243,236,227,.06);
+  --tm-gain:#00A47C;
+  --tm-loss:#F7172E;
+  --tm-mid:#4A4F57;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --page:#181512;
@@ -109,4 +116,7 @@
   --shadow-1:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
   --shimmer:rgba(243,236,227,.06);
+  --tm-gain:#00A47C;
+  --tm-loss:#F7172E;
+  --tm-mid:#4A4F57;
   color-scheme:dark}

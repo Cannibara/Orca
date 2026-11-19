@@ -2,7 +2,8 @@ import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEv
 import type { Stock } from "../data/api";
 import type { Exits, PositionRow, Summary } from "../data/types";
 import { count, pct, pp, signClass } from "../lib/format";
-import { fMm, fMoneySigned, fP0, fPc1, fPx, qShort } from "./fmt";
+import { money } from "../lib/format";
+import { fMoneySigned, fP0, fPc1, fPx, qShort } from "./fmt";
 import { useWidth } from "./hooks";
 import { moreLabel, useRowBudget } from "./loading";
 import { StockPanel } from "./StockPanel";
@@ -76,10 +77,10 @@ function LastChange({ r }: { r: SaleRow }) {
   );
 }
 
-/** Plus = missed = loss colour, minus = dodged = gain colour; a figure that prints as $0m, or an unknown one, has none. */
+/** Plus = missed = loss colour, minus = dodged = gain colour; a figure that prints as $0, or an unknown one, has none. */
 function MissedCell({ v }: { v: number | null }) {
-  const text = fMm(v, true);
-  const tone = v === null || text === "$0m" || text === "–" ? "" : v > 0 ? " loss" : " gain";
+  const text = v == null ? "–" : money(v, true);
+  const tone = v === null || text === "$0" ? "" : v > 0 ? " loss" : " gain";
   return <span className={"mv" + tone}>{text}</span>;
 }
 
@@ -92,7 +93,7 @@ function cells(r: SaleRow): Record<SaleKey, ReactNode> {
       </div>
     ),
     status: <span className="st sold">{statusWord(r.status)}</span>,
-    usd: fMm(r.soldUsd),
+    usd: money(r.soldUsd),
     ac: fPx(r.ac),
     px: fPx(r.px),
     ax: fPx(r.ax),

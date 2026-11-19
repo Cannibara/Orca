@@ -94,11 +94,7 @@ describe("fmt", () => {
   });
 
   test("money, in dollars", () => {
-    expect(fmt.fMm(2968000000)).toBe("$2,968m");
-    expect(fmt.fMm(-12e6, true)).toBe("−$12m");
-    expect(fmt.fMm(3e6, true)).toBe("+$3m");
-    expect(fmt.fMm(400000)).toBe("$0m");
-    expect(fmt.fMm(null)).toBe("–");
+    expect("fMm" in fmt).toBe(false); // the tables print money() now: "$2.97B", not "$2,968m"
     expect(fmt.fM(2968000000)).toBe("$2.97B");
     expect(fmt.fM(340e6)).toBe("$340M");
     expect(fmt.fM(12.34e6)).toBe("$12.3M");

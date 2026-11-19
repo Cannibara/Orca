@@ -72,7 +72,7 @@ const MAP: Record<string, string[]> = {
   "funds.json": ["FundsIndex"],
   "securities.json": ["Securities"],
   "latest_prices.json": ["LatestPrices"],
-  "fund/{id}/summary.json": ["Summary", "Metrics", "YearLabelRet", "YearsBlock", "QuartersBlock", "Holdings"],
+  "fund/{id}/summary.json": ["Summary", "Metrics", "YearLabelRet", "YearsBlock", "QuartersBlock", "Holdings", "About", "FormerName"],
   "fund/{id}/positions.json": ["Positions"],
   "fund/{id}/contrib.json": ["Contrib", "ContribYear"],
   "fund/{id}/exits.json": ["Exits", "ExitsRows", "ExitsSummary"],
