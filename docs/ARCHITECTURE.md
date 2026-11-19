@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-18 (pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-19 (`fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -13,7 +13,7 @@ flowchart LR
     FRED[FRED DTB3]
   end
   subgraph GHA[GitHub Actions: pipeline.yml]
-    RUN[python -m orca.run weekly<br/>ingest → securities → prices → compute → publish]
+    RUN[python -m orca.run weekly<br/>ingest → securities → prices → compute → shared files → About facts → publish]
   end
   LAKE[(R2 private lake<br/>R2_LAKE_BUCKET<br/>Parquet + state JSON, has CUSIPs)]
   SITE[(R2 public bucket orca-site<br/>brotli JSON per pipeline/contract.md)]
@@ -41,6 +41,7 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `http.py` | `Client` (rate limit, retries), `FetchError`, `sec_client`, `figi_client`, `tiingo_client`, `fred_client` |
 | `sec/bulk.py` | list and parse SEC 13F data-set ZIPs (`list_bulk_zips`, `parse_bulk_zip`, `raw_holdings`, `value_to_usd`) |
 | `sec/live.py` | EDGAR daily index + submission `.txt` parsing (`fetch_new_filings`, `parse_daily_index`) |
+| `sec/about.py` | SEC facts for the fund page's About tab: the filer's record (`data.sec.gov/submissions`: address, incorporation, former names, SIC description, tickers, newest 13F-HR(/A)) and that filing's cover (`primary_doc.xml` at the folder root: signature block, other included managers); any namespace, HTML entities decoded (`fetch_about`, `parse_submissions`, `parse_cover`; lake schema `SCHEMA`) |
 | `sec/legacy.py` | pre-2013 13F filings: EDGAR full index (`fetch_index`), free-text information tables found by CUSIP check digit (`read_table`), checked against the filer's declared totals (`check_table`), per full-index quarter (`fetch_quarter`, 4 downloads at once) |
 | `holdings.py` | `select_reports`, `build_holdings`, `fill_gaps` |
 | `securities.py` | CUSIP → FIGI/ticker (`map_cusips`), stock ids, SIC → sector, SEC lookups |
@@ -52,10 +53,10 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
 | `famous.py`, `famous.csv`, `famous_search.csv` | the hand-kept Famous funds list (CIK, match word, manager, group, search keyword) and the Google Trends snapshot of its keywords (keyword, topic id, score with Warren Buffett = 100, date) for Most searched; `Sources.famous` / `Sources.search` (the demo injects its own). No run fetches Trends: `pipeline/scripts/google_trends.py` refreshes the snapshot by hand (Google has no Trends API; uses pytrends, unmaintained) |
 | `home.py` | home lists (`top_funds` with its `famous` rows, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
-| `publish.py` | JSON + brotli writers, manifest, health |
+| `publish.py` | JSON + brotli writers, manifest, health; `weekly_closes` (weekly and quarter-end closes), `about_json` (the summary's `about`: street and city title-cased) |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
 | `hierarchy/` | sector → industry → industry vertical labels for the stock-picker / sector-picker metric: `labels.txt` (source of truth), `model.py` (parser and labeller), `matching.py` (Orca security names to Damodaran's company list), `tools/` (labelling, model batches, review page). Draft, not read by the pipeline yet; see its `README.md` |
-| `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
+| `run/` | `cli.py` (argparse), `weekly.py` (`run_weekly`, `run_home`, `verify`), `workbook.py` (`build_workbooks`), `ingest.py`, `market.py`, `compute.py`, `publish_step.py`, `about_step.py` (`update_fund_about`), `sectors_step.py`, `state.py`, `budget.py`, `sources.py`, `preflight.py` |
 | `demo.py` | synthetic offline dataset for `web/public/demo-data` |
 
 CLI: `python -m orca.run {weekly | rebuild | backfill | home | check-keys | verify [--sample N --seed S] | workbook --fund ID [--fund ID …] [--out DIR --max-positions N] | demo [--out --plain --seed]}`. Demo data: `uv run python -m orca.run demo --plain --out ../web/public/demo-data` (from the pipeline plan; `DEMO_TODAY` 2026-10-30, 12 funds).
@@ -67,13 +68,14 @@ Env var names read by code: `ORCA_CONTACT`, `OPENFIGI_KEY`, `TIINGO_KEY`, `TIING
 |---|---|
 | Schedule | `pipeline.yml`: `23 6 16 * *` (the job is named `weekly` but runs monthly), `41 7 1 * *` runs `verify`; both need `vars.ORCA_SCHEDULE_ENABLED == 'true'`; manual inputs `full`, `home_only`, `backfill` (one at most; `backfill` uploads and purges nothing); concurrency group `pipeline` |
 | Prices | daily bars from each stock's last stored date to today, from `prices.HISTORY_START` = 1999-01-01 for a new stock (`prices.TiingoSource`, `startDate`/`endDate`); then stage "price history": the missing years before a stock's first stored bar for stocks held before 2013 (`run/market.backfill_price_heads`, `prices.fetch_heads`, once each: `state.price_backfilled`); targets: latest-quarter holdings, SPY, exits within `EXIT_REFRESH_QUARTERS = 6`, never-fetched stocks; stalest first (`run/market.refresh_prices`) |
+| About facts | after compute and the shared files, before health and the manifest (`run/weekly._update_about`): funds without a `fund_about` row first, then those whose row is out of date (the lake has a 13F-HR(/A) of the fund filed after the row's), active and bigger books first; ≤ `about_step.MAX_CALLS` = 12,000 SEC calls a run (two a fund, ~25 min at 8/s), stopped with `RESERVE_MIN` = 30 min of the budget left; a failed lookup is flag `about_failed` and never stops the run. A summary is written with the row its fund had at compute; a fund computed this run whose facts changed has its staged summary rewritten (`publish.publish_about`), one not computed is owed to the next run (`pending_funds`). First fill of ~16,100 funds: ~32,000 calls, three runs (code) |
 | Timeouts | job 330 min, step 300 min; budget `ORCA_TIME_BUDGET_MIN` (default 270, `run/budget.py`); the price stage stops with `min(90, budget/3)` min left (`run/market.py` `PRICES_RESERVE_MIN`) |
 | SEC | `SEC_RATE_PER_SEC = 8.0` (`http.py`); User-Agent `Orca research {ORCA_CONTACT}`, `RuntimeError` if unset |
 | Others | OpenFIGI keyed 25 req/6 s × 100 jobs (anonymous 25/60 s × 10); Tiingo 2.5/s default; FRED 2/s; timeout 30 s |
 | Retries | up to 4, sleeping 2/4/8/16 s, on transport errors, 429 and 5xx; other 4xx and all 3xx raise (no redirects) (`Client._request`) |
 | Breakers | prices stop on 401/403/429 or 25 consecutive failures (`prices.py`); live ingest stops after 3 refused days/downloads or a 429 (`live.py`) |
 | Idempotency | `ingested.json` (ZIP name → sha256; the skip check is by name only); per-quarter parts replaced by (accession, source); `state.json` pending sets are cleared only after a successful publish; `_reconcile_published` compares `published.json` with the site manifest; only changed files upload; `manifest.json` last |
-| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`), at most 100 per kind; `InvariantError` / `CusipLeakError` / `HealthGateError` abort before the manifest; the lake is saved after any run. Health gates (`run/gates.check_health`, called in `run_weekly` after the CUSIP scan): lake has CUSIPs but none mapped to a stock; median `priced_pct` of the active funds below `config.COVERAGE_MIN` = 0.90 (live 0.988); funds with reports were tried and none was computed (`_Funds.with_reports`; funds without a report are not counted, and not when the time budget cut the run). `run_home` is not gated |
+| Failures | `health.json` flags (e.g. `fetch_failed`, `live_failed`, `cusip_mapping_failed`, `prices`, `tbill_failed`, `time_budget`, `price_mismatch`, `split_suspect`, `about_failed`), at most 100 per kind; `InvariantError` / `CusipLeakError` / `HealthGateError` abort before the manifest; the lake is saved after any run. Health gates (`run/gates.check_health`, called in `run_weekly` after the CUSIP scan): lake has CUSIPs but none mapped to a stock; median `priced_pct` of the active funds below `config.COVERAGE_MIN` = 0.90 (live 0.988); funds with reports were tried and none was computed (`_Funds.with_reports`; funds without a report are not counted, and not when the time budget cut the run). `run_home` is not gated |
 | verify | rebuilds 50 random published funds from raw parts and compares sha256 with `published.json`, leaving out funds owed a recompute (after a backfill they differ until the next run); no API calls |
 
 ### 13F quirks handled
@@ -149,6 +151,7 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `prices_daily/{y<year>, z<run>-NNNN}` | raw unadjusted OHLC f32, volume f64, split_factor f32, dividend f32 |
 | `vendor_tickers` | stock_id, ticker, end |
 | `rf` | year i32, rate f64 (decimal); from 1999 (`rf.START`), fetched again when the stored table starts later |
+| `fund_about` | cik i64, name, street, city, state, incorporated, sic, tickers list[str], exchanges list[str], former_names list[{name, from date, to date}], signer, signer_title, signed date, other_managers list[str], accession, filed date (the 13F the row was read from; the lake's newest when the record lists none), fetched date. One row per fund, as the SEC gives it; `run/about_step.update_fund_about` (two SEC calls a fund) |
 | `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history` |
 | `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; draft, not published) |
 | `stock_quarters` | stock_id, q, close, div, vwap (split-adjusted; stocks and ETFs), written with `sector_returns` |
@@ -159,12 +162,12 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`, `price_backfilled`, `legacy_done`, `legacy_retry`), `published.json` |
 
 ### Lake backups (`pipeline.yml`, step "Back up the lake state")
-- After a scheduled run that succeeded end to end (pipeline and save; never a manual run, so reruns cannot flush the good monthly backups), `rclone copy` puts the small, hard-to-rebuild lake state in `backups/<UTC date>/` of the PRIVATE lake bucket: `ingested.json`, `state.json`, `published.json`, `fund_state`, `cusip_map`, `vendor_tickers`, `securities`, `rf`. Not `prices_daily` (large; refetched from Tiingo) and not `filings`/`raw_holdings`/`holdings`/`reports` (rebuilt from the SEC's files). The source is the local lake just saved, not a server-side copy (no overlap with the live keys).
+- After a scheduled run that succeeded end to end (pipeline and save; never a manual run, so reruns cannot flush the good monthly backups), `rclone copy` puts the small, hard-to-rebuild lake state in `backups/<UTC date>/` of the PRIVATE lake bucket: `ingested.json`, `state.json`, `published.json`, `fund_state`, `cusip_map`, `vendor_tickers`, `securities`, `rf`. Not `fund_about` (refetched from the SEC over three runs), not `prices_daily` (large; refetched from Tiingo) and not `filings`/`raw_holdings`/`holdings`/`reports` (rebuilt from the SEC's files). The source is the local lake just saved, not a server-side copy (no overlap with the live keys).
 - Then the 3 newest folders named exactly `YYYY-MM-DD/` are kept and older ones removed with `rclone purge`; nothing is removed unless today's folder is listed. Anything else under `backups/` is never touched.
 - `restore-r2` and the save both `--exclude "backups/**"`, like `workbooks/**`: backups are never restored into a run and the save's `sync` never deletes them.
 - The step is the last one, with a 10-minute timeout. A failed copy removes today's partial folder, prints `::error::` and fails the run (red run, and the `alert` job opens an issue); the site and lake are already published and saved by then. Restore drill: `docs/domain-and-data-hosting.md`, "Restore from backup".
 
-Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.publish_fund`); `funds.json`, `securities.json`, `latest_prices.json`, `home/*.json` (`publish.publish_shared`); `stock/{id}/weekly.json` (`publish.publish_weekly`); `health.json`, `manifest.json`. They are minified with sorted keys and brotli quality 9, uploaded with `Content-Encoding: br` and `Cache-Control: public, max-age=300`, which the Cloudflare cache rule overrides. CUSIP guard: `_json_ready` refuses a `cusip` key and `publish_step.cusip_leaks` scans the staged files. Field meanings and units: `pipeline/contract.md`.
+Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.publish_fund`; the summary's `about` from `fund_about`); `funds.json`, `securities.json`, `latest_prices.json`, `home/*.json` (`publish.publish_shared`); `stock/{id}/weekly.json` (`publish.publish_weekly`: weekly closes, and `q0`/`qclose`, each quarter's close by the engine's valuation rule, so the site values an older quarter's holdings exactly as the summary does); `health.json`, `manifest.json`. They are minified with sorted keys and brotli quality 9, uploaded with `Content-Encoding: br` and `Cache-Control: public, max-age=300`, which the Cloudflare cache rule overrides. CUSIP guard: `_json_ready` refuses a `cusip` key and `publish_step.cusip_leaks` scans the staged files. Field meanings and units: `pipeline/contract.md`.
 
 ### Workbook (`pipeline/orca/workbook/`, phase 1: owner-only)
 - Modules:

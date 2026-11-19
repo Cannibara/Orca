@@ -13,8 +13,9 @@ escape `&` twice, so `&amp;amp;` is read as `&`. Namespaces vary between filers'
 """
 
 import html
+import re
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date
 from pathlib import PurePosixPath
 from xml.etree import ElementTree as ET
 
@@ -48,7 +49,11 @@ SCHEMA = pl.Schema(
         "fetched": pl.Date,
     }
 )
-_DATE_FORMATS = ("%m-%d-%Y", "%m/%d/%Y", "%Y-%m-%d")  # the cover's MM-DD-YYYY, and what some filers write
+# The cover's MM-DD-YYYY, and what some filers write instead.
+_DATE_FORMATS = (
+    re.compile(r"(?P<m>\d{1,2})[-/](?P<d>\d{1,2})[-/](?P<y>\d{4})"),
+    re.compile(r"(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})"),
+)
 
 
 @dataclass(frozen=True)
@@ -238,9 +243,10 @@ def _day(value: object) -> date | None:
 
 def _cover_date(value: str | None) -> date | None:
     text = (value or "").strip()
-    for fmt in _DATE_FORMATS:
-        try:
-            return datetime.strptime(text, fmt).date()
-        except ValueError:
-            continue
+    for pattern in _DATE_FORMATS:
+        if (m := pattern.fullmatch(text)) is not None:
+            try:
+                return date(int(m["y"]), int(m["m"]), int(m["d"]))
+            except ValueError:
+                return None
     return None

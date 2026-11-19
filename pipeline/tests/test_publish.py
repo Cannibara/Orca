@@ -19,7 +19,12 @@ from orca.engine.fund import (
     fund_years,
 )
 from orca.engine.metrics import Performance, hold_lengths, performance, turnover
-from orca.engine.position import PositionResult, Trade, compute_position
+from orca.engine.position import (
+    PositionResult,
+    Trade,
+    _valuation_close,
+    compute_position,
+)
 from orca.engine.whatif import ExitRow, beat_spy_pct, buys_vs_sells, exit_rows
 from orca.publish import (
     _PRICE_DECIMALS,
@@ -42,7 +47,6 @@ from orca.publish import (
     write_json,
     write_manifest,
 )
-from orca.engine.position import _valuation_close
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_index
 

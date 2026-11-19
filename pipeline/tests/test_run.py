@@ -55,8 +55,8 @@ from orca.run.budget import Budget
 from orca.run.market import latest_closes, update_rf
 from orca.run.publish_step import is_cusip
 from orca.run.state import State, decode, encode
-from orca.sec.live import fetch_new_filings
 from orca.sec.about import COVER_URL
+from orca.sec.live import fetch_new_filings
 from orca.securities import FIGI_URL, SUBMISSIONS_URL
 from orca.storage import Lake
 from orca.vendor import UNIVERSE_SCHEMA
@@ -2128,3 +2128,17 @@ def test_a_fund_the_sec_does_not_know_publishes_no_about(tmp_path):
     assert read_json(tmp_path / "bucket" / "fund" / str(SMALL_FUND) / "summary.json")["about"] is None
     row = Lake(tmp_path / "lake").read("fund_about").row(0, named=True)
     assert (row["cik"], row["name"], row["accession"]) == (SMALL_FUND, None, "0000001001-24-000001")
+
+
+def test_a_failed_summary_rewrite_owes_the_fund_to_the_next_run(fixtures, tmp_path, monkeypatch):
+    def broken(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("orca.run.weekly.publish_about", broken)
+    stats = run(tmp_path, fixture_sources(fixtures), WEEK1)
+    assert stats.funds_recomputed == 12
+    assert {"type": "about_failed", "error": "OSError"} in health(tmp_path)["flags"]
+    assert State.load(Lake(tmp_path / "lake")).pending_funds == set(DEMO_CIKS) - {COBBLEREEF}
+    monkeypatch.undo()
+    run(tmp_path, fixture_sources(fixtures), WEEK1)
+    assert all(s["about"] for cik, s in summaries(tmp_path).items() if cik != COBBLEREEF)

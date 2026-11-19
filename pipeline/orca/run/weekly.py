@@ -307,6 +307,8 @@ def _update_about(
     if sources.fund_about is None:
         return set()
     started = time.monotonic()
+    changed: dict[int, dict | None] = {}
+    rewritten: set[int] = set()
     try:
         counts, changed = update_fund_about(
             lake,
@@ -316,14 +318,15 @@ def _update_about(
             budget,
             today,
         )
+        for cik in sorted(changed.keys() & computed):
+            files.update(publish_about(staging, cik, changed[cik], compress))
+            rewritten.add(cik)
     except Exception as err:  # the About tab must never cost the publish
-        log.exception("about: skipped after a failure")
+        log.exception("about: stopped after a failure")
         flags.append({"type": "about_failed", "error": type(err).__name__})
-        return set()
-    for cik in sorted(changed.keys() & computed):
-        files.update(publish_about(staging, cik, changed[cik], compress))
-    owed = set(changed) - computed
-    _log_stage("about", started, {**counts, "republished": len(changed) - len(owed), "next_run": len(owed)})
+        return set(changed) - rewritten
+    owed = set(changed) - rewritten
+    _log_stage("about", started, {**counts, "republished": len(rewritten), "next_run": len(owed)})
     return owed
 
 

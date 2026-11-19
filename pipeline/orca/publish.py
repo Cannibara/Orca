@@ -553,7 +553,8 @@ def publish_shared(
 
 def publish_weekly(out: Path, weekly: Mapping[int, dict], compress: bool = True) -> dict[str, str]:
     """Write stock/{id}/weekly.json under `out` for each stock of `weekly` (stock_id ->
-    `weekly_closes`'s result) that has closes, prices rounded to 4 places; path -> checksum."""
+    `weekly_closes`'s result) that has closes, prices (weekly and quarter-end) rounded to 4 places;
+    path -> checksum."""
     docs = {
         f"stock/{stock_id}/weekly.json": {
             "start": closes["start"],

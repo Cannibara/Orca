@@ -12,7 +12,8 @@ Built in: two stocks that split while held (one of them twice), a stock delisted
 and new-holdings amendments (one restating a 2019 quarter, filed in October 2026), a single
 missed quarter, a two-quarter gap, a fund gone inactive, a young fund, a late filer, an early
 filer of the next quarter, options and a bond, a reported value off by 100x and a position that
-triples exactly.
+triples exactly. Each fund but Cobblereef has an invented SEC record and 13F cover pages for the About
+tab (`DEMO_ABOUT`), served in the SEC's shapes to the real `sec.about.fetch_about`.
 """
 
 import io
@@ -22,8 +23,8 @@ import random
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
-from functools import partial
 from datetime import UTC, date, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
@@ -198,9 +199,11 @@ DEMO_ABOUT = {
     ),
     "Brinestone Value Partners": _Record(
         "450 BRINESTONE BOULEVARD", "OMAHA", "NE", "NE", "Hal Morrow", "President",
-        (("BRINESTONE CAPITAL INC", "2001-06-12", "2008-04-30"),
-         ("BRINESTONE VALUE FUND INC", "2008-04-30", "2014-01-02")),
-    ),  # fmt: skip
+        (
+            ("BRINESTONE CAPITAL INC", "2001-06-12", "2008-04-30"),
+            ("BRINESTONE VALUE FUND INC", "2008-04-30", "2014-01-02"),
+        ),
+    ),
     "Driftwood Capital": _Record(
         "12 DRIFTWOOD ROW", "AUSTIN", "TX", "DE", "Theo Drift", "Managing Partner"
     ),
@@ -209,11 +212,17 @@ DEMO_ABOUT = {
     ),
     "Seastack Asset Management": _Record(
         "1 SEASTACK PLAZA", "BALTIMORE", "MD", "MD", "Rafael Ortiz", "Senior Vice President",
-        managers=("Seastack Trust Co", "Seastack Investment Advisers LLC",
-                  "Seastack Asset Management International Ltd", "Seastack & Partners Ltd",
-                  "Seastack Private Wealth LLC"),
-        sic="Investment Advice", tickers=("SSAM",), exchanges=("NYSE",),
-    ),  # fmt: skip
+        managers=(
+            "Seastack Trust Co",
+            "Seastack Investment Advisers LLC",
+            "Seastack Asset Management International Ltd",
+            "Seastack & Partners Ltd",
+            "Seastack Private Wealth LLC",
+        ),
+        sic="Investment Advice",
+        tickers=("SSAM",),
+        exchanges=("NYSE",),
+    ),
     "Orcinus Lane Capital": _Record(
         "88 ORCINUS LANE", "MIAMI", "FL", "DE", "Wren Orcinus", "Chief Investment Officer"
     ),

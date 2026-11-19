@@ -101,7 +101,7 @@ def test_a_fund_is_asked_again_only_once_it_files_a_newer_13f(lake):
 
     filings(lake, [(SMALL, "0000000002-27-000001", date(2027, 2, 12), "13F-HR")], part="q055")
     sec = Sec({SMALL: about(SMALL, "0000000002-27-000001", date(2027, 2, 12), signer="Bo Chen")})
-    stats, changed = run_step(lake, sec)
+    _, changed = run_step(lake, sec)
     assert sec.asked == [SMALL]
     assert changed[SMALL]["signer"] == "Bo Chen" and list(changed) == [SMALL]
     table = read_table(lake, TABLE, SCHEMA)
@@ -140,7 +140,7 @@ def test_a_cik_the_sec_does_not_know_keeps_the_lakes_13f(lake):
     # No record (404) or no 13F in it: the row holds the lake's newest 13F, so the fund is not asked
     # again every run, and publishes no about.
     answers_ = {**answers(), BIG: None, SMALL: About(name="FUND 2 LP")}
-    stats, changed = run_step(lake, Sec(answers_))
+    _, changed = run_step(lake, Sec(answers_))
     table = read_table(lake, TABLE, SCHEMA).sort("cik")
     rows = {r["cik"]: r for r in table.iter_rows(named=True)}
     assert (rows[BIG]["accession"], rows[BIG]["filed"]) == ("0000000001-26-000002", date(2026, 11, 14))
