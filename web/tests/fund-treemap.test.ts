@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PositionRow, Trade } from "../src/data/types";
 import { dividendsAsOf, type Timeline } from "../src/fund/positions";
 import {
@@ -18,6 +21,7 @@ import {
   type Rect,
   type RGB,
 } from "../src/fund/treemap";
+import { DUR, EASE, LABEL_FROM, LABEL_FULL, LABEL_OUT, bezier } from "../src/fund/treemapView";
 
 const trade = (q: number, delta: number, px: number, sharesAfter: number): Trade => ({ q, delta, px, low: null, high: null, sharesAfter });
 const row = (over: Partial<PositionRow> = {}): PositionRow => ({
@@ -289,30 +293,55 @@ describe("label ink", () => {
 
 // ---- labels ---------------------------------------------------------------------------------
 
-describe("labelSet: only what fits", () => {
+describe("labelSet: only what fits, and always the dollar value where there is room for it", () => {
   const measure: Measure = (_f, s) => s.length * 7; // 7px a character, whatever the font
   const stock = { other: false, ticker: "AAPL", name: "Apple Computer Holdings", weight: 0.123, value: 80.2e9, count: 0 };
+  const none = { tk: null, w: null, n: null, v: null };
 
   test("a tiny tile has no label", () => {
-    expect(labelSet(stock, 200, 23, measure)).toEqual({ tk: null, w: null, n: null });
-    expect(labelSet(stock, 20, 100, measure)).toEqual({ tk: null, w: null, n: null });
+    expect(labelSet(stock, 200, 23, measure)).toEqual(none);
+    expect(labelSet(stock, 20, 100, measure)).toEqual(none);
   });
-  test("a short tile: the ticker only; a ticker too wide: nothing", () => {
-    expect(labelSet(stock, 60, 30, measure)).toEqual({ tk: "AAPL", w: null, n: null });
-    expect(labelSet(stock, 38, 60, measure)).toEqual({ tk: null, w: null, n: null }); // 28px of ticker in 24px
+  test("a short tile: the ticker, with the value at the right end of its row when both fit", () => {
+    expect(labelSet(stock, 60, 30, measure)).toEqual({ ...none, tk: "AAPL" }); // 28 + 8 + 42 px in 46: no room for the value
+    expect(labelSet(stock, 120, 30, measure)).toEqual({ ...none, tk: "AAPL", v: "$80.2B" });
+    expect(labelSet(stock, 38, 60, measure)).toEqual(none); // 28px of ticker in 24px
   });
-  test("then the weight; from 96 x 54 the value and the name, ellipsised", () => {
-    expect(labelSet(stock, 80, 45, measure)).toEqual({ tk: "AAPL", w: "12.3%", n: null });
-    expect(labelSet(stock, 95, 60, measure)).toEqual({ tk: "AAPL", w: "12.3%", n: null });
+  test("a second row: the value, with the weight before it when both fit; the weight alone only when the value cannot", () => {
+    expect(labelSet(stock, 80, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "$80.2B" });
+    expect(labelSet(stock, 95, 60, measure)).toEqual({ ...none, tk: "AAPL", w: "$80.2B" }); // under 96 wide: no name
+    expect(labelSet(stock, 50, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "12.3%" }); // 36px of room: 35px weight, 42px value
+  });
+  test("from 96 x 54 the name too, ellipsised", () => {
     const big = labelSet(stock, 140, 60, measure);
     expect(big.w).toBe("12.3% · $80.2B");
     expect(big.n).toBe("Apple Computer Ho…"); // 126px of room: 17 characters and the ellipsis
     expect(labelSet(stock, 300, 60, measure).n).toBe("Apple Computer Holdings");
   });
-  test("Other stocks: its name, then the count and weight", () => {
+  test("Other stocks: its name, then its value and weight, then how many stocks", () => {
     const other = { other: true, ticker: "", name: "", weight: 0.098, value: 1e9, count: 16 };
-    expect(labelSet(other, 200, 60, measure)).toEqual({ tk: "Other stocks", w: "16 stocks · 9.8%", n: null });
-    expect(labelSet(other, 70, 45, measure)).toEqual({ tk: "Other", w: "9.8%", n: null });
+    expect(labelSet(other, 200, 60, measure)).toEqual({ tk: "Other stocks", w: "9.8% · $1.00B", n: "16 stocks", v: null });
+    expect(labelSet(other, 70, 45, measure)).toEqual({ ...none, tk: "Other", w: "$1.00B" });
+  });
+  test("every tile that holds a ticker shows its value when the value fits; no tile is ever left with the weight over a value that fits", () => {
+    const val = "$80.2B";
+    for (const tile of [stock, { other: true, ticker: "", name: "", weight: 0.05, value: 80.2e9, count: 4 }]) {
+      for (let w = 20; w <= 320; w += 3) {
+        for (let h = 20; h <= 120; h += 3) {
+          const o = labelSet(tile, w, h, measure);
+          if (o.tk === null) continue;
+          const aw = w - 14;
+          const where = `${tile.other ? "other" : "stock"} ${w}x${h}`;
+          if (h >= 39) {
+            if (measure("w", val) <= aw) expect(`${o.w}|${o.v}`, where).toContain("$");
+            expect(o.v, where).toBeNull();
+          } else {
+            expect(o.w, where).toBeNull();
+            if (measure("w", o.tk) + 8 + measure("w", val) <= aw) expect(o.v, where).toBe(val);
+          }
+        }
+      }
+    }
   });
   test("ellipsize keeps at least four characters, else nothing", () => {
     expect(ellipsize("n", "Microsoft", 7 * 9, measure)).toBe("Microsoft");
@@ -349,5 +378,27 @@ describe("neighbour: arrow keys move to the tile in that direction", () => {
       { x: 60, y: 12, w: 10, h: 10 },
     ];
     expect(neighbour(r, 0, "right")).toBe(1); // gap 10 + 2 × offset 30 = 70 beats gap 50 + 2 × offset 12 = 74
+  });
+});
+
+// ---- motion ---------------------------------------------------------------------------------
+
+describe("tile motion is the Analysis bars' motion", () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../src/tokens.css"), "utf8");
+  test("the duration and the curve are the --d-grow and --ease-out the bars use", () => {
+    const grow = /--d-grow:\s*(\d+)ms/.exec(css);
+    expect(grow, "--d-grow in tokens.css").not.toBeNull();
+    expect(DUR).toBe(Number(grow![1]));
+    const ease = /--ease-out:\s*cubic-bezier\(([^)]+)\)/.exec(css);
+    expect(ease, "--ease-out in tokens.css").not.toBeNull();
+    const [a, b, c, d] = ease![1].split(",").map(Number);
+    const bars = bezier(a, b, c, d);
+    for (let x = 0; x <= 1; x += 0.05) expect(EASE(x)).toBeCloseTo(bars(x), 6);
+  });
+  test("the words are in full when the box is most of the way (about 89% at 250 ms), and out before they change", () => {
+    expect(EASE(LABEL_FULL / DUR)).toBeGreaterThan(0.85);
+    expect(EASE(LABEL_FROM / DUR)).toBeLessThan(0.6); // they start once it is about half way
+    expect(LABEL_OUT).toBeLessThan(LABEL_FROM);
+    expect(LABEL_FULL).toBeLessThan(DUR / 2);
   });
 });

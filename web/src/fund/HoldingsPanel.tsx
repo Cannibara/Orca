@@ -24,14 +24,15 @@ import {
   type Scale,
   type Tile,
 } from "./treemap";
-import { createTreemapView, type TileDatum, type TreemapView } from "./treemapView";
+import { DUR, createTreemapView, type TileDatum, type TreemapView } from "./treemapView";
 import { useWeeklyPrices, type HoldingsState, type PositionData } from "./usePositionData";
 import "./holdings.css";
 
 // The Holdings panel: the period picker that drives the whole tab, then a tree map of what the fund held at the
 // end of the period. A tile's area is the holding's value (the Positions table's figures, so the two agree) and
-// its colour the fund's return on it over the period. Older quarters need weekly price files; until a tile's are
-// in it keeps its last colour (or a neutral one), then tweens to its own.
+// its colour the fund's return on it over the period. The colour needs each stock's weekly price file, so nothing
+// is drawn until every tile's is in: the tiles then form (or move) already in their final red or green, and the
+// colours are never animated. While the files load, the last drawing stays under a quiet note.
 
 /** The return the scale reaches its full colour at: ±25% for a quarter, ±50% for 12 months. */
 const CLAMP_Q = 0.25;
@@ -188,7 +189,6 @@ export function HoldingsPanel({ h, data, prices }: Props) {
   }, [grouped, wk.weekly, shown, qs, qe, tl, prices]);
 
   const rects = useMemo(() => layout(grouped.tiles.map((t) => t.value), W, H), [grouped, W, H]);
-  const lastFill = useRef(new Map<string, RGB>());
 
   const endLabel = qe >= tl.latest ? fmtLong(tl.asof) : qShort(qe);
   const startLabel = qShort(qs - 1);
@@ -252,7 +252,8 @@ export function HoldingsPanel({ h, data, prices }: Props) {
       const key = String(r.id);
       const info = infos.get(r.id);
       const hollow = info !== undefined && info.ret === null;
-      const fill: RGB = !info ? (lastFill.current.get(key) ?? colours.band) : info.ret === null ? colours.surface : returnColor(info.ret, clamp, colours.scale);
+      // a tile without its prices is never drawn (see `ready`); the band colour only fills the gap in this list
+      const fill: RGB = !info ? colours.band : info.ret === null ? colours.surface : returnColor(info.ret, clamp, colours.scale);
       const { ink, soft } = inkFor(fill, colours.ink, colours.surface);
       const ret = info?.ret ?? null;
       const said = !info ? "loading" : ret === null ? "not available" : `${pct(ret)} over ${year ? "12 months" : "the quarter"}`;
@@ -283,18 +284,36 @@ export function HoldingsPanel({ h, data, prices }: Props) {
     };
   }, [hatchId, measure, tip]);
 
+  // Every tile's colour is known: its weekly file is in (or it has none). Until then the last drawing stays.
+  const ready = !wk.pending;
+  /** The first render reads the box at fallback sizes; the next one has the real ones. Drawing waits for them. */
+  const sized = () => {
+    const bw = boxRef.current?.clientWidth ?? 0;
+    const pw = panelRef.current?.clientWidth ?? 0;
+    return (bw <= 0 || Math.max(200, Math.floor(bw)) === W) && (pw <= 0 || Math.max(280, Math.floor(pw)) === panelW);
+  };
   const drawn = useRef<{ W: number; H: number; theme: number; fonts: number } | null>(null);
+  const landedAt = useRef<number | null>(null);
+  const [landed, setLanded] = useState(false);
   useLayoutEffect(() => {
     const v = view.current;
-    if (!v) return;
+    if (!v || !ready || !sized()) return;
     const p = drawn.current;
-    // a resize, a new theme or the fonts arriving redraw in place; a new period or new colours move
-    // the first draw grows in (as the Analysis charts do on landing); a resize, theme or font change redraws in place
-    const animate = (p === null || (p.W === W && p.H === H && p.theme === themeKey && p.fonts === fontsKey)) && !reducedMotion();
+    const t = performance.now();
+    const same = p !== null && p.W === W && p.H === H && p.theme === themeKey && p.fonts === fontsKey;
+    // The first drawing of tiles grows them in, and a redraw that comes while that is still running (the fonts
+    // arriving, the scrollbar changing the width) joins it instead of cutting it short. After that a new period
+    // or new prices move the tiles; a resize, a new theme or new fonts redraw in place.
+    const joining = landedAt.current !== null && t - landedAt.current < DUR + 150;
+    const animate = !reducedMotion() && (landedAt.current === null || same || joining);
     drawn.current = { W, H, theme: themeKey, fonts: fontsKey };
     v.render(datums, animate);
-    for (const d of datums) if (d.fill && !d.hollow) lastFill.current.set(d.key, d.fill);
-  }, [datums, W, H, themeKey, fontsKey]);
+    if (datums.length && landedAt.current === null) {
+      landedAt.current = t;
+      setLanded(true);
+    }
+    // (`sized` reads W and panelW, so they are listed)
+  }, [datums, W, H, panelW, themeKey, fontsKey, ready]);
 
   const loading = data.pending || wk.pending;
   const asOf = periodAsOf(period, tl);
@@ -333,9 +352,9 @@ export function HoldingsPanel({ h, data, prices }: Props) {
             </defs>
             <g ref={layerRef} />
           </svg>
-          {data.rows === null && <p className="tm-msg">Loading prices…</p>}
+          {(data.rows === null || (wk.pending && !landed)) && <p className="tm-msg">Loading prices…</p>}
           {empty && <p className="tm-msg">The fund held no priced stock at the end of this period.</p>}
-          {loading && data.rows !== null && (
+          {loading && landed && (
             <div className="tm-load" aria-hidden="true">
               <span>Loading prices…</span>
             </div>
