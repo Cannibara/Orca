@@ -289,7 +289,8 @@ export function HoldingsPanel({ h, data, prices }: Props) {
     if (!v) return;
     const p = drawn.current;
     // a resize, a new theme or the fonts arriving redraw in place; a new period or new colours move
-    const animate = p !== null && p.W === W && p.H === H && p.theme === themeKey && p.fonts === fontsKey && !reducedMotion();
+    // the first draw grows in (as the Analysis charts do on landing); a resize, theme or font change redraws in place
+    const animate = (p === null || (p.W === W && p.H === H && p.theme === themeKey && p.fonts === fontsKey)) && !reducedMotion();
     drawn.current = { W, H, theme: themeKey, fonts: fontsKey };
     v.render(datums, animate);
     for (const d of datums) if (d.fill && !d.hollow) lastFill.current.set(d.key, d.fill);
