@@ -30,11 +30,11 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `funds.json`: `{"v": 1, "id": [], "name": [], "book": [], "n": []}`
 - `securities.json`: `{"stock_id": [], "ticker": [], "name": [], "sector": []}`
 - `latest_prices.json`: `{"asof": "YYYY-MM-DD", "stock_id": [], "price": [], "date": []}`
-- `fund/{id}/summary.json`: `{"id", "name", "cik", "period_q", "filed", "book", "n_holdings", "priced_pct", "tracked_since_q", "inactive", "metrics": {"ann_return", "sharpe", "sortino", "vol", "max_dd", "calmar", "best_year": {"label", "ret"}, "worst_year": {"label", "ret"}, "years_pos", "years_total", "quarters_pos_pct", "turnover", "hold_all", "hold_sold", "first_year", "last_year"}, "years": {"label": [], "ret": [], "start": [], "end": [], "gains": [], "inflows": [], "dividends": [], "approx_ret": []}, "quarters": {"q": [], "ret": [], "start": [], "end": [], "market_move": [], "net_buying": [], "trade_gains": [], "dividends": []}, "holdings_now": {"stock_id": [], "shares": [], "cost": []}}`
+- `fund/{id}/summary.json`: `{"id", "name", "cik", "period_q", "filed", "book", "n_holdings", "priced_pct", "tracked_since_q", "inactive", "metrics": {"ann_return", "sharpe", "sortino", "vol", "max_dd", "calmar", "best_year": {"label", "ret"}, "worst_year": {"label", "ret"}, "years_pos", "years_total", "quarters_pos_pct", "turnover", "hold_all", "hold_sold", "first_year", "last_year"}, "years": {"label": [], "ret": [], "start": [], "end": [], "gains": [], "inflows": [], "dividends": [], "approx_ret": []}, "quarters": {"q": [], "ret": [], "start": [], "end": [], "market_move": [], "net_buying": [], "trade_gains": [], "dividends": []}, "holdings_now": {"stock_id": [], "shares": [], "cost": []}, "about": {"name", "street", "city", "state", "signer", "signer_title", "signed", "other_managers": [], "incorporated", "former_names": [{"name", "from", "to"}], "sic", "tickers": [], "exchanges": []} | null}`
 - `fund/{id}/positions.json`: `{"stock_id": [], "from_q": [], "to_q": [], "avg_cost": [], "avg_exit": [], "invested": [], "realised": [], "dividends": [], "shares_now": [], "cost_now": [], "last_q": [], "last_type": [], "last_pct": [], "last_usd": [], "trades": [[[q, delta, px, low, high, shares_after], ...], ...]}`
 - `fund/{id}/contrib.json`: `{"years": [label...], "by_year": {label: {"stock_id": [], "points": [], "pnl": []}}}`
 - `fund/{id}/exits.json`: `{"rows": {"stock_id": [], "status": [], "sold_shares": [], "sold_usd": [], "avg_exit": [], "last_sale_q": [], "one_y": [], "spy_one_y": []}, "summary": {"buys_12m": number|null, "sells_12m": number|null, "beat_spy_pct": number|null}}`
-- `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": []}` (weekly Friday closes, split-adjusted; `close` is `(number | null)[]`)
+- `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": [], "q0": int | null, "qclose": []}` (weekly Friday closes and quarter-end closes, split-adjusted; `close` and `qclose` are `(number | null)[]`)
 - `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction_q.json`, `home/conviction_y.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
 - `manifest.json` at the bucket root: `{"version": "...", "built": "...", "files": {path: sha256}}`; `health.json`: `{"filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags": [...]}`.
 
@@ -78,6 +78,21 @@ website builds its TypeScript types from it. Change this file first, then the wr
   quarter's start value or denominator is not positive. `start` / `end` are the book in dollars. The bridge:
   `end = start + market_move + net_buying + trade_gains`. `net_buying` = buys − sells.
 - `holdings_now`: positions with shares now, ordered by `stock_id`; `shares` and `cost` (cost basis, dollars).
+- `about`: what SEC EDGAR says about the filer, for the About tab; `null` when nothing is known (not looked
+  up yet, or the SEC does not know the CIK). It comes from the filer's record (`data.sec.gov/submissions`) and the
+  cover page of its latest 13F-HR or 13F-HR/A. Every string field is `null` and every list `[]` when unknown;
+  names are as the SEC gives them (often in capitals), with HTML entities decoded.
+  - `name`: the filer's name on its record. `street` (first line), `city` and `state` are its business address:
+    street and city in title case (the SEC stores capitals), `state` the SEC's two-letter code, a US state or
+    territory ("NE") or the SEC's code for another country ("X0" is the United Kingdom). `incorporated` is the
+    SEC's code of the state (or country) of incorporation.
+  - `signer`, `signer_title` and `signed` (ISO date) are the cover page's signature block; `other_managers` the
+    names of the other managers included in the report (its summary page), in filing order.
+  - `former_names`: the filer's earlier names, oldest first, each with the ISO dates it was used `from` and
+    `to` (`null` when the SEC gives none).
+  - `sic`: the SEC's description of the filer's industry code. `tickers` and `exchanges`: the filer's own listed
+    shares, `exchanges[i]` being where `tickers[i]` trades (an exchange may be `null`); empty for most managers.
+  - Files built before 2026-11-19 have no `about` key.
 
 ### `fund/{id}/positions.json`
 
@@ -122,6 +137,18 @@ One entry per stock the fund ever held in its current tracking segment, ordered 
   dividend-adjusted). It is `null` for a week in between with no priced day (a trading halt or a data gap); the
   previous close is not carried forward. A day without a close is not priced. A stock without a single priced
   day has no file; a published file is deleted when its stock loses every priced day.
+- `q0` and `qclose` are the quarter-end closes: `qclose[i]` is the close of quarter `q0 + i`, the close of the
+  quarter's last priced day, else (a quarter without one) the last close before it. This is the price the engine
+  values a fund's book with at a quarter end, on the same share basis as `close` and as the shares of
+  `positions.json` `trades`, so shares × `qclose` summed over a fund's holdings at quarter `q` is that quarter's
+  `summary.quarters.end` (to the rounding of the prices). Only a stock without any close up to the quarter (before
+  `q0`) is valued otherwise: at the fund's reported value per share, which no file publishes.
+  - `qclose` runs from the stock's first quarter with a priced day to its last, with no gaps (a quarter without a
+    priced day carries the close before it), so no entry is `null` today. A quarter after the last entry (a stock
+    that stopped trading) is valued at the last entry; a quarter before `q0` has no close. The entry of the
+    quarter in progress is its latest close so far.
+  - `q0` is `null` and `qclose` is `[]` when the stock has no priced day.
+  - Files built before 2026-11-19 have neither: a reader then falls back to the weekly closes.
 
 ### Home
 

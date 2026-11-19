@@ -70,14 +70,6 @@ export function fM(v: number | null, signed = false): string {
   return (v < 0 ? MINUS : signed && a >= 0.5 ? "+" : "") + t;
 }
 
-/** Whole millions with thousands separators: 2968000000 → "$2,968m". */
-export function fMm(v: number | null, signed = false): string {
-  if (v == null) return "–";
-  const m = Math.round(v / 1e6);
-  if (m === 0) return "$0m";
-  return (m < 0 ? MINUS : signed ? "+" : "") + "$" + Math.abs(m).toLocaleString("en-US") + "m";
-}
-
 /** A figure already in percent, signed, one decimal (a weight change in points): 1.26 → "+1.3%". */
 export function fPc1(v: number | null): string {
   return v == null ? "–" : (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(1) + "%";

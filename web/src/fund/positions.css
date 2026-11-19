@@ -1,10 +1,12 @@
-/* Positions panel: period picker, the 13-column table, the expanded stock row. Ported from the
+/* Positions panel and the period picker (in the Holdings panel): the 12-column table, the expanded stock row. Ported from the
    approved artifact's style.css. Every selector sits under `.fp`; tokens and the shared pieces
    (.panel, .seg, .stepper, .tag, .tbl-mini, .viz, .scrub) come from base.css. The table sets every
    property it cares about itself, so the generic table rules of styles.css never leak into it. */
 
 /* the panel draws its own padding (header, tools, table); the generic .panel padding of styles.css is not wanted */
 .fp #posPanel.panel{padding:0}
+/* the picker moved up into the Holdings panel: keep the header off the table's top rule */
+.fp #posPanel>.ph{padding-bottom:14px}
 
 /* ---------- header and tools ---------- */
 .fp .asof{font-size:12px;color:var(--ink3)}
@@ -22,6 +24,9 @@
 .fp .stepper .pi.hole{cursor:default;pointer-events:none}
 .fp .stepper .pi .caret{width:11px;height:11px;stroke-width:2;flex:none}
 .fp .stepper .pi .psel-o{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:14px;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0}
+/* the pill window clips outside rings (overflow:hidden), so pills get an inset one; the selected pill's ring follows its hidden list */
+.fp .stepper .pi:focus-visible,.fp .stepper .pi.on:has(>.psel-o:focus-visible){outline:2px solid var(--focus);outline-offset:-2px;box-shadow:inset 0 0 0 3px var(--surface)}
+.fp .stepper .pi .psel-o:focus-visible{outline:none}
 .fp .stepper .whint{display:inline-flex;align-items:center;padding:0 7px 0 6px;margin-left:2px;border-left:1px solid var(--line);color:var(--ink3);height:18px}
 .fp .stepper .whint svg{width:10px;height:15px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round}
 .fp .stepper:hover .whint{color:var(--ink)}

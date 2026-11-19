@@ -81,6 +81,29 @@ export type Holdings = {
   cost: number[];
 };
 
+/** A former name of the filer and the dates it was used (ISO, either may be null). */
+export type FormerName = { name: string; from: string | null; to: string | null };
+
+/**
+ * What SEC EDGAR says about the filer: its record (submissions JSON) and its latest 13F cover page. Every field is
+ * null (or []) when unknown. `state` and `incorporated` are SEC codes ("NE", "DE"); names come in capitals.
+ */
+export type About = {
+  name: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  signer: string | null;
+  signer_title: string | null;
+  signed: string | null;
+  other_managers: string[];
+  incorporated: string | null;
+  former_names: FormerName[];
+  sic: string | null;
+  tickers: string[];
+  exchanges: string[];
+};
+
 export type Summary = {
   id: number;
   name: string;
@@ -96,6 +119,8 @@ export type Summary = {
   years: YearsBlock;
   quarters: QuartersBlock;
   holdings_now: Holdings;
+  /** null when nothing is known; absent from files built before it. */
+  about?: About | null;
 };
 
 // ---- fund/{id}/positions.json ----------------------------------------------
@@ -199,10 +224,16 @@ export type Exits = {
 
 // ---- stock/{stock_id}/weekly.json ------------------------------------------
 
-/** `start` is a Friday; close[i] is the last close of the week ending start + 7 i days. null = gap, never carried forward. */
+/**
+ * `start` is a Friday; close[i] is the last close of the week ending start + 7 i days. null = gap, never carried forward.
+ * qclose[i] is the close for quarter q0 + i (its last close, else the last one before it): the price the engine values
+ * the book with. q0 is null and qclose [] for a stock without prices; both are absent from files built before them.
+ */
 export type Weekly = {
   start: string;
   close: (number | null)[];
+  q0?: number | null;
+  qclose?: (number | null)[];
 };
 
 // ---- home/*.json -----------------------------------------------------------

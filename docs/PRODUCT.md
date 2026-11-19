@@ -1,6 +1,6 @@
 # Product
 
-Last verified: 2026-11-17
+Last verified: 2026-11-19
 
 Tags: (chat) session conversation, (code) checked in code, (git) commit history, (spec) `docs/superpowers/specs/2026-10-30-orca-fund-pnl-design.md`.
 
@@ -22,7 +22,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | Status | Feature | Where |
 |---|---|---|
 | Shipped | Home: fund search (`/` focuses it) and 6 tabs (Top funds 1y/3y/5y/10y/15y/since start + Index giants, Famous funds (one list per style, 10 a page each, the period shared with Top funds), Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
-| Shipped | Fund page panels (below) | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code) |
+| Shipped | Fund page panels (below), in three tabs since 2026-11-19: Holdings, Analysis, About | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code); spec `docs/superpowers/specs/2026-11-19-fund-tabs-design.md` |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
 | Shipped | Not found page (the How it works page was removed 2026-11-11: users need no 13F education) | `web/src/pages/NotFound.tsx` (chat)(code) |
 | Shipped | Site-wide footer on every page: "Estimates from SEC 13F filings. Not investment advice." | `web/src/App.tsx` (code) |
@@ -33,7 +33,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 | File only | Just filed list: `home/just_filed.json` is still published; its tab was removed 2026-11-06 | `pipeline/orca/home.py` `just_filed` (code) |
 | Proposed, unanswered | Conviction: drop funds with ≥ 30% of book in ETFs; common stock only (no convertibles/preferreds); name filters for wealth managers and charities | (chat) |
 | Proposed, declined | Best & worst calls from every qualifying buy, re-cut live (owner kept the 50 + 50 file) | (chat) |
-| Backlog | Per-fund quarter-end price file (fewer requests) | (chat) |
+| Backlog | Per-fund quarter-end price file (fewer requests); since 2026-11-19 each stock's `weekly.json` carries its quarter-end closes (`q0`, `qclose`) | (chat)(spec) |
 | Phase 1 built (owner-only) | Paid per-fund workbook (phase 1: owner-only): an Excel file per fund with the raw quarterly data and formulas for every fund-page metric, reconciled to Orca's figures; built by hand with Actions > Workbook into the private bucket; not for sale until the Tiingo licence is settled; login, payment and on-demand build are phase 2 | `pipeline/orca/workbook/`, `docs/superpowers/specs/2026-11-10-fund-workbook-design.md` (code)(chat) |
 | Backlog | Gated paid tier, login | (spec)(chat) |
 | Backlog (F1) | Paid per-fund workbook, the phase 2 of the row above | `docs/ROADMAP.md` (proposal until the owner approves) |
@@ -57,15 +57,22 @@ Thresholds in `pipeline/orca/config.py`, applied in `pipeline/orca/home.py` (cod
 Holdings go back to Q1 1999 (the SEC's pre-2013 text filings, read since 2026-11-17), so the 15y and Since start tabs cover funds with a long unbroken record. Until the first backfill runs, the 15y tab lists only funds with back-filed reports (spec `docs/superpowers/specs/2026-11-17-pre-2013-13f-design.md`).
 
 ## Views
+The fund page is a header and three tabs (spec `docs/superpowers/specs/2026-11-19-fund-tabs-design.md`). The URL hash picks the tab (`#holdings`, `#analysis`, `#about`; none = Holdings) and a tab click replaces it, so Back leaves the page rather than stepping through tabs. Only the open tab's panels are mounted; the page keeps the shared state (the year picked, the bracket, the Holdings period and the weekly price files loaded) across tabs. The source note sits at the foot of every tab.
+
 | View | Shows |
 |---|---|
-| Fund header | Name (the `<h1>` text equals the fund name, which e2e checks), "$X reported book", "N holdings now, M positions ever", "Updated <filed date> · Qn filing", a priced-% badge below 80%, an inactive note, and Overview/Positions tabs (code `FundHeader.tsx`) |
+| Fund header | Name (the `<h1>` text equals the fund name, which e2e checks), "$X reported book", "N holdings now, M positions ever", "Updated <filed date> · Qn filing", a priced-% badge below 80%, an inactive note, and the Holdings (with the holdings-now count) / Analysis / About tabs: WAI-ARIA tabs, one Tab stop, arrows, Home and End (code `FundHeader.tsx`, `Fund.tsx`) |
+| **Holdings tab** | The Holdings panel, then Positions; one period picker (in the Holdings panel) drives both (code `HoldingsTab.tsx`) |
+| Holdings (tree map) | Period picker: Quarter / Year; Year adds a Q1–Q4 "years end in" control and its pills are the quarter ends with that Q, four quarters apart, each a 12-month period (qs = qe − 3, "12 months to 30 Sep 2025"); wheel (only from rest), arrows, list, jiggle at the ends. A squarified tree map of the holdings at the period end (440px, 340px under 600px wide): area = value from the Positions table's model (so the tiles equal the table; an older quarter sums to the published book), holdings under 1% grouped as one hatched "Other stocks" tile, colour = the fund's return on the holding over the period (below) on a red (loss) ← grey → green (gain) scale clamped at ±25% (quarter) or ±50% (12 months), hollow dashed tile = no return; labels only where they fit; shared tooltip; legend and caption; 600ms tweens on a period change (none under reduced motion); one Tab stop, the arrows move by position, Home/End (code `HoldingsPanel.tsx`, `treemap.ts`, `treemapView.ts`, `PeriodPicker.tsx`) |
+| Positions | 12 columns (Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total P&L), all as of the period the Holdings picker chose; money as the site prints it ("$2.97B", "+$469M"); click a row to see its price chart and trades (code `PositionsPanel.tsx`, `PositionsTable.tsx`, `StockPanel.tsx`) |
+| **Analysis tab** | Key figures, Annual returns, Return constituents, What if they'd kept it, in that order |
 | Key figures (8 tiles) | Row 1 follows the Annual-returns bracket: annualised return (+growth of $1), years positive (+% quarters positive), max drawdown, volatility. Row 2 covers the whole period: Sharpe/Sortino/Calmar, turnover per year, average hold length, positions profitable (code `KpiStrip.tsx`) |
 | Annual returns | Bars per year, 15 years or Max, % labels, draggable annualised-return bracket, year tooltip (max drawdown, volatility, each quarter), "Show the numbers" table (code `ReturnsPanel.tsx`, `returnsLayout.ts`) |
 | Return constituents (was "What drove") | Waterfall of contribution points for a year or a period (strip, stepper), named stocks by \|contribution\| + "Other stocks", one-line headline (code `DrivePanel.tsx`, `drive.ts`) |
-| Assets under management | Static stacked bars: carried-over book, net inflows, gains; dotted boxes for losses and outflows; tooltip pinned top-left (code `AumPanel.tsx`, `aum.ts`) |
-| Positions | Quarter/Year/Custom period picker (wheel, arrows, jiggle at the ends); 12 columns (Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total P&L), all as of the period end; click a row to see its price chart and trades (code `PositionsPanel.tsx`, `PositionsTable.tsx`, `PeriodPicker.tsx`, `StockPanel.tsx`) |
 | What if they'd kept it | Tiles (sold too early, losses dodged, sold stocks that beat SPY next year, buys vs sells next 12 months) and a sold/trimmed table in the Positions style (code `WhatIfPanel.tsx`, `whatif.ts`) |
+| **About tab** | About, then Assets under management |
+| About | SEC EDGAR facts only (`summary.about`): a sentence built from the facts (a clause left out for each missing one), then Headquarters, 13F signed by, Other managers in the report (first 4, "Show all N"), Incorporated in, Former names, SEC CIK (links to EDGAR's 13F-HR list, new tab); state codes in full, SEC capitals title-cased; "No SEC details yet" when the block is null (code `AboutPanel.tsx`, `about.ts`) |
+| Assets under management | Static stacked bars: carried-over book, net inflows, gains; dotted boxes for losses and outflows; tooltip pinned top-left (code `AumPanel.tsx`, `aum.ts`) |
 
 ## Metric definitions
 All figures are 13F estimates from quarter-end snapshots of long US stock positions (spec §5). Pipeline formulas are listed in `docs/ARCHITECTURE.md` with their source functions.
@@ -84,6 +91,8 @@ All figures are 13F estimates from quarter-end snapshots of long US stock positi
 | Return (position) | total P&L ÷ dollars invested | `asOf` (code) |
 | IRR | Excel's XIRR convention: trades dated mid-quarter (quarter start + half its days), days ÷ 365; terminal value at the period end; dividends excluded. Changed 2026-11-10 from the old quarter-step clock (`q/4 + 0.125`); median gap 0.011 pp on Berkshire | `web/src/lib/live.ts` (code) |
 | Weight | position value ÷ priced book at the period end | `positions.ts` (code) |
+| Price at an older quarter end | the stock's published quarter-end close (`weekly.json` `qclose`, the price the engine values the book with), else the last weekly close on or before the quarter's last day (older files), else the position's last trade price | `positions.ts` `quarterClose`, `priceAt` (code) |
+| Fund's return on a holding (tree map colour) | (end + sales + dividends − start − buys) ÷ (start + buys) over the period: shares held at qs − 1 at that quarter-end close, trades in qs..qe at their `px`, dividends received in the period, the holding at qe at its period-end price; null when the denominator ≤ 0, a needed price is missing, or the period starts before the fund's record | `treemap.ts` `holdingReturn` (code) |
 | Weight (cell) | "was% → now%" where the fund traded in the period; bar: old weight solid grey, change striped (blue larger, orange smaller); was = weight before at the period-end prices | `positions.ts` `wPrev`, `PositionsTable.tsx` (code) |
 | Last change (box, What-if table only) | weight change in % of AUM from the stock's own trade: A/(vb−B+A) − B/vb at period-end prices | `positions.ts` (code) |
 | Contribution points | stock P&L ÷ (year start + ½ inflows) × 100 | `pipeline/contract.md` |

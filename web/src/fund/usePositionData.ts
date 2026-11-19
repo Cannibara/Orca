@@ -1,5 +1,5 @@
-// Loading for the Positions panel: the weekly price files an earlier period needs, and the table's rows
-// once they are in. The newest quarter needs no weekly file at all.
+// Loading for the Holdings tab: the weekly price files an earlier period needs, and the table's rows
+// once they are in. The newest quarter's table needs no weekly file at all.
 //
 // Every weekly file goes through one queue per panel (src/fund/prefetch.ts). A period that needs files asks
 // for them as DEMAND; once the page is idle after landing, the files of every position of the fund are
@@ -7,8 +7,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { NotFoundError, loadWeekly, type Stock } from "../data/api";
-import type { PositionRow, Weekly } from "../data/types";
-import { buildRows, neededStocks, prefetchOrder, type PosRow, type Timeline } from "./positions";
+import type { PositionRow, Summary, Weekly } from "../data/types";
+import { buildRows, defaultPeriod, neededStocks, prefetchOrder, withSortedTrades, type PeriodState, type PosRow, type Timeline } from "./positions";
 import { rowsAreFilling } from "./loading";
 import { createPriorityQueue, startPrefetch, type PriorityQueue } from "./prefetch";
 
@@ -130,6 +130,8 @@ export function useWeeklyPrices(store: WeeklyStore, ids: number[]): WeeklyPrices
 export type PositionData = {
   /** Rows of the last period that finished loading; null before the first one. */
   rows: PosRow[] | null;
+  /** The period `rows` are of (the one asked for, or the previous one while it loads); null with no rows. */
+  shown: { qs: number; qe: number } | null;
   /** The period asked for is still loading its prices: `rows` are the previous period's. */
   pending: boolean;
   failed: number;
@@ -155,9 +157,35 @@ export function usePositionData({ positions, tl, prices, stocks, qs, qe, store }
     () => (pending ? null : buildRows(positions, qs, qe, { tl, prices, weekly }, stocks)),
     [pending, positions, qs, qe, tl, prices, weekly, stocks],
   );
-  const last = useRef<PosRow[] | null>(null);
-  if (rows) last.current = rows;
-  return { rows: rows ?? last.current, pending, failed, progress };
+  const last = useRef<{ rows: PosRow[]; qs: number; qe: number } | null>(null);
+  if (rows && last.current?.rows !== rows) last.current = { rows, qs, qe };
+  const shown = last.current;
+  return { rows: shown?.rows ?? null, shown: shown ? { qs: shown.qs, qe: shown.qe } : null, pending, failed, progress };
+}
+
+/** The Holdings tab's shared state: the timeline, the fund's positions, the one period both panels show, the weekly queue. */
+export type HoldingsState = {
+  tl: Timeline;
+  /** positions.json with every trade list in quarter order. */
+  positions: PositionRow[];
+  period: PeriodState;
+  setPeriod: (p: PeriodState) => void;
+  store: WeeklyStore;
+};
+
+/**
+ * The Holdings tab's state, kept by the fund page so that it outlives a visit to another tab: the period picked
+ * and the weekly files loaded stay. A new fund re-keys the page, which starts again from its newest quarter.
+ */
+export function useHoldingsState(summary: Summary, positions: PositionRow[], prices: Map<number, number>, asof: string): HoldingsState {
+  const tl = useMemo<Timeline>(
+    () => ({ qmin: summary.tracked_since_q, latest: summary.period_q, asof }),
+    [summary.tracked_since_q, summary.period_q, asof],
+  );
+  const [period, setPeriod] = useState(() => defaultPeriod(tl));
+  const sorted = useMemo(() => withSortedTrades(positions), [positions]);
+  const store = useWeeklyStore(sorted, tl, prices);
+  return { tl, positions: sorted, period, setPeriod, store };
 }
 
 /**

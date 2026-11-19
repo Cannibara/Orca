@@ -1,45 +1,45 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { PeriodStrip } from "./PeriodStrip";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Seg } from "./Seg";
 import { qShort } from "./fmt";
 import { reducedMotion } from "./hooks";
-import { yearLabel, yearRange, type Mode, type PeriodState, type Timeline } from "./positions";
+import { periodValues, withMode, withYearQuarter, yearRange, type Mode, type PeriodState, type Timeline } from "./positions";
 import "./positions.css";
 
-// The Positions panel's header and period picker: the title and "as of" date, the Quarter / Year / Custom
-// switch, the stepper (three periods in full with the edge of the ones either side peeking in, arrows,
-// mouse-wheel hint) and the custom strip. Ported from the artifact's period picker. The mouse wheel
-// over the header or the tools steps through periods (down goes back in time), and trying to go
-// past the newest or oldest one makes the selected pill nudge and spring back.
+// The Holdings panel's header and period picker: the title and the as-of line, the Quarter / Year switch (and,
+// in Year mode, which quarter the years end in), and the stepper (three periods in full with the edge of the
+// ones either side peeking in, arrows, mouse-wheel hint). One picker drives the tree map and the Positions
+// table. The mouse wheel over the header or the tools steps through periods (down goes back in time) once the
+// page is at rest, and trying to go past the newest or oldest one makes the selected pill nudge and spring back.
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "quarter", label: "Quarter" },
   { id: "year", label: "Year" },
-  { id: "custom", label: "Custom" },
 ];
-
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** The wheel has to travel this far (px) before it steps a period, and steps no faster than every 60ms. */
 const WHEEL_STEP = 24;
 const WHEEL_GAP = 60;
+/** Within this long (ms) of a page scroll the wheel keeps scrolling the page: the picker only steps from rest. */
+const WHEEL_REST = 300;
 
 type Props = {
   state: PeriodState;
   onChange: (next: PeriodState) => void;
   tl: Timeline;
-  /** The end date of the period, already printed: "30 Oct 2026". */
+  /** The panel's heading and its id (the panel is labelled by it). */
+  title: string;
+  titleId: string;
+  /** The as-of line, already printed: "Holdings and prices as of 30 Oct 2026". */
   asOf: string;
 };
 
-export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
+export function PeriodPicker({ state, onChange, tl, title, titleId, asOf }: Props) {
   const { mode } = state;
   const ys = mode === "year";
-  const yr = yearRange(tl);
+  const vals = periodValues(state, tl);
+  const n = vals.length;
   const cur = ys ? state.py : state.pq;
-  const lo = ys ? yr.lo : tl.qmin;
-  const hi = ys ? yr.hi : tl.latest;
-  const lab = (v: number) => (ys ? yearLabel(v, tl) : qShort(v));
+  const ci = Math.max(0, vals.indexOf(cur));
 
   const phRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
@@ -69,28 +69,32 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
     );
   };
 
+  /** dx periods later (a quarter, or a year of four quarters). */
   const step = (dx: number) => {
-    if (mode === "custom") return;
-    const next = clamp(cur + dx, lo, hi);
-    if (next !== cur) pick(next);
+    const ni = Math.max(0, Math.min(n - 1, ci + dx));
+    if (ni !== ci) pick(vals[ni]);
     else jiggle(dx);
   };
 
   // The wheel listener is attached once and reads the latest step through this.
   const stepRef = useRef(step);
   stepRef.current = step;
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
 
   useEffect(() => {
     // Native, non-passive listeners: the page must not scroll under a wheel that steps periods.
     let acc = 0;
     let last = 0;
     let seen = 0;
+    // The picker sits near the top of the page: a page scroll that carries it under the cursor keeps scrolling
+    // the page (like the browser's own scroll latching); the wheel steps periods only from rest.
+    let paged = 0;
+    const onScroll = () => {
+      paged = Date.now();
+    };
     const onWheel = (e: WheelEvent) => {
-      if (modeRef.current === "custom") return;
-      e.preventDefault();
       const now = Date.now();
+      if (now - paged < WHEEL_REST) return;
+      e.preventDefault();
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1); // lines and pages (Firefox, some mice) to pixels
       if (now - seen > 250 || dy > 0 !== acc > 0) acc = 0;
       seen = now;
@@ -104,64 +108,64 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
       stepRef.current(acc > 0 ? -1 : 1);
       acc = 0;
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
     const els = [phRef.current, toolsRef.current].filter((el): el is HTMLDivElement => el !== null);
     els.forEach((el) => el.addEventListener("wheel", onWheel, { passive: false }));
-    return () => els.forEach((el) => el.removeEventListener("wheel", onWheel));
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      els.forEach((el) => el.removeEventListener("wheel", onWheel));
+    };
   }, []);
 
-  // A pick from the list takes the focus with it: the selected pill is a different element afterwards.
+  // A pick from the list keeps the focus on the list: the selected pill is a different element afterwards.
   useLayoutEffect(() => {
     if (!refocus.current) return;
     refocus.current = false;
-    winRef.current?.querySelector<HTMLElement>(".pi.on")?.focus({ preventScroll: true });
+    winRef.current?.querySelector<HTMLElement>(".pi.on .psel-o")?.focus({ preventScroll: true });
   });
 
   // Three periods in full, the selected one among them, with the edge of the periods either side peeking in.
-  const st = Math.max(lo, Math.min(hi - 2, cur - 1));
+  const st = Math.max(0, Math.min(n - 3, ci - 1));
   const slots: number[] = [];
-  for (let v = st - 1; v <= st + 3; v++) slots.push(v);
-  const options: number[] = [];
-  for (let v = hi; v >= lo; v--) options.push(v);
-
-  const strip = useMemo(() => {
-    const names: string[] = [];
-    const ticks: string[] = [];
-    for (let q = tl.qmin; q <= tl.latest; q++) {
-      names.push(qShort(q));
-      ticks.push(q % 4 === 0 ? "’" + String(2013 + Math.floor(q / 4)).slice(2) : "");
-    }
-    return { names, ticks };
-  }, [tl.qmin, tl.latest]);
+  for (let i = st - 1; i <= st + 3; i++) slots.push(i);
 
   const hint = ys ? "Scroll with the mouse wheel to change year" : "Scroll with the mouse wheel to change quarter";
+  const quarters = [0, 1, 2, 3].map((yq) => {
+    const r = yearRange(tl, yq);
+    return { id: String(yq), label: "Q" + (yq + 1), title: `Years ending in Q${yq + 1}`, disabled: r.lo > r.hi };
+  });
 
   return (
     <>
       <div className="ph" ref={phRef}>
         <div className="ph-t">
-          <h3 className="pt" id="posTitle">
-            Positions
+          <h3 className="pt" id={titleId}>
+            {title}
           </h3>
         </div>
         <div className="ph-c">
-          <span className="asof">{"Positions and prices as of " + asOf}</span>
+          <span className="asof">{asOf}</span>
         </div>
       </div>
       <div className="ptools" ref={toolsRef}>
-        <Seg label="Period" options={MODES} value={mode} onChange={(id) => onChange({ ...state, mode: id as Mode })} />
-        <div className="stepper" role="group" aria-label={ys ? "Year" : "Quarter"} title={hint} hidden={mode === "custom"}>
+        <div className="pmodes">
+          <Seg label="Period" options={MODES} value={mode} onChange={(id) => onChange(withMode(state, id as Mode, tl))} />
+          {ys && <Seg label="Years end in" options={quarters} value={String(state.yq)} onChange={(id) => onChange(withYearQuarter(state, Number(id), tl))} />}
+        </div>
+        <div className="stepper" role="group" aria-label={ys ? "Year" : "Quarter"} title={hint}>
           {/* The arrows grey out at the ends but stay clickable (aria-disabled, not disabled), so a click can still nudge. */}
-          <button type="button" aria-label={ys ? "Earlier year" : "Earlier quarter"} aria-disabled={cur <= lo} onClick={() => step(-1)}>
+          <button type="button" aria-label={ys ? "Earlier year" : "Earlier quarter"} aria-disabled={ci <= 0} onClick={() => step(-1)}>
             <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M9.75 4 5.75 8l4 4" />
             </svg>
           </button>
           <span className="pwin" ref={winRef}>
             <span className="ptrack">
-              {slots.map((v) => {
-                if (v < lo || v > hi) return <span key={"ph" + v} className="pi hole" aria-hidden="true" />;
-                const on = v === cur;
-                const edge = v === st - 1 || v === st + 3;
+              {slots.map((i) => {
+                if (i < 0 || i >= n) return <span key={"h" + i} className="pi hole" aria-hidden="true" />;
+                const v = vals[i];
+                const on = i === ci;
+                const edge = i === st - 1 || i === st + 3;
                 return (
                   <button
                     key={v}
@@ -169,15 +173,16 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
                     className={"pi" + (on ? " on" : "") + (edge ? " edge" : "")}
                     data-v={v}
                     aria-pressed={on}
-                    tabIndex={edge ? -1 : undefined}
-                    aria-label={edge ? lab(v) : undefined}
-                    onClick={() => {
-                      if (on) return;
+                    // the selected pill's list is its tab stop; the pill itself does nothing
+                    tabIndex={edge || on ? -1 : undefined}
+                    aria-label={edge ? qShort(v) : undefined}
+                    onClick={(e) => {
+                      if (on || (e.target as HTMLElement).tagName === "SELECT") return;
                       refocus.current = false;
                       pick(v);
                     }}
                   >
-                    <span>{lab(v)}</span>
+                    <span>{qShort(v)}</span>
                     {on && (
                       <>
                         <svg className="ico caret" viewBox="0 0 16 16" aria-hidden="true">
@@ -192,11 +197,14 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
                             pick(Number(e.target.value));
                           }}
                         >
-                          {options.map((o) => (
-                            <option key={o} value={o}>
-                              {lab(o)}
-                            </option>
-                          ))}
+                          {vals
+                            .slice()
+                            .reverse()
+                            .map((o) => (
+                              <option key={o} value={o}>
+                                {qShort(o)}
+                              </option>
+                            ))}
                         </select>
                       </>
                     )}
@@ -205,7 +213,7 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
               })}
             </span>
           </span>
-          <button type="button" aria-label={ys ? "Later year" : "Later quarter"} aria-disabled={cur >= hi} onClick={() => step(1)}>
+          <button type="button" aria-label={ys ? "Later year" : "Later quarter"} aria-disabled={ci >= n - 1} onClick={() => step(1)}>
             <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M6.25 4l4 4-4 4" />
             </svg>
@@ -218,17 +226,6 @@ export function PeriodPicker({ state, onChange, tl, asOf }: Props) {
           </span>
         </div>
       </div>
-      {mode === "custom" && (
-        <PeriodStrip
-          variant="quarters"
-          names={strip.names}
-          tickLabels={strip.ticks}
-          a={state.pr.a - tl.qmin}
-          b={state.pr.b - tl.qmin}
-          onChange={(a, b) => onChange({ ...state, pr: { a: a + tl.qmin, b: b + tl.qmin } })}
-          ariaLabel="Custom period for the positions table. Drag the handles or the box, or use the arrow keys on a handle."
-        />
-      )}
     </>
   );
 }

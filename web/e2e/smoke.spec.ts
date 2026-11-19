@@ -1,8 +1,8 @@
 // Smoke tests against `vite preview` of the demo-data build (see playwright.config.ts): the home
-// page, a fund page, that fund's first position page, the methodology and a not-found page, at
+// page, a fund page (each of its three tabs), that fund's first position page and a not-found page, at
 // desktop and phone width, light and dark (the two projects). Each page must show its heading, log
-// no console or page errors, and not scroll sideways. The fund page also gets its sections and one
-// click on a year bar checked in a real layout.
+// no console or page errors, and not scroll sideways. The fund page also gets its tabs, its tree map
+// and one click on a year bar checked in a real layout.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -19,6 +19,8 @@ const stockId: number = readJson(`fund/${fundId}/positions.json`).stock_id[0];
 const routes = [
   { name: "home", path: "/" },
   { name: "fund page", path: `/fund/${fundId}` },
+  { name: "fund page, Analysis tab", path: `/fund/${fundId}#analysis` },
+  { name: "fund page, About tab", path: `/fund/${fundId}#about` },
   { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
   { name: "not found", path: "/no-such-page" },
 ];
@@ -71,10 +73,29 @@ for (const width of widths) {
 
     // jsdom cannot measure, so the unit tests draw every chart at a fixed fallback width: this is the
     // one place the panels are laid out for real, at a desktop and a phone width.
-    test("fund page: every section is there, and clicking a year bar picks that year for Return constituents", async ({ page }) => {
+    test("fund page: Holdings first, with its tree map and the Positions table; the tabs open the rest", async ({ page }) => {
       const errors = await open(page, `/fund/${fundId}`);
       await expect(page.locator("h1")).toHaveText(fundName);
-      for (const name of ["Annual returns", "Assets under management", "Positions", "What if they'd kept it"]) {
+      await expect(page.getByRole("tab", { name: /^Holdings/ })).toHaveAttribute("aria-selected", "true");
+      for (const name of ["Holdings", "Positions"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      // the tree map fills its box: tiles inside it, none past its right edge
+      const tiles = page.locator("svg.tm g.tile");
+      await expect(tiles.first()).toBeVisible();
+      const box = (await page.locator(".tm-box").boundingBox())!;
+      for (const t of await tiles.all()) {
+        const b = (await t.boundingBox())!;
+        expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width + 1);
+      }
+      await expect(page.locator(".tm-cap")).toContainText("at prices of");
+
+      await page.getByRole("tab", { name: "About" }).click();
+      await expect(page).toHaveURL(/#about$/);
+      for (const name of ["About", "Assets under management"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Positions", exact: true })).toHaveCount(0);
+
+      await page.getByRole("tab", { name: "Analysis" }).click();
+      await expect(page).toHaveURL(/#analysis$/);
+      for (const name of ["Annual returns", "What if they'd kept it"]) {
         await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
       }
       await expect(page.getByRole("heading", { name: /^Return constituents / })).toBeVisible();
@@ -87,6 +108,17 @@ for (const width of widths) {
       await page.getByRole("button", { name: new RegExp(`^${label}: `) }).click();
       await expect(page.getByRole("heading", { name: `Return constituents ${label}`, exact: true })).toBeVisible();
       await expect(page.locator("#retPanel rect.hit[aria-pressed='true']")).toHaveCount(1);
+      expect(errors).toEqual([]);
+    });
+
+    test("fund page: the Year mode steps the tree map and the table together", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}`);
+      await page.getByRole("button", { name: "Year", exact: true }).click();
+      await expect(page.getByRole("group", { name: "Years end in" })).toBeVisible();
+      await page.getByRole("button", { name: "Earlier year" }).click();
+      await expect(page.locator("#holdPanel .asof")).toHaveText(/^12 months to /);
+      await expect(page.locator(".tm-cap")).toContainText("at quarter-end prices");
+      await expect(page.locator(".tm-ticks")).toContainText("+50%");
       expect(errors).toEqual([]);
     });
   });

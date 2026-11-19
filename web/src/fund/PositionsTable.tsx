@@ -1,5 +1,6 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { fMm, fP0, fPx, fW0, qShort } from "./fmt";
+import { money } from "../lib/format";
+import { fP0, fPx, fW0, qShort } from "./fmt";
 import { useWidth } from "./hooks";
 import { moreLabel, useRowBudget } from "./loading";
 import { sortRows, type PosRow, type SortKey } from "./positions";
@@ -26,6 +27,9 @@ const COLS: { key: SortKey; head: string; w: number }[] = [
 ];
 
 const count = (n: number): string => n.toLocaleString("en-US");
+
+/** Money as the site prints it ("$2.97B", "+$469M"); a missing figure is the table's "–". */
+const usd = (v: number | null, signed = false): string => (v == null ? "–" : money(v, signed));
 
 function SortIcon({ desc }: { desc: boolean }) {
   return (
@@ -94,13 +98,13 @@ function cells(r: PosRow, maxW: number): Record<SortKey, ReactNode> {
     w: <WeightCell r={r} maxW={maxW} />,
     ret: fP0(r.ret),
     irr: fP0(r.irr()),
-    val: r.open ? fMm(r.val, false) : "–",
+    val: r.open ? usd(r.val) : "–",
     ac: fPx(r.ac),
     px: fPx(r.px),
     ax: r.open ? "–" : fPx(r.ax),
-    re: fMm(r.re, true),
-    unreal: r.unreal == null ? "–" : fMm(r.unreal, true),
-    total: fMm(r.total, true),
+    re: usd(r.re, true),
+    unreal: usd(r.unreal, true),
+    total: usd(r.total, true),
   };
 }
 

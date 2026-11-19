@@ -19,7 +19,7 @@ import {
   yearsSince2013,
 } from "../data/api";
 import type { PositionRow, Summary, Trade, Weekly } from "../data/types";
-import { fMm, qShort } from "../fund/fmt";
+import { qShort } from "../fund/fmt";
 import { DASH, fmtDate, money, pct, printsZero, px, qLabel, sgn, shareCount, signClass, tidyName } from "../lib/format";
 import { irr, positionFlows, positionRows, returnPct, totalPnl, tradeMove, type Move } from "../lib/live";
 import { parseId } from "../lib/routeId";
@@ -100,8 +100,6 @@ const TRADE_COLS = [
   { head: "Shares after", w: 116 },
 ];
 
-/** Whole millions like the fund page ("$2,968m"); under a million that would read "$0m", so plain dollars. */
-const tradeValue = (usd: number): string => (usd < 1e6 ? money(usd) : fMm(usd));
 
 function TradesTable({ trades }: { trades: Trade[] }) {
   return (
@@ -145,7 +143,7 @@ function TradesTable({ trades }: { trades: Trade[] }) {
                 </td>
                 <td>{px(t.px)}</td>
                 <td>{t.low == null || t.high == null ? DASH : `${px(t.low)}–${px(t.high)}`}</td>
-                <td>{tradeValue(Math.abs(t.delta) * t.px)}</td>
+                <td>{money(Math.abs(t.delta) * t.px)}</td>
                 <td>{shareCount(t.sharesAfter)}</td>
               </tr>
             );

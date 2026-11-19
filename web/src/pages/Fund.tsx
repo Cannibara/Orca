@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { useParams } from "react-router";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
+import { useTooltip } from "../charts/Tooltip";
 import {
   isFundFileMissing,
   isListedFund,
@@ -19,11 +20,13 @@ import { positionRows, profitablePct } from "../lib/live";
 import { parseId } from "../lib/routeId";
 import { useLoad } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
+import { AboutPanel } from "../fund/AboutPanel";
 import { AumPanel } from "../fund/AumPanel";
 import { DrivePanel } from "../fund/DrivePanel";
-import { FundHeader } from "../fund/FundHeader";
+import { FundHeader, tabOfHash, type FundTab } from "../fund/FundHeader";
+import { HoldingsTab } from "../fund/HoldingsTab";
 import { KpiStrip } from "../fund/KpiStrip";
-import { PositionsPanel } from "../fund/PositionsPanel";
+import { WeeklyStoreContext, useHoldingsState } from "../fund/usePositionData";
 import { WhatIfPanel } from "../fund/WhatIfPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
@@ -71,9 +74,40 @@ async function loadFund(id: number): Promise<FundData | null> {
   };
 }
 
+/** The tab the URL's hash picks, and a way to open another (it replaces the hash: a tab is not a page to go back to). */
+function useFundTab(): [FundTab, (t: FundTab) => void] {
+  const { hash } = useLocation();
+  const navigate = useNavigate();
+  const tip = useTooltip();
+  const tab = tabOfHash(hash);
+  const open = (t: FundTab) => {
+    if (t === tab) return;
+    tip.hide();
+    navigate({ hash: "#" + t }, { replace: true });
+  };
+  // A long tab can leave the reader far down the page: bring the tab strip back under the sticky top bar.
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const strip = document.querySelector<HTMLElement>(".fp .tabs");
+    if (!strip || typeof window.scrollTo !== "function") return;
+    const top = document.querySelector<HTMLElement>("header.top");
+    const th = top ? top.getBoundingClientRect().height : 0;
+    const r = strip.getBoundingClientRect();
+    if (r.top < th) window.scrollTo({ top: window.scrollY + r.top - th - 8, behavior: "auto" });
+  }, [tab]);
+  return [tab, open];
+}
+
 function FundView({ data }: { data: FundData }) {
   const { summary, contrib, positions, stocks, prices, asof } = data;
   useTitle(fundTitle(summary.name));
+  const [tab, openTab] = useFundTab();
+  // The Holdings tab's period and weekly files live here, so a visit to another tab keeps them.
+  const holdings = useHoldingsState(summary, positions, prices, asof);
   const series = useMemo(() => buildSeries(summary), [summary]);
   // The page's shared state: the window of years, the selected year, the annualised-return bracket and the
   // What-drove period (the last two as year labels, so they survive a change of window).
@@ -97,21 +131,35 @@ function FundView({ data }: { data: FundData }) {
   };
 
   return (
-    <div className="fp">
-      <div className="fp-main">
-        <FundHeader summary={summary} positionsEver={positions.length} />
-        <KpiStrip series={series} win={win} br={br} summary={summary} profitable={data.profitable} />
-        <ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />
-        <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
-        <AumPanel series={series} win={win} />
-        <PositionsPanel fundId={summary.id} summary={summary} positions={positions} prices={prices} stocks={names} asof={asof} />
-        <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
-        <p className="fp-foot">
-          Source: SEC Form 13F-HR filings, quarterly. Every figure is an Orca estimate built from quarter-end holdings, so risk numbers
-          understate swings inside a quarter.
-        </p>
+    <WeeklyStoreContext.Provider value={holdings.store}>
+      <div className="fp">
+        <div className="fp-main">
+          <FundHeader summary={summary} positionsEver={positions.length} tab={tab} onTab={openTab} />
+          {/* Only the open tab's panels are mounted. */}
+          <div className="tp" role="tabpanel" id={"fund-panel-" + tab} aria-labelledby={"fund-tab-" + tab}>
+            {tab === "holdings" && <HoldingsTab fundId={summary.id} h={holdings} prices={prices} stocks={names} />}
+            {tab === "analysis" && (
+              <>
+                <KpiStrip series={series} win={win} br={br} summary={summary} profitable={data.profitable} />
+                <ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />
+                <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
+                <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
+              </>
+            )}
+            {tab === "about" && (
+              <>
+                <AboutPanel summary={summary} />
+                <AumPanel series={series} win={win} />
+              </>
+            )}
+          </div>
+          <p className="fp-foot">
+            Source: SEC Form 13F-HR filings, quarterly. Every figure is an Orca estimate built from quarter-end holdings, so risk numbers
+            understate swings inside a quarter.
+          </p>
+        </div>
       </div>
-    </div>
+    </WeeklyStoreContext.Provider>
   );
 }
 

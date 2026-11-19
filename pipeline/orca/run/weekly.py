@@ -21,12 +21,14 @@ from orca.publish import (
     FundMeta,
     changed_files,
     new_version,
+    publish_about,
     publish_fund,
     read_manifest,
     write_health,
     write_manifest,
 )
 from orca.quarters import q_end, q_of_date
+from orca.run.about_step import update_fund_about
 from orca.run.budget import Budget
 from orca.run.compute import Context, compute_batch
 from orca.run.gates import check_health
@@ -281,6 +283,53 @@ def _merge_fund_state(lake: Lake, replaced: set[int], clear: bool) -> None:
     drop_parts(lake, FUND_FLOWS_RUN)
 
 
+def _update_about(
+    lake: Lake,
+    sources: Sources,
+    metas: dict[int, FundMeta],
+    computed: set[int],
+    staging: Path,
+    files: dict[str, str],
+    flags: list,
+    budget: Budget,
+    today: date,
+    compress: bool,
+) -> set[int]:
+    """The About tab's SEC facts (`about_step.update_fund_about`) for the funds published (`metas`).
+
+    It runs after the funds and the shared files are staged and before the health check and the manifest,
+    so its SEC calls (two per fund, capped, stopped while `about_step.RESERVE_MIN` of the budget are left)
+    cannot cost the fund compute or this run's publish; any failure is a flag. In a deadline month thousands
+    of funds have a new 13F, too many to look up before the compute. So each summary is written with what
+    the table held when the fund was computed, and a fund computed this run whose facts changed has its
+    staged summary rewritten with them (a fresh rebuild writes the same bytes). A fund not computed this
+    run whose facts changed is returned: it is owed a recompute, which publishes them next run."""
+    if sources.fund_about is None:
+        return set()
+    started = time.monotonic()
+    changed: dict[int, dict | None] = {}
+    rewritten: set[int] = set()
+    try:
+        counts, changed = update_fund_about(
+            lake,
+            sources.fund_about,
+            [(cik, meta.book, meta.inactive) for cik, meta in metas.items()],
+            flags,
+            budget,
+            today,
+        )
+        for cik in sorted(changed.keys() & computed):
+            files.update(publish_about(staging, cik, changed[cik], compress))
+            rewritten.add(cik)
+    except Exception as err:  # the About tab must never cost the publish
+        log.exception("about: stopped after a failure")
+        flags.append({"type": "about_failed", "error": type(err).__name__})
+        return set(changed) - rewritten
+    owed = set(changed) - rewritten
+    _log_stage("about", started, {**counts, "republished": len(rewritten), "next_run": len(owed)})
+    return owed
+
+
 _WEEKLY_PATH = re.compile(r"^stock/(\d+)/weekly\.json$")
 DELETIONS_FILE = "deleted.txt"
 
@@ -419,6 +468,7 @@ def run_weekly(
             sources.search(),
         )
     )
+    about_owed = _update_about(lake, sources, metas, computed, staging, files, flags, budget, today, compress)
 
     cusip_map = read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)
     # Active funds only: a fund that stopped filing before 2013 holds mostly companies gone since
@@ -477,7 +527,7 @@ def run_weekly(
     # Recomputed funds replaced, dropped ones gone.
     _merge_fund_state(lake, funds.attempted, clear=rebuild)
     write_json_atomic(published_path(lake), merged)
-    state.pending_funds = remaining  # what the price and filing changes still owe
+    state.pending_funds = remaining | about_owed  # what the price, filing and About changes still owe
     state.pending_stocks.clear()
     state.pending_weekly.clear()
     state.pending_all = False

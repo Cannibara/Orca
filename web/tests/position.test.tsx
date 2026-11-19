@@ -159,12 +159,12 @@ describe("Position page", () => {
       "Shares after",
     ]);
     // Oldest first; a stock bought again after a full exit is "New" again. The quarter is "Q2 ’25", the move
-    // a tinted word box and the value whole millions, like the fund page's positions table.
+    // a tinted word box and the value as the site prints money, like the fund page's positions table.
     expect(tradeRows()).toEqual([
-      ["Q1 ’23", "New", "+12,916,044", "$111", "$97.59–$121", "$1,431m", "12,916,044"],
-      ["Q2 ’23", "Sold all", "−12,916,044", "$135", "$110–$153", "$1,744m", "0"],
-      ["Q4 ’24", "New", "+12,543,441", "$283", "$223–$343", "$3,554m", "12,543,441"],
-      ["Q2 ’25", "Added", "+5,200,998", "$219", "$174–$258", "$1,137m", "17,744,439"],
+      ["Q1 ’23", "New", "+12,916,044", "$111", "$97.59–$121", "$1.43B", "12,916,044"],
+      ["Q2 ’23", "Sold all", "−12,916,044", "$135", "$110–$153", "$1.74B", "0"],
+      ["Q4 ’24", "New", "+12,543,441", "$283", "$223–$343", "$3.55B", "12,543,441"],
+      ["Q2 ’25", "Added", "+5,200,998", "$219", "$174–$258", "$1.14B", "17,744,439"],
     ]);
   });
 
@@ -221,7 +221,7 @@ describe("Position page", () => {
     renderApp(positionPath(SOLO));
     await loaded("GOOGL · Alphabet");
     expect(tradeRows()).toEqual([
-      ["Q1 ’13", "New", "+100", "$10.00", "—", "$1,000", "100"], // under a million: plain dollars, not "$0m"
+      ["Q1 ’13", "New", "+100", "$10.00", "—", "$1,000", "100"], // plain dollars
       ["Q1 ’14", "Trimmed", "−40", "$12.00", "$11.00–$13.50", "$480", "60"],
     ]);
   });
