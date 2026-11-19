@@ -81,6 +81,14 @@
 .home .fam-h h3{font:600 15px/20px var(--f-sans);letter-spacing:-.01em}
 .home .fam-h p{font-size:12.5px;line-height:18px;color:var(--ink3);margin-top:2px;text-wrap:pretty}
 .home .fam .tbl-wrap{--tpad:var(--ppad);border-width:1px 0 0;border-radius:0}
+/* the person's photo before the fund name: bigger than a plain row (38px), so these rows are taller.
+   --face and --face-gap also size the name column (Home.tsx FAMOUS_FUND_W); a fund with no photo has no
+   circle and its name starts at the left edge. */
+.home .fam{--face:52px;--face-gap:12px}
+.home .fam .tbl-wrap table{--row:68px}
+.home .fund-row{display:flex;align-items:center;gap:var(--face-gap);min-width:0}
+.home .face{flex:none;width:var(--face);height:var(--face);border-radius:50%;object-fit:cover;object-position:50% 20%;background:var(--sunken);box-shadow:0 0 0 1px var(--line2),0 1px 3px rgba(0,0,0,.12)}
+@container app (max-width:559px){.home .fam{--face:44px;--face-gap:10px}.home .fam .tbl-wrap table{--row:60px}}
 /* two lists side by side (wins and losses) when the panel is wide enough, stacked otherwise */
 .home .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px var(--gap);align-items:start}
 .home .duo>div{display:flex;flex-direction:column;gap:8px;min-width:0}

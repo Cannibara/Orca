@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
+import { Face } from "../components/Face";
 import { Pager } from "../components/Pager";
 import { Panel } from "../components/Panel";
 import { Signed } from "../components/Signed";
@@ -123,6 +124,8 @@ function change(price: number | undefined, base: number): number | null {
  */
 const FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px)";
 const STOCK_W = "calc(var(--stk-w) + var(--tpad) + 8px)";
+/** Famous funds' name column: the same, plus the round photo before the name (home.css: --face, --face-gap). */
+const FAMOUS_FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px + var(--face) + var(--face-gap))";
 
 /** A fund's name, bold, cut with an ellipsis (the full name on hover). */
 function FundLink({ id, name }: { id: number; name: string }) {
@@ -498,6 +501,7 @@ function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
       ? c
       : {
           ...c,
+          width: FAMOUS_FUND_W,
           orders: { pop: (r) => -(rank.get(r.fund_id) ?? Infinity) },
           cycle: [
             { key: "name", dir: 1 },
@@ -506,18 +510,21 @@ function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
           ],
           alt: { pop: "most popular" },
           cell: (r) => (
-            <div className="stk fund">
-              <FundLink id={r.fund_id} name={r.name} />
-              {(r.manager || r.until_q != null) && (
-                <span className="sub">
-                  {[
-                    r.manager,
-                    r.until_q != null && `filed until ${qLabel(r.until_q)}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              )}
+            <div className="fund-row">
+              <Face manager={r.manager} />
+              <div className="stk fund">
+                <FundLink id={r.fund_id} name={r.name} />
+                {(r.manager || r.until_q != null) && (
+                  <span className="sub">
+                    {[
+                      r.manager,
+                      r.until_q != null && `filed until ${qLabel(r.until_q)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                )}
+              </div>
             </div>
           ),
         },

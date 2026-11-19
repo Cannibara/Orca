@@ -20,6 +20,15 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | Run 31 (`sectors_only`, `main` 591984a, 27 min after waiting behind backfill run 29) succeeded and saved the lake. Shares: 5,908 companies, none owed (13 min, 163 MB). Indices: 6,765 stocks in 323 labels (default 3,829, placed 1,293, model 798, sic 748, rule 97), 0.01% of last-quarter market value unlabelled and 0.01% on today's share count (2,791 stocks used it in some quarter); peak 2.1 GB. Scores: 2,771 of 2,773 funds scored in 160 chunks of ≤300,000 trades (14 min, peak 4.3 GB of 16 GB), 45,741 ETF positions, 268,056 positions dropped (no label or series), median coverage 78%. Nothing published; phase 6 (contract, publish, web) waits for the owner | Owner: "Ensure the run occurs" | — |
 
+## 2026-11-19 — Famous funds: photo of the person before the fund name
+
+| What changed | Why | Files |
+|---|---|---|
+| Each Famous funds row shows a round 52 px photo of the person under the fund name (phone 44 px), before the name; rows in these lists are 68 px tall (phone 60; other tables stay 38). A fund with no photo shows no circle, so its name starts at the left edge | Owner: put the founder's photo before the fund name, bigger than the row, easy to replace by hand | `web/src/components/Face.tsx`, `lib/people.ts`, `pages/Home.tsx` (`famousColumns`, `FAMOUS_FUND_W`), `pages/home.css` |
+| Photos live in `web/src/assets/people/<slug>.jpg` (slug = the name lower case with hyphens). Any jpg/png/webp dropped in with the same name replaces it; `people.json` maps the text under a fund name to a slug when it differs. Bundled by `import.meta.glob`, so no manifest to keep and a replaced file gets a new URL (no stale cache) | Owner wants to swap images manually | `web/src/assets/people/` (+ `README.md`) |
+| `pipeline/scripts/fetch_people_images.py` (by hand, like `google_trends.py`) finds each person's Wikipedia photo on Wikimedia Commons, keeps only public domain, CC0, CC BY and CC BY-SA, crops around the face (OpenCV) to 192 px and writes `credits.json`. Credits show on a new `/photo-credits` page linked from the footer, as CC BY and CC BY-SA require. People with no free photo are skipped. Wikimedia rate-limits the cloud sandbox (HTTP 429), so a run is slow and resumable; a picture with no face found is skipped (a guess cropped to clothing) | Owner: public, copyright-free images; chose CC BY/BY-SA with credits | `pipeline/scripts/fetch_people_images.py`, `web/src/pages/PhotoCredits.tsx`, `App.tsx` |
+| New workflow **People photos** (Actions > People photos > Run workflow): runs the script on a GitHub runner, whose network Wikimedia limits far less than the cloud sandbox's, and commits the photos to the branch it was run on. It refuses the default branch (a commit there deploys). 20 photos were in when it was added; the rest come from running it | Owner: a click instead of running a script; the sandbox could fetch only a handful in an hour | `.github/workflows/people-photos.yml` |
+
 ## 2026-11-18 — Run 28: monthly run fine, sector scores lost the runner; chunks by trades
 
 | What changed | Why | Files |
