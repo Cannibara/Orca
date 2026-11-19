@@ -33,13 +33,18 @@ from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
 from orca.holdings import fill_gaps
 from orca.home import ConvictionQuarter, FundSnapshot
-from orca.prices import HISTORY_START, ShareFactors, first_dates, split_factors_by_quarter
+from orca.prices import (
+    HISTORY_START,
+    ShareFactors,
+    first_dates,
+    split_factors_by_quarter,
+)
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_end
+from orca.run.ingest import LEGACY_CHECKS
 from orca.run.market import BENCHMARK_CUSIP, load_daily, rf_table, stock_of
 from orca.run.state import CUSIP_MAP_SCHEMA, chunks, read_table
-from orca.run.ingest import LEGACY_CHECKS
 from orca.sec.about import SCHEMA as ABOUT_SCHEMA
 from orca.sec.about import TABLE as ABOUT_TABLE
 from orca.sec.legacy import STORED
