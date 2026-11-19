@@ -5,6 +5,13 @@ Last verified: 2026-11-19
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-19 — People photos: 33 checked photos; the finder was loosened, then tightened
+
+| What changed | Why | Files |
+|---|---|---|
+| The People photos workflow ran on a GitHub runner (about 4 minutes; the cloud sandbox is throttled by Wikimedia). The finder now also tries a person's Wikidata image and their Commons category (files named after them), accepts a Wikidata human whose description fits, and logs why each missing person has none (`WHY` lines in the run summary). A first loosened version also searched Wikipedia and Commons by name: it produced wrong faces (a baseball player for Chris Davis, a congressman for Steve Cohen, cartoons, a manuscript). 33 photos were removed by eye; the name search over Commons is gone, the description check is tighter, and a `BLOCK` list in the script keeps the wrong ones from coming back | A wrong face is worse than none. Photos were checked on a contact sheet, but only by eye: the owner should look at the lists too | `pipeline/scripts/fetch_people_images.py`, `.github/workflows/people-photos.yml`, `web/src/assets/people/` |
+| 33 photos remain, including Warren Buffett (Berkshire's row; he was missing only because the first workflow run had not been merged yet). About 100 of the 299 "people" are firms, pensions or sovereign funds (no photo by design); of the rest, many have no free photo or no Wikipedia page | — | — |
+
 ## 2026-11-19 — Fund page tabs, holdings tree map, quarter-end closes, SEC About
 
 | What changed | Why | Files |

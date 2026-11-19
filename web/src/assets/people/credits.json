@@ -6,6 +6,13 @@
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Valeant_Pharmaceuticals%27_Business_Model_(headshot).jpg"
  },
+ "bill-foley": {
+  "name": "Bill Foley",
+  "author": "U.S. Army Photos by Eric Bartelt/USMA PAO",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Vegas_Goldens_Knights_Bring_the_Stanley_Cup_to_West_Point_(53486672358)_(cropped).jpg"
+ },
  "bill-gates": {
   "name": "Bill Gates",
   "author": "Bogdan Hoyaux / European Union",
@@ -55,6 +62,13 @@
   "licence_url": "https://creativecommons.org/licenses/by/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Chris_Hohn_GFSS_2023.jpg"
  },
+ "cliff-asness": {
+  "name": "Cliff Asness",
+  "author": "BillCramer",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Cliff-asness-by-bill-cramer.jpg"
+ },
  "daniel-och": {
   "name": "Daniel Och",
   "author": "World Economic Forum",
@@ -89,6 +103,13 @@
   "licence": "CC BY-SA 2.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
   "source": "https://commons.wikimedia.org/wiki/File:Guy_Spier,_Chief_Executive_Officer,_Aquamarine_Capital.jpg"
+ },
+ "howard-marks": {
+  "name": "Howard Marks",
+  "author": "kellywritershouse",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Howard_Marks_2.17.12_(cropped).jpg"
  },
  "israel-englander": {
   "name": "Israel Englander",
@@ -125,6 +146,13 @@
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Kenneth_C._Griffin.jpg"
  },
+ "mary-meeker": {
+  "name": "Mary Meeker",
+  "author": "Wikimedia Commons contributor",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Mary_Meeker,_Web_2.0_Conference.jpg"
+ },
  "masayoshi-son": {
   "name": "Masayoshi Son",
   "author": "European Communities, 2025 / EC - Audiovisual Service",
@@ -138,5 +166,68 @@
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Moez_Kassam_Photograph.jpg"
+ },
+ "neil-shen": {
+  "name": "Neil Shen",
+  "author": "World Economic Forum",
+  "licence": "CC BY 3.0",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Neil_Shen.png"
+ },
+ "nicolai-tangen": {
+  "name": "Nicolai Tangen",
+  "author": "Birgit Fostervold",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:NicolaiTangen.jpg"
+ },
+ "paul-singer": {
+  "name": "Paul Singer",
+  "author": "World Economic Forum",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:The_Global_Financial_Context_Paul_Singer_(cropped).jpg"
+ },
+ "paul-tudor-jones": {
+  "name": "Paul Tudor Jones",
+  "author": "Department of the Interior. National Business Center. Administrative Operations Directorate. Division of Employee and Public Services. Creative Communications Branch. Photographic Services. 2000",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Paul_Tudor_Jones_2006.jpg"
+ },
+ "phil-town": {
+  "name": "Phil Town",
+  "author": "Collins Grave",
+  "licence": "CC BY 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Phil_Town.jpg"
+ },
+ "ray-dalio": {
+  "name": "Ray Dalio",
+  "author": "Web Summit",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Web_Summit_2018_-_Forum_-_Day_2,_November_7_HM1_7481_(44858045925).jpg"
+ },
+ "tom-steyer": {
+  "name": "Tom Steyer",
+  "author": "Gage Skidmore from Surprise, AZ, United States of America",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Tom_Steyer_February_2019.jpg"
+ },
+ "warren-buffett": {
+  "name": "Warren Buffett",
+  "author": "USA International Trade Administration",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Warren_Buffett_at_the_2015_SelectUSA_Investment_Summit_(cropped).jpg"
+ },
+ "yuri-milner": {
+  "name": "Yuri Milner",
+  "author": "TechCrunch",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Yuri_Milner_in_2017_(cropped).jpg"
  }
 }
