@@ -271,6 +271,8 @@ describe("Holdings panel: motion", () => {
     await settle();
     await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/));
     const key = tiles()[0].getAttribute("aria-label")!.split(",")[0];
+    // the first draw grows in: let it finish before measuring where the tile starts
+    await act(async () => void (await new Promise((r) => setTimeout(r, 800))));
     const w0 = width(tile(key));
     fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
     await waitFor(() => expect(document.querySelector(".tm-lt")?.textContent).toContain("Q4 ’25 → Q1 ’26"));
@@ -280,11 +282,29 @@ describe("Holdings panel: motion", () => {
     return { w0, wMid, w1 };
   }
 
+  test("on landing the tiles grow in, with their figures shown from the start", async () => {
+    document.documentElement.removeAttribute("data-motion");
+    mount();
+    await settle();
+    await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/));
+    const t = tiles()[0];
+    await act(async () => void (await new Promise((r) => setTimeout(r, 60))));
+    const early = Number(t.querySelector("rect.tr")!.getAttribute("width"));
+    expect(t.querySelector("text.l-tk")!.textContent).not.toBe("");
+    expect(t.querySelector("text.l-tk")!.getAttribute("opacity")).toBe("1"); // the ticker does not wait for the move
+    await act(async () => void (await new Promise((r) => setTimeout(r, 800))));
+    const late = Number(t.querySelector("rect.tr")!.getAttribute("width"));
+    expect(early).toBeLessThan(late);
+  });
+
   test("a period change tweens a tile from where it was to where it goes", async () => {
     document.documentElement.removeAttribute("data-motion");
     const { w0, wMid, w1 } = await stepBack();
     expect(Math.abs(w1 - w0)).toBeGreaterThan(4); // the step moves this tile
-    expect(Math.abs(wMid - w0)).toBeLessThan(Math.abs(wMid - w1)); // just after: still near where it was
+    // just after: on its way, not yet where it goes (a fast-out curve, so it may be past halfway)
+    expect(wMid).not.toBe(w1);
+    expect(Math.min(w0, w1) - 0.5).toBeLessThanOrEqual(wMid);
+    expect(wMid).toBeLessThanOrEqual(Math.max(w0, w1) + 0.5);
     expect(Number.isFinite(w1)).toBe(true);
   });
 
