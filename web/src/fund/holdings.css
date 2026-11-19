@@ -25,7 +25,9 @@
 .fp .tm .tm-hb{fill:var(--band)}
 .fp .tm .tm-hl{stroke:var(--line2);stroke-width:1.2}
 /* the newest prices or an older quarter's still loading: the last tiles stay, with a quiet note over them */
-.fp .tm-load{position:absolute;left:8px;top:8px;pointer-events:none}
+.fp .tm-load{position:absolute;left:8px;top:8px;pointer-events:none;animation:tmLoadIn 160ms ease-out 400ms both}
+/* a quick load never shows the note: it fades in only after 400ms (opacity only, so reduced motion keeps it) */
+@keyframes tmLoadIn{from{opacity:0}to{opacity:1}}
 .fp .tm-load span{display:inline-block;padding:5px 10px;border-radius:var(--r-2);background:var(--inv);color:var(--invfg);font-size:12px;line-height:16px;font-weight:500;box-shadow:var(--shadow-1)}
 .fp .tm-msg{position:absolute;left:0;top:0;padding:24px 0;font-size:13px;color:var(--ink3)}
 

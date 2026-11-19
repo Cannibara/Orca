@@ -222,6 +222,20 @@ describe("Holdings panel: periods", () => {
     }
   });
 
+  test("with the published quarter-end closes an older quarter's tiles add up to the fund's book at that quarter end", async () => {
+    weeklyMock.mockImplementation(async (id: number) => readJson<Weekly>(`stock/${id}/weekly.json`));
+    const f = fund(9100002);
+    mount();
+    await settle();
+    for (const label of ["Q1 ’26", "Q4 ’25", "Q3 ’25"]) {
+      fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
+      await waitFor(() => expect(document.querySelector(".tm-lt")?.textContent).toMatch(new RegExp(`→ ${label}$`)));
+      const q = f.summary.period_q - ["Q1 ’26", "Q4 ’25", "Q3 ’25"].indexOf(label) - 1;
+      const end = f.summary.quarters.end[f.summary.quarters.q.indexOf(q)];
+      expect(document.querySelector(".tm-cap")?.textContent).toMatch(new RegExp(`^\\${money(end)} at quarter-end prices`));
+    }
+  });
+
   test("the first tracked quarter has nothing to compare with: hollow tiles that say why", async () => {
     mount();
     await settle();

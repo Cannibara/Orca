@@ -233,7 +233,7 @@ describe("the demo fund", () => {
     expect(JSON.stringify(rows.map((r) => [r.ac, r.px, r.ax, r.ret]))).not.toMatch(/NaN|Infinity/);
   });
 
-  it("estimates an older quarter's weight change to within 1.5 points of the Positions table's, which reads every weekly series", () => {
+  it("estimates an older quarter's weight change to within 1.6 points of the Positions table's, which reads every quarter-end close", () => {
     const weekly = new Map<number, Weekly | null>();
     for (const p of positions) {
       const file = join(DEMO, `stock/${p.stock_id}/weekly.json`);
@@ -250,7 +250,8 @@ describe("the demo fund", () => {
       worst = Math.max(worst, gap);
       expect(table?.tag, `${r.ticker} q${q}`).toBe(r.last?.tag);
     }
-    expect(worst).toBeLessThan(1.5);
+    // 1.5 against the last weekly closes; the published quarter-end closes (2026-11-19) move the table's figure a little
+    expect(worst).toBeLessThan(1.6);
   });
 
   it("takes the exact weight change for a stock traded in the newest quarter", () => {
