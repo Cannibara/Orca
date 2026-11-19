@@ -125,6 +125,13 @@
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Kenneth_C._Griffin.jpg"
  },
+ "louis-bacon": {
+  "name": "Louis Bacon",
+  "author": "USFWS Mountain-Prairie",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Louis_Bacon_donating_Historic_Conservation_Easement_in_Sangre_de_Cristo_Mountains,_In_June_2012.jpg"
+ },
  "masayoshi-son": {
   "name": "Masayoshi Son",
   "author": "European Communities, 2025 / EC - Audiovisual Service",
@@ -138,5 +145,54 @@
   "licence": "CC BY-SA 4.0",
   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
   "source": "https://commons.wikimedia.org/wiki/File:Moez_Kassam_Photograph.jpg"
+ },
+ "nicolai-tangen": {
+  "name": "Nicolai Tangen",
+  "author": "Birgit Fostervold",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:NicolaiTangen.jpg"
+ },
+ "paul-singer": {
+  "name": "Paul Singer",
+  "author": "World Economic Forum",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:The_Global_Financial_Context_Paul_Singer_(cropped).jpg"
+ },
+ "paul-tudor-jones": {
+  "name": "Paul Tudor Jones",
+  "author": "Department of the Interior. National Business Center. Administrative Operations Directorate. Division of Employee and Public Services. Creative Communications Branch. Photographic Services. 2000",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Paul_Tudor_Jones_2006.jpg"
+ },
+ "ray-dalio": {
+  "name": "Ray Dalio",
+  "author": "Web Summit",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Web_Summit_2018_-_Forum_-_Day_2,_November_7_HM1_7481_(44858045925).jpg"
+ },
+ "tom-steyer": {
+  "name": "Tom Steyer",
+  "author": "Gage Skidmore from Surprise, AZ, United States of America",
+  "licence": "CC BY-SA 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Tom_Steyer_February_2019.jpg"
+ },
+ "warren-buffett": {
+  "name": "Warren Buffett",
+  "author": "USA International Trade Administration",
+  "licence": "Public domain",
+  "licence_url": "",
+  "source": "https://commons.wikimedia.org/wiki/File:Warren_Buffett_at_the_2015_SelectUSA_Investment_Summit_(cropped).jpg"
+ },
+ "yuri-milner": {
+  "name": "Yuri Milner",
+  "author": "TechCrunch",
+  "licence": "CC BY 2.0",
+  "licence_url": "https://creativecommons.org/licenses/by/2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Yuri_Milner_in_2017_(cropped).jpg"
  }
 }
