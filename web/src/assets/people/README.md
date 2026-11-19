@@ -23,7 +23,10 @@ A photo with no entry gets no credit line.
 
 ## Fetch more automatically
 
-New famous funds in `pipeline/orca/famous.csv` get photos with:
+Easiest: GitHub → Actions → **People photos** → Run workflow, and pick a branch (not `main`). It adds the photos
+to that branch; merge the branch to publish. It fills in everyone who has no photo yet and keeps your replacements.
+
+Or by hand, for new famous funds in `pipeline/orca/famous.csv`:
 
 ```
 cd pipeline && uv run --with pillow --with opencv-python-headless==4.10.0.84 python scripts/fetch_people_images.py

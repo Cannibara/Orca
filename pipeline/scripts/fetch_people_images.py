@@ -183,12 +183,11 @@ def commons_info(files: list[str]) -> dict[str, dict]:
 
 
 def face_box(im: Image.Image):
-    """The biggest frontal face in the picture as (x, y, w, h), or None (OpenCV, if installed)."""
-    try:
-        import cv2
-        import numpy as np
-    except ImportError:
-        return None
+    """The biggest frontal face in the picture as (x, y, w, h), or None when there is none.
+    Raises ImportError without OpenCV."""
+    import cv2
+    import numpy as np
+
     grey = cv2.cvtColor(np.array(im), cv2.COLOR_RGB2GRAY)
     det = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     faces = det.detectMultiScale(grey, scaleFactor=1.1, minNeighbors=6, minSize=(40, 40))
@@ -196,11 +195,16 @@ def face_box(im: Image.Image):
 
 
 def square(raw: bytes) -> bytes | None:
-    """A square around the face (or toward the top of the picture when none is found), SIZE px.
-    None when the face is too small in the picture to stay sharp."""
+    """A square around the face, SIZE px (toward the top of the picture when OpenCV is not installed).
+    None when no face is found, or it is too small in the picture to stay sharp."""
     im = Image.open(io.BytesIO(raw)).convert("RGB")
     w, h = im.size
-    f = face_box(im)
+    try:
+        f = face_box(im)
+        if f is None:
+            return None  # a guess would crop to clothing or a wall: no photo beats a wrong crop
+    except ImportError:
+        f = None  # no OpenCV: crop toward the top of the picture instead
     if f is not None:
         x, y, fw, fh = (int(v) for v in f)
         side = min(int(fw * 2.4), w, h)
