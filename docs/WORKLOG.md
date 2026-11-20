@@ -5,6 +5,12 @@ Last verified: 2026-11-20
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-20 — Home: Famous funds first
+
+| What changed | Why | Files |
+|---|---|---|
+| Home tabs now run Famous funds, Top funds, Conviction moves, …; the page opens on Famous funds. The period chip is still shared by both lists | Owner: "swap the positions of top funds and famous funds" | `web/src/pages/Home.tsx` (`TABS`, default tab), `web/tests/home.test.tsx` (`openTop` helper), `docs/PRODUCT.md` |
+
 ## 2026-11-20 — Fund page: Annual returns to Holdings, AUM to Analysis, tiles 4 and 4
 
 | What changed | Why | Files |

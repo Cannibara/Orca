@@ -21,7 +21,7 @@ WhaleWisdom and GuruFocus show what big funds own. Orca shows how well they did 
 ## Features
 | Status | Feature | Where |
 |---|---|---|
-| Shipped | Home: fund search (`/` focuses it) and 6 tabs (Top funds 1y/3y/5y/10y/15y/since start + Index giants, Famous funds (one list per style, 10 a page each, the period shared with Top funds), Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
+| Shipped | Home: fund search (`/` focuses it) and 6 tabs (Famous funds, the tab it opens on (owner, 2026-11-20: one list per style, 10 a page each, the period shared with Top funds), Top funds 1y/3y/5y/10y/15y/since start + Index giants, Conviction moves, Big wins & losses, Crowded buys, Best & worst calls) | `web/src/pages/Home.tsx` (code) |
 | Shipped | Fund page panels (below), in three tabs since 2026-11-19: Holdings, Analysis, About | `web/src/pages/Fund.tsx`, `web/src/fund/*` (code); spec `docs/superpowers/specs/2026-11-19-fund-tabs-design.md` |
 | Shipped | Position page `/fund/:id/stock/:stockId` (tiles, price chart with trade markers and quarter ranges, shares-held step chart, trades table) | `web/src/pages/Position.tsx` (code) |
 | Shipped | Not found page (the How it works page was removed 2026-11-11: users need no 13F education) | `web/src/pages/NotFound.tsx` (chat)(code) |

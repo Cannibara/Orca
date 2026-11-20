@@ -103,8 +103,8 @@ function renderHome() {
 }
 
 const TAB_NAMES = [
-  "Top funds",
   "Famous funds",
+  "Top funds",
   "Conviction moves",
   "Big wins & losses",
   "Crowded buys",
@@ -120,6 +120,11 @@ const fundOrder = () =>
     .getAllByRole("row")
     .slice(1)
     .map((r) => within(r).getAllByRole("link")[1].textContent);
+/** Home opens on Famous funds: switch to Top funds and wait for its table. */
+async function openTop(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("tab", { name: "Top funds" }));
+  return screen.findByRole("table", { name: "Top funds" });
+}
 
 beforeEach(() => clearDataCache());
 afterEach(() => vi.unstubAllGlobals());
@@ -141,7 +146,7 @@ describe("Home", () => {
   it("shows six tabs in order", async () => {
     stubData();
     renderHome();
-    await screen.findByRole("table"); // Top funds has loaded
+    await screen.findAllByRole("table"); // Famous funds has loaded
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(TAB_NAMES);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -278,9 +283,7 @@ describe("Home", () => {
     await user.clear(box);
     await user.type(box, "Tern H");
     expect(await screen.findByText(/· 1 position$/)).toBeInTheDocument();
-    const cells = within(
-      await screen.findByRole("table", { name: "Top funds" }),
-    ).getAllByRole("row")[1];
+    const cells = within(await openTop(user)).getAllByRole("row")[1];
     expect(within(cells).getByText("16,000")).toBeInTheDocument();
   });
 
@@ -293,7 +296,7 @@ describe("Home", () => {
     const t10 = demo<TopList>("home/top_10y.json");
     const tMax = demo<TopList>("home/top_max.json");
     renderHome();
-    await screen.findByRole("table");
+    await openTop(user);
     expect(firstFund()).toBe(t3.eligible[0].name); // 3 years is the pressed chip
 
     for (const [chip, file, list] of [
@@ -331,8 +334,6 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
-    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     const panel = (
       await screen.findByRole("heading", { level: 2, name: "Famous funds" })
     ).closest("section")!;
@@ -405,8 +406,6 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
-    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     const table = await screen.findByRole("table", { name: "Value" });
     const names = () =>
       within(table)
@@ -439,8 +438,6 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
-    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     await user.click(screen.getByRole("button", { name: "1 year" }));
     await waitFor(() =>
       expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent(
@@ -494,8 +491,6 @@ describe("Home", () => {
     });
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
-    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     const value = await screen.findByRole("table", { name: "Value" });
     const macro = screen.getByRole("table", { name: "Macro" });
     const names = (t: HTMLElement) =>
@@ -533,10 +528,7 @@ describe("Home", () => {
         famous: undefined,
       },
     });
-    const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
-    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
     expect(
       await screen.findByText(
         "The famous funds list arrives with the next data update.",
@@ -548,7 +540,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
+    await openTop(user);
     await user.click(screen.getByRole("button", { name: "15 years" }));
     expect(await screen.findByText("No fund has 15 years of 13F history that meets the list's rules.")).toBeInTheDocument();
   });
@@ -562,7 +554,7 @@ describe("Home", () => {
     expect(
       screen.getByText("Quarterly 13F Data from SEC.gov"),
     ).toBeInTheDocument();
-    await screen.findByRole("table", { name: "Top funds" });
+    await screen.findAllByRole("table");
     expect(screen.queryByText(/Who qualifies/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Orca estimates what they paid/),
@@ -574,7 +566,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    const table = await screen.findByRole("table", { name: "Top funds" });
+    const table = await openTop(user);
     const names = () =>
       within(table)
         .getAllByRole("row")
@@ -609,7 +601,7 @@ describe("Home", () => {
     stubData({ "home/top_3y.json": { ...t3, eligible: many } });
     const user = userEvent.setup();
     renderHome();
-    const table = await screen.findByRole("table", { name: "Top funds" });
+    const table = await openTop(user);
     const rows = () => within(table).getAllByRole("row").slice(1);
     expect(rows()).toHaveLength(100);
     const pagers = screen.getAllByRole("navigation", {
@@ -658,7 +650,9 @@ describe("Home", () => {
       max_dd: null,
     };
     stubData({ "home/top_3y.json": { ...t3, giants: [giant] } });
+    const user = userEvent.setup();
     renderHome();
+    await openTop(user);
     await screen.findByRole("heading", { name: "Index giants" });
     const [main, giants] = screen.getAllByRole("table");
     expect(
@@ -682,8 +676,9 @@ describe("Home", () => {
 
   it("has no giants heading when there are no giants", async () => {
     stubData();
+    const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table");
+    await openTop(user);
     expect(
       screen.queryByRole("heading", { name: "Index giants" }),
     ).not.toBeInTheDocument();
@@ -693,7 +688,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
+    await screen.findAllByRole("table");
 
     const rules: [string, RegExp, string[]][] = [
       [
@@ -892,7 +887,7 @@ describe("Home", () => {
     renderHome();
     expect(screen.getByRole("status")).toHaveTextContent("Loading…");
     expect(screen.getByRole("group", { name: "Period" })).toBeInTheDocument();
-    await screen.findByRole("table", { name: "Top funds" });
+    await screen.findAllByRole("table");
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -900,7 +895,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("table", { name: "Top funds" });
+    await openTop(user);
     await user.click(screen.getByRole("button", { name: "15 years" }));
     const msg = await screen.findByText("No fund has 15 years of 13F history that meets the list's rules.");
     expect(msg.closest(".state")).not.toBeNull();
@@ -1189,6 +1184,6 @@ describe("Home", () => {
     expect(
       await screen.findByText(/search isn.t available/i),
     ).toBeInTheDocument();
-    await screen.findByRole("table"); // lists unaffected
+    await screen.findAllByRole("table"); // lists unaffected
   });
 });
