@@ -7,7 +7,7 @@ from pathlib import Path
 
 import polars as pl
 
-from orca.famous import Famous, SearchScores, load_famous, load_search
+from orca.famous import Famous, SearchScores, load_ranked_famous, load_search
 from orca.http import FigiClient
 from orca.prices import PriceSource
 from orca.sec.about import About
@@ -22,7 +22,7 @@ class Sources:
     `no_index_days`); `figi` is a FigiClient for `securities.map_cusips`; `sic` and
     `shares_outstanding` take a company CIK; `tbill()` is `rf.fetch_tbill`; `price_universe()`
     is `vendor.load_universe` (None: no universe, every held stock is asked for); `famous()` is
-the Famous funds list (famous.csv; the demo lists its own funds) and `search()` their Google
+the Famous funds list (famous.csv in the order of famous_rank.csv; the demo lists its own funds) and `search()` their Google
 Trends scores (famous_search.csv, a snapshot; the demo has its own). `legacy_quarter(key, skip,
 stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-2013 source);
 `fund_about(cik)` is `sec.about.fetch_about` on it (the demo serves its own fictional records)."""
@@ -37,7 +37,7 @@ stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-201
     prices: PriceSource
     tbill: Callable[[], dict[int, float]]
     price_universe: Callable[[], pl.DataFrame] | None = None
-    famous: Callable[[], tuple[Famous, ...]] = load_famous
+    famous: Callable[[], tuple[Famous, ...]] = load_ranked_famous
     search: Callable[[], SearchScores] = load_search
     legacy_quarter: (
         Callable[[str, set[str], dict], tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]] | None

@@ -120,6 +120,11 @@ const fundOrder = () =>
     .getAllByRole("row")
     .slice(1)
     .map((r) => within(r).getAllByRole("link")[1].textContent);
+/** The famous lists' most popular order: the owner's rank, then the Google Trends score, then size. */
+const byPopularity = (a: TopRow, b: TopRow) =>
+  (a.rank ?? Infinity) - (b.rank ?? Infinity) ||
+  (b.fame ?? 0) - (a.fame ?? 0) ||
+  b.book - a.book;
 /** Home opens on Famous funds: switch to Top funds and wait for its table. */
 async function openTop(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("tab", { name: "Top funds" }));
@@ -360,10 +365,8 @@ describe("Home", () => {
         "Max Drawdown",
         "Sharpe",
       ]);
-      // a list opens with its most popular fund first: Google Trends score, then size
-      const best = famous
-        .filter((f) => f.group === group)
-        .sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book);
+      // a list opens with its most popular fund first: the owner's rank, Google Trends score, then size
+      const best = famous.filter((f) => f.group === group).sort(byPopularity);
       const rows = within(table).getAllByRole("row").slice(1);
       expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
         best.map((f) => f.name),
@@ -401,7 +404,7 @@ describe("Home", () => {
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     const popular = value
       .slice()
-      .sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book)
+      .sort(byPopularity)
       .map((f) => f.name);
     stubData();
     const user = userEvent.setup();
@@ -427,14 +430,18 @@ describe("Home", () => {
     expect(fund()).toHaveTextContent("most popular");
   });
 
-  it("Most searched comes first: the most searched famous funds, once each, with their Google Trends score", async () => {
+  it("Most searched comes first: the owner's order, then the most searched famous funds, once each, with no score shown", async () => {
     const t1 = demo<TopList>("home/top_1y.json");
     const read = [
       ...new Map(
-        (t1.famous ?? []).filter((r) => r.search).map((r) => [r.fund_id, r]),
+        (t1.famous ?? [])
+          .filter((r) => r.search != null)
+          .map((r) => [r.fund_id, r]),
       ).values(),
-    ].sort((a, b) => b.search! - a.search!);
-    expect(read.length).toBeGreaterThan(2);
+    ].sort(byPopularity);
+    // the demo ranks Mara Cobble ahead of higher Google scores, and Saltglass, which has no score
+    expect(read.slice(0, 2).map((r) => r.manager)).toEqual(["Mara Cobble", "Ada Brine"]);
+    expect(read.length).toBeGreaterThan(3);
     stubData();
     const user = userEvent.setup();
     renderHome();
@@ -450,8 +457,7 @@ describe("Home", () => {
         .getAllByRole("columnheader")
         .map((h) => h.textContent),
     ).toEqual([
-      "Fund",
-      "Search interest",
+      "Fund most popular",
       "AUM",
       "Positions",
       "Return / yr",
@@ -462,13 +468,8 @@ describe("Home", () => {
     expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
       read.map((r) => r.name),
     );
-    expect(within(rows[0]).getByText("32")).toBeInTheDocument(); // Driftwood: 31.5 (Buffett = 100)
-    expect(within(rows[rows.length - 1]).getByText("<1")).toBeInTheDocument(); // Halyard: 0.4
-    expect(
-      screen.getByText(
-        /Google Trends interest in the manager or founder .* the 12 months to 30 Oct 2026/,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("The famous funds investors look up most.")).toBeInTheDocument();
+    expect(screen.queryByText(/Google Trends/)).toBeNull();
   });
 
   it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {

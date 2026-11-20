@@ -14,7 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
-from orca.famous import load_famous, load_search
+from orca.famous import load_ranked_famous, load_search
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -619,7 +619,7 @@ def run_home(
     order = sorted(metas)
     run_id = today.strftime("%Y%m%d")
     staging = new_version(out_root, run_id)
-    famous = load_famous()
+    famous = load_ranked_famous()
     files = publish_shared_files(
         ctx,
         staging,

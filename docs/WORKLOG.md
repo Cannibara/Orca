@@ -5,6 +5,14 @@ Last verified: 2026-11-20
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-20 — Famous funds: the owner's own order (famous_rank.csv)
+
+| What changed | Why | Files |
+|---|---|---|
+| New `pipeline/orca/famous_rank.csv`: one name per line, top first (a famous.csv `search` keyword, or a CIK for a fund with none). Listed funds lead Most searched and every list's most popular order; the rest follow by Google Trends score, then AUM. A name listed twice or matching nothing fails the tests. Seeded with today's Trends order (108 keywords), so nothing moves until it is edited. Home rows gain `rank` (contract) | Owner wants to rank the famous funds by hand; editing Trends scores would show made-up numbers and be overwritten by the next refresh | `orca/famous.py` (`load_rank`, `apply_rank`, `load_ranked_famous`), `orca/home.py`, `orca/run/sources.py`, `orca/run/weekly.py`, `orca/demo.py`, `contract.md` |
+| Most searched has no "Search interest" column and no Trends caption ("The famous funds investors look up most."); it uses the style lists' columns and order | Owner: users don't need the score, only the right funds | `web/src/pages/Home.tsx`, `homeFmt.ts` (`fSearch` gone), `data/types.ts` |
+| To publish an edit: merge it to main, then Actions > Pipeline > Run workflow with `home_only` | — | — |
+
 ## 2026-11-20 — Home: Famous funds first
 
 | What changed | Why | Files |

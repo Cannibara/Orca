@@ -13,7 +13,8 @@ with none it is left out until someone fills `topic` in by hand (a name with no 
 go there in double quotes, "Gavin Baker": an exact phrase, since the bare words also count searches
 holding them apart, "nick jr train" for Nick Train). Scores chain through anchors: every batch of 4
 keywords holds an anchor, so all land on one scale; keywords too small to read against the first anchor are
-measured again against a smaller one. The saved file is what the site shows: commit it."""
+measured again against a smaller one. The saved file is what the site shows: commit it. The owner's
+order in famous_rank.csv comes first and is not touched by a refresh; the scores order the rest."""
 
 import csv
 import re

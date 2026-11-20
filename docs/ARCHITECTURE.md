@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-19 (`fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-20 (`famous_rank.csv` from the code; `fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -51,7 +51,7 @@ There is no API server. The "API" is the set of static JSON files defined in `pi
 | `rf.py` | FRED DTB3 yearly average (`fetch_tbill`) |
 | `storage.py` | `Lake` (zstd Parquet, atomic writes), `Manifest` |
 | `engine/position.py`, `engine/fund.py`, `engine/metrics.py`, `engine/whatif.py` | average-cost P&L, fund quarters/years/contributions, performance metrics, exits |
-| `famous.py`, `famous.csv`, `famous_search.csv` | the hand-kept Famous funds list (CIK, match word, manager, group, search keyword) and the Google Trends snapshot of its keywords (keyword, topic id, score with Warren Buffett = 100, date) for Most searched; `Sources.famous` / `Sources.search` (the demo injects its own). No run fetches Trends: `pipeline/scripts/google_trends.py` refreshes the snapshot by hand (Google has no Trends API; uses pytrends, unmaintained) |
+| `famous.py`, `famous.csv`, `famous_search.csv`, `famous_rank.csv` | the hand-kept Famous funds list (CIK, match word, manager, group, search keyword), the owner's popularity order (one keyword or CIK per line, top first; ahead of any score; a typo fails the tests) and the Google Trends snapshot of its keywords (keyword, topic id, score with Warren Buffett = 100, date) for Most searched; `Sources.famous` / `Sources.search` (the demo injects its own). No run fetches Trends: `pipeline/scripts/google_trends.py` refreshes the snapshot by hand (Google has no Trends API; uses pytrends, unmaintained) |
 | `home.py` | home lists (`top_funds` with its `famous` rows, `conviction_moves`, `wins_losses`, `just_filed`, `crowded_buys`, `calls`) |
 | `publish.py` | JSON + brotli writers, manifest, health; `weekly_closes` (weekly and quarter-end closes), `about_json` (the summary's `about`: street and city title-cased) |
 | `workbook/` | the per-fund Excel workbook builder (see Workbook below) |
