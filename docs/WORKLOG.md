@@ -13,6 +13,19 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | The window, selected year and bracket stay page state: Analysis' span tiles, AUM and Return constituents follow what was picked on Holdings' Annual returns. The phone full-row rule for the profitable tile names `.kpi-prof` instead of `:last-child`, so Holdings' tiles sit 2×2 | Keep the panels as they were | `fund/returns.css` |
 | Open, not built: a year picker on Analysis; clicking a year on Holdings to set the tree map period | Raised in the draft | — |
 
+## 2026-11-19 — Tree map motion: grow-in on landing fixed, no colour animation, words by the midway point, a $ value on every tile
+
+| What changed | Why | Files |
+|---|---|---|
+| Landing: the grow-in never ran in a real browser. The box is first drawn at the 600 px fallback width and measured a moment later; that re-measure counted as a resize and redrew the tiles finished (jsdom never measures, so the tests passed). The first draw now waits for the measured size, and a redraw within 750 ms of landing (fonts, a scrollbar) joins the landing. Regression tests: a jsdom test with a stubbed `clientWidth` (fails without the fix) and a Playwright test that samples every frame | Owner: "make the rectangles of the tree map form upon page load" | `fund/HoldingsPanel.tsx`, `tests/fund-holdings-ui.test.tsx`, `e2e/smoke.spec.ts` |
+| Colours: tiles were drawn beige and tweened to red/green when the weekly files arrived (32 shades per tile on a step). Nothing is drawn now until every tile's prices are in (a "Loading prices…" note meanwhile); a tile has its final colour from its first frame, on landing and on every step, and tiles no longer fade in (a pale red is not the red) | Owner: "I don't want colour animations. Keep it the striking red and green" | `fund/HoldingsPanel.tsx`, `fund/treemapView.ts` |
+| Words: hidden until 100 ms, fully in at 250 ms (the box is ~89% there on the curve); a changed text goes out in 70 ms; an unchanged word stays put. Before, they were clipped by the moving box and arrived late | Owner: "find a midway point where you can see most of where the rectangle is going, then have the words completely visible" | `fund/treemapView.ts` (`LABEL_OUT/FROM/FULL`) |
+| Speed: already 600 ms on the bars' curve since #50 (900 ms in #48). A test now holds `DUR` and the curve to `--d-grow` and `--ease-out` in `tokens.css`. Measured on the demo build: tiles start moving 58-66 ms after a click (136-140 ms at 4x CPU slowdown), the Analysis bars 123 ms (317 ms) after their tab click; both run 600 ms. A deferred table render was tried and gave nothing, so it was left out | Owner: "start moving (delay) equal to the delay found in the Analysis tab" | `tests/fund-treemap.test.ts` |
+| Value on every tile: the second row is `12.3% · $80.2B`, the value alone when both do not fit (the weight alone only when the value cannot); a tile under 39 px tall puts the value at the right end of the ticker's row; Other stocks shows `$ · %` and its stock count on the third row. The value was already the table's: today's prices for the newest quarter, the quarter-end close for older ones. A tile too small for any text (some on a phone) still has only the tooltip | Owner: "ensure all of them have the $ amount" | `fund/treemap.ts` (`labelSet`), `holdings.css` |
+| Smaller: a redraw in place no longer schedules 600 ms of idle frames. New `tests/fund-treemap-view.test.ts` drives the view on a hand-turned clock | - | `fund/treemapView.ts` |
+
+- Not live until this branch is merged to `main` (the Web workflow deploys). Open: with real funds the blank wait under "Loading prices…" depends on how many weekly files a fund's tiles need; the demo funds have 9 to 24 holdings, so check Berkshire after the deploy.
+
 ## 2026-11-19 — People photos: 33 checked photos; the finder was loosened, then tightened
 
 | What changed | Why | Files |

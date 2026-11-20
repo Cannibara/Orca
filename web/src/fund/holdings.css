@@ -20,7 +20,7 @@
 .fp .tm text{pointer-events:none}
 .fp .tm .l-tk{font:600 13px var(--f-mono);letter-spacing:-.01em}
 .fp .tm .oth .l-tk{font-family:var(--f-sans);letter-spacing:-.005em}
-.fp .tm .l-w{font:500 12px var(--f-sans)}
+.fp .tm .l-w,.fp .tm .l-v{font:500 12px var(--f-sans)}
 .fp .tm .l-n{font:400 11.5px var(--f-sans)}
 .fp .tm .tm-hb{fill:var(--band)}
 .fp .tm .tm-hl{stroke:var(--line2);stroke-width:1.2}

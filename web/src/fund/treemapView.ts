@@ -1,8 +1,10 @@
 // The Holdings tree map's drawing: SVG tiles kept in step with a list of tile data, tweened with
-// requestAnimationFrame (persisting tiles move and recolour, new ones grow from their centre, leaving ones
-// shrink into theirs). A new list mid-tween continues from where every tile is. Imperative on purpose: a
-// period step re-lays out dozens of tiles and their labels at 60 fps, which React would re-render each frame.
-// The layout, colours and labels themselves come from ./treemap (pure).
+// requestAnimationFrame (persisting tiles move, new ones grow from their centre, leaving ones shrink into
+// theirs). A new list mid-tween continues from where every tile is. Imperative on purpose: a period step
+// re-lays out dozens of tiles and their labels at 60 fps, which React would re-render each frame.
+// Only the boxes move: a tile has its final colour from the moment it exists (the owner wants no colour
+// animation; a red tile fading into green passes through brown). The layout, colours and labels themselves
+// come from ./treemap (pure).
 
 import type { TipContent, TooltipApi } from "../charts/Tooltip";
 import { BASE, PADX, labelSet, neighbour, rgbCss, type Direction, type LabelTile, type Measure, type Rect, type RGB } from "./treemap";
@@ -23,9 +25,9 @@ export type TileDatum = {
   tip: () => TipContent;
 };
 
-type Geo = { x: number; y: number; w: number; h: number; op: number };
-type Key = "tk" | "w" | "n";
-const KEYS: Key[] = ["tk", "w", "n"];
+type Geo = { x: number; y: number; w: number; h: number };
+type Key = "tk" | "w" | "n" | "v";
+const KEYS: Key[] = ["tk", "w", "n", "v"];
 type Label = { el: SVGTextElement; text: string; kf: { t: number; v: number }[]; texts: { t: number; s: string }[] };
 
 type Node = {
@@ -37,18 +39,22 @@ type Node = {
   from: Geo;
   to: Geo;
   t0: number;
-  fillFrom: RGB | null;
-  fillTo: RGB | null;
-  inkFrom: RGB;
-  inkTo: RGB;
   leaving: boolean;
   d: TileDatum;
 };
 
 /** The same motion as the Analysis charts' bars (--d-grow 600 ms on --ease-out, cubic-bezier(.2,.7,.2,1)): the
- * owner wants one speed across the page. */
+ * owner wants one speed across the page, and a test holds this to tokens.css. A tile starts moving on the frame
+ * after the draw: no delay of its own. */
 export const DUR = 600;
-const LABEL_OUT = 110;
+/**
+ * The words. On that curve a box has covered 56% of its way at 100 ms and 89% at 250 ms, so a label that changes
+ * (or a tile that is new) is hidden until 100 ms, then fades in and is fully shown at 250 ms: by then you can see
+ * where the box is going. An old text goes out in 70 ms. A label that does not change stays as it is.
+ */
+export const LABEL_OUT = 70;
+export const LABEL_FROM = 100;
+export const LABEL_FULL = 250;
 
 /** A CSS cubic-bezier timing function as a function of progress. */
 export function bezier(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
@@ -85,11 +91,10 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): (x: numb
     return sy(t);
   };
 }
-const EASE = bezier(0.2, 0.7, 0.2, 1);
+export const EASE = bezier(0.2, 0.7, 0.2, 1);
 
 const SVGNS = "http://www.w3.org/2000/svg";
 const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
-const lerpRgb = (a: RGB, b: RGB, p: number): RGB => [lerp(a[0], b[0], p), lerp(a[1], b[1], p), lerp(a[2], b[2], p)];
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 function kfValue(kf: { t: number; v: number }[], t: number): number {
@@ -121,15 +126,10 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
   let raf = 0;
   let clipSeq = 0;
 
+  const progress = (n: Node, t: number) => EASE(Math.max(0, Math.min(1, (t - n.t0) / DUR)));
   const geoAt = (n: Node, t: number): Geo => {
-    const p = EASE(Math.max(0, Math.min(1, (t - n.t0) / DUR)));
-    return {
-      x: lerp(n.from.x, n.to.x, p),
-      y: lerp(n.from.y, n.to.y, p),
-      w: lerp(n.from.w, n.to.w, p),
-      h: lerp(n.from.h, n.to.h, p),
-      op: lerp(n.from.op, n.to.op, p),
-    };
+    const p = progress(n, t);
+    return { x: lerp(n.from.x, n.to.x, p), y: lerp(n.from.y, n.to.y, p), w: lerp(n.from.w, n.to.w, p), h: lerp(n.from.h, n.to.h, p) };
   };
 
   const settleTexts = (l: Label, t: number) => {
@@ -145,20 +145,20 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
   /** Draws the node as it is at time t; true while anything of it is still moving. */
   const apply = (n: Node, t: number): boolean => {
     const geo = geoAt(n, t);
-    const p = EASE(Math.max(0, Math.min(1, (t - n.t0) / DUR)));
+    const w = String(Math.max(0, geo.w));
+    const h = String(Math.max(0, geo.h));
     n.g.setAttribute("transform", `translate(${geo.x},${geo.y})`);
-    n.g.style.opacity = String(geo.op);
-    n.rect.setAttribute("width", String(Math.max(0, geo.w)));
-    n.rect.setAttribute("height", String(Math.max(0, geo.h)));
-    n.clipRect.setAttribute("width", String(Math.max(0, geo.w)));
-    n.clipRect.setAttribute("height", String(Math.max(0, geo.h)));
-    n.rect.style.fill = n.fillTo === null ? opts.hatch : rgbCss(n.fillFrom ? lerpRgb(n.fillFrom, n.fillTo, p) : n.fillTo);
-    const ink = rgbCss(lerpRgb(n.inkFrom, n.inkTo, p));
-    let busy = t < n.t0 + DUR;
+    n.rect.setAttribute("width", w);
+    n.rect.setAttribute("height", h);
+    n.clipRect.setAttribute("width", w);
+    n.clipRect.setAttribute("height", h);
+    // the value on the ticker's row hugs the tile's right edge as the edge moves
+    n.labels.v.el.setAttribute("x", String(Math.max(PADX, geo.w - PADX)));
+    const moves = n.from.x !== n.to.x || n.from.y !== n.to.y || n.from.w !== n.to.w || n.from.h !== n.to.h;
+    let busy = moves && t < n.t0 + DUR;
     for (const k of KEYS) {
       const l = n.labels[k];
       settleTexts(l, t);
-      l.el.style.fill = ink;
       l.el.setAttribute("opacity", String(kfValue(l.kf, t)));
       if (l.texts.length || (l.kf.length && t < l.kf[l.kf.length - 1].t)) busy = true;
     }
@@ -195,7 +195,7 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     rect.setAttribute("class", "tr");
     rect.setAttribute("rx", "2");
     g.append(rect);
-    // labels show their final figures at once and are clipped to the tile while it moves, so nothing waits
+    // labels are clipped to the tile while it moves, so nothing is drawn outside it
     const clipId = `tmclip-${++clipSeq}`;
     const clip = document.createElementNS(SVGNS, "clipPath");
     clip.setAttribute("id", clipId);
@@ -207,7 +207,8 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       const el = document.createElementNS(SVGNS, "text");
       el.setAttribute("class", "l-" + k);
       el.setAttribute("x", String(PADX));
-      el.setAttribute("y", String(BASE[k]));
+      el.setAttribute("y", String(k === "v" ? BASE.tk : BASE[k]));
+      if (k === "v") el.setAttribute("text-anchor", "end");
       el.setAttribute("opacity", "0");
       el.setAttribute("clip-path", `url(#${clipId})`);
       g.append(el);
@@ -219,13 +220,9 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       rect,
       clipRect,
       labels,
-      from: { x: 0, y: 0, w: 0, h: 0, op: 0 },
-      to: { x: 0, y: 0, w: 0, h: 0, op: 0 },
+      from: { x: 0, y: 0, w: 0, h: 0 },
+      to: { x: 0, y: 0, w: 0, h: 0 },
       t0: 0,
-      fillFrom: null,
-      fillTo: d.fill,
-      inkFrom: d.ink,
-      inkTo: d.ink,
       leaving: false,
       d,
     };
@@ -243,19 +240,39 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     return n;
   };
 
-  /** The labels of n for its new box nb: the final figures at once (the owner wants no delay); the tile's clip
-   * hides whatever does not fit yet while it grows. */
-  const setLabels = (n: Node, _ob: Geo, nb: Rect, _anim: boolean, t: number) => {
+  /** Sets what the tile's labels say for its new box `nb`, and when each one shows (see LABEL_FULL). */
+  const setLabels = (n: Node, nb: Rect, anim: boolean, t: number) => {
     const fin = labelSet(n.d.label, nb.w, nb.h, opts.measure);
     for (const k of KEYS) {
       const l = n.labels[k];
-      l.texts = [];
+      settleTexts(l, t);
+      const cur = kfValue(l.kf, t);
       const f = fin[k] ?? "";
-      if (f !== l.text) {
-        l.text = f;
-        l.el.textContent = f;
+      l.texts = [];
+      const put = (s: string) => {
+        if (s !== l.text) {
+          l.text = s;
+          l.el.textContent = s;
+        }
+      };
+      if (!anim) {
+        put(f);
+        l.kf = [{ t, v: f ? 1 : 0 }];
+      } else if (f === l.text) {
+        // unchanged: it stays (a fade still running carries on to full)
+        l.kf = f && cur < 1 ? [{ t, v: cur }, { t: t + LABEL_FULL, v: 1 }] : [{ t, v: f ? 1 : 0 }];
+      } else if (l.text === "") {
+        // new on this tile: hidden, then in by the midway point
+        put(f);
+        l.kf = [{ t, v: 0 }, { t: t + LABEL_FROM, v: 0 }, { t: t + LABEL_FULL, v: 1 }];
+      } else if (f === "") {
+        l.kf = [{ t, v: cur }, { t: t + LABEL_OUT, v: 0 }];
+        l.texts = [{ t: t + LABEL_OUT, s: "" }];
+      } else {
+        // a new text: the old one goes, the new one is in by the midway point
+        l.kf = [{ t, v: cur }, { t: t + LABEL_OUT, v: 0 }, { t: t + LABEL_FROM, v: 0 }, { t: t + LABEL_FULL, v: 1 }];
+        l.texts = [{ t: t + LABEL_OUT, s: f }];
       }
-      l.kf = [{ t, v: f ? 1 : 0 }];
     }
   };
 
@@ -299,10 +316,8 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
         n.g.removeAttribute("tabindex");
         n.g.setAttribute("aria-hidden", "true");
         n.from = c;
-        n.to = { x: c.x + c.w / 2, y: c.y + c.h / 2, w: 0, h: 0, op: 0 };
+        n.to = { x: c.x + c.w / 2, y: c.y + c.h / 2, w: 0, h: 0 };
         n.t0 = t;
-        n.fillFrom = n.fillTo;
-        n.inkFrom = n.inkTo;
         for (const k of KEYS) {
           const l = n.labels[k];
           settleTexts(l, t);
@@ -319,7 +334,7 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       order = tiles.map((d) => {
         let n = nodes.get(d.key);
         const r = d.rect;
-        const target: Geo = { x: r.x, y: r.y, w: r.w, h: r.h, op: 1 };
+        const target: Geo = { x: r.x, y: r.y, w: r.w, h: r.h };
         if (!n || n.leaving) {
           if (n) {
             n.g.remove();
@@ -327,24 +342,18 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
           }
           n = make(d);
           nodes.set(d.key, n);
-          n.from = anim ? { x: r.x + r.w / 2, y: r.y + r.h / 2, w: 0, h: 0, op: 0 } : target;
-          n.fillFrom = null;
-          n.inkFrom = d.ink;
-          n.d = d;
-          setLabels(n, { ...n.from }, r, anim, t);
+          n.from = anim ? { x: r.x + r.w / 2, y: r.y + r.h / 2, w: 0, h: 0 } : target;
         } else {
-          const c = anim ? geoAt(n, t) : target;
-          const p = EASE(Math.max(0, Math.min(1, (t - n.t0) / DUR)));
-          n.fillFrom = anim && n.fillTo && d.fill ? (n.fillFrom ? lerpRgb(n.fillFrom, n.fillTo, p) : n.fillTo) : null;
-          n.inkFrom = anim ? lerpRgb(n.inkFrom, n.inkTo, p) : d.ink;
-          n.from = c;
-          n.d = d;
-          setLabels(n, c, r, anim, t);
+          n.from = anim ? geoAt(n, t) : target;
         }
+        n.d = d;
         n.to = target;
         n.t0 = t;
-        n.fillTo = d.fill;
-        n.inkTo = d.ink;
+        // colours are set once, here, and never tweened
+        n.rect.style.fill = d.fill === null ? opts.hatch : rgbCss(d.fill);
+        const ink = rgbCss(d.ink);
+        for (const k of KEYS) n.labels[k].el.style.fill = ink;
+        setLabels(n, r, anim, t);
         n.g.classList.toggle("oth", d.other);
         n.g.classList.toggle("nul", d.hollow);
         n.g.classList.remove("out");
