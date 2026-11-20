@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import type { Summary } from "../src/data/types";
 import { FundHeader, tabOfHash, type FundTab } from "../src/fund/FundHeader";
@@ -181,20 +181,44 @@ describe("FundHeader", () => {
 const series = buildSeries(demo);
 const win15 = windowYears(series, "15");
 
+type StripProps = Omit<ComponentProps<typeof KpiStrip>, "group">;
+/** Both strips, as the page splits them: Holdings' four tiles, then Analysis' four. */
+function Strips(p: StripProps) {
+  return (
+    <>
+      <KpiStrip group="holdings" {...p} />
+      <KpiStrip group="analysis" {...p} />
+    </>
+  );
+}
+/** The eight tiles in their old order (span tiles, then whole period), whichever strip each is in. */
+const ORDER = [
+  "Annualised return",
+  "Years positive",
+  "Max drawdown",
+  "Volatility",
+  "Risk-adjusted return",
+  "Turnover per year",
+  "Average hold length",
+  "Positions profitable",
+];
 /** The label of a tile is its first text, before the "Whole period" tag. */
-const tiles = (container: HTMLElement) =>
+const tilesInDom = (container: HTMLElement) =>
   Array.from(container.querySelectorAll(".kpi")).map((k) => ({
     label: k.querySelector(".kpi-l")?.firstChild?.textContent,
     value: k.querySelector(".kpi-v")?.textContent,
     note: k.querySelector(".kpi-n")?.textContent,
   }));
+const tiles = (container: HTMLElement) =>
+  tilesInDom(container).sort((x, y) => ORDER.indexOf(x.label ?? "") - ORDER.indexOf(y.label ?? ""));
+const captions = (container: HTMLElement) => Array.from(container.querySelectorAll(".kpi-cap")).map((c) => c.textContent);
 /** The Sharpe, Sortino and Calmar of the risk tile, as "label value". */
 const trio = (container: HTMLElement) =>
   Array.from(container.querySelectorAll(".kpi-trio > div")).map((d) => d.querySelector("dt")?.textContent + " " + d.querySelector("dd")?.textContent);
 
 describe("KpiStrip", () => {
   test("the whole window: the figures of the artifact, then the whole period", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
     expect(tiles(container)).toEqual([
       { label: "Annualised return", value: "+0.6%", note: "Growth of $1: $1.07" },
       { label: "Years positive", value: "6 of 13", note: "55% of quarters positive" }, // part years count: 2014 and 2026 H1,
@@ -206,15 +230,27 @@ describe("KpiStrip", () => {
       { label: "Positions profitable", value: "50%", note: "of stocks ever held, at latest prices" },
     ]);
     expect(trio(container)).toEqual(["Sharpe −0.01", "Sortino −0.01", "Calmar 0.02"]);
-    expect(container.querySelector(".kpi-cap")).toHaveTextContent(
-      "The first four tiles follow the Annual returns bracket: 2014 to 2026 H1. The rest cover the whole tracked period.",
-    );
+    expect(captions(container)).toEqual([
+      "Annualised return and Max drawdown follow the Annual returns bracket: 2014 to 2026 H1. Turnover per year and Average hold length cover the whole tracked period.",
+      "Years positive and Volatility follow the Annual returns bracket: 2014 to 2026 H1. Risk-adjusted return and Positions profitable cover the whole tracked period.",
+    ]);
     expect(container.querySelector(".kpi-cap b")).toHaveTextContent("2014 to 2026 H1");
-    expect(screen.getByRole("region", { name: "Key figures" })).toBeInTheDocument();
+    expect(screen.getAllByRole("region", { name: "Key figures" })).toHaveLength(2);
+  });
+
+  test("four tiles a strip: Holdings has the return and risk of holding, Analysis the rest", () => {
+    const one = (group: "holdings" | "analysis") => {
+      const { container, unmount } = render(<KpiStrip group={group} series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
+      const labels = tilesInDom(container).map((t) => t.label);
+      unmount();
+      return labels;
+    };
+    expect(one("holdings")).toEqual(["Annualised return", "Max drawdown", "Turnover per year", "Average hold length"]);
+    expect(one("analysis")).toEqual(["Years positive", "Volatility", "Risk-adjusted return", "Positions profitable"]);
   });
 
   test("the whole window equals the figures the pipeline published", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
     const m = demo.metrics;
     const t = tiles(container);
     expect(t[0].value).toBe((m.ann_return! >= 0 ? "+" : "−") + (Math.abs(m.ann_return!) * 100).toFixed(1) + "%");
@@ -233,10 +269,10 @@ describe("KpiStrip", () => {
   });
 
   test("a bracket narrows the first four tiles to its years; the whole period does not move", () => {
-    const whole = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
+    const whole = render(<Strips series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
     const wholeTiles = tiles(whole.container);
     whole.unmount();
-    const { container } = render(<KpiStrip series={series} win={win15} br={{ a: "2016", b: "2023" }} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={{ a: "2016", b: "2023" }} summary={demo} profitable={0.5} />);
     expect(tiles(container).slice(0, 4)).toEqual([
       { label: "Annualised return", value: "+6.2%", note: "Growth of $1: $1.62" },
       { label: "Years positive", value: "5 of 8", note: "63% of quarters positive" },
@@ -249,20 +285,21 @@ describe("KpiStrip", () => {
   });
 
   test("a bracket that no longer fits the window falls back to the whole window", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={{ a: "1999", b: "2023" }} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={{ a: "1999", b: "2023" }} summary={demo} profitable={0.5} />);
     expect(container.querySelector(".kpi-cap b")).toHaveTextContent("2014 to 2026 H1");
   });
 
   test("each of the first four tiles has a picture of its span; the others have none but the bar", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={{ a: "2016", b: "2023" }} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={{ a: "2016", b: "2023" }} summary={demo} profitable={0.5} />);
     const sparks = Array.from(container.querySelectorAll(".kpi-s svg"));
     expect(sparks).toHaveLength(4);
     expect(sparks[0].querySelector("path.spk-line")).not.toBeNull();
     expect(sparks[0].querySelector("circle.spk-dot")).not.toBeNull();
+    // Holdings: growth, then the drawdown; Analysis: the year ticks, then the size bars
+    expect(sparks[1].querySelector("path.spk-area-loss")).not.toBeNull();
     // 5 gains and 3 losses among the 8 full years
-    expect(sparks[1].querySelectorAll("rect.spk-gain")).toHaveLength(5);
-    expect(sparks[1].querySelectorAll("rect.spk-loss")).toHaveLength(3);
-    expect(sparks[2].querySelector("path.spk-area-loss")).not.toBeNull();
+    expect(sparks[2].querySelectorAll("rect.spk-gain")).toHaveLength(5);
+    expect(sparks[2].querySelectorAll("rect.spk-loss")).toHaveLength(3);
     // one bar per year in the span, the biggest dark
     expect(sparks[3].querySelectorAll("rect.spk-neutral")).toHaveLength(8);
     expect(sparks[3].querySelectorAll("rect.spk-neutral.hi")).toHaveLength(1);
@@ -275,7 +312,7 @@ describe("KpiStrip", () => {
   });
 
   test("the profitable share is drawn as a two-colour bar: the share in gain colour, the rest in loss colour", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.59} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={demo} profitable={0.59} />);
     expect(tiles(container)[7].value).toBe("59%");
     const bar = container.querySelector(".kpi-bar") as HTMLElement;
     expect(bar).toHaveAttribute("aria-hidden", "true");
@@ -283,11 +320,11 @@ describe("KpiStrip", () => {
   });
 
   test("row 2 tiles carry a Whole period tag; row 1 tiles do not", () => {
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={demo} profitable={0.5} />);
     const tag = (k: Element) => k.querySelector(".kpi-l .kpi-wp")?.textContent;
     const all = Array.from(container.querySelectorAll(".kpi"));
-    expect(all.slice(0, 4).map(tag)).toEqual([undefined, undefined, undefined, undefined]);
-    expect(all.slice(4).map(tag)).toEqual(["Whole period", "Whole period", "Whole period", "Whole period"]);
+    // in each strip, two span tiles, then two of the whole period
+    expect(all.map(tag)).toEqual([undefined, undefined, "Whole period", "Whole period", undefined, undefined, "Whole period", "Whole period"]);
   });
 
   test("under four quarters there is no annualised return and no volatility, but the whole-period figures stay", () => {
@@ -300,7 +337,7 @@ describe("KpiStrip", () => {
       }
     });
     const ser = buildSeries(part);
-    const { container } = render(<KpiStrip series={ser} win={windowYears(ser, "15")} br={null} summary={part} profitable={0.5} />);
+    const { container } = render(<Strips series={ser} win={windowYears(ser, "15")} br={null} summary={part} profitable={0.5} />);
     const t = tiles(container);
     expect(t[0].value).toBe("–");
     expect(t[3].value).toBe("–");
@@ -311,9 +348,9 @@ describe("KpiStrip", () => {
   });
 
   test("no year with a return: the first four tiles are dashes, the whole period still reads", () => {
-    const { container } = render(<KpiStrip series={series} win={{ years: [], offset: 0, total: 0 }} br={null} summary={demo} profitable={0.5} />);
+    const { container } = render(<Strips series={series} win={{ years: [], offset: 0, total: 0 }} br={null} summary={demo} profitable={0.5} />);
     expect(tiles(container).map((t) => t.value)).toEqual(["–", "–", "–", "–", undefined, "40%", "8.0 yrs", "50%"]);
-    expect(container.querySelector(".kpi-cap")).toHaveTextContent(/^No year with a return yet\.$/);
+    expect(captions(container)).toEqual(["No year with a return yet.", "No year with a return yet."]);
     expect(trio(container)).toEqual(["Sharpe −0.01", "Sortino −0.01", "Calmar 0.02"]);
   });
 
@@ -321,7 +358,7 @@ describe("KpiStrip", () => {
     const empty = copy((s) => {
       for (const k of Object.keys(s.metrics)) (s.metrics as Record<string, unknown>)[k] = null;
     });
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={empty} profitable={null} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={empty} profitable={null} />);
     expect(trio(container)).toEqual(["Sharpe –", "Sortino –", "Calmar –"]);
     expect(tiles(container).slice(5)).toEqual([
       { label: "Turnover per year", value: "–", note: "of fund size · lesser of buys or sells" },
@@ -339,7 +376,7 @@ describe("KpiStrip", () => {
       s.metrics.hold_all = NaN;
       s.metrics.hold_sold = 5;
     });
-    const { container } = render(<KpiStrip series={series} win={win15} br={null} summary={odd} profitable={NaN} />);
+    const { container } = render(<Strips series={series} win={win15} br={null} summary={odd} profitable={NaN} />);
     expect(trio(container)[0]).toBe("Sharpe –");
     const t = tiles(container);
     expect(t[5].value).toBe("–");
@@ -368,7 +405,7 @@ function Host({ summary = demo, initialBr = null, onSelect, onBr, onRange }: Hos
   const win = windowYears(ser, range);
   return (
     <TooltipProvider>
-      <KpiStrip series={ser} win={win} br={br} summary={summary} profitable={0.5} />
+      <KpiStrip group="holdings" series={ser} win={win} br={br} summary={summary} profitable={0.5} />
       <ReturnsPanel
         series={ser}
         win={win}

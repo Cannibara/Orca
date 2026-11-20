@@ -5,6 +5,14 @@ Last verified: 2026-11-20
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-20 — Fund page: Annual returns to Holdings, AUM to Analysis, tiles 4 and 4
+
+| What changed | Why | Files |
+|---|---|---|
+| Holdings: four tiles (Annualised return, Max drawdown, Turnover per year, Average hold length), Holdings tree map, Annual returns, Positions. Analysis: four tiles (Years positive, Volatility, Risk-adjusted return, Positions profitable), Assets under management, Return constituents, What if they'd kept it. About: About only. Panels unchanged; only their place moved | Owner approved draft (claude.ai artifact HqU6sXjkXUy91FNa9GoN64, v4) | `web/src/pages/Fund.tsx`, `fund/KpiStrip.tsx` (`group` prop), `fund/HoldingsTab.tsx`, `fund/returns.css` |
+| The window, selected year and bracket stay page state: Analysis' span tiles, AUM and Return constituents follow what was picked on Holdings' Annual returns. The phone full-row rule for the profitable tile names `.kpi-prof` instead of `:last-child`, so Holdings' tiles sit 2×2 | Keep the panels as they were | `fund/returns.css` |
+| Open, not built: a year picker on Analysis; clicking a year on Holdings to set the tree map period | Raised in the draft | — |
+
 ## 2026-11-20 — Tree map: the fund's return for the period beside the weight and the value
 
 | What changed | Why | Files |
