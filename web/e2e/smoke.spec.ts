@@ -111,6 +111,36 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
+    // jsdom has no layout, so only here can the landing be watched as a real page runs it (the first draw used to
+    // be cut short by the width being measured a moment later, and the tiles began in a neutral colour).
+    test("fund page: the tree map forms on landing, every tile in its final colour from its first frame", async ({ page }) => {
+      type Seen = { fills: string[]; widths: number[] };
+      await page.addInitScript(() => {
+        const seen: Seen[] = [];
+        (window as unknown as { __tm: Seen[] }).__tm = seen;
+        const loop = () => {
+          document.querySelectorAll<SVGGElement>("svg.tm g.tile:not(.out)").forEach((g, i) => {
+            const r = g.querySelector<SVGRectElement>("rect.tr")!;
+            const s = (seen[i] ??= { fills: [], widths: [] });
+            if (r.style.fill && !s.fills.includes(r.style.fill)) s.fills.push(r.style.fill);
+            s.widths.push(Number(r.getAttribute("width") ?? 0));
+          });
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+      });
+      const errors = await open(page, `/fund/${fundId}`);
+      await expect(page.locator("svg.tm g.tile").first()).toBeVisible();
+      await page.waitForTimeout(1500); // the grow-in takes 600 ms
+      const seen = await page.evaluate(() => (window as unknown as { __tm: Seen[] }).__tm);
+      expect(seen.length).toBeGreaterThan(3);
+      for (const t of seen) {
+        expect(t.fills).toHaveLength(1); // one colour, never tweened
+        expect(t.widths[0]).toBeLessThan(t.widths[t.widths.length - 1] * 0.5); // it grew in, it was not drawn finished
+      }
+      expect(errors).toEqual([]);
+    });
+
     test("fund page: the Year mode steps the tree map and the table together", async ({ page }) => {
       const errors = await open(page, `/fund/${fundId}`);
       await page.getByRole("button", { name: "Year", exact: true }).click();

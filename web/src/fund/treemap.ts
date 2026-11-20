@@ -305,12 +305,19 @@ export function inkFor(fill: RGB, ink: RGB, surface: RGB): { ink: RGB; soft: boo
 export type LabelFont = "tk" | "oth" | "w" | "n";
 /** Width in px of a text in a label font. */
 export type Measure = (font: LabelFont, text: string) => number;
-export type LabelSet = { tk: string | null; w: string | null; n: string | null };
+/**
+ * tk: the ticker. w: the second row, always the dollar value, with the weight before it when both fit. n: the
+ * third row (the name; the stock count on Other stocks). v: the value at the right end of the ticker's row, only
+ * on a tile too short for a second row.
+ */
+export type LabelSet = { tk: string | null; w: string | null; n: string | null; v: string | null };
 export type LabelTile = { other: boolean; ticker: string; name: string; weight: number; value: number; count: number };
 
 /** The labels' inner padding and baselines, px from the tile's top left. */
 export const PADX = 7;
 export const BASE = { tk: 18, w: 33, n: 48 } as const;
+/** The least room between the ticker and a value on the same row. */
+const ROW_GAP = 8;
 
 /** A share of the book: 0.123 → "12.3%". */
 export const share = (x: number): string => pct(x, 1, false);
@@ -329,11 +336,13 @@ export function ellipsize(font: LabelFont, s: string, aw: number, measure: Measu
 }
 
 /**
- * What fits in a w × h tile, top down: the ticker; then the weight; on tiles of at least 96 × 54 also the
- * value after the weight and the name (ellipsised). A label that does not fit is left out, never clipped.
+ * What fits in a w × h tile, top down: the ticker; then a second row holding the dollar value (the owner wants
+ * every tile to show it), with the weight before it when both fit; on tiles of at least 96 × 54 also the name
+ * (ellipsised; the stock count on Other stocks). A tile too short for a second row (under 39 px) puts the value
+ * at the right end of the ticker's row when both fit. A label that does not fit is left out, never clipped.
  */
 export function labelSet(t: LabelTile, w: number, h: number, measure: Measure): LabelSet {
-  const o: LabelSet = { tk: null, w: null, n: null };
+  const o: LabelSet = { tk: null, w: null, n: null, v: null };
   const aw = w - 2 * PADX;
   if (h < 24 || aw < 8) return o;
   const font: LabelFont = t.other ? "oth" : "tk";
@@ -341,19 +350,16 @@ export function labelSet(t: LabelTile, w: number, h: number, measure: Measure): 
   if (t.other && measure(font, first) > aw) first = "Other";
   if (measure(font, first) > aw) return o;
   o.tk = first;
-  if (h < 39) return o;
-  const wt = share(t.weight);
-  if (t.other) {
-    const full = `${t.count} stocks · ${wt}`;
-    o.w = measure("w", full) <= aw ? full : measure("w", wt) <= aw ? wt : null;
+  const val = money(t.value);
+  if (h < 39) {
+    if (measure(font, first) + ROW_GAP + measure("w", val) <= aw) o.v = val;
     return o;
   }
-  if (measure("w", wt) > aw) return o;
-  o.w = wt;
+  const wv = share(t.weight) + " · " + val;
+  o.w = measure("w", wv) <= aw ? wv : measure("w", val) <= aw ? val : measure("w", share(t.weight)) <= aw ? share(t.weight) : null;
   if (h >= 54 && w >= 96) {
-    const wv = wt + " · " + money(t.value);
-    if (measure("w", wv) <= aw) o.w = wv;
-    o.n = t.name ? ellipsize("n", t.name, aw, measure) : null;
+    const name = t.other ? `${t.count} stocks` : t.name;
+    o.n = name ? ellipsize("n", name, aw, measure) : null;
   }
   return o;
 }

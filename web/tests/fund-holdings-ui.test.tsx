@@ -98,7 +98,7 @@ describe("Holdings panel at the newest quarter", () => {
     expect(keys).toHaveTextContent("Other stocks");
   });
 
-  test("the colours ask only for the weekly files of the tiles; until they are in, a tile says it is loading", async () => {
+  test("the colours ask only for the weekly files of the tiles; until they are in nothing is drawn, then the tiles come in their colours", async () => {
     const waiting: (() => void)[] = [];
     weeklyMock.mockImplementation(() => new Promise<Weekly>((ok) => waiting.push(() => ok(flat(50)))));
     mount();
@@ -106,7 +106,8 @@ describe("Holdings panel at the newest quarter", () => {
     const held = f.summary.holdings_now.stock_id;
     expect(weeklyMock).toHaveBeenCalledTimes(8); // demand runs eight at a time
     for (const c of weeklyMock.mock.calls) expect(c).toHaveLength(1); // demand, not the background plan
-    expect(tiles()[0].getAttribute("aria-label")).toMatch(/fund's return loading$/);
+    expect(tiles()).toHaveLength(0); // no tile in a neutral colour that changes later
+    expect(document.querySelector(".tm-msg")?.textContent).toBe("Loading prices…");
     expect(screen.getByRole("group", { name: /^Holdings at Q2 ’26/ })).toHaveAttribute("aria-busy", "true");
     for (let i = 0; i < 5; i++)
       await act(async () => {
@@ -114,7 +115,9 @@ describe("Holdings panel at the newest quarter", () => {
         await new Promise((r) => setTimeout(r, 0));
       });
     expect(weeklyMock.mock.calls.map((c) => c[0]).sort((a, b) => a - b)).toEqual([...held].sort((a, b) => a - b));
-    await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/));
+    await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
+    expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/);
+    expect(document.querySelector(".tm-msg")).toBeNull();
     expect(screen.getByRole("group", { name: /^Holdings at Q2 ’26/ })).toHaveAttribute("aria-busy", "false");
   });
 
@@ -135,7 +138,7 @@ describe("Holdings panel at the newest quarter", () => {
     expect(tiles().filter((t) => t.classList.contains("nul"))).toHaveLength(0);
   });
 
-  test("labels: the ticker, the weight, and on a big tile the value and the name", async () => {
+  test("labels: the ticker, the weight and value, and on a big tile the name", async () => {
     mount();
     await settle();
     const big = tiles()[0];
@@ -144,6 +147,18 @@ describe("Holdings panel at the newest quarter", () => {
     expect(texts[1]).toMatch(/^\d+\.\d% · \$[\d.]+[KMB]$/);
     expect(texts[2]).not.toBe("");
     expect(document.body.textContent).not.toMatch(/NaN|undefined|Infinity/);
+  });
+
+  test("every tile that has a label shows its dollar value: the table's Value for that stock", async () => {
+    mount();
+    await settle();
+    for (const t of tiles()) {
+      const ticker = t.querySelector("text.l-tk")!.textContent!;
+      if (ticker === "") continue;
+      const shown = [".l-w", ".l-v"].map((c) => t.querySelector(c)!.textContent!).join(" ");
+      if (t.classList.contains("oth")) expect(shown, ticker).toMatch(/\$/);
+      else expect(shown, ticker).toContain(tableValue(ticker));
+    }
   });
 
   test("hover or focus shows the shared tooltip with the tile's figures", async () => {
@@ -277,29 +292,67 @@ describe("Holdings panel: motion", () => {
     fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
     await waitFor(() => expect(document.querySelector(".tm-lt")?.textContent).toContain("Q4 ’25 → Q1 ’26"));
     const wMid = width(tile(key));
+    const fillMid = tile(key).querySelector<SVGRectElement>("rect.tr")!.style.fill;
+    const tkMid = tile(key).querySelector("text.l-tk")!.getAttribute("opacity"); // the ticker did not change: it stays
+    await act(async () => void (await new Promise((r) => setTimeout(r, 300))));
+    const wlab300 = tile(key).querySelector("text.l-w")!.getAttribute("opacity"); // in full by the midway point
     await act(async () => void (await new Promise((r) => setTimeout(r, 800))));
     const w1 = width(tile(key));
-    return { w0, wMid, w1 };
+    const fill1 = tile(key).querySelector<SVGRectElement>("rect.tr")!.style.fill;
+    return { w0, wMid, w1, fillMid, fill1, tkMid, wlab300 };
   }
 
-  test("on landing the tiles grow in, with their figures shown from the start", async () => {
+  test("on landing the tiles grow in, already in their final colours, with their words in by the midway point", async () => {
     document.documentElement.removeAttribute("data-motion");
     mount();
     await settle();
-    await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/));
+    await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
     const t = tiles()[0];
-    await act(async () => void (await new Promise((r) => setTimeout(r, 60))));
+    const fill = () => t.querySelector<SVGRectElement>("rect.tr")!.style.fill;
+    const first = fill();
+    expect(first).toMatch(/^rgb\(/); // the colour it keeps, from the first frame
+    await act(async () => void (await new Promise((r) => setTimeout(r, 40))));
     const early = Number(t.querySelector("rect.tr")!.getAttribute("width"));
-    expect(t.querySelector("text.l-tk")!.textContent).not.toBe("");
-    expect(t.querySelector("text.l-tk")!.getAttribute("opacity")).toBe("1"); // the ticker does not wait for the move
-    await act(async () => void (await new Promise((r) => setTimeout(r, 800))));
+    expect(t.querySelector("text.l-tk")!.textContent).not.toBe(""); // the words are set...
+    expect(Number(t.querySelector("text.l-tk")!.getAttribute("opacity"))).toBeLessThan(0.1); // ...but not shown while the box is on its way
+    await act(async () => void (await new Promise((r) => setTimeout(r, 300))));
+    expect(t.querySelector("text.l-tk")!.getAttribute("opacity")).toBe("1"); // in full by 250 ms
+    expect(Number(t.querySelector("rect.tr")!.getAttribute("width"))).toBeGreaterThan(early);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 500))));
     const late = Number(t.querySelector("rect.tr")!.getAttribute("width"));
     expect(early).toBeLessThan(late);
+    expect(fill()).toBe(first); // no colour animation
   });
 
-  test("a period change tweens a tile from where it was to where it goes", async () => {
+  test("the grow-in survives the box being measured wider than the fallback (a real page's first re-measure)", async () => {
     document.documentElement.removeAttribute("data-motion");
-    const { w0, wMid, w1 } = await stepBack();
+    // jsdom cannot lay out: every element reports 900 px, as a desktop page would. The first render still uses 600.
+    const real = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 900 });
+    try {
+      mount();
+      await settle();
+      await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
+      const t = tiles()[0];
+      await act(async () => void (await new Promise((r) => setTimeout(r, 40))));
+      const early = Number(t.querySelector("rect.tr")!.getAttribute("width"));
+      await act(async () => void (await new Promise((r) => setTimeout(r, 800))));
+      const late = Number(t.querySelector("rect.tr")!.getAttribute("width"));
+      expect(early).toBeLessThan(late * 0.9); // still growing, not snapped to its final size
+      const right = Math.max(...tiles().map((g) => Number(/translate\(([-\d.]+)/.exec(g.getAttribute("transform") ?? "")?.[1]) + width(g)));
+      expect(right).toBeGreaterThan(890); // laid out for the measured 900, not the fallback 600
+    } finally {
+      if (real) Object.defineProperty(HTMLElement.prototype, "clientWidth", real);
+      else delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
+  test("a period change moves a tile from where it was to where it goes, and its colour changes at once", async () => {
+    document.documentElement.removeAttribute("data-motion");
+    const { w0, wMid, w1, fillMid, fill1, tkMid, wlab300 } = await stepBack();
+    expect(fillMid).toBe(fill1); // no colour tween
+    expect(tkMid).toBe("1");
+    expect(wlab300).toBe("1");
     expect(Math.abs(w1 - w0)).toBeGreaterThan(4); // the step moves this tile
     // just after: on its way, not yet where it goes (a fast-out curve, so it may be past halfway)
     expect(wMid).not.toBe(w1);
