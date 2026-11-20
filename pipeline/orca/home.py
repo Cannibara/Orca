@@ -128,7 +128,10 @@ def top_funds(
     None, and `search`: the Google Trends score of the row's keyword (`search`, keyword ->
     score, Warren Buffett = 100), set on one fund per keyword (`_searched`), None on every other
     row, and `fame`: the same score on every row of the keyword (Sequoia's seven filers all have
-    it), for the web to order every list by popularity; None without a score."""
+    it), for the web to order every list by popularity; None without a score, and `rank`: the
+    owner's place for the fund in famous_rank.csv (1 = first, ahead of any score), None when not
+    listed. A ranked fund with no score still gets a `search` (0.0), so it has a place in Most
+    searched."""
     if period not in PERIODS:
         raise ValueError(f"unknown period {period!r}")
     ranked = []
@@ -157,8 +160,9 @@ def top_funds(
             "manager": f.manager or None,
             "group": f.group,
             "until_q": int(s.period_q) if s.excluded else None,
-            "search": searched.get(s.fund_id) if f.search else None,
+            "search": searched.get(s.fund_id) if f.search or f.rank else None,
             "fame": float(scores[f.search]) if scores.get(f.search, 0) > 0 else None,
+            "rank": f.rank,
         }
         for s, p, f in picked
     ]
@@ -170,20 +174,25 @@ def _searched(
 ) -> dict[int, float]:
     """Fund id -> Google Trends score of its keyword, for one fund per keyword: a manager with
     several filers (Sequoia's funds, Fundsmith's two) is counted once, on the filer still filing
-    with the biggest book. A keyword without a score is left out."""
+    with the biggest book. A keyword without a score is left out, unless the owner ranked it
+    (famous_rank.csv): then it counts with 0.0, as does a ranked fund with no keyword."""
     best: dict[str, FundSnapshot] = {}
+    ranked: set[str] = set()
     for f in famous:
         s = by_id.get(f.fund_id)
-        if not f.search or s is None:
+        key = f.search or (f"#{f.fund_id}" if f.rank else "")
+        if not key or s is None:
             continue
-        held = best.get(f.search)
-        rank = (not s.excluded, s.book, -s.fund_id)
-        if held is None or rank > (not held.excluded, held.book, -held.fund_id):
-            best[f.search] = s
+        if f.rank:
+            ranked.add(key)
+        held = best.get(key)
+        order = (not s.excluded, s.book, -s.fund_id)
+        if held is None or order > (not held.excluded, held.book, -held.fund_id):
+            best[key] = s
     out: dict[int, float] = {}
     for key, s in best.items():
-        if scores.get(key, 0) > 0:
-            out[s.fund_id] = max(out.get(s.fund_id, 0.0), float(scores[key]))
+        if scores.get(key, 0) > 0 or key in ranked:
+            out[s.fund_id] = max(out.get(s.fund_id, 0.0), float(scores.get(key, 0.0)))
     return out
 
 

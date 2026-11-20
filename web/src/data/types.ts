@@ -252,10 +252,12 @@ export type TopRow = {
   group?: string;
   /** Famous funds rows only: the last quarter of a fund that stopped filing (its figures run to it); null when it still files. */
   until_q?: number | null;
-  /** Famous funds rows only: Google Trends search interest in the fund's manager (or institution), Warren Buffett = 100 (Most searched); null when not ranked. */
+  /** Famous funds rows only: Google Trends search interest in the fund's manager (or institution), Warren Buffett = 100; set (0 for an owner-ranked fund with no score) on the one filer per manager that has a place in Most searched, null on the rest. Not shown. */
   search?: number | null;
   /** Famous funds rows only: the same score on every row of the keyword, to order each list by popularity; null without one (files before 2026-11-18 have none). */
   fame?: number | null;
+  /** Famous funds rows only: the owner's place for the fund (famous_rank.csv), 1 = first, ahead of any score; null when not listed (files before 2026-11-20 have none). */
+  rank?: number | null;
 };
 
 /** top_{1y|3y|5y|10y|15y|max}.json */

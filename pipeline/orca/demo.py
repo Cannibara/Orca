@@ -31,7 +31,7 @@ from xml.sax.saxutils import escape as xml_escape
 import httpx
 import polars as pl
 
-from orca.famous import Famous, SearchScores
+from orca.famous import Famous, SearchScores, apply_rank
 from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
@@ -149,6 +149,9 @@ DEMO_SEARCH = SearchScores(
     "2026-10-30",
     {"Iris Kelp": 12.0, "Theo Drift": 31.5, "Halyard Point Partners": 0.4, "Mara Cobble": 2.6},
 )
+# The owner's order (famous_rank.csv): Mara Cobble ahead of higher Google scores, and Saltglass,
+# which has no keyword, ranked by its CIK.
+DEMO_RANK = ("Mara Cobble", str(FUND_CIK0 + 4))
 LAST_Q = q_index(2026, 2)  # the deadline quarter as of DEMO_TODAY
 CROWDED = (
     "Kelpwood Capital LP",
@@ -442,7 +445,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
         shares_outstanding=lambda cik: fx.shares_out.get(cik),
         prices=FixtureSource(fx.prices),
         tbill=lambda: dict(fx.tbill),
-        famous=lambda: DEMO_FAMOUS,
+        famous=lambda: apply_rank(DEMO_FAMOUS, DEMO_RANK),
         search=lambda: DEMO_SEARCH,
         fund_about=partial(fetch_about, sec_stub(fx.about)),
     )

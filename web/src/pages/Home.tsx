@@ -37,7 +37,6 @@ import type {
 import {
   count,
   DASH,
-  fmtDate,
   HOME_TITLE,
   pct,
   printsZero,
@@ -49,7 +48,7 @@ import { qShort } from "../fund/fmt";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
-import { fAum, fBook, fPrice, fSearch, fWeight } from "./homeFmt";
+import { fAum, fBook, fPrice, fWeight } from "./homeFmt";
 import "./home.css";
 
 // ---- loading ----------------------------------------------------------------
@@ -475,8 +474,9 @@ const BEST_RETURN: SortState = { key: "ret", dir: -1 };
 const MOST_POPULAR: SortState = { key: "pop", dir: -1 };
 
 /**
- * Every famous fund's place in the popularity order, 1 = most popular: funds with a Google Trends score
- * by score (a manager's several filers share it), then the rest by size. A fund in two lists has one place.
+ * Every famous fund's place in the popularity order, 1 = most popular: the owner's order first
+ * (famous_rank.csv), then funds with a Google Trends score by score (a manager's several filers share
+ * both), then the rest by size. A fund in two lists has one place.
  */
 function popularity(rows: TopRow[]): Map<number, number> {
   const best = new Map<number, TopRow>();
@@ -486,7 +486,10 @@ function popularity(rows: TopRow[]): Map<number, number> {
   }
   const order = [...best.values()].sort(
     (a, b) =>
-      (b.fame ?? 0) - (a.fame ?? 0) || b.book - a.book || a.fund_id - b.fund_id,
+      (a.rank ?? Infinity) - (b.rank ?? Infinity) ||
+      (b.fame ?? 0) - (a.fame ?? 0) ||
+      b.book - a.book ||
+      a.fund_id - b.fund_id,
   );
   return new Map(order.map((r, i) => [r.fund_id, i + 1]));
 }
@@ -531,38 +534,20 @@ function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
   );
 }
 
-/** Most searched: Famous funds' columns with the search score after the name, most searched first. */
-function searchedColumns(
-  asof: string | null | undefined,
-  rank: Map<number, number>,
-): Col<TopRow>[] {
-  const famous = famousColumns(rank);
-  const tip = `Google Trends, worldwide, the 12 months to ${asof ? fmtDate(asof) : "the last snapshot"}; Warren Buffett = 100`;
-  return [
-    famous[0],
-    {
-      header: "Search interest",
-      key: "search",
-      by: (r) => r.search ?? null,
-      cell: (r) => <span title={tip}>{fSearch(r.search)}</span>,
-    },
-    ...famous.slice(1),
-  ];
-}
-const MOST_SEARCHED_ORDER: SortState = { key: "search", dir: -1 };
 /** Funds in Most searched: the head of the ranking, as a list of what people look up should be. */
 const MOST_SEARCHED_MAX = 50;
-function mostSearchedAbout(asof: string | null | undefined): string {
-  const when = asof ? ` over the 12 months to ${fmtDate(asof)}` : "";
-  return `The famous funds people search Google for most: Google Trends interest in the manager or founder (or the firm, for venture firms), worldwide${when}. Warren Buffett = 100.`;
-}
+const MOST_SEARCHED_ABOUT = "The famous funds investors look up most.";
 
-/** The most searched famous funds, once each (a fund in two lists has its score on both rows). */
-function mostSearched(rows: TopRow[]): TopRow[] {
+/**
+ * Most searched: the funds with a place in it (`search` set: one filer per manager), once each, in
+ * the popularity order (`rank` from `popularity`: the owner's order, then Google Trends).
+ */
+function mostSearched(rows: TopRow[], rank: Map<number, number>): TopRow[] {
   const seen = new Set<number>();
+  const place = (r: TopRow) => rank.get(r.fund_id) ?? Infinity;
   return rows
-    .filter((r) => r.search != null && r.search > 0)
-    .sort((a, b) => b.search! - a.search! || a.fund_id - b.fund_id)
+    .filter((r) => r.search != null)
+    .sort((a, b) => place(a) - place(b) || a.fund_id - b.fund_id)
     .filter((r) => !seen.has(r.fund_id) && !!seen.add(r.fund_id))
     .slice(0, MOST_SEARCHED_MAX);
 }
@@ -612,6 +597,11 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
     name: "Macro",
     about:
       "Macro funds. The 13F shows only their US stocks, not their bonds, currencies or futures.",
+  },
+  {
+    name: "Credit & event-driven",
+    about:
+      "Credit, distressed-debt and event-driven funds. The 13F shows only their listed shares, not their bonds or loans.",
   },
   {
     name: "Family offices",
@@ -667,22 +657,13 @@ function FamousFunds({
   const list = useLoad(() => loadHome(`top_${period}`), [period]);
   const rows = list.status === "ready" ? list.data.famous : undefined;
   const groups = useMemo(() => byGroup(rows ?? []), [rows]);
-  const searched = useMemo(() => mostSearched(rows ?? []), [rows]);
   const rank = useMemo(() => popularity(rows ?? []), [rows]);
+  const searched = useMemo(() => mostSearched(rows ?? [], rank), [rows, rank]);
   const columns = useMemo(() => famousColumns(rank), [rank]);
-  const searchedCols = useMemo(
-    () =>
-      searchedColumns(
-        list.status === "ready" ? list.data.search_asof : undefined,
-        rank,
-      ),
-    [list, rank],
-  );
-  const asof = list.status === "ready" ? list.data.search_asof : undefined;
   return (
     <Panel
       title="Famous funds"
-      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Each list opens with its most popular fund first (most searched on Google, then biggest); select a heading to sort, and Fund again to cycle A–Z, Z–A and most popular."
+      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Each list opens with its most popular fund first, then the biggest; select a heading to sort, and Fund again to cycle A–Z, Z–A and most popular."
       controls={
         <Choice
           label="Period"
@@ -708,10 +689,9 @@ function FamousFunds({
           {searched.length > 0 && (
             <FamousGroup
               name="Most searched"
-              about={mostSearchedAbout(asof)}
+              about={MOST_SEARCHED_ABOUT}
               rows={searched}
-              columns={searchedCols}
-              initial={MOST_SEARCHED_ORDER}
+              columns={columns}
             />
           )}
           {groups.map((g) => (

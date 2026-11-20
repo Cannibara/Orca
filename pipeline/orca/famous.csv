@@ -371,3 +371,89 @@ fund_id,match,manager,group,filer_name,search
 1697848,WOODSON,Woodson Davis,Fundamental long/short,"Woodson Capital Management, LP",
 1627436,SYLEBRA,Dan Gibson,Fundamental long/short,Sylebra Capital Ltd,Dan Gibson
 1352662,GRANTHAM MAYO|GMO,Jeremy Grantham,Value,"Grantham, Mayo, Van Otterloo & Co. LLC",Jeremy Grantham
+1637460,MAN GROUP,,Quant & multi-strategy,Man Group plc,
+916542,ACADIAN,,Quant & multi-strategy,ACADIAN ASSET MANAGEMENT LLC,
+1387941,ALPHASIMPLEX,Andrew Lo,Quant & multi-strategy,"ALPHASIMPLEX GROUP, LLC",Andrew Lo
+1218710,BALYASNY,Dmitry Balyasny,Quant & multi-strategy,BALYASNY ASSET MANAGEMENT L.P.,Dmitry Balyasny
+1426196,CAPSTONE INVESTMENT,,Quant & multi-strategy,"CAPSTONE INVESTMENT ADVISORS, LLC",
+1620220,ENGINEERS GATE,,Quant & multi-strategy,Engineers Gate Manager LP,
+1736225,EXODUSPOINT,Michael Gelband,Quant & multi-strategy,"ExodusPoint Capital Management, LP",Michael Gelband
+1011443,HBK,,Quant & multi-strategy,HBK INVESTMENTS L P,
+919185,HIGHBRIDGE,Glenn Dubin,Quant & multi-strategy,HIGHBRIDGE CAPITAL MANAGEMENT LLC,Glenn Dubin
+1393825,HUDSON BAY,Sander Gerber,Quant & multi-strategy,Hudson Bay Capital Management LP,Sander Gerber
+1600344,LIGHTHOUSE INVESTMENT,Sean McGould,Quant & multi-strategy,"Lighthouse Investment Partners, LLC",Sean McGould
+883677,PANAGORA,,Quant & multi-strategy,PANAGORA ASSET MANAGEMENT INC,
+1564702,PDT PARTNERS,Peter Muller,Quant & multi-strategy,"PDT Partners, LLC",Peter Muller
+1665241,SCHONFELD,Steven Schonfeld,Quant & multi-strategy,Schonfeld Strategic Advisors LLC,Steven Schonfeld
+1642575,SQUAREPOINT,,Quant & multi-strategy,Squarepoint Ops LLC,
+1454027,VERITION,Nicholas Maounis,Quant & multi-strategy,Verition Fund Management LLC,Nicholas Maounis
+1556921,VOLORIDGE,David Vogel,Quant & multi-strategy,"VOLORIDGE INVESTMENT MANAGEMENT, LLC",David Vogel
+1758720,WALLEYE,Will England,Quant & multi-strategy,Walleye Capital LLC,Will England
+1745981,WORLDQUANT,Igor Tulchinsky,Quant & multi-strategy,WORLDQUANT MILLENNIUM ADVISORS LLC,Igor Tulchinsky
+1479847,VOLEON,Michael Kharitonov,Quant & multi-strategy,Voleon Capital Management LP,Michael Kharitonov
+1323645,CAPITAL FUND MANAGEMENT,Jean-Philippe Bouchaud,Quant & multi-strategy,CAPITAL FUND MANAGEMENT S.A.,Jean-Philippe Bouchaud
+1362033,GSA CAPITAL,,Quant & multi-strategy,GSA CAPITAL PARTNERS LLP,
+1578621,LMR PARTNERS,,Quant & multi-strategy,LMR Partners LLP,
+1729829,QUBE RESEARCH,Pierre-Alain Sarthou,Quant & multi-strategy,Qube Research & Technologies Ltd,Pierre-Alain Sarthou
+1612063,WINTON,David Harding,Quant & multi-strategy,WINTON GROUP Ltd,David Harding
+1393234,ASPECT CAPITAL,Anthony Todd,Quant & multi-strategy,Aspect Capital LTD,Anthony Todd
+1561418,QUANTEDGE,,Quant & multi-strategy,Quantedge Capital Pte Ltd,
+1426486,BRACEBRIDGE,Nancy Zimmerman,Quant & multi-strategy,"Bracebridge Capital, LLC",Nancy Zimmerman
+1639668,SKYBRIDGE,Anthony Scaramucci,Quant & multi-strategy,"SkyBridge Capital II, LLC",Anthony Scaramucci
+1403169,GCM GROSVENOR,Michael Sacks,Quant & multi-strategy,GCM Grosvenor L.P.,Michael Sacks
+1512857,BREVAN HOWARD,Alan Howard,Macro,Brevan Howard Capital Management LP,Alan Howard
+1557017,CAPULA,Yan Huo,Macro,Capula Management Ltd,Yan Huo
+872573,CAXTON,Bruce Kovner,Macro,CAXTON ASSOCIATES LP,Bruce Kovner
+1666335,ROKOS,Chris Rokos,Macro,Rokos Capital Management LLP,Chris Rokos
+1478032,PHARO,Guillaume Fonkenell,Macro,"Pharo Management, Inc.",Guillaume Fonkenell
+1849486,EISLER,Ed Eisler,Macro,Eisler Capital (UK) Ltd.,Ed Eisler
+2055810,EISLER,Ed Eisler,Macro,Eisler Capital Management Ltd.,Ed Eisler
+1535943,ALPHADYNE,,Macro,Alphadyne Asset Management LP,
+1315421,GRAHAM CAPITAL,Kenneth Tropin,Macro,"Graham Capital Management, L.P.",Kenneth Tropin
+1666905,GARDA,,Macro,Garda Capital Partners LP,
+1554664,DYMON,Danny Yong,Macro,DYMON ASIA CAPITAL LTD,Danny Yong
+1426859,RUFFER,Jonathan Ruffer,Macro,Ruffer LLP,Jonathan Ruffer
+1336657,TOURADJI,Paul Touradji,Macro,"TOURADJI CAPITAL MANAGEMENT, LP",Paul Touradji
+1326533,OSPRAIE,Dwight Anderson,Macro,"Ospraie Management, LLC",Dwight Anderson
+1639101,BFAM,Benjamin Fuchs,Macro,BFAM Partners (Cayman) Ltd,Benjamin Fuchs
+1278951,GOLDENTREE,Steven Tananbaum,Credit & event-driven,GOLDENTREE ASSET MANAGEMENT LP,Steven Tananbaum
+860662,ANGELO GORDON,John Angelo,Credit & event-driven,"ANGELO GORDON & CO., L.P.",John Angelo
+1362948,AURELIUS,Mark Brodsky,Credit & event-driven,"Aurelius Capital Management, LP",Mark Brodsky
+1074034,CANYON CAPITAL,Josh Friedman,Credit & event-driven,CANYON CAPITAL ADVISORS LLC,Josh Friedman
+1453885,BEACH POINT,,Credit & event-driven,Beach Point Capital Management LP,
+1332784,SILVER POINT,Ed Mulé,Credit & event-driven,"Silver Point Capital, L.P.",Ed Mulé
+1548836,GRAMERCY,Robert Koenigsberger,Credit & event-driven,Gramercy Funds Management LLC,Robert Koenigsberger
+1098490,ELLINGTON,Michael Vranos,Credit & event-driven,ELLINGTON MANAGEMENT GROUP LLC,Michael Vranos
+1380393,FORTRESS,Wes Edens,Credit & event-driven,Fortress Investment Group LLC,Wes Edens
+1279913,MARATHON ASSET,Bruce Richards,Credit & event-driven,MARATHON ASSET MANAGEMENT LP,Bruce Richards
+1570717,WATERFALL,Tom Capasso,Credit & event-driven,"Waterfall Asset Management, LLC",Tom Capasso
+1218199,KING STREET,Brian Higgins,Credit & event-driven,"KING STREET CAPITAL MANAGEMENT, L.P.",Brian Higgins
+1352851,MAGNETAR,Alec Litowitz,Credit & event-driven,Magnetar Financial LLC,Alec Litowitz
+1595082,DAVIDSON KEMPNER,Tom Kempner,Credit & event-driven,DAVIDSON KEMPNER CAPITAL MANAGEMENT LP,Tom Kempner
+937617,DAVIDSON KEMPNER,Tom Kempner,Credit & event-driven,DAVIDSON KEMPNER CAPITAL MANAGEMENT LLC (to 2014),Tom Kempner
+1427430,ASSURED INVESTMENT,Andrew Feldstein,Credit & event-driven,Assured Investment Management LLC (earlier BlueMountain),Andrew Feldstein
+1456927,HARBINGER,Philip Falcone,Credit & event-driven,"HARBINGER HOLDINGS, LLC",Philip Falcone
+1390457,CHEYNE,Jonathan Lourie,Credit & event-driven,Cheyne Capital Management (UK) LLP,Jonathan Lourie
+1431256,CQS,Michael Hintze,Credit & event-driven,CQS Cayman LP,Michael Hintze
+1447946,CQS,Michael Hintze,Credit & event-driven,"CQS (US), LLC",Michael Hintze
+1480532,YORK CAPITAL,Jamie Dinan,Credit & event-driven,"York Capital Management Global Advisors, LLC",Jamie Dinan
+1510281,SABA CAPITAL,Boaz Weinstein,Activists,"Saba Capital Management, L.P.",Boaz Weinstein
+1317904,OASIS MANAGEMENT,Seth Fischer,Activists,Oasis Management Co Ltd.,Seth Fischer
+1165408,ADAGE,Phill Gross,Fundamental long/short,"ADAGE CAPITAL PARTNERS GP, L.L.C.",Phill Gross
+1063296,ATLANTIC INVESTMENT,Alexander Roepers,Fundamental long/short,"ATLANTIC INVESTMENT MANAGEMENT, INC.",Alexander Roepers
+1079563,HIGHFIELDS,Jonathan Jacobson,Fundamental long/short,HIGHFIELDS CAPITAL MANAGEMENT LP,Jonathan Jacobson
+1289643,GLG,Noam Gottesman,Fundamental long/short,GLG Partners LP,Noam Gottesman
+1698093,MASO,Manoj Jain,Fundamental long/short,MASO CAPITAL PARTNERS Ltd,Manoj Jain
+1544676,SEGANTII,Simon Sadler,Fundamental long/short,Segantii Capital Management Ltd,Simon Sadler
+1439289,TOSCAFUND,Martin Hughes,Fundamental long/short,Toscafund Asset Management LLP,Martin Hughes
+1577133,GREENWOODS,Jiang Jinzhi,Fundamental long/short,Greenwoods Asset Management Ltd,Jiang Jinzhi
+1848138,GREENWOODS,Jiang Jinzhi,Fundamental long/short,Greenwoods Asset Management Hong Kong Ltd.,Jiang Jinzhi
+1802695,PERSEVERANCE,,Fundamental long/short,Perseverance Asset Management International,
+1803237,PINPOINT,,Fundamental long/short,Pinpoint Asset Management Ltd,
+2080247,PINPOINT,,Fundamental long/short,Pinpoint Asset Management (Singapore) Pte. Ltd.,
+1251567,WYNNEFIELD,Nelson Obus,Value,WYNNEFIELD CAPITAL INC,Nelson Obus
+1005846,VALUE PARTNERS,Cheah Cheng Hye,Value,VALUE PARTNERS LTD /ADV,Cheah Cheng Hye
+1256071,PLATINUM INVESTMENT,Kerr Neilson,Value,PLATINUM INVESTMENT MANAGEMENT LTD,Kerr Neilson
+1574850,TSAI CAPITAL,Christopher Tsai,Value,Tsai Capital Corp,Christopher Tsai
+1762304,HHLR,Zhang Lei,Tech & growth,"HHLR ADVISORS, LTD. (Hillhouse)",Zhang Lei
+1510589,HILLHOUSE,Zhang Lei,Tech & growth,"HILLHOUSE INVESTMENT MANAGEMENT, LTD.",Zhang Lei

@@ -166,9 +166,12 @@ fund's name.
   firm for venture firms; famous.csv `search`), Warren Buffett = 100, worldwide over the 12 months to `search_asof`; set on
   one fund per keyword (the filer still filing with the biggest book) and on each of its rows, `null` on every
   other row, and `"fame"`: the same score on every row of the keyword (Sequoia's seven filers all have it), for the
-  site to order each list by popularity; `null` without a score. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
+  site to order each list by popularity; `null` without a score, and `"rank"`: the owner's place for the fund in
+  `pipeline/orca/famous_rank.csv` (1 = first; every filer of a ranked keyword shares it), which orders Most searched
+  and each list ahead of any score; `null` when not listed. A ranked fund with no score still has `"search"` (`0`) on
+  its one filer, so it has a place in Most searched. The site shows neither score. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
   Google Trends snapshot (`pipeline/orca/famous_search.csv`), `null` without one. Files built before 2026-11-15
-  have no `famous` key; before 2026-11-17 no `search` or `search_asof`; before 2026-11-18 no `fame`.
+  have no `famous` key; before 2026-11-17 no `search` or `search_asof`; before 2026-11-18 no `fame`; before 2026-11-20 no `rank`.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`

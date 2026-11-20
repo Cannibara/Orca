@@ -1,4 +1,6 @@
-from orca.famous import FAMOUS_GROUPS, Famous, load_famous, load_search
+import pytest
+
+from orca.famous import FAMOUS_GROUPS, Famous, apply_rank, load_famous, load_rank, load_ranked_famous, load_search
 from orca.home import top_funds
 from test_home import perf, snap
 
@@ -64,3 +66,48 @@ def test_famous_csv_search_keywords():
     assert not any(f.search for f in famous if f.group == "Sovereign & pension funds")
     for f in famous:
         assert f.search == f.search.strip()
+
+
+def test_owner_rank_lets_a_fund_without_a_score_into_most_searched():
+    big = snap(2, "SEQUOIA GROWTH", book=5e9)
+    small = snap(3, "SEQUOIA SMALL", book=1e9)
+    lone = snap(4, "SCION ASSET")
+    corp = snap(5, "MARKEL GROUP")
+    famous = apply_rank(
+        (
+            Famous(2, "SEQUOIA", "", "Venture capital", "Sequoia Capital"),
+            Famous(3, "SEQUOIA", "", "Venture capital", "Sequoia Capital"),
+            Famous(4, "SCION", "Michael Burry", "Value", "Michael Burry"),
+            Famous(5, "MARKEL", "", "Big companies"),  # no keyword: ranked by its CIK
+        ),
+        ("5", "Sequoia Capital"),
+    )
+    rows = top_funds([big, small, lone, corp], "3y", famous, {"Michael Burry": 27.25})["famous"]
+    got = {r["fund_id"]: (r["rank"], r["search"]) for r in rows}
+    assert got == {
+        5: (1, 0.0),  # ranked with no score: still in Most searched
+        2: (2, 0.0),  # every filer of the keyword shares the place; the biggest one is listed
+        3: (2, None),
+        4: (None, 27.25),  # not ranked: its Google score, after the ranked funds (the web orders)
+    }
+
+
+def test_rank_file_orders_by_score_and_rejects_typos(tmp_path):
+    path = tmp_path / "famous_rank.csv"
+    assert load_rank(path) == ()
+    path.write_text("name,score\nMichael Burry,27.25\n\n5,90\nBill Ackman,\nRay Dalio,90\n")
+    assert load_rank(path) == ("5", "Ray Dalio", "Michael Burry")  # higher first; a tie keeps file order; no score: not ranked
+    path.write_text("name,score\nMichael Burry,high\n")
+    with pytest.raises(ValueError, match="not a number"):
+        load_rank(path)
+    famous = (Famous(4, "SCION", "Michael Burry", "Value", "Michael Burry"),)
+    with pytest.raises(ValueError, match="twice"):
+        apply_rank(famous, ("Michael Burry", "Michael Burry"))
+    with pytest.raises(ValueError, match="no search keyword or CIK"):
+        apply_rank(famous, ("Micheal Burry",))
+    assert apply_rank(famous, ()) == famous
+
+
+def test_famous_rank_csv_names_known_funds():
+    ranked = [f for f in load_ranked_famous() if f.rank]
+    assert ranked and min(f.rank for f in ranked) == 1
