@@ -62,6 +62,13 @@ function mount(id = 9100002) {
 const tiles = () => Array.from(document.querySelectorAll<SVGGElement>("svg.tm g.tile:not(.out)"));
 const tile = (ticker: string) => tiles().find((t) => /^[^,:]+/.exec(t.getAttribute("aria-label") ?? "")?.[0] === ticker)!;
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+/** The return a tile's label prints after its dollar value ("$2.97B · +4.1%"); null when it prints none. */
+const labelReturn = (g: SVGGElement): string | null => {
+  const text = [".l-w", ".l-v"].map((c) => g.querySelector(c)!.textContent).join(" ");
+  return /\$[\d.,]+[KMB]? · ([+−]?\d+\.\d%)/.exec(text)?.[1] ?? null;
+};
+/** The return in the tile's aria-label: the figure its colour and tooltip use. */
+const ariaReturn = (g: SVGGElement): string | null => /fund's return ([+−]?\d+\.\d%) over/.exec(g.getAttribute("aria-label") ?? "")?.[1] ?? null;
 const tableValue = (ticker: string) => {
   const heads = Array.from(document.querySelectorAll("#posPanel thead th")).map((th) => th.textContent);
   const tr = document.querySelector(`#posPanel tbody tr[data-t="${ticker}"]`)!;
@@ -91,7 +98,7 @@ describe("Holdings panel at the newest quarter", () => {
     await settle();
     const book = f.positions.reduce((s, p) => s + p.shares_now * (prices.get(p.stock_id) ?? 0), 0);
     expect(document.querySelector(".tm-cap")?.textContent).toBe(`${money(book)} at prices of 30 Oct 2026 across 9 holdings`);
-    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour: the fund's return on each holding, Q1 ’26 → 30 Oct 2026");
+    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q1 ’26 → 30 Oct 2026");
     expect(Array.from(document.querySelectorAll(".tm-ticks span")).map((s) => s.textContent)).toEqual(["−25%", "0%", "+25%"]);
     const keys = document.querySelector(".tm-keys")!;
     expect(keys).toHaveTextContent("No price data");
@@ -144,9 +151,50 @@ describe("Holdings panel at the newest quarter", () => {
     const big = tiles()[0];
     const texts = Array.from(big.querySelectorAll("text")).map((t) => t.textContent);
     expect(texts[0]).toMatch(/^[A-Z.]+$/);
-    expect(texts[1]).toMatch(/^\d+\.\d% · \$[\d.]+[KMB]$/);
+    expect(texts[1]).toMatch(/^\d+\.\d% · \$[\d.]+[KMB] · [+−]\d+\.\d%$/); // weight, value, and the return beside them
     expect(texts[2]).not.toBe("");
     expect(document.body.textContent).not.toMatch(/NaN|undefined|Infinity/);
+  });
+
+  test("the return on a label is the figure the tile's colour, tooltip and aria-label use", async () => {
+    mount();
+    await settle();
+    expect(labelReturn(tiles()[0])).not.toBeNull();
+    let shown = 0;
+    for (const t of tiles()) {
+      const r = labelReturn(t);
+      if (r === null) continue;
+      expect(r, t.getAttribute("aria-label")!).toBe(ariaReturn(t));
+      shown++;
+    }
+    expect(shown).toBeGreaterThan(3);
+    act(() => tiles()[0].focus());
+    const rows = Array.from(document.querySelectorAll("#tip .v")).map((v) => [v.querySelector(".vl")?.textContent, v.querySelector(".vv")?.textContent]);
+    expect(rows).toContainEqual(["Fund's return, quarter", labelReturn(tiles()[0])]);
+  });
+
+  test("an older quarter and a 12-month period show the return of their own period", async () => {
+    mount();
+    await settle();
+    for (const step of ["quarter", "year"] as const) {
+      if (step === "year") {
+        fireEvent.click(screen.getByRole("button", { name: "Year" }));
+        await settle();
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: "Earlier quarter" }));
+        await settle();
+      }
+      await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
+      await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).not.toMatch(/loading$/));
+      let shown = 0;
+      for (const t of tiles()) {
+        const r = labelReturn(t);
+        if (r === null) continue;
+        expect(r, `${step}: ${t.getAttribute("aria-label")}`).toBe(ariaReturn(t));
+        shown++;
+      }
+      expect(shown, step).toBeGreaterThan(0);
+    }
   });
 
   test("every tile that has a label shows its dollar value: the table's Value for that stock", async () => {
@@ -210,7 +258,7 @@ describe("Holdings panel: periods", () => {
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Year" }));
     await settle();
-    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour: the fund's return on each holding, Q2 ’25 → 30 Oct 2026");
+    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q2 ’25 → 30 Oct 2026");
     expect(Array.from(document.querySelectorAll(".tm-ticks span")).map((s) => s.textContent)).toEqual(["−50%", "0%", "+50%"]);
     await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).toMatch(/over 12 months$|not available$/));
     act(() => tiles()[0].focus());
@@ -224,7 +272,7 @@ describe("Holdings panel: periods", () => {
     await settle();
     await waitFor(() => expect(document.querySelector(".tm-cap")?.textContent).toMatch(/at quarter-end prices across \d+ holdings?/));
     expect(document.querySelector("#holdPanel .asof")?.textContent).toBe("Holdings and prices as of 31 Mar 2026");
-    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour: the fund's return on each holding, Q4 ’25 → Q1 ’26");
+    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q4 ’25 → Q1 ’26");
     for (const r of Array.from(document.querySelectorAll<HTMLElement>("#posPanel tbody tr[data-t]"))) {
       const t = r.getAttribute("data-t")!;
       if (tableValue(t) === "–") continue; // sold out in the quarter: not a tile
@@ -259,6 +307,7 @@ describe("Holdings panel: periods", () => {
     await settle();
     await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
     await waitFor(() => expect(tiles().every((t) => t.classList.contains("nul"))).toBe(true));
+    for (const t of tiles()) expect(labelReturn(t), "no return to print, and no dash in its place").toBeNull();
     act(() => tiles()[0].focus());
     expect(document.querySelector("#tip .x")?.textContent).toBe("The data starts at Q1 ’14: there is no Q4 ’13 price to compare.");
   });

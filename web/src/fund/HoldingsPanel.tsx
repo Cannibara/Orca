@@ -243,7 +243,7 @@ export function HoldingsPanel({ h, data, prices }: Props) {
           hollow: false,
           ink,
           soft: true,
-          label: { other: true, ticker: "", name: "", weight: t.weight, value: t.value, count: t.others.length },
+          label: { other: true, ticker: "", name: "", weight: t.weight, value: t.value, count: t.others.length, ret: null },
           aria: `Other stocks: ${t.others.length} holdings under 1% each, ${money(t.value)}, ${share(t.weight)} of the book`,
           tip: () => tipFor(t, undefined, colours.band),
         };
@@ -265,7 +265,7 @@ export function HoldingsPanel({ h, data, prices }: Props) {
         hollow,
         ink,
         soft,
-        label: { other: false, ticker: r.ticker, name: r.name, weight: t.weight, value: t.value, count: 0 },
+        label: { other: false, ticker: r.ticker, name: r.name, weight: t.weight, value: t.value, count: 0, ret },
         aria: `${r.ticker}${r.name ? ", " + r.name : ""}: ${money(r.val)}, ${share(t.weight)} of the book, fund's return ${said}`,
         tip: () => tipFor(t, info, fill),
       };
@@ -362,7 +362,7 @@ export function HoldingsPanel({ h, data, prices }: Props) {
         </div>
       </div>
       <div className="strip legend tm-leg">
-        <span className="tm-lt">{shown ? `Colour: the fund's return on each holding, ${startLabel} → ${endLabel}` : "Colour: the fund's return on each holding"}</span>
+        <span className="tm-lt">{shown ? `Colour, and the % after each value: the fund's return on each holding, ${startLabel} → ${endLabel}` : "Colour, and the % after each value: the fund's return on each holding"}</span>
         <span className="tm-scale" aria-hidden="true">
           <span className="tm-grad" style={{ background: gradientCss(colours.scale) }} />
           <span className="tm-ticks">

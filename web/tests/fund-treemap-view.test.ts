@@ -36,7 +36,7 @@ const tile = (key: string, rect: { x: number; y: number; w: number; h: number },
   hollow: false,
   ink: INK,
   soft: false,
-  label: { other: false, ticker: key, name: "Alphabet Inc", weight: 0.25, value: 4.55e9, count: 0 },
+  label: { other: false, ticker: key, name: "Alphabet Inc", weight: 0.25, value: 4.55e9, count: 0, ret: null },
   aria: key,
   tip: () => ({ title: key, rows: [] }),
   ...over,
@@ -113,7 +113,7 @@ describe("landing: the boxes form, the colour is final from the first frame, the
 
 describe("a step to another period", () => {
   const before = [tile("AAA", { x: 0, y: 0, w: 300, h: 200 }, { fill: RED })];
-  const after = [tile("AAA", { x: 0, y: 0, w: 200, h: 200 }, { fill: GREEN, label: { other: false, ticker: "AAA", name: "Alphabet Inc", weight: 0.4, value: 6e9, count: 0 } })];
+  const after = [tile("AAA", { x: 0, y: 0, w: 200, h: 200 }, { fill: GREEN, label: { other: false, ticker: "AAA", name: "Alphabet Inc", weight: 0.4, value: 6e9, count: 0, ret: null } })];
 
   beforeEach(() => {
     view.render(before, false);
