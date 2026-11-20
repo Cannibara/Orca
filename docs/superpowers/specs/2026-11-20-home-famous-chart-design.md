@@ -107,8 +107,8 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
 2. Header: H2 "Famous funds" (30/34px, 700, −0.03em). Standfirst 15/22px `--ink2`:
    "Estimated return a year over the last 5 years, best first. The dotted line is the S&P 500 (+12.2%)."
 3. Controls row: **list switch** (segmented control: Most searched | Buffett inspired | …) on the left;
-   **period** segmented control (1y | 5y | Max — the owner cut it to three) and a **Table view / Chart view**
-   button (secondary, 38px, same icons as Annual returns) on the right.
+   **period** segmented control (1y | 5y | Max — the owner cut it to three) and a **Chart | Table** segmented
+   switch (icon + word, same icons as Annual returns' table toggle) on the right. Chart is the default.
 4. The chart module (no card, no border; FT style):
    - A 40×4px ink bar above the title (`.rule::before`).
    - H3 list name (20/26px 700) with the count on the right ("50 FUNDS", 12px `--ink3`).
@@ -123,7 +123,8 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
 Phone (designed at 400×844; everything fits one screen so only the list scrolls, never the page):
 1. H2 "Famous funds" 24/28px. 2. List switch (full width, 38px tall buttons). 3. Period switch.
 4. Rule + H3 + count + lead line (13/18px). 5. Axis header (36px). 6. Window of **10 rows**.
-7. Caption and source (11–12px). No table toggle on phone (optional), no tooltip (tap opens the fund page).
+7. Caption and source (11–12px). No tooltip (tap opens the fund page). The Chart | Table switch sits beside
+   the period switch as two 44px icon-only buttons (`aria-label` "Chart" / "Table").
 
 ## 5. The row
 
@@ -230,9 +231,34 @@ Then:
 - Row hover band 80ms; photo greyscale → colour 160ms.
 - Reduced motion: no grow-in, no glide, ticks swap instantly.
 
-## 9. Table view
-Button swaps the chart for a plain table (Annual returns' `tbl-mini` look): Fund, Manager, Return a year,
-vs S&P 500, AUM; numbers right-aligned and tabular; visually hidden caption. Switching back replays the grow-in.
+## 9. Table view: the existing detailed table, one switch away
+Owner: "a button to go from the proposed view back to the old detailed table view (existing columns)".
+The **Table** side of the Chart | Table switch shows today's Famous funds table for the same list, unchanged in
+substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `web/src/pages/Home.tsx`):
+
+| Column | Value | Format (today's helpers) |
+|---|---|---|
+| Fund | photo (26–28px), short name (600), sub line "manager · filed until Qn YYYY" (the table keeps `until_q`) | link to the fund page; full legal name on hover |
+| Search interest | `search` — **Most searched only** | `fSearch` (`100`, `4.8`, `<1`, `—`) |
+| AUM | `book` | `fBook` (`$304.2B`, `$250m`) — note: the table keeps the site's `$…m` below $1B; the chart uses `$X.XB` |
+| Positions | `n_positions` | `count` |
+| Return / yr | `ann_return` | `pct(x, 0)` in `Signed` colours (blue up / orange down), `+12%` |
+| Max Drawdown | `max_dd` | `pct(x, 0, false)` (`−20%`) |
+| Sharpe | `sharpe` | `ratio` (`0.57`, `−0.33`) |
+
+- Every heading sorts (button inside the `th`, `aria-sort`); a new column starts high-to-low, the same column
+  flips. **Fund** steps through A–Z, Z–A and **most popular** (Google Trends `fame`, then AUM), shown as
+  "Fund · most popular". Opening order: Most searched by search interest, other lists most popular first (as
+  today).
+- 10 funds a page with "1–10 of 50" and Previous / Next (as today's `FAMOUS_PAGE`). A new sort or a new list
+  goes back to page 1.
+- Phone: the same columns in a sideways-scrolling box (table ≥ 640px), the Fund column sticky on the left
+  (168px). Row 44px; desktop 52px.
+- The chart's lead line and the source line stay above/below in both views; the desktop standfirst changes to
+  "Estimated figures over the last 5 years. Select a heading to sort; Fund steps through A–Z, Z–A and most
+  popular." in table view. Switching back to Chart replays the grow-in.
+- Build note: reuse the existing `ListTable` + `FamousGroup` for this view rather than re-implementing it; the
+  switch only chooses which of the two renders.
 
 ## 10. Dark mode
 Tokens as `tokens.css` dark (`--page #181512`, `--ink #F3ECE3`, `--band #38322B`, `--zero #AEA498`, inverted pill
@@ -255,6 +281,7 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 | Return in a separate right-hand column | Dropped | Direct labels at the bar tip (FT/WSJ and Annual returns) |
 | Average line | Dropped by owner | The S&P line is the meaningful reference |
 | AUM inside the bar | Tweak only | Owner preferred AUM next to the name |
+| Replacing the table outright | Kept as a Table view | Owner wants the old detailed columns one click away |
 | Two lists side by side | Dropped | One chart across the page; lists via a switch |
 | 50 rows on the page | Dropped | A 15-row (phone 10) scrolling window |
 | Scale that waits until scrolling stops, then animates | Dropped | Felt jumpy |
