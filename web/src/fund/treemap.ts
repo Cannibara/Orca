@@ -306,12 +306,13 @@ export type LabelFont = "tk" | "oth" | "w" | "n";
 /** Width in px of a text in a label font. */
 export type Measure = (font: LabelFont, text: string) => number;
 /**
- * tk: the ticker. w: the second row, always the dollar value, with the weight before it when both fit. n: the
- * third row (the name; the stock count on Other stocks). v: the value at the right end of the ticker's row, only
- * on a tile too short for a second row.
+ * tk: the ticker. w: the second row: the weight, the dollar value and the fund's return over the period, as many
+ * as fit (see labelSet). n: the third row (the name; the stock count on Other stocks). v: the value (and return)
+ * at the right end of the ticker's row, only on a tile too short for a second row.
  */
 export type LabelSet = { tk: string | null; w: string | null; n: string | null; v: string | null };
-export type LabelTile = { other: boolean; ticker: string; name: string; weight: number; value: number; count: number };
+/** `ret`: the fund's return on the holding over the period (a fraction); null = none to show (also Other stocks). */
+export type LabelTile = { other: boolean; ticker: string; name: string; weight: number; value: number; count: number; ret: number | null };
 
 /** The labels' inner padding and baselines, px from the tile's top left. */
 export const PADX = 7;
@@ -336,10 +337,12 @@ export function ellipsize(font: LabelFont, s: string, aw: number, measure: Measu
 }
 
 /**
- * What fits in a w × h tile, top down: the ticker; then a second row holding the dollar value (the owner wants
- * every tile to show it), with the weight before it when both fit; on tiles of at least 96 × 54 also the name
- * (ellipsised; the stock count on Other stocks). A tile too short for a second row (under 39 px) puts the value
- * at the right end of the ticker's row when both fit. A label that does not fit is left out, never clipped.
+ * What fits in a w × h tile, top down: the ticker; then a second row of figures, most important first: the dollar
+ * value (the owner wants every tile to show it), then the fund's return over the period, then the weight. The row
+ * is the fullest of `12.3% · $80.2B · +4.1%`, `$80.2B · +4.1%`, `12.3% · $80.2B` (no return to show), `$80.2B`,
+ * `12.3%` that fits. On tiles of at least 96 × 54 also the name (ellipsised; the stock count on Other stocks). A
+ * tile too short for a second row (under 39 px) puts the value, with the return when both fit, at the right end
+ * of the ticker's row. A label that does not fit is left out, never clipped.
  */
 export function labelSet(t: LabelTile, w: number, h: number, measure: Measure): LabelSet {
   const o: LabelSet = { tk: null, w: null, n: null, v: null };
@@ -351,12 +354,17 @@ export function labelSet(t: LabelTile, w: number, h: number, measure: Measure): 
   if (measure(font, first) > aw) return o;
   o.tk = first;
   const val = money(t.value);
+  const wt = share(t.weight);
+  const rt = t.ret === null ? null : pct(t.ret);
+  const fits = (s: string, room: number) => measure("w", s) <= room;
   if (h < 39) {
-    if (measure(font, first) + ROW_GAP + measure("w", val) <= aw) o.v = val;
+    const room = aw - measure(font, first) - ROW_GAP;
+    const vr = rt === null ? null : `${val} · ${rt}`;
+    o.v = vr !== null && fits(vr, room) ? vr : fits(val, room) ? val : null;
     return o;
   }
-  const wv = share(t.weight) + " · " + val;
-  o.w = measure("w", wv) <= aw ? wv : measure("w", val) <= aw ? val : measure("w", share(t.weight)) <= aw ? share(t.weight) : null;
+  const ladder = rt === null ? [`${wt} · ${val}`, val, wt] : [`${wt} · ${val} · ${rt}`, `${val} · ${rt}`, val, wt];
+  o.w = ladder.find((s) => fits(s, aw)) ?? null;
   if (h >= 54 && w >= 96) {
     const name = t.other ? `${t.count} stocks` : t.name;
     o.n = name ? ellipsize("n", name, aw, measure) : null;
