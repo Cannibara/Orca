@@ -1,10 +1,16 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-19
+Last verified: 2026-11-20
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-20 — Fund page: tiles split 4 and 4; Annual returns on Holdings, AUM on Analysis
+- Decision: Holdings = four tiles (annualised return, max drawdown, turnover per year, average hold length), Holdings tree map, Annual returns, Positions. Analysis = four tiles (years positive, volatility, risk-adjusted return, positions profitable), Assets under management, Return constituents, What if they'd kept it. About = About only. Panels, titles, details and formatting unchanged; only their place moved (owner approved draft claude.ai artifact HqU6sXjkXUy91FNa9GoN64, v4) (chat)(code `web/src/pages/Fund.tsx`, `fund/KpiStrip.tsx` `group`, `fund/HoldingsTab.tsx`).
+- Context: the window (15 years / Max), selected year and bracket stay page state, so Analysis' span tiles, AUM and Return constituents follow what was picked on Holdings' Annual returns; Analysis has no control for them except Return constituents' own strip and stepper (chat).
+- Consequences: on phones (< 560 px) the risk-adjusted and positions-profitable tiles still take a full row; the rule now names `.kpi-prof` instead of `:last-child`, so Holdings' four tiles sit 2×2 (code `fund/returns.css`).
+- Open: a year picker on Analysis, and clicking a year on Holdings to set the tree map period, were raised in the draft and not built (chat).
 
 ## 2026-11-19 — Fund page in three tabs; holdings tree map coloured by the fund's return
 - Decision: the fund page is Holdings | Analysis | About. Holdings = an animated tree map of the holdings plus the Positions table, driven by one Quarter | Year picker (Year = the 12 months to a chosen quarter-end, stepping a year at a time; Custom removed). Tile colour is the fund's own return on each holding over the period (start value at the start quarter-end close, buys and sells at the quarter's VWAP, end at the period-end price, today's prices for the newest quarter), green/red through grey, on the tree map only. Every table prints money as $80.2B. About shows SEC facts only (owner approved draft v4, chat 2026-11-19; spec `docs/superpowers/specs/2026-11-19-fund-tabs-design.md`) (chat)(code).

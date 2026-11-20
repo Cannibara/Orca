@@ -137,21 +137,26 @@ function FundView({ data }: { data: FundData }) {
           <FundHeader summary={summary} positionsEver={positions.length} tab={tab} onTab={openTab} />
           {/* Only the open tab's panels are mounted. */}
           <div className="tp" role="tabpanel" id={"fund-panel-" + tab} aria-labelledby={"fund-tab-" + tab}>
-            {tab === "holdings" && <HoldingsTab fundId={summary.id} h={holdings} prices={prices} stocks={names} />}
+            {tab === "holdings" && (
+              <HoldingsTab
+                fundId={summary.id}
+                h={holdings}
+                prices={prices}
+                stocks={names}
+                tiles={<KpiStrip group="holdings" series={series} win={win} br={br} summary={summary} profitable={data.profitable} />}
+                returns={<ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />}
+              />
+            )}
+            {/* Analysis reads the window, year and bracket picked on Holdings' Annual returns; the state lives here. */}
             {tab === "analysis" && (
               <>
-                <KpiStrip series={series} win={win} br={br} summary={summary} profitable={data.profitable} />
-                <ReturnsPanel series={series} win={win} range={range} onRange={setRange} sel={sel} onSelect={select} br={br} onBr={setBr} />
+                <KpiStrip group="analysis" series={series} win={win} br={br} summary={summary} profitable={data.profitable} />
+                <AumPanel series={series} win={win} />
                 <DrivePanel series={series} win={win} contrib={contrib} stocks={names} sel={sel} cr={cr} onCr={setCr} />
                 <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
               </>
             )}
-            {tab === "about" && (
-              <>
-                <AboutPanel summary={summary} />
-                <AumPanel series={series} win={win} />
-              </>
-            )}
+            {tab === "about" && <AboutPanel summary={summary} />}
           </div>
           <p className="fp-foot">
             Source: SEC Form 13F-HR filings, quarterly. Every figure is an Orca estimate built from quarter-end holdings, so risk numbers

@@ -6,11 +6,11 @@ import { returnYears, spanKpi, spanName, type Series, type SpanKpi, type Win } f
 import { resolveBracket, type Span } from "./span";
 import "./returns.css";
 
-// The eight tiles under the header, in two rows of four.
-// Row 1 follows the bracket of the Annual returns chart: the figures are for the calendar years from
-// its left arrow to its right arrow, computed from the quarterly returns inside them (series.spanKpi).
-// Each of those tiles has a small picture of the same span.
-// Row 2 covers the whole tracked period, straight from summary.metrics (Sharpe and Sortino use 3-month
+// Eight tiles, four at the top of the Holdings tab and four at the top of Analysis (`group`).
+// The first two of each group follow the bracket of the Annual returns chart (on Holdings): the figures are
+// for the calendar years from its left arrow to its right arrow, computed from the quarterly returns inside
+// them (series.spanKpi). Each of those tiles has a small picture of the same span.
+// The other two cover the whole tracked period, straight from summary.metrics (Sharpe and Sortino use 3-month
 // T-bill rates the site does not have, so they cannot follow the bracket). No pictures there, except
 // the thin bar of the profitable share.
 
@@ -83,13 +83,24 @@ function WholeTag() {
   return <span className="kpi-wp">Whole period</span>;
 }
 
+/** Which four tiles a strip shows: Holdings has the return and risk of holding, Analysis the rest. */
+export type KpiGroup = "holdings" | "analysis";
+
+const GROUP_TILES: Record<KpiGroup, { span: [string, string]; whole: string }> = {
+  holdings: { span: ["Annualised return", "Max drawdown"], whole: "Turnover per year and Average hold length" },
+  analysis: { span: ["Years positive", "Volatility"], whole: "Risk-adjusted return and Positions profitable" },
+};
+
 export function KpiStrip({
+  group,
   series,
   win,
   br,
   summary,
   profitable,
 }: {
+  /** Which four tiles to show (the Holdings or the Analysis tab's). */
+  group: KpiGroup;
   series: Series;
   win: Win;
   br: Span | null;
@@ -113,160 +124,193 @@ export function KpiStrip({
   const ticks = k ? tickSpark(rets) : null;
   const under = k ? underwaterSpark(k.dd) : null;
   const sizes = k ? sizeSpark(rets) : [];
+  const g = GROUP_TILES[group];
+
+  const annualisedTile = (
+    <article className="kpi">
+      <div className="kpi-l">Annualised return</div>
+      <div className="kpi-v">{k && k.ann != null ? fPct(k.ann) : dash}</div>
+      <div className="kpi-b">
+        <div className="kpi-n">{k ? "Growth of $1: $" + k.growth.toFixed(2) : ""}</div>
+        <Spark>
+          {growth && (
+            <>
+              <line className="spk-zero" x1="2" x2={W - 2} y1={d1(growth.zy)} y2={d1(growth.zy)} />
+              <path className="spk-line" d={growth.d} />
+              <circle className="spk-dot" cx={d1(growth.last[0])} cy={d1(growth.last[1])} r="3" />
+            </>
+          )}
+        </Spark>
+      </div>
+    </article>
+  );
+  const yearsPositiveTile = (
+    <article className="kpi">
+      <div className="kpi-l">Years positive</div>
+      <div className="kpi-v">
+        {k ? (
+          <>
+            {k.upAll}
+            <span className="vh"> </span>
+            <small>of {k.nAll}</small>
+          </>
+        ) : (
+          dash
+        )}
+      </div>
+      <div className="kpi-b">
+        <div className="kpi-n">{k && k.qpos != null ? Math.round(k.qpos * 100) + "% of quarters positive" : ""}</div>
+        <Spark>
+          {ticks && (
+            <>
+              {ticks.ticks.map((t, i) => (
+                <rect key={i} className={t.gain ? "spk-gain" : "spk-loss"} x={d1(t.x)} y={t.y} width={d1(t.w)} height="10" rx="1" />
+              ))}
+              <line className="spk-zero" x1="0" x2={W} y1={ticks.mid} y2={ticks.mid} />
+            </>
+          )}
+        </Spark>
+      </div>
+    </article>
+  );
+  const maxDrawdownTile = (
+    <article className="kpi">
+      <div className="kpi-l">Max drawdown</div>
+      <div className="kpi-v">{k ? fPct(k.mdd) : dash}</div>
+      <div className="kpi-b">
+        <div className="kpi-n">{k ? "Peak to trough, quarterly" : ""}</div>
+        <Spark>
+          {under && (
+            <>
+              <path className="spk-area-loss" d={under.area} />
+              <path className="spk-ln-loss" d={under.line} />
+              <line className="spk-zero" x1="2" x2={W - 2} y1="3" y2="3" />
+            </>
+          )}
+        </Spark>
+      </div>
+    </article>
+  );
+  const volatilityTile = (
+    <article className="kpi">
+      <div className="kpi-l">Volatility</div>
+      <div className="kpi-v">{k && k.vol != null ? f1(k.vol).replace("+", "") + "%" : dash}</div>
+      <div className="kpi-b">
+        <div className="kpi-n">Annualised</div>
+        <Spark>
+          {sizes.map((r, i) => (
+            <rect key={i} className={"spk-neutral" + (r.hi ? " hi" : "")} x={d1(r.x)} y={d1(r.y)} width={d1(r.w)} height={d1(r.h)} rx="1" />
+          ))}
+        </Spark>
+      </div>
+    </article>
+  );
+  const riskTile = (
+    <article className="kpi kpi-w kpi-risk">
+      <div className="kpi-l">
+        Risk-adjusted return
+        <WholeTag />
+      </div>
+      <dl className="kpi-trio">
+        <div>
+          <dt>Sharpe</dt>
+          <dd>{ratioText(m.sharpe)}</dd>
+        </div>
+        <div>
+          <dt>Sortino</dt>
+          <dd>{ratioText(m.sortino)}</dd>
+        </div>
+        <div>
+          <dt>Calmar</dt>
+          <dd>{ratioText(m.calmar)}</dd>
+        </div>
+      </dl>
+      <div className="kpi-b">
+        <div className="kpi-n">Sharpe and Sortino use 3-month T-bill rates; Calmar = return per year ÷ max drawdown</div>
+      </div>
+    </article>
+  );
+  const turnoverTile = (
+    <article className="kpi kpi-w">
+      <div className="kpi-l">
+        Turnover per year
+        <WholeTag />
+      </div>
+      <div className="kpi-v">{shareText(m.turnover)}</div>
+      <div className="kpi-b">
+        <div className="kpi-n">of fund size · lesser of buys or sells</div>
+      </div>
+    </article>
+  );
+  const holdTile = (
+    <article className="kpi kpi-w">
+      <div className="kpi-l">
+        Average hold length
+        <WholeTag />
+      </div>
+      <div className="kpi-v">
+        {holdAll != null ? (
+          <>
+            {holdAll}
+            <span className="vh"> </span>
+            <small>yrs</small>
+          </>
+        ) : (
+          dash
+        )}
+      </div>
+      <div className="kpi-b">
+        <div className="kpi-n">sold positions only: {holdSold != null ? holdSold + " yrs" : dash}</div>
+      </div>
+    </article>
+  );
+  const profitableTile = (
+    <article className="kpi kpi-w kpi-prof">
+      <div className="kpi-l">
+        Positions profitable
+        <WholeTag />
+      </div>
+      <div className="kpi-v">{shareText(profitable)}</div>
+      <div className="kpi-b">
+        <div className="kpi-n">of stocks ever held, at latest prices</div>
+      </div>
+      {share != null && (
+        <div className="kpi-bar" aria-hidden="true">
+          {share > 0 && <i style={{ width: share * 100 + "%" }} />}
+        </div>
+      )}
+    </article>
+  );
 
   return (
     <>
-      {/* Not shown on screen (the tiles speak for themselves); kept for screen readers, which are told which years the first four tiles cover. */}
+      {/* Not shown on screen (the tiles speak for themselves); kept for screen readers, which are told which years the first two tiles cover. */}
       <p className="kpi-cap vh">
         {k ? (
           <>
-            The first four tiles follow the Annual returns bracket: <b>{spanName(labels[bs.a], labels[bs.b])}</b>. The rest cover the whole
-            tracked period.
+            {g.span[0]} and {g.span[1]} follow the Annual returns bracket: <b>{spanName(labels[bs.a], labels[bs.b])}</b>. {g.whole} cover the
+            whole tracked period.
           </>
         ) : (
           "No year with a return yet."
         )}
       </p>
       <section className="kpis" aria-label="Key figures">
-        <article className="kpi">
-          <div className="kpi-l">Annualised return</div>
-          <div className="kpi-v">{k && k.ann != null ? fPct(k.ann) : dash}</div>
-          <div className="kpi-b">
-            <div className="kpi-n">{k ? "Growth of $1: $" + k.growth.toFixed(2) : ""}</div>
-            <Spark>
-              {growth && (
-                <>
-                  <line className="spk-zero" x1="2" x2={W - 2} y1={d1(growth.zy)} y2={d1(growth.zy)} />
-                  <path className="spk-line" d={growth.d} />
-                  <circle className="spk-dot" cx={d1(growth.last[0])} cy={d1(growth.last[1])} r="3" />
-                </>
-              )}
-            </Spark>
-          </div>
-        </article>
-        <article className="kpi">
-          <div className="kpi-l">Years positive</div>
-          <div className="kpi-v">
-            {k ? (
-              <>
-                {k.upAll}
-                <span className="vh"> </span>
-                <small>of {k.nAll}</small>
-              </>
-            ) : (
-              dash
-            )}
-          </div>
-          <div className="kpi-b">
-            <div className="kpi-n">{k && k.qpos != null ? Math.round(k.qpos * 100) + "% of quarters positive" : ""}</div>
-            <Spark>
-              {ticks && (
-                <>
-                  {ticks.ticks.map((t, i) => (
-                    <rect key={i} className={t.gain ? "spk-gain" : "spk-loss"} x={d1(t.x)} y={t.y} width={d1(t.w)} height="10" rx="1" />
-                  ))}
-                  <line className="spk-zero" x1="0" x2={W} y1={ticks.mid} y2={ticks.mid} />
-                </>
-              )}
-            </Spark>
-          </div>
-        </article>
-        <article className="kpi">
-          <div className="kpi-l">Max drawdown</div>
-          <div className="kpi-v">{k ? fPct(k.mdd) : dash}</div>
-          <div className="kpi-b">
-            <div className="kpi-n">{k ? "Peak to trough, quarterly" : ""}</div>
-            <Spark>
-              {under && (
-                <>
-                  <path className="spk-area-loss" d={under.area} />
-                  <path className="spk-ln-loss" d={under.line} />
-                  <line className="spk-zero" x1="2" x2={W - 2} y1="3" y2="3" />
-                </>
-              )}
-            </Spark>
-          </div>
-        </article>
-        <article className="kpi">
-          <div className="kpi-l">Volatility</div>
-          <div className="kpi-v">{k && k.vol != null ? f1(k.vol).replace("+", "") + "%" : dash}</div>
-          <div className="kpi-b">
-            <div className="kpi-n">Annualised</div>
-            <Spark>
-              {sizes.map((r, i) => (
-                <rect key={i} className={"spk-neutral" + (r.hi ? " hi" : "")} x={d1(r.x)} y={d1(r.y)} width={d1(r.w)} height={d1(r.h)} rx="1" />
-              ))}
-            </Spark>
-          </div>
-        </article>
-        <article className="kpi kpi-w kpi-risk">
-          <div className="kpi-l">
-            Risk-adjusted return
-            <WholeTag />
-          </div>
-          <dl className="kpi-trio">
-            <div>
-              <dt>Sharpe</dt>
-              <dd>{ratioText(m.sharpe)}</dd>
-            </div>
-            <div>
-              <dt>Sortino</dt>
-              <dd>{ratioText(m.sortino)}</dd>
-            </div>
-            <div>
-              <dt>Calmar</dt>
-              <dd>{ratioText(m.calmar)}</dd>
-            </div>
-          </dl>
-          <div className="kpi-b">
-            <div className="kpi-n">Sharpe and Sortino use 3-month T-bill rates; Calmar = return per year ÷ max drawdown</div>
-          </div>
-        </article>
-        <article className="kpi kpi-w">
-          <div className="kpi-l">
-            Turnover per year
-            <WholeTag />
-          </div>
-          <div className="kpi-v">{shareText(m.turnover)}</div>
-          <div className="kpi-b">
-            <div className="kpi-n">of fund size · lesser of buys or sells</div>
-          </div>
-        </article>
-        <article className="kpi kpi-w">
-          <div className="kpi-l">
-            Average hold length
-            <WholeTag />
-          </div>
-          <div className="kpi-v">
-            {holdAll != null ? (
-              <>
-                {holdAll}
-                <span className="vh"> </span>
-                <small>yrs</small>
-              </>
-            ) : (
-              dash
-            )}
-          </div>
-          <div className="kpi-b">
-            <div className="kpi-n">sold positions only: {holdSold != null ? holdSold + " yrs" : dash}</div>
-          </div>
-        </article>
-        <article className="kpi kpi-w">
-          <div className="kpi-l">
-            Positions profitable
-            <WholeTag />
-          </div>
-          <div className="kpi-v">{shareText(profitable)}</div>
-          <div className="kpi-b">
-            <div className="kpi-n">of stocks ever held, at latest prices</div>
-          </div>
-          {share != null && (
-            <div className="kpi-bar" aria-hidden="true">
-              {share > 0 && <i style={{ width: share * 100 + "%" }} />}
-            </div>
-          )}
-        </article>
+        {group === "holdings" ? (
+          <>
+            {annualisedTile}
+            {maxDrawdownTile}
+            {turnoverTile}
+            {holdTile}
+          </>
+        ) : (
+          <>
+            {yearsPositiveTile}
+            {volatilityTile}
+            {riskTile}
+            {profitableTile}
+          </>
+        )}
       </section>
     </>
   );

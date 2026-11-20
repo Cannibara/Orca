@@ -1,6 +1,6 @@
 # Product
 
-Last verified: 2026-11-19
+Last verified: 2026-11-20
 
 Tags: (chat) session conversation, (code) checked in code, (git) commit history, (spec) `docs/superpowers/specs/2026-10-30-orca-fund-pnl-design.md`.
 
@@ -62,15 +62,15 @@ The fund page is a header and three tabs (spec `docs/superpowers/specs/2026-11-1
 | View | Shows |
 |---|---|
 | Fund header | Name (the `<h1>` text equals the fund name, which e2e checks), "$X reported book", "N holdings now, M positions ever", "Updated <filed date> · Qn filing", a priced-% badge below 80%, an inactive note, and the Holdings (with the holdings-now count) / Analysis / About tabs: WAI-ARIA tabs, one Tab stop, arrows, Home and End (code `FundHeader.tsx`, `Fund.tsx`) |
-| **Holdings tab** | The Holdings panel, then Positions; one period picker (in the Holdings panel) drives both (code `HoldingsTab.tsx`) |
+| **Holdings tab** | Four key-figure tiles (annualised return, max drawdown, turnover per year, average hold length), the Holdings panel, Annual returns, then Positions; one period picker (in the Holdings panel) drives the tree map and Positions (code `HoldingsTab.tsx`, `Fund.tsx`) |
 | Holdings (tree map) | Period picker: Quarter / Year; Year adds a Q1–Q4 "years end in" control and its pills are the quarter ends with that Q, four quarters apart, each a 12-month period (qs = qe − 3, "12 months to 30 Sep 2025"); wheel (only from rest), arrows, list, jiggle at the ends. A squarified tree map of the holdings at the period end (440px, 340px under 600px wide): area = value from the Positions table's model (so the tiles equal the table; an older quarter sums to the published book), holdings under 1% grouped as one hatched "Other stocks" tile, colour = the fund's return on the holding over the period (below) on a red (loss) ← grey → green (gain) scale clamped at ±25% (quarter) or ±50% (12 months), hollow dashed tile = no return; labels only where they fit; shared tooltip; legend and caption; 600ms tweens on a period change (none under reduced motion); one Tab stop, the arrows move by position, Home/End (code `HoldingsPanel.tsx`, `treemap.ts`, `treemapView.ts`, `PeriodPicker.tsx`) |
 | Positions | 12 columns (Stock, Held, Weight, Return, IRR, Value, Avg cost, Price, Avg exit, Realised, Unrealised, Total P&L), all as of the period the Holdings picker chose; money as the site prints it ("$2.97B", "+$469M"); click a row to see its price chart and trades (code `PositionsPanel.tsx`, `PositionsTable.tsx`, `StockPanel.tsx`) |
-| **Analysis tab** | Key figures, Annual returns, Return constituents, What if they'd kept it, in that order |
-| Key figures (8 tiles) | Row 1 follows the Annual-returns bracket: annualised return (+growth of $1), years positive (+% quarters positive), max drawdown, volatility. Row 2 covers the whole period: Sharpe/Sortino/Calmar, turnover per year, average hold length, positions profitable (code `KpiStrip.tsx`) |
+| **Analysis tab** | Four key-figure tiles (years positive, volatility, risk-adjusted return, positions profitable), Assets under management, Return constituents, What if they'd kept it, in that order. Its window, selected year and bracket are the ones picked on Holdings' Annual returns (page state); Return constituents also has its own strip and stepper |
+| Key figures (8 tiles, 4 per tab) | The span tiles follow the Annual-returns bracket: annualised return (+growth of $1) and max drawdown on Holdings, years positive (+% quarters positive) and volatility on Analysis. The others cover the whole period: turnover per year and average hold length on Holdings, Sharpe/Sortino/Calmar and positions profitable on Analysis (code `KpiStrip.tsx`, prop `group`) |
 | Annual returns | Bars per year, 15 years or Max, % labels, draggable annualised-return bracket, year tooltip (max drawdown, volatility, each quarter), "Show the numbers" table (code `ReturnsPanel.tsx`, `returnsLayout.ts`) |
 | Return constituents (was "What drove") | Waterfall of contribution points for a year or a period (strip, stepper), named stocks by \|contribution\| + "Other stocks", one-line headline (code `DrivePanel.tsx`, `drive.ts`) |
 | What if they'd kept it | Tiles (sold too early, losses dodged, sold stocks that beat SPY next year, buys vs sells next 12 months) and a sold/trimmed table in the Positions style (code `WhatIfPanel.tsx`, `whatif.ts`) |
-| **About tab** | About, then Assets under management |
+| **About tab** | About only (Assets under management moved to Analysis on 2026-11-20) |
 | About | SEC EDGAR facts only (`summary.about`): a sentence built from the facts (a clause left out for each missing one), then Headquarters, 13F signed by, Other managers in the report (first 4, "Show all N"), Incorporated in, Former names, SEC CIK (links to EDGAR's 13F-HR list, new tab); state codes in full, SEC capitals title-cased; "No SEC details yet" when the block is null (code `AboutPanel.tsx`, `about.ts`) |
 | Assets under management | Static stacked bars: carried-over book, net inflows, gains; dotted boxes for losses and outflows; tooltip pinned top-left (code `AumPanel.tsx`, `aum.ts`) |
 
