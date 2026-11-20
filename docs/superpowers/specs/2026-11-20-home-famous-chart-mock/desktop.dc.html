@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home page v4, desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&amp;family=Instrument+Serif&amp;display=swap">
+<style>
+body{margin:0}
+.orca{--ez:cubic-bezier(.2,.7,.2,1);--page:#FAF3EA;--surface:#FFFCF8;--sunken:#F0E6D8;--band:#F0E6D8;--line:#E6DCCF;--line2:#CDBFAE;--control:#A89C8E;--zero:#6A635A;--ink:#1B1916;--ink2:#4B463F;--ink3:#6A635A;--focus:#0E658C;--inv:#1B1916;--invfg:#FFFCF8;--inv2:#BDB4A8;--initBg:#E6DCCF;--initFg:#4B463F}
+.orca.dark{--page:#181512;--surface:#211D19;--sunken:#24201B;--band:#38322B;--line:#2F2A24;--line2:#4A423A;--control:#6F655A;--zero:#AEA498;--ink:#F3ECE3;--ink2:#CBC2B6;--ink3:#AEA498;--focus:#5BA3CE;--inv:#F3ECE3;--invfg:#1B1916;--inv2:#6A635A;--initBg:#3A342D;--initFg:#CBC2B6}
+.orca .cols{display:grid;grid-template-columns:32px 252px minmax(0,1fr);column-gap:14px;align-items:center}
+.orca .in{position:absolute;top:0;bottom:0;left:0;right:56px}
+.orca .axis{height:46px;box-shadow:0 1px 0 var(--line2)}
+/* the window: 15 rows of 46px, free scrolling (no snap) with a thin scrollbar */
+.orca .scr{position:relative;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;border-radius:2px}
+.orca .scr:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+.orca .fade{position:absolute;left:0;right:0;height:24px;z-index:6;pointer-events:none;transition:opacity 200ms linear}
+.orca .fade.t{top:0;background:linear-gradient(var(--page),transparent)}
+.orca .fade.b{bottom:0;background:linear-gradient(transparent,var(--page))}
+.orca .row{position:relative;z-index:1;height:46px;color:var(--ink);text-decoration:none;border-radius:6px;scroll-snap-align:start}
+.orca .row::before{content:"";position:absolute;inset:0 -8px;border-radius:6px;background:var(--band);opacity:0;z-index:-1;transition:opacity 80ms linear}
+.orca .row:hover,.orca .row:focus-visible{z-index:3}
+.orca .row:hover::before,.orca .row:focus-visible::before{opacity:.6}
+.orca .row:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.orca .face{width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:var(--initBg);display:block;transition:filter 160ms ease-out}
+.orca.grey .face{filter:grayscale(1) contrast(1.06)}
+.orca.grey .row:hover .face,.orca.grey .row:focus-visible .face{filter:none}
+.orca .init{display:flex;align-items:center;justify-content:center;font:600 11px/1 'Instrument Sans',sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--initFg)}
+.orca .who{display:flex;flex-direction:column;gap:1px;min-width:0}
+.orca .l1{display:flex;align-items:center;gap:7px;min-width:0}
+.orca .nm{flex:0 1 auto;min-width:0;font-size:14px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orca .sep{flex:none;width:3px;height:3px;border-radius:50%;background:var(--control)}
+.orca .am{flex:none;font-size:13px;line-height:18px;color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.orca .mg{display:flex;align-items:center;gap:6px;min-width:0;font-size:12.5px;line-height:16px;color:var(--ink3);white-space:nowrap}
+.orca .mg span{overflow:hidden;text-overflow:ellipsis}
+.orca .tag{flex:none;height:16px;padding:0 5px;border-radius:4px;border:1px dashed var(--control);font:500 10.5px/14px 'Instrument Sans',sans-serif;color:var(--ink2);box-sizing:border-box}
+.orca .plot{position:relative;height:46px}
+/* everything on the scale is placed every frame from the scroll position, so nothing waits on a transition */
+.orca .bar{position:absolute;top:14px;height:18px;min-width:2px;container-type:inline-size}
+.orca .bar.gain{border-radius:0 3px 3px 0}
+.orca .bar.loss{border-radius:3px 0 0 3px}
+/* a bar that runs past the scale (only mid-scroll) is drawn broken at the edge; its label keeps the true value */
+.orca .bar.cut::after{content:"";position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--page);transform:skewX(-20deg)}
+.orca .bar.cut.gain::after{right:7px}
+.orca .bar.cut.loss::after{left:7px}
+.orca .lab{position:absolute;top:0;font:600 12.5px/46px 'Instrument Sans',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;text-shadow:0 0 2px var(--page),0 0 2px var(--page),0 0 3px var(--page)}
+.orca .lab.lead{top:12px;height:22px;padding:0 6px;border-radius:4px;background:var(--inv);color:var(--invfg);font-weight:700;line-height:22px;text-shadow:none}
+.orca .aum{position:absolute;top:0;font:600 10.5px/18px 'Instrument Sans',sans-serif;font-variant-numeric:tabular-nums;color:#FFFFFF;white-space:nowrap}
+.orca .bar.gain .aum{right:6px}
+.orca .bar.loss .aum{left:6px}
+@container (max-width:48px){.orca .aum.s{display:none}}
+@container (max-width:56px){.orca .aum.l{display:none}}
+.orca .grid{position:absolute;inset:0;z-index:0;pointer-events:none}
+.orca .gl{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--line);transition:opacity 200ms linear}
+.orca .gl.z{border-left-color:var(--zero)}
+/* only the zero line is drawn; the other ticks are labels on the axis */
+.orca .gl:not(.z){display:none}
+.orca .spl{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:repeating-linear-gradient(to bottom,var(--ink3) 0 1.5px,transparent 1.5px 5px);opacity:.75}
+.orca .spx{position:absolute;top:2px;transform:translateX(-50%);font:600 11px/14px 'Instrument Sans',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.orca .spx-m{position:absolute;bottom:0;width:0;height:0;margin-left:-5px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--ink)}
+.orca .tick{position:absolute;bottom:9px;transform:translateX(-50%);font:400 11px/14px 'Instrument Sans',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink3);white-space:nowrap;transition:opacity 200ms linear}
+.orca .tip{position:absolute;left:298px;bottom:calc(100% - 4px);z-index:5;display:none;min-width:190px;max-width:260px;padding:8px 10px;border-radius:6px;background:var(--inv);color:var(--invfg);font:400 12px/1.35 'Instrument Sans',sans-serif;box-shadow:0 4px 14px rgba(27,25,22,.18);pointer-events:none}
+.orca .tip.below{bottom:auto;top:calc(100% - 4px)}
+.orca .row:hover .tip,.orca .row:focus-visible .tip{display:block}
+.orca .tip .t{color:var(--inv2);font-weight:500;margin:0 0 2px}
+.orca .tip .v{display:flex;align-items:center;gap:7px;margin-top:3px;font-variant-numeric:tabular-nums}
+.orca .tip .v i{width:10px;height:3px;border-radius:2px;display:block;flex:none}
+.orca .tip .vl{color:var(--inv2);font-weight:500;flex:1;padding-right:12px}
+.orca .tip b{font-weight:700}
+.orca .rule::before{content:"";display:block;width:40px;height:4px;background:var(--ink);margin-bottom:12px}
+.orca h2{margin:0;font:700 30px/34px 'Instrument Sans',sans-serif;letter-spacing:-.03em}
+.orca h3{margin:0;font:700 20px/26px 'Instrument Sans',sans-serif;letter-spacing:-.015em}
+.orca.serif h2{font:400 40px/42px 'Instrument Serif',Georgia,serif;letter-spacing:-.01em}
+.orca.serif h3{font:400 28px/32px 'Instrument Serif',Georgia,serif;letter-spacing:0}
+.orca .tabs a{padding:10px 14px;color:var(--ink3);text-decoration:none}
+.orca .tabs a:hover{color:var(--ink)}
+.orca .tabs a[aria-current="page"]{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--ink)}
+.orca a:focus-visible,.orca button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.orca button{cursor:pointer;font-family:'Instrument Sans',sans-serif}
+.orca .seg{display:flex;background:var(--sunken);border-radius:6px;padding:3px;gap:2px}
+.orca .seg button{border:0;background:transparent;color:var(--ink2);font-size:13px;font-weight:500;height:32px;padding:0 14px;border-radius:4px;white-space:nowrap}
+.orca .seg button[aria-pressed="true"]{background:var(--page);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(27,25,22,.14)}
+.orca .btn2{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:500}
+.orca .btn2:hover{background:var(--sunken)}
+.orca .ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.orca table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.orca th,.orca td{height:36px;padding:0 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.orca thead th{height:30px;font-size:12px;font-weight:500;color:var(--ink3);border-bottom-color:var(--line2)}
+.orca th.tl,.orca td.tl{text-align:left}
+.orca tbody th{font-weight:600}
+/* intro, as the annual chart: bars grow out of zero (600ms, 40ms stagger over the first screen), labels fade in 450ms after their bar */
+.orca.run-a .bar{animation:growA 600ms var(--ez) backwards}
+.orca.run-b .bar{animation:growB 600ms var(--ez) backwards}
+.orca.run-a .lab,.orca.run-a .aum{animation:fadeA 300ms ease-out backwards}
+.orca.run-b .lab,.orca.run-b .aum{animation:fadeB 300ms ease-out backwards}
+@keyframes growA{from{transform:scaleX(0)}}
+@keyframes growB{from{transform:scaleX(0)}}
+@keyframes fadeA{from{opacity:0}}
+@keyframes fadeB{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+.orca .bar,.orca .lab,.orca .aum{animation:none!important}
+.orca .gl,.orca .tick{transition:none!important}
+.orca .row::before{transition:none}
+}
+</style>
+</helmet>
+<div class="orca {{rootClass}}" style="min-height: 1320px; background: var(--page); color: var(--ink); font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; padding: 40px 24px 48px; box-sizing: border-box">
+<div style="max-width: 1232px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px">
+
+<nav class="tabs" aria-label="Home lists" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line2); font-size: 14px">
+<a href="#">Top funds</a>
+<a href="#" aria-current="page">Famous funds</a>
+<a href="#">Conviction moves</a>
+<a href="#">Big wins &amp; losses</a>
+<a href="#">Crowded buys</a>
+<a href="#">Best &amp; worst calls</a>
+</nav>
+
+<header style="display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h2>Famous funds</h2>
+<p style="margin: 0; font-size: 15px; line-height: 22px; color: var(--ink2)">Estimated return a year over the last 5 years, best first. The dotted line is the S&amp;P 500 ({{spx}}).</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<div role="group" aria-label="List" class="seg">
+<button type="button" aria-pressed="{{msPressed}}" onClick="{{showMs}}">Most searched</button>
+<button type="button" aria-pressed="{{biPressed}}" onClick="{{showBi}}">Buffett inspired</button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<div role="group" aria-label="Period" class="seg">
+<button type="button" aria-pressed="false">1y</button>
+<button type="button" aria-pressed="true">5y</button>
+<button type="button" aria-pressed="false">Max</button>
+</div>
+<button type="button" class="btn2" aria-pressed="{{tablePressed}}" onClick="{{toggleTable}}">
+<sc-if value="{{table}}" hint-placeholder-val="{{ false }}"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M3 8h7M3 11.5h4"></path></svg></sc-if>
+<sc-if value="{{chart}}" hint-placeholder-val="{{ true }}"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1.5"></rect><path d="M2.5 6.5h11M6.5 6.5V13"></path></svg></sc-if>
+<span>{{toggleLabel}}</span>
+</button>
+</div>
+</div>
+</header>
+
+<figure aria-label="{{g.name}}" style="margin: 0; display: flex; flex-direction: column; min-width: 0">
+<div class="rule" style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+<h3>{{g.name}}</h3>
+<span style="font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums">{{g.count}}</span>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 20px; color: var(--ink2)">{{g.lead}}</p>
+</div>
+
+<sc-if value="{{chart}}" hint-placeholder-val="{{ true }}">
+<div>
+<div style="min-width: 0">
+<div class="cols axis" aria-hidden="true">
+<span></span><span></span>
+<div style="position: relative; height: 46px">
+<div class="in">
+<sc-for list="{{ticks}}" as="t" hint-placeholder-count="6">
+<span class="tick" style="left: {{t.left}}; opacity: {{t.op}}">{{t.label}}</span>
+</sc-for>
+<span class="spx" style="left: {{spxLeft}}">S&amp;P 500 {{spx}}</span>
+<span class="spx-m" style="left: {{spxLeft}}"></span>
+</div>
+</div>
+</div>
+
+<div style="position: relative">
+<span class="fade t" style="opacity: {{fadeTop}}"></span>
+<div class="scr" tabindex="0" role="region" aria-label="{{scrLabel}}" style="height: {{scrH}}" ref="{{boxRef}}" onScroll="{{onScroll}}" onKeyDown="{{onKey}}">
+<div style="position: relative">
+<div class="cols grid" aria-hidden="true">
+<span></span><span></span>
+<div style="position: relative; height: 100%">
+<div class="in">
+<sc-for list="{{ticks}}" as="t" hint-placeholder-count="6">
+<span class="gl {{t.cls}}" style="left: {{t.left}}; opacity: {{t.op}}"></span>
+</sc-for>
+<span class="spl" style="left: {{spxLeft}}"></span>
+</div>
+</div>
+</div>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="15">
+<a href="#" class="row cols" aria-label="{{r.aria}}">
+<sc-if value="{{r.hasPhoto}}" hint-placeholder-val="{{ true }}">
+<img class="face" src="{{r.photo}}" alt="">
+</sc-if>
+<sc-if value="{{r.noPhoto}}" hint-placeholder-val="{{ false }}">
+<span class="face init" aria-hidden="true">{{r.initials}}</span>
+</sc-if>
+<span class="who" aria-hidden="true">
+<span class="l1"><span class="nm">{{r.name}}</span><sc-if value="{{aumName}}" hint-placeholder-val="{{ true }}"><span class="sep"></span><span class="am">{{r.aum}}</span></sc-if></span>
+<sc-if value="{{r.hasMgr}}" hint-placeholder-val="{{ true }}"><span class="mg"><span>{{r.mgr}}</span></span></sc-if>
+</span>
+<span class="plot" aria-hidden="true">
+<span class="in">
+<span class="bar {{r.kind}} {{r.cut}}" style="left: {{r.left}}; width: {{r.width}}; background: {{r.fill}}; transform-origin: {{r.origin}}; animation-delay: {{r.delay}}"><sc-if value="{{aumIn}}" hint-placeholder-val="{{ false }}"><span class="aum {{r.aumCls}}" style="animation-delay: {{r.late}}">{{r.aum}}</span></sc-if></span>
+<span class="lab {{r.leadClass}}" style="left: {{r.lx}}; right: {{r.rx}}; animation-delay: {{r.late}}">{{r.num}}</span>
+</span>
+</span>
+<span class="tip {{r.tipCls}}" aria-hidden="true">
+<p class="t">{{r.full}}</p>
+<span class="v"><i style="background: {{r.fill}}"></i><span class="vl">Return a year</span><b>{{r.num}}</b></span>
+<span class="v"><i></i><span class="vl">vs S&amp;P 500</span><b>{{r.vs}}</b></span>
+<span class="v"><i></i><span class="vl">AUM</span><b>{{r.aum}}</b></span>
+</span>
+</a>
+</sc-for>
+</div>
+</div>
+<span class="fade b" style="opacity: {{fadeBot}}"></span>
+</div>
+<p style="margin: 10px 0 0; font-size: 12px; line-height: 16px; color: var(--ink3)" aria-live="polite">{{caption}}</p>
+</div>
+
+</div>
+</sc-if>
+
+<sc-if value="{{table}}" hint-placeholder-val="{{ false }}">
+<table>
+<caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">{{g.name}}: estimated return a year</caption>
+<thead><tr><th scope="col" class="tl">Fund</th><th scope="col" class="tl">Manager</th><th scope="col">Return a year</th><th scope="col">vs S&amp;P 500</th><th scope="col">AUM</th></tr></thead>
+<tbody>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="12">
+<tr><th scope="row" class="tl">{{r.name}}</th><td class="tl" style="color: var(--ink2)">{{r.mgr}}</td><td style="font-weight: 600">{{r.num}}</td><td>{{r.vs}}</td><td>{{r.aum}}</td></tr>
+</sc-for>
+</tbody>
+</table>
+</sc-if>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line2)">
+<span style="font-size: 12px; line-height: 16px; color: var(--ink3)">Source: SEC 13F filings; Orca estimates. S&amp;P 500: SPY price return, Q3 2021 to Q3 2026.</span>
+</div>
+</figure>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px">
+<p style="margin: 0; font-size: 12px; color: var(--ink3)">Real 5-year figures from data.orcaetf.com (Q3 2026 filings). Scroll the list or use the arrow / Page keys. Home page v4 mock-up.</p>
+<button type="button" onClick="{{replay}}" style="height: 32px; padding: 0 12px; border: 1px dashed var(--line2); border-radius: 6px; background: transparent; color: var(--ink2); font-size: 12px">Replay animation (mock-up only)</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"scale":{"editor":"enum","options":["Fits the funds in view","Same for the whole list"],"default":"Fits the funds in view"},"colour":{"editor":"enum","options":["Shaded by size","Solid"],"default":"Shaded by size"},"aum":{"editor":"enum","options":["Next to name","Inside bar (white)"],"default":"Next to name"},"photos":{"editor":"enum","options":["Grey until hover","Colour"],"default":"Grey until hover"},"headline":{"editor":"enum","options":["Sans","Serif"],"default":"Sans"},"$preview":{"width":1280,"height":1320}}'>
+class Component extends DCLogic {
+  // ---- data: real 5-year rows from data.orcaetf.com home/top_5y.json (Q3 2026) ----
+  data(list) {
+    if (list === 'bi') return [
+      ["Van Den Berg", "Arnold Van Den Berg", 0.1748, 0.49, null, "VAN DEN BERG MANAGEMENT I, INC"],
+      ["Semper Augustus", "Christopher Bloomstran", 0.1159, 0.87, null, "SEMPER AUGUSTUS INVESTMENTS GROUP LLC"],
+      ["Berkshire Hathaway", "Warren Buffett", 0.1151, 304.2, null, "Berkshire Hathaway Inc"],
+      ["Chou Associates", "Francis Chou", 0.1134, 0.21, null, "Chou Associates Management Inc."],
+      ["Himalaya Capital", "Li Lu", 0.1133, 3.78, null, "Himalaya Capital Management LLC"],
+      ["Alleghany", "Weston Hicks", 0.0965, 2.21, 38, "ALLEGHANY CORP /DE"],
+      ["Aquamarine Capital", "Guy Spier", 0.0901, 0.17, 37, "Aquamarine Capital Management, LLC"],
+      ["Markel", "Tom Gayner", 0.0896, 12.79, null, "Markel Group Inc."],
+      ["Fairfax Financial", "Prem Watsa", 0.0789, 2.65, null, "FAIRFAX FINANCIAL HOLDINGS LTD/ CAN"],
+      ["Daily Journal", "Charlie Munger", 0.0712, 0.25, null, "DAILY JOURNAL CORP"],
+      ["Ruane, Cunniff & Goldfarb", "Bill Ruane", 0.0608, 6.0, null, "Ruane, Cunniff & Goldfarb L.P."],
+      ["Dalal Street", "Mohnish Pabrai", 0.0552, 0.36, null, "Dalal Street, LLC"],
+      ["Biglari Capital", "Sardar Biglari", 0.0412, 1.03, null, "BIGLARI CAPITAL CORP."],
+      ["Kahn Brothers", "Irving Kahn", 0.0265, 0.6, null, "KAHN BROTHERS GROUP INC"],
+      ["Arlington Value Capital", "Allan Mecham", -0.0327, 0.69, 28, "Arlington Value Capital, LLC"]
+    ];
+    // Most searched: the 50 funds people search Google for most (Google Trends, 12 months to 17 Nov 2026)
+    return [
+      ["Berkshire Hathaway", "Warren Buffett", 0.1151, 304.2, null, "Berkshire Hathaway Inc"],
+      ["Bridgewater", "Ray Dalio", 0.12, 22.08, null, "Bridgewater Associates, LP"],
+      ["Sequoia Capital", null, -0.1456, 25.49, null, "SC US (TTGP), LTD."],
+      ["ARK Investment", "Cathie Wood", -0.0459, 16.51, null, "ARK Investment Management LLC"],
+      ["Gates Foundation", "Bill Gates", 0.1123, 29.88, null, "GATES FOUNDATION TRUST"],
+      ["Pershing Square Capital", "Bill Ackman", 0.0969, 13.71, 52, "Pershing Square Capital Management, L.P."],
+      ["Daily Journal", "Charlie Munger", 0.0712, 0.25, null, "DAILY JOURNAL CORP"],
+      ["Insight Partners", null, -0.104, 1.24, null, "Insight Holdings Group, LLC"],
+      ["Duquesne Family Office", "Stanley Druckenmiller", 0.3025, 3.58, null, "Duquesne Family Office LLC"],
+      ["General Catalyst", null, -0.1184, 0.48, null, "General Catalyst Group Management, LLC"],
+      ["Renaissance Technologies", "Jim Simons", 0.0968, 71.52, null, "RENAISSANCE TECHNOLOGIES LLC"],
+      ["Trian", "Nelson Peltz", 0.0851, 2.59, null, "TRIAN FUND MANAGEMENT, L.P."],
+      ["Markel", "Tom Gayner", 0.0896, 12.79, null, "Markel Group Inc."],
+      ["Thrive Capital", "Josh Kushner", -0.0863, 7.55, null, "Thrive Capital Management, LLC"],
+      ["Carl Icahn", null, -0.039, 9.43, null, "ICAHN CARL C"],
+      ["Appaloosa", "David Tepper", 0.2422, 7.47, null, "APPALOOSA LP"],
+      ["Dodge & Cox", null, 0.0912, 171.47, null, "Dodge & Cox"],
+      ["Paulson & Co.", "John Paulson", 0.1347, 2.92, null, "PAULSON & CO. INC."],
+      ["Summit Partners", null, -0.1668, 0.49, null, "SUMMIT PARTNERS L P"],
+      ["Himalaya Capital", "Li Lu", 0.1133, 3.78, null, "Himalaya Capital Management LLC"],
+      ["Battery Ventures", null, -0.2258, 0.33, null, "BATTERY MANAGEMENT CORP."],
+      ["Dalal Street", "Mohnish Pabrai", 0.0552, 0.36, null, "Dalal Street, LLC"],
+      ["AQR Capital", "Cliff Asness", 0.1138, 325.03, null, "AQR CAPITAL MANAGEMENT LLC"],
+      ["Baupost", "Seth Klarman", -0.0179, 4.97, null, "BAUPOST GROUP LLC/MA"],
+      ["Gotham", "Joel Greenblatt", 0.1035, 49.68, null, "Gotham Asset Management, LLC"],
+      ["Greenlight Capital", "David Einhorn", 0.2795, 1.73, 43, "GREENLIGHT CAPITAL INC"],
+      ["HongShan", "Neil Shen", -0.1805, 1.21, null, "HSG Holding Ltd"],
+      ["Altimeter Capital", "Brad Gerstner", 0.0399, 9.84, null, "Altimeter Capital Management, LP"],
+      ["TCI", "Christopher Hohn", 0.0902, 48.45, null, "TCI FUND MANAGEMENT LTD"],
+      ["Third Point", "Dan Loeb", 0.0708, 4.28, null, "Third Point LLC"],
+      ["Fisher Investments", "Ken Fisher", 0.1191, 334.07, null, "Fisher Asset Management, LLC"],
+      ["First Eagle", null, 0.1384, 59.74, null, "First Eagle Investment Management, LLC"],
+      ["GAMCO", "Mario Gabelli", 0.1059, 9.9, null, "GAMCO INVESTORS, INC. ET AL"],
+      ["Baron Capital", "Ron Baron", -0.0143, 57.17, null, "BAMCO INC /NY/"],
+      ["AKO Capital", "Nicolai Tangen", 0.079, 2.6, null, "AKO CAPITAL LLP"],
+      ["Leon Cooperman", null, 0.1368, 2.95, null, "COOPERMAN LEON G"],
+      ["NEA", null, -0.0052, 1.3, null, "NEA Management Company, LLC"],
+      ["Fundsmith", "Terry Smith", 0.0438, 12.92, null, "Fundsmith LLP"],
+      ["DST Global", "Yuri Milner", -0.0458, 4.02, null, "Galileo (PTC) Ltd"],
+      ["Two Sigma", "John Overdeck & David Siegel", 0.064, 127.82, null, "TWO SIGMA INVESTMENTS, LP"],
+      ["Marshall Wace", "Paul Marshall & Ian Wace", 0.0907, 102.58, null, "MARSHALL WACE, LLP"],
+      ["Biglari Capital", "Sardar Biglari", 0.0412, 1.03, null, "BIGLARI CAPITAL CORP."],
+      ["Fairfax Financial", "Prem Watsa", 0.0789, 2.65, null, "FAIRFAX FINANCIAL HOLDINGS LTD/ CAN"],
+      ["ValueAct", "Mason Morfit", 0.115, 6.18, null, "ValueAct Holdings, L.P."],
+      ["Coatue", "Philippe Laffont", 0.0955, 53.87, null, "COATUE MANAGEMENT LLC"],
+      ["Baker Bros.", "Felix & Julian Baker", 0.1472, 20.78, null, "BAKER BROS. ADVISORS LP"],
+      ["Dragoneer", "Marc Stad", -0.1055, 5.87, null, "Dragoneer Investment Group, LLC"],
+      ["Greenoaks", "Neil Mehta", 0.153, 2.4, null, "GREENOAKS LLC"],
+      ["Tiger Global", "Chase Coleman", 0.036, 19.9, null, "TIGER GLOBAL MANAGEMENT LLC"],
+      ["Discovery Capital", "Rob Citrone", 0.0654, 1.84, null, "DISCOVERY CAPITAL MANAGEMENT, LLC / CT"]
+    ];
+  }
+  sorted(list) { return this.data(list).slice().sort((x, y) => y[2] - x[2]); }
+
+  // ---- the scale follows the scroll position continuously (percentage points) ----
+  // Each whole-row window k: lo = min(0, rows), hi = max(0, S&P, rows), at least 20 pts wide (grown on the gain side);
+  // with losses in view the left end is pushed out by room for their labels (~50px). The sequence is smoothed
+  // over +-3 windows (never narrower than the rows in view) and interpolated at the fractional scroll position,
+  // so the axis glides as rows enter and leave instead of stepping.
+  raw(vals, innerW) {
+    const SPX = 12.19, MIN = 20, ROOM = 50;
+    const v = vals.map((x) => x * 100);
+    let lo = Math.min(0, ...v), hi = Math.max(0, SPX, ...v);
+    if (hi - lo < MIN) hi = lo + MIN;
+    if (lo < 0) lo -= ROOM * (hi - lo) / Math.max(200, innerW - ROOM);
+    return [lo, hi];
+  }
+  track(list, innerW) {
+    const key = list + ':' + Math.round(innerW);
+    if (this._trk && this._trk.key === key) return this._trk.s;
+    const s = this.sorted(list), VIS = 15, K = Math.max(1, s.length - VIS + 1);
+    const r = [];
+    for (let k = 0; k < K; k++) r.push(this.raw(s.slice(k, k + VIS).map((a) => a[2]), innerW));
+    const R = 3, out = [];
+    for (let k = 0; k < K; k++) {
+      let lo = 0, hi = 0, w = 0;
+      for (let j = Math.max(0, k - R); j <= Math.min(K - 1, k + R); j++) { const wt = R + 1 - Math.abs(j - k); lo += r[j][0] * wt; hi += r[j][1] * wt; w += wt; }
+      out.push([Math.min(lo / w, r[k][0]), Math.max(hi / w, r[k][1])]);
+    }
+    this._trk = { key, s: out, r };
+    return out;
+  }
+  // a smooth curve (Catmull-Rom) through the windows, so the axis has no kinks as rows pass; never narrower than the rows in view
+  domAt(list, p, innerW) {
+    const s = this.track(list, innerW), r = this._trk.r, L = s.length - 1;
+    const k = Math.max(0, Math.min(L, Math.floor(p))), t = Math.max(0, Math.min(1, p - k));
+    const at = (a, j) => a[Math.max(0, Math.min(L, j))];
+    const cr = (i) => {
+      const p0 = at(s, k - 1)[i], p1 = at(s, k)[i], p2 = at(s, k + 1)[i], p3 = at(s, k + 2)[i];
+      return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+    };
+    const lin = (i) => at(r, k)[i] + (at(r, k + 1)[i] - at(r, k)[i]) * t;
+    return { lo: Math.min(cr(0), lin(0)), hi: Math.max(cr(1), lin(1)) };
+  }
+  fitOld(vals, prev) {
+    const SPX = 12.19, MIN = 20, R = 2.5;
+    const v = vals.map((x) => x * 100);
+    let lo = Math.min(0, ...v), hi = Math.max(0, SPX, ...v);
+    if (hi - lo < MIN) {
+      const pos = v.filter((x) => x >= 0).length;
+      if (pos >= v.length - pos) hi = lo + MIN; else lo = hi - MIN;
+    }
+    lo = Math.floor(lo / R + 1e-9) * R;
+    hi = Math.ceil(hi / R - 1e-9) * R;
+    if (prev) {
+      if (lo > prev.lo && lo - prev.lo < 5) lo = prev.lo;
+      if (hi < prev.hi && prev.hi - hi < 5) hi = prev.hi;
+    }
+    const span = hi - lo;
+    const step = span > 60 ? 20 : span >= 27.5 ? 10 : span <= 22.5 ? 5 : (prev ? prev.step : 5);
+    return { lo, hi, step };
+  }
+  // ---- eased scrolling: the wheel or a key sets a target and a critically damped spring carries the list there,
+  // so each scroll starts gently, runs at full speed, then slows and settles (no overshoot, ~0.45s).
+  // The scale is read from the eased position every frame, so the axis moves at the same pace as the rows. ----
+  attach(el) {
+    if (!el || el === this._box) return;
+    if (this._box && this._wheel) this._box.removeEventListener('wheel', this._wheel);
+    this._box = el;
+    this._T = this._T2 = this._C = el.scrollTop; this._v = 0;
+    this.innerW = Math.max(300, el.clientWidth - 312 - 56);
+    this._wheel = (e) => {
+      if (e.ctrlKey) return;
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
+      const max = el.scrollHeight - el.clientHeight;
+      const T = this._T == null ? el.scrollTop : this._T;
+      if ((dy < 0 && T <= 0) || (dy > 0 && T >= max - 0.5)) return; // at an end: let the page scroll on
+      e.preventDefault();
+      this.glide(T + dy);
+    };
+    el.addEventListener('wheel', this._wheel, { passive: false });
+  }
+  glide(to) {
+    const el = this._box; if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    this._T = Math.max(0, Math.min(max, to));
+    if (this.reduced()) { this.stopGlide(); el.scrollTop = this._T; this._C = this._T2 = this._T; return; }
+    if (this._anim) return;
+    if (this._C == null) this._C = el.scrollTop;
+    if (this._T2 == null) this._T2 = this._C;
+    this._v = this._v || 0;
+    let last = 0;
+    // two stages per 60fps frame: the target itself eases in (A), and a critically damped spring (K) follows it,
+    // giving an S-curve: slow start, full speed, slow settle (~0.55s for one wheel notch)
+    const A = 0.2, K = 0.05, D = 2 * Math.sqrt(K);
+    const step = (now) => {
+      const dt = last ? Math.min(2, (now - last) / 16.667) : 1; last = now;
+      this._T2 += (this._T - this._T2) * Math.min(1, A * dt);
+      const a = (this._T2 - this._C) * K - this._v * D;
+      this._v += a * dt; this._C += this._v * dt;
+      if (Math.abs(this._T - this._C) < 0.4 && Math.abs(this._v) < 0.05) { this._C = this._T2 = this._T; this._v = 0; }
+      el.scrollTop = this._C;
+      this._p = this._C / 46;
+      this.setState({ p: this._p });
+      this._anim = this._C === this._T ? 0 : requestAnimationFrame(step);
+    };
+    this._anim = requestAnimationFrame(step);
+  }
+  stopGlide() { if (this._anim) cancelAnimationFrame(this._anim); this._anim = 0; this._v = 0; }
+  componentWillUnmount() { this.stopGlide(); if (this._box && this._wheel) this._box.removeEventListener('wheel', this._wheel); }
+  reduced() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
+  renderVals() {
+    const ROW = 46, VIS = 15;
+    const SPX = 0.1219; // SPY quarter-end closes on data.orcaetf.com, 429.14 (Q3 2021) to 762.63 (Q3 2026), price only
+    const dark = this.props.dark ?? false;
+    const fixed = (this.props.scale ?? 'Fits the funds in view') === 'Same for the whole list';
+    const shaded = (this.props.colour ?? 'Shaded by size') === 'Shaded by size';
+    const aumIn = (this.props.aum ?? 'Next to name') === 'Inside bar (white)';
+    const grey = (this.props.photos ?? 'Grey until hover') === 'Grey until hover';
+    const serif = (this.props.headline ?? 'Sans') === 'Serif';
+    const st = this.state || {};
+    const run = st.run || 0;
+    const table = !!st.table;
+    const list = st.list || 'ms';
+    const all = this.sorted(list);
+    const n = all.length;
+    const scroll = n > VIS;
+    const p = scroll ? Math.max(0, Math.min(n - VIS, st.p || 0)) : 0;
+    const view = Math.round(p);
+    const innerW = this.innerW || 864;
+    const wl = this.raw(all.map((a) => a[2]), innerW);
+    const d = fixed || !scroll ? { lo: wl[0], hi: wl[1] } : this.domAt(list, p, innerW);
+    const D0 = d.lo / 100, D1 = d.hi / 100, SPAN = D1 - D0;
+    const step = SPAN * 100 > 60 ? 20 : SPAN * 100 >= 25 ? 10 : 5;
+
+    const photos = {
+      'Warren Buffett': '/_blob/2c096ba4961a158b2e4a05d0f8b9b19a',
+      'Charlie Munger': '/_blob/39b5162caa82b7b9329d07a8b494a98e',
+      'Ray Dalio': '/_blob/497a4995478706117383c2a471a8a878',
+      'Cathie Wood': '/_blob/1efcbe2d8b2f0cbc1d5070edabf2b10f',
+      'Bill Gates': '/_blob/7228c59cce6a1234a2643bdbb6eac62a',
+      'Bill Ackman': '/_blob/c765d1c2140d30f0901cb327e8b3cda8',
+      'Guy Spier': '/_blob/c7269ec90b77a72173c378a171ed2cf2',
+      'Jim Simons': '/_blob/a87f2e29a8ed6e51d8c97a90e8f01d4a',
+      'Carl Icahn': '/_blob/5a5dcf8833e2c3937003692b1c0073d8',
+      'Josh Kushner': '/_blob/58aadc32a7a2ebf11b5f6924da32e90d',
+      'David Tepper': '/_blob/881c33132d568ec860dfc612ea1b0bc2',
+      'Cliff Asness': '/_blob/e044012e0693acd5ae8e7e55e40c30c9',
+      'Brad Gerstner': '/_blob/ac9b26370ac9a764571f7b1cbcf57d3d',
+      'Christopher Hohn': '/_blob/c5f10b6ed1489fd41af97293cd9b805d',
+      'Nicolai Tangen': '/_blob/0a5bf5992466c9826a7447089d558d1a',
+      'Yuri Milner': '/_blob/082e12b7fee27402283c3861c5359e1e'
+    };
+    const faceOf = { 'Carl Icahn': 'Carl Icahn' };
+    const GAIN = aumIn ? ['#267CAA', '#1B6A98', '#0B4A72'] : dark ? ['#1F5F86', '#3D93C2', '#8CCBEE'] : ['#9CC8E2', '#267CAA', '#0B4A72'];
+    const LOSS = aumIn ? ['#C64A14', '#A93E0E', '#8A3208'] : dark ? ['#7E3714', '#D9622B', '#F7A882'] : ['#F2B08F', '#C64A14', '#8A3208'];
+    const SOLID = aumIn ? ['#267CAA', '#C64A14'] : dark ? ['#3D93C2', '#F48D60'] : ['#267CAA', '#D4561F'];
+    const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const mix = (a, b, t) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+    const ramp = (s, f) => f <= 0.5 ? mix(s[0], s[1], f / 0.5) : mix(s[1], s[2], (f - 0.5) / 0.5);
+    const pct = (x) => (x * 100).toFixed(3) + '%';
+    const M = '−';
+    const fmt = (r) => (r >= 0 ? '+' : M) + Math.abs(r * 100).toFixed(1) + '%';
+    const pp = (r) => (r >= 0 ? '+' : M) + Math.abs(r * 100).toFixed(1) + ' pts';
+    const book = (b) => '$' + b.toFixed(1) + 'B';
+    const qLabel = (q) => 'Q' + ((q % 4) + 1) + ' ' + (2013 + Math.floor(q / 4));
+    const initials = (s) => s.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('');
+    const pos = (v) => (Math.max(D0, Math.min(D1, v)) - D0) / SPAN;
+    const zero = pos(0);
+    const STEP = 40;
+
+    const rows = all.map((a, i) => {
+      const [name, mgr, ret, b, until, full] = a;
+      const up = ret >= 0;
+      const start = up ? zero : pos(ret);
+      const end = up ? pos(ret) : zero;
+      const f = Math.min(Math.abs(ret) / 0.30, 1);
+      const face = mgr || faceOf[name];
+      const photo = face ? photos[face] : undefined;
+      const fill = shaded ? ramp(up ? GAIN : LOSS, aumIn ? f : 0.15 + 0.85 * f) : (up ? SOLID[0] : SOLID[1]);
+      const dl = Math.min(Math.max(i - view, 0), VIS) * STEP;
+      return {
+        name, full: full || name, photo, hasPhoto: !!photo, noPhoto: !photo,
+        initials: initials(face || name),
+        mgr: mgr || '', hasMgr: !!mgr,
+        stopped: until != null, until: until != null ? qLabel(until) : '',
+        hasSub: !!mgr || until != null,
+        kind: up ? 'gain' : 'loss',
+        cut: ret > D1 + 1e-9 || ret < D0 - 1e-9 ? 'cut' : '',
+        left: pct(start), width: pct(end - start), fill,
+        origin: up ? 'left center' : 'right center',
+        lx: up ? 'calc(' + pct(end) + ' + 6px)' : 'auto',
+        rx: up ? 'auto' : 'calc(' + pct(1 - start) + ' + 6px)',
+        leadClass: i === 0 ? 'lead' : '',
+        tipCls: scroll && i - view < 2 ? 'below' : '',
+        delay: dl + 'ms', late: (dl + 450) + 'ms',
+        num: fmt(ret), vs: pp(ret - SPX), aum: book(b), aumCls: book(b).length > 6 ? 'l' : 's',
+        aria: (i + 1) + ' of ' + n + '. ' + name + (mgr ? ', ' + mgr : '') + ', AUM ' + book(b) + ': ' + (up ? 'gain' : 'loss') + ' of ' + Math.abs(ret * 100).toFixed(1) + '% a year (estimate), ' + (ret > SPX ? 'ahead of' : 'behind') + ' the S&P 500' + (i === 0 ? ', best in this list' : '')
+      };
+    });
+
+    // one stable set of candidate ticks (every 5 pts), so a tick keeps its element: it slides with the scale and fades in or out
+    const ticks = [];
+    for (let t = -50; t <= 50; t += 5) {
+      const inside = t >= d.lo + 1 && t <= d.hi - 0.5;
+      const on = t === 0 || (inside && t % step === 0);
+      ticks.push({
+        left: pct(Math.max(-0.08, Math.min(1.08, (t / 100 - D0) / SPAN))),
+        label: t === 0 ? '0%' : (t > 0 ? '+' : M) + Math.abs(t) + '%',
+        op: on ? 1 : 0,
+        cls: t === 0 ? 'z' : ''
+      });
+    }
+
+    const lead = (() => {
+      const beat = all.filter((a) => a[2] > SPX).length, lost = all.filter((a) => a[2] < 0).length;
+      return all[0][0] + ' leads with ' + fmt(all[0][2]) + ' a year. ' + beat + ' of the ' + n + ' beat the S&P 500' + (lost ? '; ' + lost + ' lost money.' : '; none lost money.');
+    })();
+
+    const go = (el, t) => {
+      t = Math.max(0, Math.min(n - VIS, t));
+      this.attach(el);
+      this.glide(t * ROW);
+    };
+    const show = (l) => (e) => {
+      const box = e && e.currentTarget && e.currentTarget.closest('.orca') ? e.currentTarget.closest('.orca').querySelector('.scr') : null;
+      clearTimeout(this._t);
+      this.stopGlide();
+      if (box) box.scrollTop = 0;
+      this._T = this._T2 = this._C = 0;
+      this.setState({ list: l, p: 0, run: run + 1 });
+    };
+
+    return {
+      rootClass: [dark ? 'dark' : '', grey ? 'grey' : '', serif ? 'serif' : '', run % 2 ? 'run-b' : 'run-a'].join(' '),
+      replay: () => this.setState({ run: run + 1 }),
+      table, chart: !table, tablePressed: table ? 'true' : 'false',
+      toggleLabel: table ? 'Chart view' : 'Table view',
+      toggleTable: () => this.setState({ table: !table, run: table ? run + 1 : run }),
+      msPressed: list === 'ms' ? 'true' : 'false', biPressed: list === 'bi' ? 'true' : 'false',
+      showMs: show('ms'), showBi: show('bi'),
+      aumName: !aumIn, aumIn,
+      spx: fmt(SPX), spxLeft: pct(pos(SPX)),
+      ticks, scroll, n,
+      scrH: scroll ? (VIS * ROW) + 'px' : 'auto',
+      scrLabel: 'Funds ' + (view + 1) + ' to ' + Math.min(n, view + VIS) + ' of ' + n + ', scrollable',
+      fadeTop: scroll && view > 0 ? 1 : 0,
+      fadeBot: scroll && view + VIS < n ? 1 : 0,
+      caption: scroll
+        ? 'Showing ' + (view + 1) + '–' + (view + VIS) + ' of ' + n + ' · ' + (fixed ? 'same scale for the whole list' : 'scale fits the funds in view')
+        : 'All ' + n + ' funds',
+      // scroll: one update per frame; the scale is a smooth function of the scroll position
+      boxRef: this._boxRef || (this._boxRef = (el) => this.attach(el)),
+      onScroll: (e) => {
+        const el = e.currentTarget;
+        this.attach(el);
+        // a scroll the spring did not drive (scrollbar drag, touch): follow it
+        if (!this._anim) { this._T = this._T2 = this._C = el.scrollTop; this._v = 0; }
+        this._p = el.scrollTop / ROW;
+        if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.setState({ p: this._p }); });
+      },
+      onKey: (e) => {
+        if (!scroll) return;
+        const el = e.currentTarget;
+        const cur = Math.round((this._T == null ? el.scrollTop : this._T) / ROW);
+        const k = { ArrowDown: cur + 1, ArrowUp: cur - 1, PageDown: cur + 14, PageUp: cur - 14, Home: 0, End: n - VIS }[e.key];
+        if (k === undefined) return;
+        e.preventDefault();
+        go(el, k);
+      },
+      g: { name: list === 'bi' ? 'Buffett inspired' : 'Most searched', count: n + ' FUNDS', lead, rows }
+    };
+  }
+}
+</script>
+</body>
+</html>

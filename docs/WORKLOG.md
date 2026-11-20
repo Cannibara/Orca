@@ -5,6 +5,13 @@ Last verified: 2026-11-20
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-20 — Home: Famous funds as one ranked return chart (design approved, not built)
+
+| What changed | Why | Files |
+|---|---|---|
+| Design spec for replacing the Famous funds tables with one full-width bar chart per list: sorted by 5y return, zero line (gains right, losses left), shaded blue/orange by size, labels at the bar tips, S&P 500 dotted line (+12.2% a year, SPY Q3 2021–Q3 2026), a 15-row (phone 10) scrolling window whose scale fits the funds in view and glides with an eased scroll. Written so an LLM or developer can build it cold; mock-ups saved beside it | Owner: "make the home page simpler and more visual with a colourful annual return graph"; approved over several rounds on the claude.ai Design canvas RBrW19wJQpU4mToFrVpG8B (v4 boards) | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `docs/superpowers/specs/2026-11-20-home-famous-chart-mock/` |
+| Open: dividends in fund estimates vs SPY price return; sorting by return vs the 2026-11-18 "most popular first" rule in PRODUCT.md | Owner to decide | — |
+
 ## 2026-11-20 — Home: Famous funds first
 
 | What changed | Why | Files |
