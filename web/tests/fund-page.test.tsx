@@ -112,7 +112,7 @@ function renderFund(id: string | number = FUND, extra: ReactNode = null, hash = 
   );
 }
 
-/** The Analysis tab of a fund page: key figures, Annual returns, Return constituents, What if. */
+/** The Analysis tab of a fund page: key figures, Assets under management, Return constituents, What if. */
 const renderAnalysis = (id: string | number = FUND, extra: ReactNode = null) => renderFund(id, extra, "#analysis");
 
 /** Wait until the page has loaded fund `name`. */
@@ -130,14 +130,12 @@ const tileSub = (label: string) => tile(label).querySelector(".kpi-n")?.textCont
 /** One of the three ratios of the Risk-adjusted return tile: "Sharpe", "Sortino" or "Calmar". */
 const ratioValue = (name: string) =>
   Array.from(tile("Risk-adjusted return").querySelectorAll(".kpi-trio > div")).find((d) => d.querySelector("dt")?.textContent === name)?.querySelector("dd")?.textContent;
-const wholePeriodValues = () => [
-  ratioValue("Sharpe"),
-  ratioValue("Sortino"),
-  ratioValue("Calmar"),
-  tileValue("Turnover per year"),
-  tileValue("Average hold length"),
-  tileValue("Positions profitable"),
-];
+/** The whole-period tiles of the Analysis tab: the three ratios and the profitable share. */
+const analysisWhole = () => [ratioValue("Sharpe"), ratioValue("Sortino"), ratioValue("Calmar"), tileValue("Positions profitable")];
+/** The whole-period tiles of the Holdings tab: turnover and hold length. */
+const holdingsWhole = () => [tileValue("Turnover per year"), tileValue("Average hold length")];
+/** The labels of the tiles on the open tab, in order. */
+const tileLabels = () => within(region("Key figures")).getAllByRole("article").map((a) => a.querySelector(".kpi-l")?.firstChild?.textContent);
 
 const region = (name: string) => screen.getByRole("region", { name });
 /** The bars of Annual returns, as their labels. */
@@ -146,11 +144,18 @@ const pressedBars = () => bars().filter((b) => b.getAttribute("aria-pressed") ==
 const bar = (label: string) => screen.getByRole("button", { name: new RegExp(`^${label}: `) });
 const drovTitle = (span: string) => screen.getByRole("heading", { name: `Return constituents ${span}` });
 const kpiCaption = () => document.querySelector(".kpi-cap")?.textContent;
-/** The caption above the key figures when the bracket spans `span`. */
-const bracketCaption = (span: string) => `The first four tiles follow the Annual returns bracket: ${span}. The rest cover the whole tracked period.`;
+/** The caption above the Holdings tab's key figures when the bracket spans `span`. */
+const holdingsCaption = (span: string) =>
+  `Annualised return and Max drawdown follow the Annual returns bracket: ${span}. Turnover per year and Average hold length cover the whole tracked period.`;
+/** The caption above the Analysis tab's key figures when the bracket spans `span`. */
+const analysisCaption = (span: string) =>
+  `Years positive and Volatility follow the Annual returns bracket: ${span}. Risk-adjusted return and Positions profitable cover the whole tracked period.`;
 /** The span the bracket names in that caption, e.g. "2014 to 2026 H1". */
 const kpiSpan = () => document.querySelector(".kpi-cap b")?.textContent;
 const handle = (name: string) => screen.getByRole("slider", { name });
+/** Open a tab of the fund page by clicking it. */
+const openTab = (user: ReturnType<typeof userEvent.setup>, name: "Holdings" | "Analysis" | "About") =>
+  user.click(screen.getByRole("tab", { name: name === "Holdings" ? /^Holdings/ : name }));
 
 const COULDNT_LOAD = "Couldn't load this fund. Check your connection and reload the page.";
 
@@ -271,39 +276,44 @@ describe("Fund page", () => {
       expect(document.querySelector(".fp-foot")).toHaveTextContent(/^Source: SEC Form 13F-HR filings/);
     });
 
-    it("Holdings: the Holdings panel, then Positions, and nothing else", async () => {
+    it("Holdings: key figures, the Holdings panel, Annual returns, then Positions, and nothing else", async () => {
       stubData();
       renderFund();
       await loaded("Kelpwood Capital LP");
       const panel = screen.getByRole("tabpanel");
-      expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Holdings", "Positions"]);
-      expect(region("Holdings").compareDocumentPosition(region("Positions")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(screen.queryByRole("heading", { name: "Annual returns" })).toBeNull();
+      expect(within(panel).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Holdings", "Annual returns", "Positions"]);
+      const inOrder = [region("Key figures"), region("Holdings"), region("Annual returns"), region("Positions")];
+      inOrder.slice(1).forEach((el, i) => {
+        expect(inOrder[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING, `section ${i + 1} follows section ${i}`).toBeTruthy();
+      });
+      expect(screen.queryByRole("heading", { name: /^Return constituents/ })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Assets under management" })).toBeNull();
       expect(screen.queryByRole("heading", { name: "About" })).toBeNull();
     });
 
-    it("Analysis: key figures, Annual returns, Return constituents and What if, top to bottom", async () => {
+    it("Analysis: key figures, Assets under management, Return constituents and What if, top to bottom", async () => {
       stubData();
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
       expect(screen.getByRole("tab", { name: "Analysis" })).toHaveAttribute("aria-selected", "true");
       const heading = (name: string | RegExp) => screen.getByRole("heading", { name });
-      const inOrder = [region("Key figures"), heading("Annual returns"), heading(/^Return constituents /), heading("What if they'd kept it")];
+      const inOrder = [region("Key figures"), heading("Assets under management"), heading(/^Return constituents /), heading("What if they'd kept it")];
       inOrder.slice(1).forEach((el, i) => {
         expect(inOrder[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING, `section ${i + 1} follows section ${i}`).toBeTruthy();
       });
-      for (const name of ["Annual returns", "Return constituents 2025", "What if they'd kept it"]) expect(region(name)).toBeInTheDocument();
+      for (const name of ["Assets under management", "Return constituents 2025", "What if they'd kept it"]) expect(region(name)).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Positions" })).toBeNull();
-      expect(screen.queryByRole("heading", { name: "Assets under management" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Annual returns" })).toBeNull();
       expect(document.querySelector(".fp-foot")).toBeInTheDocument();
     });
 
-    it("About: the About panel, then Assets under management", async () => {
+    it("About: the About panel, and nothing else", async () => {
       stubData();
       renderFund(FUND, null, "#about");
       await loaded("Kelpwood Capital LP");
       expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute("aria-selected", "true");
-      expect(region("About").compareDocumentPosition(region("Assets under management")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(screen.getByRole("tabpanel")).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["About"]);
+      expect(screen.queryByRole("heading", { name: "Assets under management" })).toBeNull();
       expect(screen.queryByRole("heading", { name: "Annual returns" })).toBeNull();
       expect(document.querySelector(".fp-foot")).toBeInTheDocument();
     });
@@ -316,24 +326,26 @@ describe("Fund page", () => {
         hash = useLocation().hash;
         return null;
       }
-      renderFund(FUND, <Spy />, "#analysis");
+      renderFund(FUND, <Spy />);
       await loaded("Kelpwood Capital LP");
       await user.click(bar("2023"));
-      expect(drovTitle("2023")).toBeInTheDocument();
-      await user.click(screen.getByRole("tab", { name: /^Holdings/ }));
-      expect(hash).toBe("#holdings");
-      expect(region("Positions")).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Annual returns" })).toBeNull();
       // the Holdings period picked survives a trip to another tab too
       await user.click(screen.getByRole("button", { name: "Year" }));
-      await user.click(screen.getByRole("tab", { name: "About" }));
+      await openTab(user, "Analysis");
+      expect(hash).toBe("#analysis");
+      expect(drovTitle("2023")).toBeInTheDocument(); // the year picked on Holdings' Annual returns
+      expect(screen.queryByRole("heading", { name: "Annual returns" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Positions" })).toBeNull();
+      await openTab(user, "About");
       expect(hash).toBe("#about");
       expect(region("About")).toBeInTheDocument();
-      await user.click(screen.getByRole("tab", { name: "Analysis" }));
-      expect(drovTitle("2023")).toBeInTheDocument();
+      await openTab(user, "Holdings");
+      expect(hash).toBe("#holdings");
+      expect(region("Positions")).toBeInTheDocument();
       expect(pressedBars()).toEqual(["2023"]);
-      await user.click(screen.getByRole("tab", { name: /^Holdings/ }));
       expect(screen.getByRole("button", { name: "Year" })).toHaveAttribute("aria-pressed", "true");
+      await openTab(user, "Analysis");
+      expect(drovTitle("2023")).toBeInTheDocument();
     });
 
     it("header: the filing line, the book, and the positions count from positions.json", async () => {
@@ -347,23 +359,21 @@ describe("Fund page", () => {
       expect(screen.getByRole("tab", { name: /^Holdings\s*10$/ })).toBeInTheDocument(); // the count of holdings now, as in the line above
     });
 
-    it("key figures: the first four tiles follow the Annual returns bracket", async () => {
+    it("key figures: four tiles on Holdings and four on Analysis; the first two of each follow the Annual returns bracket", async () => {
       stubData();
-      renderAnalysis();
+      const user = userEvent.setup();
+      renderFund();
       await loaded("Kelpwood Capital LP");
-      const strip = region("Key figures");
-      expect(
-        within(strip)
-          .getAllByRole("article")
-          .slice(0, 4)
-          .map((a) => a.querySelector(".kpi-l")?.firstChild?.textContent),
-      ).toEqual(["Annualised return", "Years positive", "Max drawdown", "Volatility"]);
-      expect(kpiCaption()).toBe(bracketCaption("2014 to 2026 H1"));
+      expect(tileLabels()).toEqual(["Annualised return", "Max drawdown", "Turnover per year", "Average hold length"]);
+      expect(kpiCaption()).toBe(holdingsCaption("2014 to 2026 H1"));
+      await openTab(user, "Analysis");
+      expect(tileLabels()).toEqual(["Years positive", "Volatility", "Risk-adjusted return", "Positions profitable"]);
+      expect(kpiCaption()).toBe(analysisCaption("2014 to 2026 H1"));
     });
 
     it("Annual returns draws a bar for each year and selects the latest full year (R14)", async () => {
       stubData();
-      renderAnalysis();
+      renderFund();
       await loaded("Kelpwood Capital LP");
       expect(bars()).toHaveLength(13);
       expect(pressedBars()).toEqual(["2025"]); // not 2026 H1: a part year
@@ -372,11 +382,13 @@ describe("Fund page", () => {
 
     it("the default year of a fund that stopped filing is its last full year", async () => {
       stubData();
+      const user = userEvent.setup();
       renderAnalysis(INACTIVE_FUND);
       await loaded("Cobblereef Holdings");
       expect(drovTitle("2023")).toBeInTheDocument();
-      expect(pressedBars()).toEqual(["2023"]);
       expect(screen.getByRole("note")).toHaveTextContent(/filed nothing in the latest two quarters/i);
+      await openTab(user, "Holdings");
+      expect(pressedBars()).toEqual(["2023"]);
     });
 
     it("Return constituents names the selected year and draws its stocks, with company names tidied", async () => {
@@ -390,7 +402,7 @@ describe("Fund page", () => {
 
     it("Assets under management shows the book at the end of the last year", async () => {
       stubData();
-      renderFund(FUND, null, "#about");
+      renderAnalysis();
       await loaded("Kelpwood Capital LP");
       expect(region("Assets under management")).toHaveTextContent("Book at the end of 2026 H1$24.0B");
     });
@@ -468,28 +480,22 @@ describe("Fund page", () => {
   });
 
   describe("key figures", () => {
-    it("shows eight tiles: the bracket's four, then the whole period's risk ratios and trading figures", async () => {
+    it("Holdings shows the bracket's return and drawdown, then turnover and hold length; Analysis the bracket's years positive and volatility, then the risk ratios and profitable share", async () => {
       stubData();
-      renderAnalysis();
+      const user = userEvent.setup();
+      renderFund();
       await loaded("Kelpwood Capital LP");
-      const tiles = Array.from(region("Key figures").querySelectorAll(".kpi")).map((k) => k.querySelector(".kpi-l")?.firstChild?.textContent);
-      expect(tiles).toEqual([
-        "Annualised return",
-        "Years positive",
-        "Max drawdown",
-        "Volatility",
-        "Risk-adjusted return",
-        "Turnover per year",
-        "Average hold length",
-        "Positions profitable",
-      ]);
-      expect(kpiCaption()).toBe(bracketCaption("2014 to 2026 H1"));
-      expect(ratioValue("Sharpe")).toBe("0.30");
-      expect(ratioValue("Sortino")).toBe("0.58");
-      expect(ratioValue("Calmar")).toBe("0.28");
+      expect(tileLabels()).toEqual(["Annualised return", "Max drawdown", "Turnover per year", "Average hold length"]);
+      expect(kpiCaption()).toBe(holdingsCaption("2014 to 2026 H1"));
       expect(tileValue("Turnover per year")).toBe("49%");
       expect(tileValue("Average hold length")).toBe("7.8 yrs");
       expect(tileSub("Average hold length")).toBe("sold positions only: 6.3 yrs");
+      await openTab(user, "Analysis");
+      expect(tileLabels()).toEqual(["Years positive", "Volatility", "Risk-adjusted return", "Positions profitable"]);
+      expect(kpiCaption()).toBe(analysisCaption("2014 to 2026 H1"));
+      expect(ratioValue("Sharpe")).toBe("0.30");
+      expect(ratioValue("Sortino")).toBe("0.58");
+      expect(ratioValue("Calmar")).toBe("0.28");
       expect(tileValue("Positions profitable")).toBe("59%"); // 13 of 22 positions have a positive total at the latest prices
       // the old "More figures" section is gone
       expect(screen.queryByRole("heading", { name: "More figures" })).toBeNull();
@@ -497,39 +503,54 @@ describe("Fund page", () => {
 
     it("the demo fund Halyard Point Partners reads Sharpe −0.01, Sortino −0.01, Calmar 0.02, turnover 40%, hold 8.0 yrs", async () => {
       stubData();
+      const user = userEvent.setup();
       renderAnalysis(OTHER_FUND);
       await loaded("Halyard Point Partners");
-      expect(wholePeriodValues().slice(0, 5)).toEqual(["−0.01", "−0.01", "0.02", "40%", "8.0 yrs"]);
-      expect(tileSub("Average hold length")).toBe("sold positions only: 6.9 yrs");
+      expect(analysisWhole().slice(0, 3)).toEqual(["−0.01", "−0.01", "0.02"]);
       const positions = positionRows(demo<Positions>(`fund/${OTHER_FUND}/positions.json`));
       const share = profitablePct(positions, priceMap(demo<LatestPrices>("latest_prices.json"))) as number;
       expect(tileValue("Positions profitable")).toBe(`${Math.round(share * 100)}%`);
       expect(tileValue("Positions profitable")).toBe("50%");
+      await openTab(user, "Holdings");
+      expect(holdingsWhole()).toEqual(["40%", "8.0 yrs"]);
+      expect(tileSub("Average hold length")).toBe("sold positions only: 6.9 yrs");
     });
 
     it("the whole-period tiles do not follow the Annual returns bracket", async () => {
       stubData();
+      const user = userEvent.setup();
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
-      const before = wholePeriodValues();
+      const analysisBefore = analysisWhole();
+      const years = tileValue("Years positive");
+      await openTab(user, "Holdings");
+      const holdingsBefore = holdingsWhole();
       const first = tileValue("Annualised return");
       fireEvent.keyDown(handle("End of the annualised return span"), { key: "ArrowLeft" });
       fireEvent.keyDown(handle("End of the annualised return span"), { key: "ArrowLeft" });
       expect(kpiSpan()).toBe("2014 to 2024");
       expect(tileValue("Annualised return")).not.toBe(first);
-      expect(wholePeriodValues()).toEqual(before);
+      expect(holdingsWhole()).toEqual(holdingsBefore);
+      await openTab(user, "Analysis");
+      expect(kpiSpan()).toBe("2014 to 2024"); // Analysis' span tiles follow the bracket set on Holdings
+      expect(tileValue("Years positive")).not.toBe(years);
+      expect(analysisWhole()).toEqual(analysisBefore);
     });
 
     it("reads – where a metric is null, and nothing prints NaN, undefined or null anywhere on the page", async () => {
       stubData({ ...summaryWith(nullMetrics), [`fund/${FUND}/positions.json`]: noPositions });
+      const user = userEvent.setup();
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
-      expect(wholePeriodValues()).toEqual(["–", "–", "–", "–", "–", "–"]);
-      expect(tileSub("Average hold length")).toBe("sold positions only: –");
+      expect(analysisWhole()).toEqual(["–", "–", "–", "–"]);
       expect(tile("Positions profitable").querySelector(".kpi-bar")).toBeNull();
       expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
       // the years still draw, and the default year is the latest full one
       expect(drovTitle("2025")).toBeInTheDocument();
+      await openTab(user, "Holdings");
+      expect(holdingsWhole()).toEqual(["–", "–"]);
+      expect(tileSub("Average hold length")).toBe("sold positions only: –");
+      expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
     });
 
     it("shows a dash for the profitable share when no position has a computable total", async () => {
@@ -548,17 +569,21 @@ describe("Fund page", () => {
       stubData(
         summaryWith(noYears),
       );
+      const user = userEvent.setup();
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
       expect(screen.getByRole("heading", { name: "Return constituents" })).toBeInTheDocument();
+      expect(kpiCaption()).toBe("No year with a return yet.");
+      expect(["Years positive", "Volatility"].map(tileValue)).toEqual(["–", "–"]);
+      expect(analysisWhole()).toEqual(["0.30", "0.58", "0.28", "59%"]); // the whole period needs no year
+      expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
+      expect(region("What if they'd kept it")).toBeInTheDocument(); // the lower sections do not depend on the years
+      await openTab(user, "Holdings");
       expect(within(region("Annual returns")).getByText("No annual returns yet")).toBeInTheDocument();
       expect(bars()).toHaveLength(0);
       expect(kpiCaption()).toBe("No year with a return yet.");
-      expect(["Annualised return", "Years positive", "Max drawdown", "Volatility"].map(tileValue)).toEqual(["–", "–", "–", "–"]);
-      expect(wholePeriodValues()).toEqual(["0.30", "0.58", "0.28", "49%", "7.8 yrs", "59%"]); // the whole period needs no year
-      expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
-      expect(region("What if they'd kept it")).toBeInTheDocument(); // the lower sections do not depend on the years
-      await userEvent.setup().click(screen.getByRole("tab", { name: /^Holdings/ }));
+      expect(["Annualised return", "Max drawdown"].map(tileValue)).toEqual(["–", "–"]);
+      expect(holdingsWhole()).toEqual(["49%", "7.8 yrs"]);
       expect(region("Positions")).toBeInTheDocument();
       expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
     });
@@ -569,10 +594,14 @@ describe("Fund page", () => {
           s.years.ret = s.years.ret.map(() => null);
         }),
       );
-      renderAnalysis();
+      const user = userEvent.setup();
+      renderFund();
       await loaded("Kelpwood Capital LP");
       expect(within(region("Annual returns")).getByText("No annual returns yet")).toBeInTheDocument();
       expect(bars()).toHaveLength(0);
+      expect(kpiCaption()).toBe("No year with a return yet.");
+      expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
+      await openTab(user, "Analysis");
       expect(kpiCaption()).toBe("No year with a return yet.");
       expect(drovTitle("2025")).toBeInTheDocument(); // the default year does not need a return (R14)
       expect(document.body.textContent).not.toMatch(/NaN|undefined|null|Infinity/);
@@ -586,10 +615,12 @@ describe("Fund page", () => {
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
       expect(drovTitle("2025")).toBeInTheDocument();
+      await openTab(user, "Holdings");
       await user.click(bar("2023"));
+      expect(pressedBars()).toEqual(["2023"]);
+      await openTab(user, "Analysis");
       expect(drovTitle("2023")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Return constituents 2025" })).toBeNull();
-      expect(pressedBars()).toEqual(["2023"]);
       expect(handle("Start of the period")).toHaveAttribute("aria-valuetext", "2023");
       expect(handle("End of the period")).toHaveAttribute("aria-valuetext", "2023");
     });
@@ -597,12 +628,13 @@ describe("Fund page", () => {
     it("a bar is selected from the keyboard too", async () => {
       stubData();
       const user = userEvent.setup();
-      renderAnalysis();
+      renderFund();
       await loaded("Kelpwood Capital LP");
       act(() => bar("2019").focus());
       await user.keyboard("{Enter}");
-      expect(drovTitle("2019")).toBeInTheDocument();
       expect(pressedBars()).toEqual(["2019"]);
+      await openTab(user, "Analysis");
+      expect(drovTitle("2019")).toBeInTheDocument();
     });
 
     it("selecting a bar resets the Return constituents period to that single year", async () => {
@@ -613,9 +645,11 @@ describe("Fund page", () => {
       // widen the period to 2024 to 2025 with the left handle of the strip
       fireEvent.keyDown(handle("Start of the period"), { key: "ArrowLeft" });
       expect(drovTitle("2024 to 2025")).toBeInTheDocument();
+      await openTab(user, "Holdings");
       expect(pressedBars()).toEqual(["2025"]); // the selected year is still 2025
 
       await user.click(bar("2023"));
+      await openTab(user, "Analysis");
       expect(drovTitle("2023")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: /^Return constituents 2024/ })).toBeNull();
       expect(handle("Start of the period")).toHaveAttribute("aria-valuetext", "2023");
@@ -629,21 +663,26 @@ describe("Fund page", () => {
       await loaded("Kelpwood Capital LP");
       fireEvent.keyDown(handle("End of the period"), { key: "ArrowRight" });
       expect(drovTitle("2025 to 2026 H1")).toBeInTheDocument();
+      await openTab(user, "Holdings");
       await user.click(bar("2025"));
+      await openTab(user, "Analysis");
       expect(drovTitle("2025")).toBeInTheDocument();
     });
 
-    it("the bracket of Annual returns sets the years the key figures describe", async () => {
+    it("the bracket of Annual returns sets the years the key figures describe, on both tabs", async () => {
       stubData();
-      renderAnalysis();
+      const user = userEvent.setup();
+      renderFund();
       await loaded("Kelpwood Capital LP");
-      expect(kpiCaption()).toBe(bracketCaption("2014 to 2026 H1"));
+      expect(kpiCaption()).toBe(holdingsCaption("2014 to 2026 H1"));
       const before = within(region("Key figures")).getAllByRole("article")[0].textContent;
       fireEvent.keyDown(handle("Start of the annualised return span"), { key: "ArrowRight" });
-      expect(kpiCaption()).toBe(bracketCaption("2015 to 2026 H1"));
+      expect(kpiCaption()).toBe(holdingsCaption("2015 to 2026 H1"));
       fireEvent.keyDown(handle("End of the annualised return span"), { key: "ArrowLeft" });
-      expect(kpiCaption()).toBe(bracketCaption("2015 to 2025"));
+      expect(kpiCaption()).toBe(holdingsCaption("2015 to 2025"));
       expect(within(region("Key figures")).getAllByRole("article")[0].textContent).not.toBe(before);
+      await openTab(user, "Analysis");
+      expect(kpiCaption()).toBe(analysisCaption("2015 to 2025"));
       // the bracket does not move the year selected for Return constituents
       expect(drovTitle("2025")).toBeInTheDocument();
     });
@@ -654,41 +693,49 @@ describe("Fund page", () => {
       it("the 15-year window leaves the oldest years out and Max brings them back", async () => {
         stubData(summaryWith(longHistory));
         const user = userEvent.setup();
-        renderAnalysis();
+        renderFund();
         await loaded("Kelpwood Capital LP");
         expect(bars()).toHaveLength(15);
         expect(kpiSpan()).toBe("2012 to 2026 H1");
         await user.click(seg("Max"));
         expect(bars()).toHaveLength(21);
         expect(kpiSpan()).toBe("2006 to 2026 H1");
+        await openTab(user, "Analysis");
+        expect(kpiSpan()).toBe("2006 to 2026 H1"); // the window picked on Holdings holds on Analysis too
       });
 
       it("a selected year still in the new window stays selected", async () => {
         stubData(summaryWith(longHistory));
         const user = userEvent.setup();
-        renderAnalysis();
+        renderFund();
         await loaded("Kelpwood Capital LP");
         await user.click(bar("2023"));
         await user.click(seg("Max"));
         expect(pressedBars()).toEqual(["2023"]);
+        await openTab(user, "Analysis");
         expect(drovTitle("2023")).toBeInTheDocument();
+        await openTab(user, "Holdings");
         await user.click(seg("15 years"));
         expect(pressedBars()).toEqual(["2023"]);
+        await openTab(user, "Analysis");
         expect(drovTitle("2023")).toBeInTheDocument();
       });
 
       it("a selected year the window drops falls back to the latest full year in it", async () => {
         stubData(summaryWith(longHistory));
         const user = userEvent.setup();
-        renderAnalysis();
+        renderFund();
         await loaded("Kelpwood Capital LP");
         await user.click(seg("Max"));
         await user.click(bar("2007")); // only in Max
-        expect(drovTitle("2007")).toBeInTheDocument();
         expect(pressedBars()).toEqual(["2007"]);
+        await openTab(user, "Analysis");
+        expect(drovTitle("2007")).toBeInTheDocument();
 
+        await openTab(user, "Holdings");
         await user.click(seg("15 years"));
         expect(pressedBars()).toEqual(["2025"]); // a valid year again: the latest full one, not the part year 2026 H1
+        await openTab(user, "Analysis");
         expect(drovTitle("2025")).toBeInTheDocument();
         expect(handle("Start of the period")).toHaveAttribute("aria-valuetext", "2025");
         expect(handle("End of the period")).toHaveAttribute("aria-valuetext", "2025");
@@ -701,9 +748,11 @@ describe("Fund page", () => {
         await loaded("Kelpwood Capital LP");
         fireEvent.keyDown(handle("Start of the period"), { key: "ArrowLeft" });
         expect(drovTitle("2024 to 2025")).toBeInTheDocument();
+        await openTab(user, "Holdings");
         await user.click(seg("Max"));
-        expect(drovTitle("2024 to 2025")).toBeInTheDocument();
         expect(pressedBars()).toEqual(["2025"]);
+        await openTab(user, "Analysis");
+        expect(drovTitle("2024 to 2025")).toBeInTheDocument();
       });
     });
 
@@ -711,20 +760,23 @@ describe("Fund page", () => {
       it("moving to another fund starts again: its own default year, the 15-year window and the whole bracket", async () => {
         stubData();
         const user = userEvent.setup();
-        renderAnalysis(FUND, <Link to={`/fund/${OTHER_FUND}#analysis`}>Other fund</Link>);
+        renderFund(FUND, <Link to={`/fund/${OTHER_FUND}#analysis`}>Other fund</Link>);
         await loaded("Kelpwood Capital LP");
         await user.click(bar("2023"));
         await user.click(within(region("Annual returns")).getByRole("button", { name: "Max" }));
         fireEvent.keyDown(handle("Start of the annualised return span"), { key: "ArrowRight" });
-        expect(drovTitle("2023")).toBeInTheDocument();
         expect(kpiSpan()).toBe("2015 to 2026 H1");
+        await openTab(user, "Analysis");
+        expect(drovTitle("2023")).toBeInTheDocument();
 
         await user.click(screen.getByRole("link", { name: "Other fund" }));
         await loaded("Halyard Point Partners");
         expect(drovTitle("2025")).toBeInTheDocument(); // not the 2023 picked on the other fund, which this one also has
+        expect(kpiCaption()).toBe(analysisCaption("2014 to 2026 H1"));
+        await openTab(user, "Holdings");
         expect(pressedBars()).toEqual(["2025"]);
         expect(within(region("Annual returns")).getByRole("button", { name: "15 years" })).toHaveAttribute("aria-pressed", "true");
-        expect(kpiCaption()).toBe(bracketCaption("2014 to 2026 H1"));
+        expect(kpiCaption()).toBe(holdingsCaption("2014 to 2026 H1"));
         await waitFor(() => expect(document.title).toBe(fundTitle("Halyard Point Partners")));
       });
 

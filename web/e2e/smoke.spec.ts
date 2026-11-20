@@ -73,11 +73,12 @@ for (const width of widths) {
 
     // jsdom cannot measure, so the unit tests draw every chart at a fixed fallback width: this is the
     // one place the panels are laid out for real, at a desktop and a phone width.
-    test("fund page: Holdings first, with its tree map and the Positions table; the tabs open the rest", async ({ page }) => {
+    test("fund page: Holdings first, with its tiles, tree map, Annual returns and the Positions table; the tabs open the rest", async ({ page }) => {
       const errors = await open(page, `/fund/${fundId}`);
       await expect(page.locator("h1")).toHaveText(fundName);
       await expect(page.getByRole("tab", { name: /^Holdings/ })).toHaveAttribute("aria-selected", "true");
-      for (const name of ["Holdings", "Positions"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Key figures" })).toBeVisible();
+      for (const name of ["Holdings", "Annual returns", "Positions"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
       // the tree map fills its box: tiles inside it, none past its right edge
       const tiles = page.locator("svg.tm g.tile");
       await expect(tiles.first()).toBeVisible();
@@ -87,18 +88,6 @@ for (const width of widths) {
         expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width + 1);
       }
       await expect(page.locator(".tm-cap")).toContainText("at prices of");
-
-      await page.getByRole("tab", { name: "About" }).click();
-      await expect(page).toHaveURL(/#about$/);
-      for (const name of ["About", "Assets under management"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Positions", exact: true })).toHaveCount(0);
-
-      await page.getByRole("tab", { name: "Analysis" }).click();
-      await expect(page).toHaveURL(/#analysis$/);
-      for (const name of ["Annual returns", "What if they'd kept it"]) {
-        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
-      }
-      await expect(page.getByRole("heading", { name: /^Return constituents / })).toBeVisible();
       await expect(page.locator("#retPanel rect.hit").first()).toBeAttached();
 
       // a bar in the middle: the first and last carry the bracket's handles
@@ -106,8 +95,22 @@ for (const width of widths) {
       const aria = await hits.nth(Math.floor((await hits.count()) / 2)).getAttribute("aria-label");
       const label = (aria as string).split(":")[0];
       await page.getByRole("button", { name: new RegExp(`^${label}: `) }).click();
-      await expect(page.getByRole("heading", { name: `Return constituents ${label}`, exact: true })).toBeVisible();
       await expect(page.locator("#retPanel rect.hit[aria-pressed='true']")).toHaveCount(1);
+
+      await page.getByRole("tab", { name: "About" }).click();
+      await expect(page).toHaveURL(/#about$/);
+      await expect(page.getByRole("heading", { name: "About", exact: true })).toBeVisible();
+      for (const name of ["Positions", "Assets under management"]) await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(0);
+
+      await page.getByRole("tab", { name: "Analysis" }).click();
+      await expect(page).toHaveURL(/#analysis$/);
+      await expect(page.getByRole("region", { name: "Key figures" })).toBeVisible();
+      for (const name of ["Assets under management", "What if they'd kept it"]) {
+        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      }
+      // the year picked on Holdings' Annual returns names Return constituents here
+      await expect(page.getByRole("heading", { name: `Return constituents ${label}`, exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Annual returns", exact: true })).toHaveCount(0);
       expect(errors).toEqual([]);
     });
 
