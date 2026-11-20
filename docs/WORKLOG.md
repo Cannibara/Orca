@@ -1,9 +1,17 @@
 # Worklog
 
-Last verified: 2026-11-19
+Last verified: 2026-11-20
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-20 — Tree map: the fund's return for the period beside the weight and the value
+
+| What changed | Why | Files |
+|---|---|---|
+| Second row of a tile: `12.3% · $80.2B · +4.1%` (weight, value, return; a real minus on losses). Too narrow: the weight goes first, then the return (`$80.2B · +4.1%`, `$80.2B`, `12.3%`); a tile under 39 px tall puts value and return at the right end of the ticker's row. A hollow tile (first tracked quarter, no price) and Other stocks print no return, no dash. Year mode prints the 12-month return. The legend now says "Colour, and the % after each value: the fund's return…"; its label wraps on a phone (the shared `.legend span` is nowrap and the longer text made the page scroll sideways at 400 px) | Owner: "add beside it the return for the quarter" with four rules: shares held before the quarter from the quarter's start price, shares bought in it from the quarter's VWAP, both to the current price (newest quarter) or the quarter-end close (older) | `fund/treemap.ts` (`labelSet`, `LabelTile.ret`), `fund/HoldingsPanel.tsx`, `holdings.css` |
+| No new return maths: the figure is `holdingReturn`, which already coloured the tiles and fills the tooltip, and it matches the four rules (checked). The demo-data test `fund-holdings-returns.test.ts` rebuilds each holding's return from the rules as separate lots (carried shares start to end, bought shares VWAP to end, dividends added) on 12 funds, 4 quarters and 2 year-ends and compares; changing how buys are priced or dropping dividends breaks it. Live files already carry the quarter-end closes (`q0`/`qclose` checked on stocks 1, 3, 6 on 2026-11-20) | "Ensure this logic is consistent with the positions table" | `tests/fund-holdings-returns.test.ts` |
+| Not the table's Return column: that is the whole life of a position (total P&L ÷ invested), so a long-held stake reads differently there. For a position that began in the period the two are the same number and the test asserts it. A "Qtr return" column in the table would show both side by side; not built, the owner decides | The owner's wording reads as if the table already had the per-quarter figure | `docs/PRODUCT.md`, `docs/DECISIONS.md` |
 
 ## 2026-11-19 — Tree map motion: grow-in on landing fixed, no colour animation, words by the midway point, a $ value on every tile
 

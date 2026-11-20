@@ -295,7 +295,9 @@ describe("label ink", () => {
 
 describe("labelSet: only what fits, and always the dollar value where there is room for it", () => {
   const measure: Measure = (_f, s) => s.length * 7; // 7px a character, whatever the font
-  const stock = { other: false, ticker: "AAPL", name: "Apple Computer Holdings", weight: 0.123, value: 80.2e9, count: 0 };
+  const stock = { other: false, ticker: "AAPL", name: "Apple Computer Holdings", weight: 0.123, value: 80.2e9, count: 0, ret: null as number | null };
+  const up = { ...stock, ret: 0.041 };
+  const down = { ...stock, ret: -0.0412 };
   const none = { tk: null, w: null, n: null, v: null };
 
   test("a tiny tile has no label", () => {
@@ -319,25 +321,44 @@ describe("labelSet: only what fits, and always the dollar value where there is r
     expect(labelSet(stock, 300, 60, measure).n).toBe("Apple Computer Holdings");
   });
   test("Other stocks: its name, then its value and weight, then how many stocks", () => {
-    const other = { other: true, ticker: "", name: "", weight: 0.098, value: 1e9, count: 16 };
+    const other = { other: true, ticker: "", name: "", weight: 0.098, value: 1e9, count: 16, ret: null };
     expect(labelSet(other, 200, 60, measure)).toEqual({ tk: "Other stocks", w: "9.8% · $1.00B", n: "16 stocks", v: null });
     expect(labelSet(other, 70, 45, measure)).toEqual({ ...none, tk: "Other", w: "$1.00B" });
   });
+  test("the return joins the second row: weight, value and return, then value and return, then the value", () => {
+    expect(labelSet(up, 170, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "12.3% · $80.2B · +4.1%" });
+    expect(labelSet(up, 140, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "$80.2B · +4.1%" }); // 126px of room: no weight
+    expect(labelSet(up, 80, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "$80.2B" }); // 66px: no return
+    expect(labelSet(up, 50, 45, measure)).toEqual({ ...none, tk: "AAPL", w: "12.3%" }); // 36px: the weight alone, never nothing
+    expect(labelSet(down, 170, 45, measure).w).toBe("12.3% · $80.2B · −4.1%"); // a real minus
+  });
+  test("no return to show (a hollow tile, Other stocks): the row is as before, with no dash", () => {
+    expect(labelSet(stock, 170, 45, measure).w).toBe("12.3% · $80.2B");
+    expect(labelSet({ ...stock, ret: 0 }, 170, 45, measure).w).toBe("12.3% · $80.2B · 0.0%"); // zero is a return
+  });
+  test("a short tile: the value and the return at the right end of the ticker's row, the value alone when both do not fit", () => {
+    expect(labelSet(up, 160, 30, measure)).toEqual({ ...none, tk: "AAPL", v: "$80.2B · +4.1%" });
+    expect(labelSet(up, 120, 30, measure)).toEqual({ ...none, tk: "AAPL", v: "$80.2B" });
+    expect(labelSet(up, 60, 30, measure)).toEqual({ ...none, tk: "AAPL" });
+  });
   test("every tile that holds a ticker shows its value when the value fits; no tile is ever left with the weight over a value that fits", () => {
     const val = "$80.2B";
-    for (const tile of [stock, { other: true, ticker: "", name: "", weight: 0.05, value: 80.2e9, count: 4 }]) {
+    for (const tile of [stock, up, { other: true, ticker: "", name: "", weight: 0.05, value: 80.2e9, count: 4, ret: null }]) {
       for (let w = 20; w <= 320; w += 3) {
         for (let h = 20; h <= 120; h += 3) {
           const o = labelSet(tile, w, h, measure);
           if (o.tk === null) continue;
           const aw = w - 14;
           const where = `${tile.other ? "other" : "stock"} ${w}x${h}`;
+          const ret = tile.ret === null ? null : "+4.1%";
           if (h >= 39) {
             if (measure("w", val) <= aw) expect(`${o.w}|${o.v}`, where).toContain("$");
+            if (ret !== null && measure("w", `${val} · ${ret}`) <= aw) expect(o.w, where).toContain(ret);
             expect(o.v, where).toBeNull();
           } else {
             expect(o.w, where).toBeNull();
-            if (measure("w", o.tk) + 8 + measure("w", val) <= aw) expect(o.v, where).toBe(val);
+            if (measure("w", o.tk) + 8 + measure("w", val) <= aw) expect(o.v, where).toContain(val);
+            if (ret !== null && measure("w", o.tk) + 8 + measure("w", `${val} · ${ret}`) <= aw) expect(o.v, where).toBe(`${val} · ${ret}`);
           }
         }
       }

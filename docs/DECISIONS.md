@@ -1,10 +1,14 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-19
+Last verified: 2026-11-20
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-20 — Tree map tiles print the fund's return for the period beside the weight and value
+- Decision: the second row of a tile reads `12.3% · $80.2B · +4.1%`: weight, value, and the fund's return on the holding over the period (a quarter, or 12 months in Year mode). Where the row is too narrow it drops the weight first, then the return (value, then return, then weight); a short tile puts value and return at the right end of the ticker's row. The figure is the one that already coloured the tile: shares held at the start of the period from the previous quarter's last close to the period-end price, shares bought in it from the quarter's VWAP to the period-end price (today's price for the newest quarter, the quarter's last close for an older one), sales at their VWAP, dividends received added. A hollow tile and Other stocks print no return (owner, chat 2026-11-20) (chat)(code).
+- Context: the Positions table's Return column is the whole life of a position (total P&L over everything invested), so a stake held for years shows a different figure there. For a position that began in the period the two are the same number, and a test holds that on every demo fund; a separate test rebuilds the return from the owner's four rules (carried shares start to end, bought shares VWAP to end) and compares. Open: a "Qtr return" column in the table would put the per-period figure next to the lifetime one (not built; owner to say) (code).
 
 ## 2026-11-19 — Tree map motion: boxes only, colours never animated, words in by the midway point, a dollar value on every tile
 - Decision: only the tree map's boxes animate (they grow from their centres on landing and move between periods, 600 ms on the Analysis bars' curve). A tile has its final red or green from its first frame; nothing is drawn until every tile's weekly prices are in, so there is no neutral stage and no colour tween (a red tile fading into a green one passes through brown). A word that changes goes out in 70 ms and the new one is fully in at 250 ms (the box has then covered ~89% of its way); one that does not change stays. Every labelled tile shows its dollar value: the second row is `12.3% · $80.2B`, then the value alone, then the weight; a tile under 39 px tall puts the value at the right end of the ticker's row (owner, chat 2026-11-19) (chat)(code).
