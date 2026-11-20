@@ -1332,8 +1332,8 @@ function Calls({
 
 type TabId = "top" | "famous" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
-  { id: "top", label: "Top funds" },
   { id: "famous", label: "Famous funds" },
+  { id: "top", label: "Top funds" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
   { id: "crowded", label: "Crowded buys" },
@@ -1342,7 +1342,7 @@ const TABS: TabItem<TabId>[] = [
 
 export default function Home() {
   useTitle(HOME_TITLE);
-  const [tab, setTab] = useState<TabId>("top");
+  const [tab, setTab] = useState<TabId>("famous");
   // The toggles live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");
   const [mode, setMode] = useState<Mode>("best");
