@@ -599,6 +599,11 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
       "Macro funds. The 13F shows only their US stocks, not their bonds, currencies or futures.",
   },
   {
+    name: "Credit & event-driven",
+    about:
+      "Credit, distressed-debt and event-driven funds. The 13F shows only their listed shares, not their bonds or loans.",
+  },
+  {
     name: "Family offices",
     about:
       "Star traders and billionaires investing their own fortunes, mostly in stocks.",

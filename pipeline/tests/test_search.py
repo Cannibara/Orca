@@ -92,11 +92,14 @@ def test_owner_rank_lets_a_fund_without_a_score_into_most_searched():
     }
 
 
-def test_rank_file_reads_names_in_order_and_rejects_typos(tmp_path):
+def test_rank_file_orders_by_score_and_rejects_typos(tmp_path):
     path = tmp_path / "famous_rank.csv"
     assert load_rank(path) == ()
-    path.write_text("name,google_score\nMichael Burry,27.25\n\n5,\n")
-    assert load_rank(path) == ("Michael Burry", "5")
+    path.write_text("name,score\nMichael Burry,27.25\n\n5,90\nBill Ackman,\nRay Dalio,90\n")
+    assert load_rank(path) == ("5", "Ray Dalio", "Michael Burry")  # higher first; a tie keeps file order; no score: not ranked
+    path.write_text("name,score\nMichael Burry,high\n")
+    with pytest.raises(ValueError, match="not a number"):
+        load_rank(path)
     famous = (Famous(4, "SCION", "Michael Burry", "Value", "Michael Burry"),)
     with pytest.raises(ValueError, match="twice"):
         apply_rank(famous, ("Michael Burry", "Michael Burry"))

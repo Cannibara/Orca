@@ -1,7 +1,7 @@
 """The curated "Famous funds" lists: well-known managers shown on the home page whatever the Top
 funds rules say (a famous fund can be small, young or concentrated), one list per investing style.
 Kept by hand in famous.csv. The order they show in (Most searched, and each list's most popular
-first) is famous_rank.csv, one name per line, top first; funds not in it follow by Google score."""
+first) is famous_rank.csv: a score per name, higher first; funds not in it follow by Google score."""
 
 import csv
 from dataclasses import dataclass, replace
@@ -24,6 +24,7 @@ FAMOUS_GROUPS = (
     "Venture capital",
     "Activists",
     "Macro",
+    "Credit & event-driven",
     "Family offices",
     "Quant & multi-strategy",
     "Big companies",
@@ -54,7 +55,7 @@ class Famous:
     # Trends score (famous_search.csv) ranks the Most searched list; rows sharing a keyword
     # (Sequoia's filers) share one place in it. "" = not ranked.
     search: str = ""
-    # The owner's place for this fund in famous_rank.csv, 1 = first; None when not listed there.
+    # The owner's place for this fund from famous_rank.csv's scores, 1 = first; None when not listed.
     # Listed funds lead Most searched and every list's most popular order, ahead of any score.
     rank: int | None = None
 
@@ -100,12 +101,23 @@ def load_search(path: Path = SEARCH_CSV) -> SearchScores:
 
 
 def load_rank(path: Path = RANK_CSV) -> tuple[str, ...]:
-    """famous_rank.csv's `name` column, in file order (the first line is rank 1); empty when the
-    file is missing. Other columns are notes for whoever keeps the list and are not read."""
+    """famous_rank.csv's names, best first: by the owner's `score`, higher first (any numbers; a
+    tie keeps file order). A line with no score is not ranked. Empty when the file is missing.
+    Raises ValueError on a score that is not a number, so a typo fails the tests."""
     if not path.exists():
         return ()
     with open(path, newline="", encoding="utf-8") as fh:
-        return tuple(n for r in csv.DictReader(fh) if (n := (r.get("name") or "").strip()))
+        rows = list(csv.DictReader(fh))
+    scored = []
+    for i, r in enumerate(rows):
+        name, score = (r.get("name") or "").strip(), (r.get("score") or "").strip()
+        if not name or not score:
+            continue
+        try:
+            scored.append((-float(score), i, name))
+        except ValueError:
+            raise ValueError(f"famous_rank.csv: {name!r} has score {score!r}, not a number") from None
+    return tuple(name for _, _, name in sorted(scored))
 
 
 def apply_rank(famous: tuple[Famous, ...], names: tuple[str, ...]) -> tuple[Famous, ...]:

@@ -5,6 +5,15 @@ Last verified: 2026-11-20
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-20 — Famous funds: Wikipedia's hedge funds added; rank by the owner's score
+
+| What changed | Why | Files |
+|---|---|---|
+| famous_rank.csv orders by its `score` column (renamed from `google_score`), higher first, ties in file order; a blank score is not ranked, a non-number fails the tests | Owner edited the numbers, not the line order, and chose "the number decides" | `orca/famous.py` (`load_rank`), `orca/famous_rank.csv`, `tests/test_search.py` |
+| 86 rows for the firms on Wikipedia's List of hedge funds (revision 1362551728, 4 Jul 2026) that were missing, every one checked on EDGAR (13F-HR filer, match word in its SEC name); renamed or moved filers get one row per CIK. New style list Credit & event-driven, after Macro | Owner: all of them, all regions | `orca/famous.csv`, `orca/famous.py`, `web/src/pages/Home.tsx` |
+| Not added: no 13F filer found for PIMCO, Archegos, Avenue Capital, ESL Investments, K2 Advisors, Revere, SPX Capital, Statar, TGS, Universa, Systematica, G-Research, Navigator Global, SPARX, High-Flyer, Lingjun, Minghong, Ubiquant, Yanfu. Left out on purpose: BlackRock, Goldman Sachs Asset Management, Wellington (their 13F is mostly index and mutual-fund money, not the hedge-fund book). Quantum Fund is Soros Fund Management (already listed) | — | — |
+| New rows have no Google Trends score until the next `scripts/google_trends.py` refresh; they follow by AUM. Data appears after a `home_only` run; funds that stopped filing may need one `full` rebuild | — | — |
+
 ## 2026-11-20 — Famous funds: the owner's own order (famous_rank.csv)
 
 | What changed | Why | Files |
