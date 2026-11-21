@@ -34,58 +34,74 @@ export function shadeFor(ret: number, dark: boolean): string {
 
 // ---- the fitted scale (7.3) ----
 export type Dom = { lo: number; hi: number };
-export type Track = { raw: Dom[]; smooth: Dom[] };
-
-/** The domain for the rows in one window: zero and the S&P line always in view, at least 20 pts wide, room for loss labels. */
-export function rawDomain(rets: number[], spx: number | null, innerW: number, room: number): Dom {
-  const v = rets.map((x) => x * 100);
-  let lo = Math.min(0, ...v);
-  let hi = Math.max(0, spx == null ? 0 : spx * 100, ...v);
-  if (hi - lo < 20) hi = lo + 20;
-  // the floor only guards a tiny or unmeasured width; a phone's ~140px plot keeps its full label room
-  if (lo < 0) lo -= (room * (hi - lo)) / Math.max(80, innerW - room);
-  return { lo, hi };
-}
+/**
+ * A list's scale while it scrolls. The span (points across the plot) is one for the whole list, so a bar's
+ * length for a given return never changes as you scroll (owner, 2026-11-21); only the axis slides. Per whole-row
+ * window k (rows k … k+vis−1): `top[k]` is the highest left end that keeps its losses and their labels in view
+ * (0, zero at the left edge, when it has none), `floor[k]` the lowest that keeps its gains and the S&P in view,
+ * and `smooth[k]` the left end the axis passes through there.
+ */
+export type Track = { span: number; top: number[]; floor: number[]; smooth: number[] };
 
 const SMOOTH_R = 3; // triangular weights 1,2,3,4,3,2,1
 
-/** One domain per whole-row window (rows k … k+vis−1 of `rets`, best first), then smoothed so the axis glides. */
+/**
+ * The list's fixed span and where its axis sits for each window. `rets` best first; the span is the widest
+ * window's need (zero and the S&P always in view, at least 20 pts; a window with a loss also keeps `room` px
+ * of the `innerW` px plot free for the loss labels).
+ */
 export function windowDomains(rets: number[], vis: number, spx: number | null, innerW: number, room: number): Track {
-  const K = Math.max(1, rets.length - vis + 1);
-  const raw: Dom[] = [];
-  for (let k = 0; k < K; k++) raw.push(rawDomain(rets.slice(k, k + vis), spx, innerW, room));
-  const smooth = raw.map((r, k) => {
-    let lo = 0;
-    let hi = 0;
+  const v = rets.map((x) => x * 100);
+  const s = spx == null ? 0 : spx * 100;
+  const K = Math.max(1, v.length - vis + 1);
+  const lows: number[] = [];
+  const highs: number[] = [];
+  for (let k = 0; k < K; k++) {
+    const w = v.slice(k, k + vis);
+    lows.push(Math.min(0, ...w));
+    highs.push(Math.max(0, s, ...w));
+  }
+  // A window with a loss also needs `room` px for the loss labels: its points fill only (innerW − room) px, so
+  // its need grows by f. The floor only guards a tiny or unmeasured width (a phone's ~130px plot keeps its room).
+  const f = 1 + room / Math.max(80, innerW - room);
+  const span = Math.max(...highs.map((h, k) => Math.max(20, h - lows[k]) * (lows[k] < 0 ? f : 1)));
+  const labelRoom = (span * (f - 1)) / f; // the room in points, the same in every window
+  const top = lows.map((l) => (l < 0 ? l - labelRoom : 0));
+  const floor = highs.map((h) => h - span);
+  // smoothed so the axis starts sliding a little before a loss arrives, and stays within what each window allows
+  const smooth = top.map((t, k) => {
+    let sum = 0;
     let w = 0;
     for (let j = Math.max(0, k - SMOOTH_R); j <= Math.min(K - 1, k + SMOOTH_R); j++) {
       const wt = SMOOTH_R + 1 - Math.abs(j - k);
-      lo += raw[j].lo * wt;
-      hi += raw[j].hi * wt;
+      sum += top[j] * wt;
       w += wt;
     }
-    return { lo: Math.min(lo / w, r.lo), hi: Math.max(hi / w, r.hi) };
+    return Math.min(t, Math.max(floor[k], sum / w));
   });
-  return { raw, smooth };
+  return { span, top, floor, smooth };
 }
 
-/** The domain at fractional scroll position p (rows from the top): a Catmull-Rom curve through the windows, never narrower than the linear blend of the raw ones. */
+/**
+ * The domain at fractional scroll position p (rows from the top): the left end on a Catmull-Rom curve through
+ * the windows, kept between the linear blends of their limits so the rows in view always fit; the width is
+ * always the list's span.
+ */
 export function domainAt(track: Track, p: number): Dom {
-  const { raw, smooth } = track;
+  const { span, top, floor, smooth } = track;
   const L = smooth.length - 1;
   const pc = Math.max(0, Math.min(L, p));
   const k = Math.min(L, Math.floor(pc));
   const t = pc - k;
-  const at = (a: Dom[], j: number): Dom => a[Math.max(0, Math.min(L, j))];
-  const cr = (key: "lo" | "hi"): number => {
-    const p0 = at(smooth, k - 1)[key];
-    const p1 = at(smooth, k)[key];
-    const p2 = at(smooth, k + 1)[key];
-    const p3 = at(smooth, k + 2)[key];
-    return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
-  };
-  const lin = (key: "lo" | "hi"): number => at(raw, k)[key] + (at(raw, k + 1)[key] - at(raw, k)[key]) * t;
-  return { lo: Math.min(cr("lo"), lin("lo")), hi: Math.max(cr("hi"), lin("hi")) };
+  const at = (a: number[], j: number): number => a[Math.max(0, Math.min(L, j))];
+  const p0 = at(smooth, k - 1);
+  const p1 = at(smooth, k);
+  const p2 = at(smooth, k + 1);
+  const p3 = at(smooth, k + 2);
+  const cr = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+  const lin = (a: number[]): number => at(a, k) + (at(a, k + 1) - at(a, k)) * t;
+  const lo = Math.max(lin(floor), Math.min(lin(top), cr));
+  return { lo, hi: lo + span };
 }
 
 /** Steps a tick may take, smallest first. */
@@ -144,7 +160,7 @@ export function sourceLine(spx: { ann_return: number | null; from_q: number; to_
 
 export function captionText(first: number, last: number, n: number, scrolls: boolean): string {
   if (!scrolls) return n === 1 ? "Showing 1 fund" : `Showing all ${n} funds`;
-  return `Showing ${first}–${last} of ${n} · scale fits the funds in view`;
+  return `Showing ${first}–${last} of ${n} · one scale for the whole list`;
 }
 
 /**

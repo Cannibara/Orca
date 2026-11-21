@@ -59,7 +59,7 @@ async function openFixture(file: TopList = FIXTURE) {
   renderHome();
   await screen.findByRole("heading", { level: 3, name: "Most searched" });
   await user.click(screen.getByRole("button", { name: "5 years" }));
-  await screen.findByRole("region", { name: /^Funds 1 to 15 of \d+, scrollable$/ });
+  await screen.findByRole("region", { name: /^Funds 1 to 20 of \d+, scrollable$/ });
   return user;
 }
 
@@ -112,7 +112,7 @@ describe("Famous funds chart", () => {
     expect(rows[0].querySelector(".lab")).toHaveTextContent(retLabel(want[0].ann_return));
     expect(screen.getByRole("heading", { level: 3, name: "Most searched" })).toBeInTheDocument();
     expect(screen.getByText("50 funds")).toBeInTheDocument();
-    expect(caption()).toBe("Showing 1–15 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 1–20 of 50 · one scale for the whole list");
     await user.click(rows[0]);
     expect(await screen.findByText(`Fund page ${want[0].fund_id}`)).toBeInTheDocument();
   });
@@ -157,13 +157,36 @@ describe("Famous funds chart", () => {
     await openFixture();
     const zero = document.querySelector<HTMLElement>(".fc .zl")!;
     act(() => {
-      box().scrollTop = 35 * 46;
+      box().scrollTop = 30 * 46;
       fireEvent.scroll(box());
     });
-    expect(caption()).toBe("Showing 36–50 of 50 · scale fits the funds in view");
-    expect(box()).toHaveAccessibleName("Funds 36 to 50 of 50, scrollable");
+    expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list");
+    expect(box()).toHaveAccessibleName("Funds 31 to 50 of 50, scrollable");
     // the losses are in view, so zero has moved in from the left edge
     expect(parseFloat(zero.style.left)).toBeGreaterThan(20);
+  });
+
+  it("keeps every bar's length while scrolling: only the axis slides", async () => {
+    await openFixture();
+    const want = mostSearched(famous).sort(bestFirst);
+    const zero = document.querySelector<HTMLElement>(".fc .zl")!;
+    const zeroBefore = parseFloat(zero.style.left);
+    // width per point of return, for every row in view, at several scroll positions: one number throughout
+    const perPoint: number[] = [];
+    for (const row of [0, 7.5, 18, 30]) {
+      act(() => {
+        box().scrollTop = row * 46;
+        fireEvent.scroll(box());
+      });
+      const rows = chartRows();
+      for (let i = Math.ceil(row); i < Math.floor(row) + 20; i++) {
+        const ret = Math.abs(want[i].ann_return * 100);
+        if (ret < 1) continue; // a hairline bar is drawn at a minimum width
+        perPoint.push(parseFloat(rows[i].querySelector<HTMLElement>(".bar")!.style.width) / ret);
+      }
+    }
+    perPoint.forEach((w) => expect(w).toBeCloseTo(perPoint[0], 3)); // widths are written to 3 decimals
+    expect(parseFloat(zero.style.left)).toBeGreaterThan(zeroBefore); // the axis slid right to show the losses
   });
 
   it("tells a screen reader where the window is once it settles, not at every row it passes", async () => {
@@ -171,26 +194,26 @@ describe("Famous funds chart", () => {
     const said = () => document.querySelector(".fc-said")!;
     expect(said()).toHaveAttribute("aria-live", "polite");
     expect(document.querySelector(".fc-cap")).toHaveAttribute("aria-hidden", "true");
-    expect(said()).toHaveTextContent("Showing 1–15 of 50 · scale fits the funds in view");
+    expect(said()).toHaveTextContent("Showing 1–20 of 50 · one scale for the whole list");
     vi.useFakeTimers();
     try {
       const heard: string[] = [];
       const mo = new MutationObserver(() => heard.push(said().textContent ?? ""));
       mo.observe(said(), { childList: true, characterData: true, subtree: true });
       // a glide through the list: a new row every 100ms
-      for (const row of [3, 8, 14, 20, 27, 35]) {
+      for (const row of [3, 8, 14, 20, 25, 30]) {
         act(() => {
           box().scrollTop = row * 46;
           fireEvent.scroll(box());
         });
         act(() => vi.advanceTimersByTime(100));
       }
-      expect(caption()).toBe("Showing 36–50 of 50 · scale fits the funds in view"); // the visible caption follows
-      expect(said()).toHaveTextContent("Showing 1–15 of 50 · scale fits the funds in view");
+      expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list"); // the visible caption follows
+      expect(said()).toHaveTextContent("Showing 1–20 of 50 · one scale for the whole list");
       act(() => vi.advanceTimersByTime(300));
       await Promise.resolve(); // the observer's callback
-      expect(said()).toHaveTextContent("Showing 36–50 of 50 · scale fits the funds in view");
-      expect(heard).toEqual(["Showing 36–50 of 50 · scale fits the funds in view"]);
+      expect(said()).toHaveTextContent("Showing 31–50 of 50 · one scale for the whole list");
+      expect(heard).toEqual(["Showing 31–50 of 50 · one scale for the whole list"]);
       mo.disconnect();
     } finally {
       vi.useRealTimers();
@@ -202,18 +225,18 @@ describe("Famous funds chart", () => {
     const user = await openFixture();
     const el = box();
     Object.defineProperty(el, "scrollHeight", { configurable: true, value: 50 * 46 });
-    Object.defineProperty(el, "clientHeight", { configurable: true, value: 15 * 46 });
+    Object.defineProperty(el, "clientHeight", { configurable: true, value: 20 * 46 });
     el.focus();
     await user.keyboard("{ArrowDown}");
-    expect(caption()).toBe("Showing 2–16 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 2–21 of 50 · one scale for the whole list");
     await user.keyboard("{PageDown}");
-    expect(caption()).toBe("Showing 16–30 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 21–40 of 50 · one scale for the whole list");
     await user.keyboard("{End}");
-    expect(caption()).toBe("Showing 36–50 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list");
     await user.keyboard("{ArrowUp}");
-    expect(caption()).toBe("Showing 35–49 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 30–49 of 50 · one scale for the whole list");
     await user.keyboard("{Home}");
-    expect(caption()).toBe("Showing 1–15 of 50 · scale fits the funds in view");
+    expect(caption()).toBe("Showing 1–20 of 50 · one scale for the whole list");
   });
 
   it("has no S&P 500 line, label or sentence when the file has no S&P figure", async () => {
@@ -246,8 +269,8 @@ describe("Famous funds chart", () => {
     expect(want).toHaveLength(40);
     expect(screen.getByRole("heading", { level: 3, name: "Fundamental long/short" })).toBeInTheDocument();
     expect(screen.getByText("40 funds")).toBeInTheDocument();
-    expect(box()).toHaveAccessibleName("Funds 1 to 15 of 40, scrollable");
-    expect(caption()).toBe("Showing 1–15 of 40 · scale fits the funds in view");
+    expect(box()).toHaveAccessibleName("Funds 1 to 20 of 40, scrollable");
+    expect(caption()).toBe("Showing 1–20 of 40 · one scale for the whole list");
     const rows = chartRows();
     expect(rows).toHaveLength(40);
     expect(rows[0].getAttribute("aria-label")).toMatch(new RegExp(`^1 of 40\\. ${esc(shortNameOf(want[0].fund_id, want[0].name))}`));
@@ -404,7 +427,7 @@ describe("useEasedScroll", () => {
     render(<Box onPos={onPos} />);
     const el = screen.getByTestId("box");
     Object.defineProperty(el, "scrollHeight", { configurable: true, value: 50 * 46 });
-    Object.defineProperty(el, "clientHeight", { configurable: true, value: 15 * 46 });
+    Object.defineProperty(el, "clientHeight", { configurable: true, value: 20 * 46 });
     return { el, onPos };
   }
   const wheel = (el: HTMLElement, init: WheelEventInit) => {
@@ -447,7 +470,7 @@ describe("useEasedScroll", () => {
     expect(wheel(el, { deltaY: 100 }).defaultPrevented).toBe(false);
     expect(wheel(el, { deltaY: -1, deltaMode: 2 }).defaultPrevented).toBe(true); // a page up
     for (let i = 0; i < 120 && frames.size > 0; i++) await frame();
-    expect(el.scrollTop).toBe(35 * 46 - 15 * 46);
+    expect(el.scrollTop).toBe(35 * 46 - 20 * 46);
   });
 
   it("leaves a wheel it cannot hold back to the browser, and a sideways swipe too", async () => {

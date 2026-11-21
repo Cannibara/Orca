@@ -533,7 +533,7 @@ describe("Home", () => {
     // no Most searched: the first list opens, on the chart's scrolling window
     await screen.findByRole("heading", { level: 3, name: "Value" });
     expect(
-      screen.getByRole("region", { name: "Funds 1 to 15 of 25, scrollable" }),
+      screen.getByRole("region", { name: "Funds 1 to 20 of 25, scrollable" }),
     ).toBeInTheDocument();
     await showTable(user);
     const names = () =>
