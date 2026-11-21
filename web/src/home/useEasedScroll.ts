@@ -94,6 +94,9 @@ export function useEasedScroll(
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) return; // pinch zoom
+      // a wheel the browser will scroll anyway (it cannot be held back): gliding as well would scroll twice
+      if (!e.cancelable) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // a sideways swipe on a trackpad is not for the list
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
       const from = api.target();
       const end = Math.max(0, el.scrollHeight - el.clientHeight);

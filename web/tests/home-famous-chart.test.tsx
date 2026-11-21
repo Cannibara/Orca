@@ -392,6 +392,20 @@ describe("useEasedScroll", () => {
     expect(el.scrollTop).toBe(35 * 46 - 15 * 46);
   });
 
+  it("leaves a wheel it cannot hold back to the browser, and a sideways swipe too", async () => {
+    const { el } = setup();
+    // not cancelable (the browser is already scrolling): no glide on top of the browser's own scroll
+    expect(wheel(el, { deltaY: 100, cancelable: false }).defaultPrevented).toBe(false);
+    expect(frames.size).toBe(0);
+    // mostly sideways: a trackpad swipe, not a scroll of the list
+    expect(wheel(el, { deltaX: 120, deltaY: 30 }).defaultPrevented).toBe(false);
+    expect(frames.size).toBe(0);
+    expect(el.scrollTop).toBe(0);
+    // mostly down still glides
+    expect(wheel(el, { deltaX: 10, deltaY: 100 }).defaultPrevented).toBe(true);
+    expect(frames.size).toBe(1);
+  });
+
   it("follows a scroll it did not cause (a scrollbar drag) and stops gliding", async () => {
     const { el, onPos } = setup();
     wheel(el, { deltaY: 300 });
