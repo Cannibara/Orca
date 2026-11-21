@@ -1,29 +1,29 @@
-/* Home page: Famous funds as one ranked return chart (Home.tsx FamousFunds, home/FamousChart.tsx; spec
-   docs/superpowers/specs/2026-11-20-home-famous-chart-design.md 4-10). No card: an FT-style module on the page
-   background. Everything sits under `.fp .famous`; `.phone` (set from the measured width, < 560px) switches the
-   phone layout. Tokens come from tokens.css; motion follows fund/base.css (transform and opacity only). */
+/* Home page: Famous funds and Top funds as one ranked return chart each (Home.tsx FamousFunds and TopFunds,
+   home/FamousChart.tsx; spec docs/superpowers/specs/2026-11-20-home-famous-chart-design.md 4-10). No card: an
+   FT-style module on the page background. Both sections are `.ranked` and everything sits under `.fp .ranked`;
+   `.phone` (set from the measured width, < 560px) switches the phone layout. Tokens come from tokens.css; motion follows fund/base.css (transform and opacity only). */
 
 /* ---------- the section: heading, standfirst, switches ---------- */
-.fp .famous{display:flex;flex-direction:column;gap:18px;min-width:0;padding-top:8px}
-.fp .famous .fam-head{display:flex;flex-direction:column;gap:6px;min-width:0}
-.fp .famous h2{font:700 30px/34px var(--f-sans);letter-spacing:-.03em}
-.fp .famous .fam-stand{font-size:15px;line-height:22px;color:var(--ink2);max-width:80ch;text-wrap:pretty}
+.fp .ranked{display:flex;flex-direction:column;gap:18px;min-width:0;padding-top:8px}
+.fp .ranked .fam-head{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fp .ranked h2{font:700 30px/34px var(--f-sans);letter-spacing:-.03em}
+.fp .ranked .fam-stand{font-size:15px;line-height:22px;color:var(--ink2);max-width:80ch;text-wrap:pretty}
 /* the sixteen lists on their own rows (two or three, wrapped: owner, 2026-11-21), then the period on the
    left and Chart | Table on the right, so nothing shares a row with the lists or overlaps them */
-.fp .famous .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
-.fp .famous .fam-lists{min-width:0}
-.fp .famous .fam-lists .seg{width:100%}
-.fp .famous .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}
+.fp .ranked .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
+.fp .ranked .fam-lists{min-width:0}
+.fp .ranked .fam-lists .seg{width:100%}
+.fp .ranked .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}
 
 /* ---------- the module: rule, list name and count, lead line, chart or table, source ---------- */
-.fp .famous .fam-mod{display:flex;flex-direction:column;min-width:0;margin-top:10px}
-.fp .famous .fam-rule{display:flex;flex-direction:column;gap:4px;padding-bottom:12px}
-.fp .famous .fam-rule::before{content:"";display:block;width:40px;height:4px;background:var(--ink);margin-bottom:12px}
-.fp .famous .fam-h3{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
-.fp .famous h3{font:700 20px/26px var(--f-sans);letter-spacing:-.015em}
-.fp .famous .fam-n{flex:none;font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-.fp .famous .fam-lead{font-size:14px;line-height:20px;color:var(--ink2);text-wrap:pretty}
-.fp .famous .fam-src{margin-top:14px;padding-top:10px;border-top:1px solid var(--line2);font-size:12px;line-height:16px;color:var(--ink3)}
+.fp .ranked .fam-mod{display:flex;flex-direction:column;min-width:0;margin-top:10px}
+.fp .ranked .fam-rule{display:flex;flex-direction:column;gap:4px;padding-bottom:12px}
+.fp .ranked .fam-rule::before{content:"";display:block;width:40px;height:4px;background:var(--ink);margin-bottom:12px}
+.fp .ranked .fam-h3{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
+.fp .ranked h3{font:700 20px/26px var(--f-sans);letter-spacing:-.015em}
+.fp .ranked .fam-n{flex:none;font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.fp .ranked .fam-lead{font-size:14px;line-height:20px;color:var(--ink2);text-wrap:pretty}
+.fp .ranked .fam-src{margin-top:14px;padding-top:10px;border-top:1px solid var(--line2);font-size:12px;line-height:16px;color:var(--ink3)}
 
 /* ---------- the chart ---------- */
 .fp .fc{--row:46px;--c1:32px;--c2:252px;--cg:14px;--inset:56px;--band-x:8px;position:relative;min-width:0;font-variant-numeric:tabular-nums}
@@ -88,44 +88,48 @@
 /* the label at the tip: right of a gain, left of a loss, with a page-coloured halo so no line cuts it */
 .fp .fc .lab{position:absolute;top:0;font:600 12.5px/var(--row) var(--f-sans);color:var(--ink);white-space:nowrap;text-shadow:0 0 2px var(--page),0 0 2px var(--page),0 0 3px var(--page)}
 .fp .fc .lab.lead{top:calc((var(--row) - 22px) / 2);height:22px;padding:0 6px;border-radius:4px;background:var(--inv);color:var(--invfg);font-weight:700;line-height:22px;text-shadow:none}
-.fp .fc-cap{margin-top:10px;font-size:12px;line-height:16px;color:var(--ink3)}
+/* the caption, and Top funds' page buttons on its right (the caption already says which funds are in view) */
+.fp .fc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-top:10px}
+.fp .fc-cap{font-size:12px;line-height:16px;color:var(--ink3)}
+.fp .fc-foot .pager{padding:0;margin-left:auto}
+.fp .fc-foot .pager-sum{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* loading, empty and error states: no card, so no side padding */
-.fp .famous :is(.skl,.pb){padding-inline:0}
+.fp .ranked :is(.skl,.pb){padding-inline:0}
 
 /* ---------- table view: today's table on the page, no card ---------- */
-.fp .famous{--face:28px;--face-gap:10px}
-.fp .famous .tbl-wrap{--tpad:0px;border:0;border-radius:0;background:var(--page)}
-.fp .famous .tbl-wrap thead th{background:var(--page)}
-.fp .famous .tbl-wrap tbody td{background:var(--page)}
-.fp .famous .tbl-wrap tbody tr:hover>td{background:var(--hover)}
-.fp .famous .tbl-wrap table{--row:52px}
-.fp .famous .tbl-wrap+.pager{border-top:1px solid var(--line);padding:10px 0}
+.fp .ranked{--face:28px;--face-gap:10px}
+.fp .ranked .tbl-wrap{--tpad:0px;border:0;border-radius:0;background:var(--page)}
+.fp .ranked .tbl-wrap thead th{background:var(--page)}
+.fp .ranked .tbl-wrap tbody td{background:var(--page)}
+.fp .ranked .tbl-wrap tbody tr:hover>td{background:var(--hover)}
+.fp .ranked .tbl-wrap table{--row:52px}
+.fp .ranked .tbl-wrap+.pager{border-top:1px solid var(--line);padding:10px 0}
 
 /* ---------- phone ---------- */
-.fp .famous.phone{gap:10px;padding-top:4px}
-.fp .famous.phone h2{font-size:24px;line-height:28px}
+.fp .ranked.phone{gap:10px;padding-top:4px}
+.fp .ranked.phone h2{font-size:24px;line-height:28px}
 /* the phone has no standfirst (the axis says "Est. return a year"); it stays for screen readers */
-.fp .famous.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fp .ranked.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* a phone swipes the one-row list switch sideways (sixteen lists would wrap to six rows): no scrollbar under it */
-.fp .famous.phone .fam-lists{flex:none;overflow-x:auto;scrollbar-width:none}
-.fp .famous.phone .fam-lists .seg{width:auto;max-width:none;overflow:visible}
-.fp .famous.phone .fam-lists::-webkit-scrollbar{display:none}
-.fp .famous.phone .fam-opts{gap:8px;flex-wrap:nowrap}
-.fp .famous.phone .fam-opts>.seg:first-child{flex:1 1 auto;min-width:0}
-.fp .famous.phone .fam-opts>.seg:last-child{flex:none}
+.fp .ranked.phone .fam-lists{flex:none;overflow-x:auto;scrollbar-width:none}
+.fp .ranked.phone .fam-lists .seg{width:auto;max-width:none;overflow:visible}
+.fp .ranked.phone .fam-lists::-webkit-scrollbar{display:none}
+.fp .ranked.phone .fam-opts{gap:8px;flex-wrap:nowrap}
+.fp .ranked.phone .fam-opts>.seg:first-child{flex:1 1 auto;min-width:0}
+.fp .ranked.phone .fam-opts>.seg:last-child{flex:none}
 /* 44px touch targets: 38px buttons in the 44px control */
-.fp .famous.phone .seg button{height:38px;font-size:13px}
+.fp .ranked.phone .seg button{height:38px;font-size:13px}
 /* Chart | Table: icon-only buttons (the word stays as each button's name) */
-.fp .famous.phone .fam-opts>.seg:last-child button{width:44px;padding:0;justify-content:center}
-.fp .famous.phone .seg .sl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.fp .famous.phone .fam-mod{margin-top:10px}
-.fp .famous.phone .fam-rule{padding-bottom:8px}
-.fp .famous.phone .fam-rule::before{width:36px;margin-bottom:10px}
-.fp .famous.phone h3{font-size:18px;line-height:22px}
-.fp .famous.phone .fam-n{font-size:11.5px}
-.fp .famous.phone .fam-lead{font-size:13px;line-height:18px}
-.fp .famous.phone .fam-src{margin-top:8px;padding-top:8px;font-size:11px;line-height:15px}
+.fp .ranked.phone .fam-opts>.seg:last-child button{width:44px;padding:0;justify-content:center}
+.fp .ranked.phone .seg .sl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fp .ranked.phone .fam-mod{margin-top:10px}
+.fp .ranked.phone .fam-rule{padding-bottom:8px}
+.fp .ranked.phone .fam-rule::before{width:36px;margin-bottom:10px}
+.fp .ranked.phone h3{font-size:18px;line-height:22px}
+.fp .ranked.phone .fam-n{font-size:11.5px}
+.fp .ranked.phone .fam-lead{font-size:13px;line-height:18px}
+.fp .ranked.phone .fam-src{margin-top:8px;padding-top:8px;font-size:11px;line-height:15px}
 .fp .fc.phone{--row:48px;--c1:28px;--c2:136px;--cg:8px;--inset:58px}
 .fp .fc.phone .fc-axis{height:36px}
 .fp .fc.phone .tick{bottom:7px;font-size:10.5px;line-height:13px}
@@ -144,11 +148,12 @@
 .fp .fc.phone .bar.cut.loss::after{left:6px}
 .fp .fc.phone .lab{font-size:11.5px}
 .fp .fc.phone .lab.lead{top:calc((var(--row) - 20px) / 2);height:20px;padding:0 5px;border-radius:3px;line-height:20px}
-.fp .fc.phone .fc-cap{margin-top:8px;font-size:12px;color:var(--ink2)}
+.fp .fc.phone .fc-foot{margin-top:8px}
+.fp .fc.phone .fc-cap{font-size:12px;color:var(--ink2)}
 /* the table scrolls sideways under a sticky 168px Fund column */
-.fp .famous.phone{--face:26px}
-.fp .famous.phone .tbl-wrap{--nm-w:124px}
-.fp .famous.phone .tbl-wrap table{--row:44px}
+.fp .ranked.phone{--face:26px}
+.fp .ranked.phone .tbl-wrap{--nm-w:124px}
+.fp .ranked.phone .tbl-wrap table{--row:44px}
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion:no-preference){

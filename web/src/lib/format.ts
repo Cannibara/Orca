@@ -173,6 +173,7 @@ export function fundShortName(name: string): string {
   let s = name.trim().replace(/\s+/g, " ");
   if (s === "") return name;
   s = s
+    .replace(/^.*?[\s,]+d\.?b\.?a\.?\s+(?=\S)/i, "") // "CUSHING … LP dba NXG …": the name it trades under is the brand
     .replace(/\s+(?:in its capacity|as trustee)\b.*$/i, "") // "… Pty Ltd as trustee of …"
     .replace(/[\s,]+ET AL\.?$/i, "")
     .replace(/\s+A\/S$/i, "")

@@ -13,6 +13,13 @@ describe("fundShortName (spec 3.3 rules 1-5)", () => {
     expect(fundShortName("Pershing Square Capital Management, L.P.")).toBe("Pershing Square Capital");
   });
 
+  it("names a fund by the name it trades under (dba)", () => {
+    expect(fundShortName("CUSHING ASSET MANAGEMENT, LP dba NXG INVESTMENT MANAGEMENT")).toBe("NXG");
+    expect(fundShortName("W.G. Shaheen & Associates DBA Whitney & Co")).toBe("Whitney & Co");
+    expect(fundShortName("C2P Capital Advisory Group, LLC d.b.a. Prosperity Capital Advisors")).toBe("Prosperity Capital");
+    expect(fundShortName("Adbak Capital LLC")).toBe("Adbak Capital"); // "dba" inside a word is not a trading name
+  });
+
   it("drops state and country tags, roman numerals I-III and trailing 'ET AL'", () => {
     expect(fundShortName("BAUPOST GROUP LLC/MA")).toBe("Baupost");
     expect(fundShortName("FAIRFAX FINANCIAL HOLDINGS LTD/ CAN")).toBe("Fairfax Financial");

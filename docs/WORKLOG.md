@@ -5,6 +5,17 @@ Last verified: 2026-11-21
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-21 — Top funds made consistent with Famous funds; Index giants removed
+
+| What changed | Why | Files |
+|---|---|---|
+| Top funds is the Famous funds module: h2 + standfirst, Period and Chart \| Table, then "Funds over $1B" with its count and lead line ("Anatole leads with +138.2% a year. 321 of the 1,509 beat the S&P 500; 20 lost money."), the chart, and the rules + source under it. No card: chart and table on the page background (section classes `ranked top-funds`; famousChart.css now styles `.fp .ranked`, shared with `ranked famous`) | Owner: same UI and design as Famous funds (chart first, colours, headings) | `web/src/pages/Home.tsx`, `web/src/home/famousChart.css` |
+| The chart shows 80 funds a page in its 20-row window (phone 10); Previous / Next sit beside the caption ("Showing 81–100 of 1,509 · one scale for this page"); row labels and the lead label use the place in the whole list (`FamousChart` `offset`, `total`, `foot`). Table view: 80 a page, buttons below | Owner: 20 funds before scrolling, Next after 80 | `web/src/home/FamousChart.tsx`, `famousChart.ts` (`captionText` total, `leadLine` thousands, `standfirst` sort note) |
+| Short names (`shortNameOf`) and a photo or initials on every row; a famous fund also shows its person (from the file's famous rows). `fundShortName` names a "dba" filer by its trading name | Owner: images/initials and simpler names | `Home.tsx`, `web/src/lib/format.ts` |
+| Index giants list removed from the page (still in `top_{period}.json`) | Owner | `Home.tsx`, `docs/PRODUCT.md`, `docs/DECISIONS.md` |
+| Tests: home.test.tsx (chart, 80-a-page chart and table, person/initials, giants not listed), helper tests, e2e Top funds chart at 1280/400 light/dark (90/90 pass); checked on production data at 1280/400, light and dark | — | `web/tests/`, `web/e2e/smoke.spec.ts` |
+| Open: each page has its own scale, so bars compare within a page, not across pages; individual filers keep SEC word order ("Gendell Jeffrey L"); some short names are bare words ("Main", "Todd") — the full name is in the tooltip and the table | — | — |
+
 ## 2026-11-21 — Famous funds chart after launch: one scale per list, wrapped list switch, 20 rows
 
 | What changed | Why | Files |
