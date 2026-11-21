@@ -30,7 +30,8 @@ After several rounds (v2 3D bars → v3 flat → v4 editorial) the approved desi
   chosen period, **sorted best first**.
 - An honest scale: bars grow from a **zero line**, gains right (blue), losses left (orange).
 - The **S&P 500** over the same window is a dotted reference line.
-- A **scrolling window** (15 rows desktop, 10 phone) over up to 50 funds, with a **scale that fits the funds in
+- A **scrolling window** (15 rows desktop, 10 phone) over the list's funds (Most searched: 50; a style list: all
+  of its funds, e.g. 87 for Venture capital), with a **scale that fits the funds in
   view** and glides as you scroll.
 - Motion and details borrowed from the fund page's **Annual returns** chart (`web/src/fund/ReturnsPanel.tsx`,
   `returns.css`, `fund/base.css .viz`), so the site feels like one system.
@@ -62,12 +63,15 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
   owner-ranked fund with no Google score), one per `fund_id`, in **popularity order** (owner's `rank` ascending,
   then `fame` descending, then AUM descending), the **top 50** (`MOST_SEARCHED_MAX`). The popularity order picks
   *which* 50; the chart then displays them **by `ann_return`, best first**.
+- **Style lists show every fund in the list** (owner, 2026-11-21), not a top 50: the window scrolls through all of
+  them and the caption reads e.g. "Showing 1–15 of 87".
 - **Style lists** (`group`, the order of `FAMOUS_GROUPS` in `Home.tsx` / `pipeline/orca/famous.py`, 15 since
   2026-11-20): Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare
   specialists, Tech & growth, Venture capital, Activists, Macro, Credit & event-driven, Family offices, Quant &
   multi-strategy, Big companies, Sovereign & pension funds. Each is charted by `ann_return` desc. The mock only
-  wires Most searched and Buffett inspired; the rest join the same list switch (on desktop a segmented control
-  that wraps or scrolls sideways; on phone a horizontally scrolling chip row — pick one, keep 44px touch targets).
+  wires Most searched and Buffett inspired; the rest join the same list switch: one row that **scrolls
+  sideways** on desktop and phone (do not wrap it: `Seg`'s sliding thumb measures `offsetLeft` on one row),
+  44px touch targets on phone.
 - The existing per-list `about` lines (e.g. "The famous funds investors look up most.") are not shown in this
   design; the computed lead line (§4) replaces them. Keep them as the list section's accessible description.
 - A fund can appear in several lists; that is fine.
@@ -78,7 +82,7 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
 | Short name | `name` → short-name rules §3.3 | text |
 | AUM | `book` (dollars) | `$X.XB` always one decimal in billions: `$304.2B`, `$13.7B`, `$0.3B` |
 | Manager | `manager` → manager rules §3.4 | text, may be absent |
-| Photo | `web/src/assets/people/people.json` maps the manager string → `<slug>.jpg` | 28–32px circle; no photo → initials of manager (or fund) on a sand circle |
+| Photo | `components/Face.tsx` (`photoOf(manager)` from `people.json`) | 28–32px circle; no photo → initials of manager (or fund) on `--sunken` |
 | Return | `ann_return` (fraction) | `+30.2%` / `−22.6%`, one decimal, sign always |
 | vs S&P 500 | `ann_return − SPX` | `+18.0 pts` (chart tooltip and screen-reader label only) |
 
@@ -93,22 +97,30 @@ screen-reader label only if cheap; the mock drops it.
    Advisers, Investments, Fund, Trust.
 4. Keep brand words: Capital, Partners, Family Office, Foundation.
 5. Never strip to nothing. Full legal name on hover/tooltip and on the fund page.
-6. Hand exceptions (a `short_name` column in `pipeline/orca/famous.csv` is the intended home):
+6. Hand exceptions live in the web for now, in a new `web/src/lib/famousNames.ts` (`SHORT_NAME`, keyed by
+   `fund_id`, plus `MANAGER_LINE` and `PHONE_SHORT`, §3.4/§3.3.7); no contract change. Known cases:
    ICAHN CARL C → Carl Icahn · SC US (TTGP) → Sequoia Capital · HSG Holding → HongShan · Galileo (PTC) → DST
    Global · GATES FOUNDATION TRUST → Gates Foundation · Insight Holdings Group → Insight Partners · BATTERY
    MANAGEMENT CORP. → Battery Ventures · BAMCO → Baron Capital · Fisher Asset Management → Fisher Investments ·
    COOPERMAN LEON G → Leon Cooperman · APPALOOSA LP → Appaloosa · PAULSON & CO. → Paulson & Co. ·
    BAKER BROS. ADVISORS → Baker Bros. · Gotham Asset Management → Gotham · TCI FUND MANAGEMENT → TCI.
-7. **Phone only**, where the 136px name column is too narrow: Duquesne Family Office → Duquesne, Pershing Square
-   Capital → Pershing Square, Renaissance Technologies → Renaissance. Measure, don't guess: any name that would
-   ellipsis on phone gets a spoken short form.
+7. **Phone only**, displayed (not just in the label) where the 136px name column is too narrow:
+   `PHONE_SHORT` = Duquesne Family Office → Duquesne, Pershing Square Capital → Pershing Square, Renaissance
+   Technologies → Renaissance. During the build, run one Playwright pass at 400px over every list on production
+   data, add any other name that ellipsises to this fixed map, and list them in the PR. Anything not in the map
+   ellipsises (full name in the `aria-label`).
 
 ### 3.4 Manager line
-The person people associate with the fund (founder/star, not today's CEO), first + last name only. Strip
-parentheticals (`Bill Gates (Cascade)` → Bill Gates). Firm-as-manager (venture firms: Sequoia, Insight, General
-Catalyst, Summit, Battery, NEA) → no manager line. Same as the fund name (Carl Icahn, Leon Cooperman) → no
-manager line, but still use that person's photo. Exceptions seen: Thrive Capital → Josh Kushner; DST Global →
-Yuri Milner; HongShan → Neil Shen; Ruane, Cunniff & Goldfarb → Bill Ruane.
+The person people associate with the fund, as famous.csv's `manager` gives it (founder/star). The raw `manager`
+string still drives the photo (`photoOf` in `web/src/lib/people.ts`, via `components/Face.tsx`); only the
+**displayed line** changes:
+- A plain person's name (2–3 capitalised words, no brackets) → shown as is.
+- The 160 other values are mapped explicitly in **Appendix B** (`MANAGER_LINE` in `famousNames.ts`, generated
+  from famous.csv on 2026-11-21): 32 become a person or pair ("8VC (Joe Lonsdale)" → Joe Lonsdale, "Paul Black /
+  Mike Trigg" → Paul Black & Mike Trigg, "Sequoia Fund" → Bill Ruane); the rest are institutions or descriptions
+  (pensions, sovereign funds, venture firms, "Google") → **no manager line**.
+- A manager equal to the short fund name (Carl Icahn, Leon Cooperman) → no line, photo still shown.
+- A value not in the map and not a plain name (a future famous.csv row) → no line; add it to the map.
 
 ### 3.5 S&P 500 reference (total return, from the pipeline)
 Owner, 2026-11-21: fund estimates include dividends, so the S&P 500 line must too. The line is SPY's
@@ -120,10 +132,15 @@ Owner, 2026-11-21: fund estimates include dividends, so the S&P 500 line must to
   loads SPY: `ctx.spy_id` / `ctx.px[ctx.spy_id]` in `pipeline/orca/run/compute.py` (do not look SPY up by
   ticker: `securities.json` has a second, unrelated "SPY", Bragg Gaming, stock_id 24664; the ETF is 98).
 - Publish it (contract change — edit `pipeline/contract.md` first, then `web/src/data/types.ts`): a top-level
-  `"spx": {"ann_return": number | null, "from_q": int, "to_q": int}` in each `home/top_{period}.json`
-  (`null` for `max`, which has no shared window; also `null` if SPY lacks a quarter). Built in `pipeline/orca/home.py`
-  / the run that writes the top files; add a pipeline test with a hand-checked SPY series. The demo generator
-  (`pipeline/orca/demo.py`) must emit it too, then regenerate `web/public/demo-data`.
+  `"spx": {"ann_return": number | null, "from_q": int, "to_q": int} | null` in each `home/top_{period}.json`.
+  `to_q` = `latest_q`; `from_q` = `latest_q − n`, the quarter whose **close is the base** (Q3 2021 for 5y to Q3
+  2026, so the returns run Q4 2021 … Q3 2026). For `max` the whole `spx` is `null` (no shared window);
+  for a fixed period where SPY lacks a close or a quarter, `spx` is present with `ann_return: null`.
+  Where: `pipeline/orca/run/publish_step.py` `publish_shared_files` builds `HomeLists` and
+  `publish.publish_shared` writes the files. A `home_only` run starts with a fresh context, so call
+  `ctx.load([ctx.spy_id])` there (it currently loads only `candidates`) before reading `ctx.px[ctx.spy_id]`.
+  Add a pipeline test with a hand-checked SPY series. The demo runs this same path, so it emits `spx` once the
+  demo price data includes SPY dividends; then regenerate `web/public/demo-data`.
 - The web reads `spx.ann_return`. When it is null (Max, or an old file without `spx`): no S&P line, no axis label,
   no "beat the S&P 500" clause in the lead line, no "vs S&P 500" in tooltips, and the scale rules (§7.3) drop the
   S&P term.
@@ -138,10 +155,13 @@ Owner, 2026-11-21: fund estimates include dividends, so the S&P 500 line must to
 Desktop (max width 1232px, 24px side padding, page background `--page`):
 1. Home tabs (unchanged component; Famous funds active).
 2. Header: H2 "Famous funds" (30/34px, 700, −0.03em). Standfirst 15/22px `--ink2`:
-   "Estimated return a year over the last {period}, best first. The dotted line is the S&P 500 ({spx})."
-   (`{spx}` = `spx.ann_return` formatted `+13.5%`; drop the second sentence when it is null.)
+   "Estimated return a year {over}, best first. The dotted line is the S&P 500 ({spx})." `{over}` comes from one
+   helper used everywhere: "over the last year" (1y), "over the last 3 / 5 / 10 / 15 years", "since each fund's
+   first filing" (Max). `{spx}` = `spx.ann_return` formatted `+13.5%`; drop the second sentence when it is null.
 3. Controls row: **list switch** (segmented control: Most searched | Buffett inspired | …) on the left;
-   **period** segmented control (1y | 5y | Max — the owner cut it to three) and a **Chart | Table** segmented
+   **period** control = **today's `Choice` with all six periods (1y 3y 5y 10y 15y Max), shared with Top funds,
+   opening on 3y** (owner, 2026-11-21; the mock's 1y | 5y | Max and its 5y default are superseded), and a
+   **Chart | Table** segmented
    switch (icon + word, same icons as Annual returns' table toggle) on the right. Chart is the default.
 4. The chart module (no card, no border; FT style):
    - A 40×4px ink bar above the title (`.rule::before`).
@@ -151,11 +171,14 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
    - Axis header (46px): S&P label + ▼ notch on top, tick labels below (§6).
    - The scrolling window of rows (§5, §7).
    - Caption under it (12px `--ink3`, `aria-live="polite"`): "Showing 1–15 of 50 · scale fits the funds in view".
-   - Source line above a `--line2` rule: "Source: SEC 13F filings; Orca estimates. S&P 500: SPY price return,
-     Q3 2021 to Q3 2026."
+   - Source line above a `--line2` rule: "Source: SEC 13F filings; Orca estimates. S&P 500: SPY total return,
+     {from} to {to}." (`from`/`to` = `spx.from_q`/`to_q` as "Q3 2021"; drop the S&P sentence when `spx` or
+     `spx.ann_return` is null).
 
-Phone (designed at 400×844; everything fits one screen so only the list scrolls, never the page):
-1. H2 "Famous funds" 24/28px. 2. List switch (full width, 38px tall buttons). 3. Period switch.
+Phone (designed at 400×844 for the Famous funds module below the home header and tabs; the page scrolls
+normally to bring the module into view, then the list scrolls inside its window):
+1. H2 "Famous funds" 24/28px. 2. List switch (scrolls sideways, 38px tall buttons). 3. Period switch (the six
+   shared periods, as on desktop; scrolls sideways if it does not fit).
 4. Rule + H3 + count + lead line (13/18px). 5. Axis header (36px). 6. Window of **10 rows**.
 7. Caption and source (11–12px). No tooltip (tap opens the fund page). The Chart | Table switch sits beside
    the period switch as two 44px icon-only buttons (`aria-label` "Chart" / "Table").
@@ -196,7 +219,8 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
   - Light gain `#9CC8E2 → #267CAA → #0B4A72`; light loss `#F2B08F → #C64A14 → #8A3208`.
   - Dark mode flips so big = brightest: gain `#1F5F86 → #3D93C2 → #8CCBEE`; loss `#7E3714 → #D9622B → #F7A882`.
   - A "Solid" option (site `--gain` / `--loss`) exists as a design Tweak only.
-- **Lines drawn through the chart: only two.** The zero line (1px `--zero` = `#6A635A` light / `#AEA498` dark) and
+- **Lines drawn through the chart: only two.** The zero line (1px; add a `--zero` token to `web/src/tokens.css`
+  equal to `--ink3`: `#6A635A` light / `#AEA498` dark) and
   the **S&P 500 dotted line** (1px, `repeating-linear-gradient` 1.5px dash / 3.5px gap in `--ink3`, 75% opacity).
   No gridlines at +10%, +20% etc. (owner removed them).
 - Axis header: the S&P label "S&P 500 {spx}" (11px 600 `--ink`, phone "S&P {spx}") centred over a 10×6px ▼
@@ -272,7 +296,7 @@ substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `
 
 | Column | Value | Format (today's helpers) |
 |---|---|---|
-| Fund | photo (26–28px), short name (600), sub line "manager · filed until Qn YYYY" (the table keeps `until_q`) | link to the fund page; full legal name on hover |
+| Fund | exactly today's cell (`famousColumns`): photo, the fund's name as today (`FundLink`, full `name`), sub line "manager · filed until Qn YYYY" | unchanged, so `web/tests/home.test.tsx` keeps matching `f.name` |
 | AUM | `book` | `fBook` (`$304.2B`, `$250m`) — note: the table keeps the site's `$…m` below $1B; the chart uses `$X.XB` |
 | Positions | `n_positions` | `count` |
 | Return / yr | `ann_return` | `pct(x, 0)` in `Signed` colours (blue up / orange down), `+12%` |
@@ -289,14 +313,15 @@ substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `
 - Phone: the same columns in a sideways-scrolling box (table ≥ 640px), the Fund column sticky on the left
   (168px). Row 44px; desktop 52px.
 - The chart's lead line and the source line stay above/below in both views; the desktop standfirst changes to
-  "Estimated figures over the last 5 years. Select a heading to sort; Fund steps through A–Z, Z–A and most
-  popular." in table view. Switching back to Chart replays the grow-in.
+  "Estimated figures {over}. Select a heading to sort; Fund steps through A–Z, Z–A and most popular." in table
+  view (`{over}` from the §4 helper). Switching back to Chart replays the grow-in.
+- The Chart | Table switch needs icons: extend `Choice` with an optional `icon` per option, passed through to `Seg`.
 - Build note: reuse the existing `ListTable` + `FamousGroup` for this view rather than re-implementing it; the
   switch only chooses which of the two renders.
 
 ## 10. Dark mode
-Tokens as `tokens.css` dark (`--page #181512`, `--ink #F3ECE3`, `--band #38322B`, `--zero #AEA498`, inverted pill
-uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
+Use the dark values already in `tokens.css` (they win over any hex quoted here, e.g. dark `--invfg` is `#14110E`),
+plus the new `--zero`. Bars use the dark ramps in §6.
 
 ## 11. Owner's answers (2026-11-21) — no open questions
 1. Fund return estimates include dividends → the S&P 500 line is SPY **total** return (§3.5).
@@ -320,6 +345,8 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 | Search interest column / Trends caption | Removed (main #55, owner) | Users need the right funds, not the score |
 | S&P 500 as price return | Total return (owner, 2026-11-21) | Fund estimates include dividends |
 | Popularity order on the chart | Return order (owner, 2026-11-21) | "Sort by return of each sublist"; Table keeps popularity |
+| Famous funds' own 1y / 5y / Max switch | Kept today's six shared periods, opening on 3y (owner, 2026-11-21) | No surprise when moving between tabs |
+| Capping style lists at 50 | Every fund shown (owner, 2026-11-21) | The scrolling window handles long lists |
 | Two lists side by side | Dropped | One chart across the page; lists via a switch |
 | 50 rows on the page | Dropped | A 15-row (phone 10) scrolling window |
 | Scale that waits until scrolling stops, then animates | Dropped | Felt jumpy |
@@ -335,7 +362,7 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
   Table view. Reuse `Choice` (`web/src/components/Choice.tsx`, the home page's segmented control, a wrapper of `fund/Seg.tsx`) for the list, period and Chart | Table switches, the shared Tooltip (`useTooltip`, `web/src/charts/Tooltip.tsx`), `qOfYear` and the `lib/format.ts` / `pages/homeFmt.ts` helpers.
 - Pure, testable functions (put them in a `.ts` with vitest tests): `fundShortName`, `managerLine`,
   `aumLabel` (`$X.XB`), `shadeFor(ret, dark)`, `windowDomains(rows, VIS, innerW)` (§7.3 smoothing),
-  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone)`, `leadLine(rows, spx)`, `spyReturn(weekly, q0, q1)`.
+  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone)`, `leadLine(rows, spx)`, `periodPhrase(period)`.
 - The glide (§7.2) as a small hook (`useEasedScroll(ref, onPosition)`) with rAF; it must no-op cleanly in jsdom
   (stub `requestAnimationFrame`, as `web/tests/idle.ts` does for idle callbacks).
 - Measure the plot width with `ResizeObserver` where available, falling back to the box's `clientWidth` on
@@ -350,12 +377,16 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 2. Pipeline first (§3.5): contract.md → `spx` in `home/top_{period}.json` → pipeline code + test →
    `cd pipeline && uv run pytest -m "not network"` → demo generator + regenerate demo data
    (`uv run python -m orca.run demo --plain --out ../web/public/demo-data`) → `web/src/data/types.ts`.
+   Also grow `DEMO_FAMOUS` in `pipeline/orca/demo.py` so the demo's Most searched has **more than 15 funds with
+   at least 5 losses** (today it has 5 funds and no losses), or the window never scrolls and the loss checks
+   below cannot run on demo data.
 3. Pure helpers + vitest tests (§13): short names, manager line, `$X.XB`, shade ramp, window domains and
-   Catmull-Rom domain, ticks (desktop/phone), lead line, SPY annualised return from `qclose`.
+   Catmull-Rom domain, ticks (desktop/phone), lead line, period phrase, `SHORT_NAME` / `MANAGER_LINE` /
+   `PHONE_SHORT` (Appendix B).
 4. The chart view component for one list (rows, bars, labels, leader pill, zero + S&P lines, axis header, caption,
    source), static first (no scroll), then the 15/10-row window with the fitted scale (§7.3), then the eased
    wheel/keys glide (§7.2), then the grow-in (§8).
-5. The list switch (Most searched + the 15 style lists), the period switch (1y | 5y | Max), the Chart | Table
+5. The list switch (Most searched + the 15 style lists), today's shared period switch (six periods), the Chart | Table
    switch with today's table behind Table (§9).
 6. Dark mode, reduced motion, phone layout (§5 phone, §6 phone ticks, §7.1 phone window).
 7. Docs in the same change: `docs/PRODUCT.md` (Famous funds row: chart, sort by return, table view), the
@@ -365,10 +396,12 @@ Done when:
 - `cd web && npm test` and `npm run typecheck` pass; new helpers have tests; existing `web/tests/home.test.tsx`
   still passes (update it where the default view changed).
 - `npx playwright test` smoke passes at 1280 and 400 px, light and dark; no horizontal page scroll at 400 px.
-- With demo data (`npm run dev`), and with production data (`VITE_DATA_URL=https://data.orcaetf.com`):
+- With demo data (`npm run dev`; after the demo growth in step 2), and with production data
+  (`VITE_DATA_URL=https://data.orcaetf.com`):
   Most searched shows the same 50 funds as the Table view; the first window has the zero line at the plot's left
   edge; scrolling to the bottom brings the losses in with zero moving right smoothly; the S&P line sits at the
-  published `spx.ann_return` (total return, about +13.5% for 5y to Q3 2026); Max shows no S&P line; Chart | Table
+  published `spx.ann_return` (before merge: checked by the pipeline test and on demo data; production has no
+  `spx` until the post-merge pipeline run); Max shows no S&P line; Chart | Table
   round-trips; reduced motion removes the grow-in and the glide.
 - After merge: production data gets `spx` only after a pipeline run (Actions > Pipeline > Run workflow,
   `home_only`); until then the site must render without the S&P line (old files have no `spx`).
@@ -429,3 +462,167 @@ Sequoia Capital | — | −14.6% | $25.5B
 Summit Partners | — | −16.7% | $0.5B
 HongShan | Neil Shen | −18.1% | $1.2B
 Battery Ventures | — | −22.6% | $0.3B
+
+## Appendix B: manager line for every non-plain `manager` in famous.csv (2026-11-21)
+`MANAGER_LINE` in `web/src/lib/famousNames.ts`. Left: famous.csv `manager`; right: the line shown.
+
+8VC (Joe Lonsdale) → Joe Lonsdale
+Abu Dhabi sovereign fund (Mubadala unit) → (no manager line)
+Abu Dhabi sovereign investor → (no manager line)
+Accel (Accel X) → (no manager line)
+Accel (Accel XI) → (no manager line)
+Accel (Growth Fund V) → (no manager line)
+Accel (Leaders 4 growth fund) → (no manager line)
+Alaska's oil fund → (no manager line)
+Alberta's pension manager (AIMCo) → (no manager line)
+Andreessen Horowitz (a16z) → (no manager line)
+Arizona public pension → (no manager line)
+Arnold Van Den Berg → Arnold Van Den Berg
+Australia's largest super fund → (no manager line)
+Australian public-sector super fund → (no manager line)
+Australian universities' super fund → (no manager line)
+BOND (Mary Meeker) → Mary Meeker
+Bain Capital (Brookside) → (no manager line)
+Battery Ventures → (no manager line)
+Bessemer Venture Partners → (no manager line)
+Bijan Modanlou & Jay Kodali (co-founders) → Bijan Modanlou & Jay Kodali
+Bill Gates (Cascade) → Bill Gates
+British Columbia's pension manager (BCI) → (no manager line)
+CalPERS, largest US public pension → (no manager line)
+CalSTRS, California teachers' pension → (no manager line)
+Canaan Partners (VII) → (no manager line)
+Canaan Partners (X) → (no manager line)
+Canaan Partners (XI) → (no manager line)
+Canada Pension Plan (CPP Investments) → (no manager line)
+Canada's federal public-service pension (PSP) → (no manager line)
+Cbus, Australian construction workers' super → (no manager line)
+DST Global (Yuri Milner) → Yuri Milner
+DST Global (Yuri Milner), early entity → Yuri Milner
+DST Global / Yuri Milner trust vehicle → Yuri Milner
+Denmark's national pension (ATP) → (no manager line)
+Dutch civil servants' pension (ABP) → (no manager line)
+Dutch healthcare workers' pension → (no manager line)
+Felix & Julian Baker → Felix & Julian Baker
+First Round Capital → (no manager line)
+Founders Fund (Growth) → (no manager line)
+Founders Fund (II) → (no manager line)
+Founders Fund (IV) → (no manager line)
+Founders Fund (VI) → (no manager line)
+Founders Fund (VII) → (no manager line)
+Foundry Group → (no manager line)
+Foundry Group (Next) → (no manager line)
+GGV Capital → (no manager line)
+General Atlantic (growth equity) → (no manager line)
+George Fraise / Gordon Marchand → George Fraise & Gordon Marchand
+Google → (no manager line)
+Greylock (15) → (no manager line)
+Greylock (XI) → (no manager line)
+Greylock (XII) → (no manager line)
+Greylock (XIII) → (no manager line)
+Greylock (XIV) → (no manager line)
+Hamish Douglass (to 2022) → Hamish Douglass
+HongShan (formerly Sequoia Capital China) → (no manager line)
+IVP (XIII) → (no manager line)
+IVP (XIV) → (no manager line)
+IVP (XV) → (no manager line)
+IVP (XVI) → (no manager line)
+Index Ventures (III) → (no manager line)
+Index Ventures (IV) → (no manager line)
+Index Ventures (V) → (no manager line)
+Insight Partners → (no manager line)
+Irving Kahn (Graham's assistant) → Irving Kahn
+Jerome Lande & Matt Sirovich → Jerome Lande & Matt Sirovich
+John Overdeck & David Siegel → John Overdeck & David Siegel
+John S. Clark II → John S. Clark
+Kleiner Perkins (KPCB XII) → (no manager line)
+Kleiner Perkins (KPCB XIII) → (no manager line)
+Kleiner Perkins (KPCB XIV) → (no manager line)
+Kleiner Perkins (KPCB XV) → (no manager line)
+Kleiner Perkins Digital Growth Fund II → (no manager line)
+Korea's national pension → (no manager line)
+Korea's sovereign wealth fund → (no manager line)
+Lightspeed Venture Partners (Opportunity Fund) → (no manager line)
+Lou Simpson (GEICO) → Lou Simpson
+Malaysia's national pension (EPF) → (no manager line)
+Mark Arnold / Jason Orthman → Mark Arnold & Jason Orthman
+Matrix Partners (VII) → (no manager line)
+Matrix Partners (now Matrix) → (no manager line)
+Mayfield (XII) → (no manager line)
+Menlo Ventures → (no manager line)
+Michael Rockefeller & Karl Kroeker → Michael Rockefeller & Karl Kroeker
+Michigan public pensions → (no manager line)
+Neil Shen (founder of HongShan / Sequoia China) → Neil Shen
+New Enterprise Associates (NEA) → (no manager line)
+New Jersey state pension (equity fund) → (no manager line)
+New York State's pension fund → (no manager line)
+New York teachers' pension → (no manager line)
+Nick Sleep & Qais Zakaria → Nick Sleep & Qais Zakaria
+North Carolina state pension → (no manager line)
+Norway's largest pension company (KLP) → (no manager line)
+Norway's oil fund → (no manager line)
+Norwest Venture Partners (VIII) → (no manager line)
+Norwest Venture Partners (XI) → (no manager line)
+Norwest Venture Partners (XIII) → (no manager line)
+Norwest Venture Partners (XIV) → (no manager line)
+Notable Capital (formerly GGV Capital US) → (no manager line)
+Novo Nordisk Foundation → (no manager line)
+Ohio public employees' pension (OPERS) → (no manager line)
+Ohio teachers' pension → (no manager line)
+Ontario Teachers' Pension Plan → (no manager line)
+Ontario hospital workers' pension (HOOPP) → (no manager line)
+Ontario municipal workers' pension → (no manager line)
+Ontario public pension manager (IMCO) → (no manager line)
+Oregon public pension → (no manager line)
+Pantera Capital (crypto) → (no manager line)
+Paradigm (crypto VC) → (no manager line)
+Paul Black / Mike Trigg → Paul Black & Mike Trigg
+Paul Marshall & Ian Wace → Paul Marshall & Ian Wace
+Paul Ruddock & Steven Heinz (founders) → Paul Ruddock & Steven Heinz
+Peak XV Partners (formerly Sequoia Capital India) → (no manager line)
+Phil Town (Rule #1) → Phil Town
+Quebec's pension manager (CDPQ) → (no manager line)
+Redpoint Ventures → (no manager line)
+Ribbit Capital → (no manager line)
+Ribbit Capital (GP II) → (no manager line)
+Ribbit Capital (GP IV) → (no manager line)
+Richard Rooney / Tony Arrell → Richard Rooney & Tony Arrell
+Sam Isaly / Carl Gordon → Sam Isaly & Carl Gordon
+Saudi Arabia's central bank (SAMA) → (no manager line)
+Saudi Arabia's sovereign wealth fund → (no manager line)
+Sequoia Capital (US Venture X) → (no manager line)
+Sequoia Capital (US Venture XI) → (no manager line)
+Sequoia Capital (US Venture XII) → (no manager line)
+Sequoia Capital (US growth / TTGP) → (no manager line)
+Sequoia Capital China public equities (HongShan) → (no manager line)
+Sequoia Capital Global Equities → (no manager line)
+Sequoia Capital Growth Fund (GenPar) → (no manager line)
+Sequoia Capital Growth Fund III → (no manager line)
+Sequoia Fund → Bill Ruane
+Singapore's state investor → (no manager line)
+Social Capital (Chamath Palihapitiya) → Chamath Palihapitiya
+SoftBank Vision Fund (SB Investment Advisers) → (no manager line)
+Spark Capital (Growth) → (no manager line)
+Spark Capital (II) → (no manager line)
+Spark Capital (III) → (no manager line)
+Summit Partners (growth equity) → (no manager line)
+Swedish state pension fund AP1 → (no manager line)
+Swedish state pension fund AP2 → (no manager line)
+Swedish state pension fund AP3 → (no manager line)
+Swedish state pension fund AP4 → (no manager line)
+Switzerland's central bank → (no manager line)
+TCV (IX) → (no manager line)
+TCV (VIII) → (no manager line)
+TCV (X) → (no manager line)
+TCV (XI) → (no manager line)
+Ted Kellner (founder) → Ted Kellner
+Texas teachers' pension → (no manager line)
+Thrive Capital (Josh Kushner) → Josh Kushner
+Tom Steyer / Andrew Spokes → Tom Steyer & Andrew Spokes
+UK railway workers' pension (Railpen) → (no manager line)
+UK universities' pension (USS) → (no manager line)
+Union Square Ventures (2004 fund) → (no manager line)
+Union Square Ventures (2008 fund) → (no manager line)
+Union Square Ventures (Opportunity) → (no manager line)
+Valor Equity Partners → (no manager line)
+William von Mueffling → William von Mueffling
+Wisconsin's pension manager (SWIB) → (no manager line)
