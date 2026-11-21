@@ -45,6 +45,10 @@ import {
   tidyName,
 } from "../lib/format";
 import { qShort } from "../fund/fmt";
+import { useWidth } from "../fund/hooks";
+import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
+import { leadLine, sourceLine, standfirst } from "../home/famousChart";
+import { shortNameOf } from "../lib/famousNames";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
@@ -123,7 +127,7 @@ function change(price: number | undefined, base: number): number | null {
  */
 const FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px)";
 const STOCK_W = "calc(var(--stk-w) + var(--tpad) + 8px)";
-/** Famous funds' name column: the same, plus the round photo before the name (home.css: --face, --face-gap). */
+/** Famous funds' name column: the same, plus the round photo before the name (home/famousChart.css: --face, --face-gap). */
 const FAMOUS_FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px + var(--face) + var(--face-gap))";
 
 /** A fund's name, bold, cut with an ellipsis (the full name on hover). */
@@ -624,7 +628,7 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
   },
 ];
 
-/** Rows a page in each famous list: short pages keep nine lists scannable. */
+/** Rows a page in a famous list's table view. */
 const FAMOUS_PAGE = 10;
 
 /** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
@@ -647,94 +651,189 @@ function byGroup(
   return [...known, ...rest.map((name) => ({ name, rows: groups.get(name)! }))];
 }
 
+type FamousView = "chart" | "table";
+const FAMOUS_VIEWS: ChoiceOption<FamousView>[] = [
+  {
+    id: "chart",
+    label: "Chart",
+    // the fund page's Annual returns toggle icons (ReturnsPanel)
+    icon: (
+      <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M3.5 13V8.5M8 13V3.5M12.5 13V6.5" />
+      </svg>
+    ),
+  },
+  {
+    id: "table",
+    label: "Table",
+    icon: (
+      <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+        <path d="M2.5 6.5h11M6.5 6.5V13" />
+      </svg>
+    ),
+  },
+];
+const MOST_SEARCHED = "Most searched";
+
+type FamousList = { name: string; about?: string; rows: TopRow[] };
+
+/**
+ * Famous funds: one list at a time (Most searched, then the styles), as a chart of returns best first
+ * or as today's table in popularity order. The list, the view and the period live in Home.
+ */
 function FamousFunds({
   period,
   onPeriod,
+  list,
+  onList,
+  view,
+  onView,
 }: {
   period: Period;
   onPeriod: (p: Period) => void;
+  list: string;
+  onList: (name: string) => void;
+  view: FamousView;
+  onView: (v: FamousView) => void;
 }) {
-  const list = useLoad(() => loadHome(`top_${period}`), [period]);
-  const rows = list.status === "ready" ? list.data.famous : undefined;
-  const groups = useMemo(() => byGroup(rows ?? []), [rows]);
+  const load = useLoad(() => loadHome(`top_${period}`), [period]);
+  const data = load.status === "ready" ? load.data : undefined;
+  const rows = data?.famous;
   const rank = useMemo(() => popularity(rows ?? []), [rows]);
-  const searched = useMemo(() => mostSearched(rows ?? [], rank), [rows, rank]);
+  const lists = useMemo<FamousList[]>(() => {
+    const searched = mostSearched(rows ?? [], rank);
+    return [
+      ...(searched.length > 0
+        ? [{ name: MOST_SEARCHED, about: MOST_SEARCHED_ABOUT, rows: searched }]
+        : []),
+      ...byGroup(rows ?? []),
+    ];
+  }, [rows, rank]);
   const columns = useMemo(() => famousColumns(rank), [rank]);
-  return (
-    <Panel
-      title="Famous funds"
-      subtitle="Well-known investors by style, whatever their size. Estimated return a year over the chosen period, for every list below; for a fund that stopped filing, the period up to its last 13F. Each list opens with its most popular fund first, then the biggest; select a heading to sort, and Fund again to cycle A–Z, Z–A and most popular."
-      controls={
-        <Choice
-          label="Period"
-          options={PERIODS}
-          value={period}
-          onChange={onPeriod}
-        />
-      }
-    >
-      {list.status !== "ready" ? (
-        <Status state={list} />
-      ) : groups.length === 0 ? (
-        <div className="pb">
-          <State>
-            {rows === undefined
-              ? "The famous funds list arrives with the next data update."
-              : (EMPTY[period] ??
-                "No famous fund has a long enough record for this period yet.")}
-          </State>
-        </div>
-      ) : (
-        <>
-          {searched.length > 0 && (
-            <FamousGroup
-              name="Most searched"
-              about={MOST_SEARCHED_ABOUT}
-              rows={searched}
-              columns={columns}
-            />
-          )}
-          {groups.map((g) => (
-            <FamousGroup key={g.name} {...g} columns={columns} />
-          ))}
-        </>
-      )}
-    </Panel>
-  );
-}
+  const shown =
+    lists.find((l) => l.name === list) ??
+    lists.find((l) => l.name === MOST_SEARCHED) ??
+    lists[0];
+  // A list the new period does not have: the switch moves to the list shown in its place.
+  useEffect(() => {
+    if (shown && shown.name !== list) onList(shown.name);
+  }, [shown, list, onList]);
+  // The switch keeps the last lists while the next period loads, so the controls do not jump.
+  const [names, setNames] = useState<string[]>([]);
+  const now = lists.map((l) => l.name);
+  if (now.length > 0 && now.join("\n") !== names.join("\n")) setNames(now);
+  const listOptions = useMemo(() => names.map((id) => ({ id, label: id })), [names]);
+  // The chart's bars grow in again on a new list, new figures, and coming back from the table.
+  const [run, setRun] = useState({ n: 0, rows, name: shown?.name, view });
+  if (run.rows !== rows || run.name !== shown?.name || run.view !== view)
+    setRun({ n: run.n + 1, rows, name: shown?.name, view });
 
-/** One style's list: its heading and line, then its table with its own page buttons. */
-function FamousGroup({
-  name,
-  about,
-  rows,
-  columns,
-  initial = MOST_POPULAR,
-}: {
-  name: string;
-  about?: string;
-  rows: TopRow[];
-  columns: Col<TopRow>[];
-  initial?: SortState;
-}) {
-  const id = useId();
-  return (
-    <section className="fam" aria-labelledby={id}>
-      <div className="fam-h">
-        <h3 id={id}>{name}</h3>
-        {about && <p>{about}</p>}
+  const spx = data?.spx?.ann_return ?? null;
+  const best = useMemo(
+    () =>
+      [...(shown?.rows ?? [])]
+        .sort(bestFirst)
+        .map((r) => ({ name: shortNameOf(r.fund_id, r.name), ret: r.ann_return })),
+    [shown],
+  );
+  const section = useRef<HTMLElement>(null);
+  const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
+  const h2 = useId();
+  const about = useId();
+
+  let body: ReactNode;
+  if (load.status !== "ready") body = <Status state={load} />;
+  else if (!shown)
+    body = (
+      <div className="pb">
+        <State>
+          {rows === undefined
+            ? "The famous funds list arrives with the next data update."
+            : (EMPTY[period] ??
+              "No famous fund has a long enough record for this period yet.")}
+        </State>
       </div>
-      <ListTable
-        label={name}
-        noun="funds"
-        columns={columns}
-        rows={rows}
-        initial={initial}
-        rowKey={(r) => r.fund_id}
-        paged
-        pageSize={FAMOUS_PAGE}
-        pagerAbove={false}
-      />
+    );
+  else
+    body = (
+      <div className="fam-mod">
+        <div className="fam-rule">
+          <div className="fam-h3">
+            <h3>{shown.name}</h3>
+            <span className="fam-n">{count(shown.rows.length, "fund")}</span>
+          </div>
+          <p className="fam-lead">{leadLine(best, spx)}</p>
+          {shown.about && (
+            <p id={about} className="vh">
+              {shown.about}
+            </p>
+          )}
+        </div>
+        {view === "chart" ? (
+          <FamousChart
+            name={shown.name}
+            rows={shown.rows}
+            spx={spx}
+            period={period}
+            run={run.n}
+          />
+        ) : (
+          <ListTable
+            key={shown.name} // each list opens most popular first, on its first page
+            label={shown.name}
+            noun="funds"
+            columns={columns}
+            rows={shown.rows}
+            initial={MOST_POPULAR}
+            rowKey={(r) => r.fund_id}
+            paged
+            pageSize={FAMOUS_PAGE}
+            pagerAbove={false}
+          />
+        )}
+        <p className="fam-src">{sourceLine(data?.spx)}</p>
+      </div>
+    );
+
+  return (
+    <section
+      ref={section}
+      className={"famous" + (phone ? " phone" : "")}
+      aria-labelledby={h2}
+      aria-describedby={shown?.about ? about : undefined}
+    >
+      <div className="fam-head">
+        <h2 id={h2}>Famous funds</h2>
+        <p className="fam-stand">{standfirst(period, spx, view)}</p>
+      </div>
+      <div className="fam-ctl">
+        {names.length > 0 && (
+          <div className="fam-lists">
+            <Choice
+              label="List"
+              options={listOptions}
+              value={shown?.name ?? list}
+              onChange={onList}
+            />
+          </div>
+        )}
+        <div className="fam-opts">
+          <Choice
+            label="Period"
+            options={PERIODS}
+            value={period}
+            onChange={onPeriod}
+          />
+          <Choice
+            label="View"
+            options={FAMOUS_VIEWS}
+            value={view}
+            onChange={onView}
+          />
+        </div>
+      </div>
+      {body}
     </section>
   );
 }
@@ -1325,6 +1424,8 @@ export default function Home() {
   const [tab, setTab] = useState<TabId>("famous");
   // The toggles live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");
+  const [famousList, setFamousList] = useState(MOST_SEARCHED);
+  const [famousView, setFamousView] = useState<FamousView>("chart");
   const [mode, setMode] = useState<Mode>("best");
   const [win, setWin] = useState<CallWindow>("q");
   const [moveWin, setMoveWin] = useState<CallWindow>("q");
@@ -1333,7 +1434,16 @@ export default function Home() {
   let panel: ReactNode;
   if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
   else if (tab === "famous")
-    panel = <FamousFunds period={period} onPeriod={setPeriod} />;
+    panel = (
+      <FamousFunds
+        period={period}
+        onPeriod={setPeriod}
+        list={famousList}
+        onList={setFamousList}
+        view={famousView}
+        onView={setFamousView}
+      />
+    );
   else if (lookup.status !== "ready") {
     // Stocks, prices and fund sizes are what these lists are made of: the panel waits for them.
     panel = (
