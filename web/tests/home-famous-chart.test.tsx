@@ -392,7 +392,9 @@ function Box({ onPos }: { onPos: (p: number) => void }) {
   const es = useEasedScroll(ref, 46, onPos);
   return (
     <div>
-      <div data-testid="box" ref={ref} />
+      <div data-testid="box" ref={ref}>
+        <div data-testid="list" />
+      </div>
       <button type="button" onClick={() => es.glide(46 * 5)}>
         five rows
       </button>
@@ -455,6 +457,34 @@ describe("useEasedScroll", () => {
     expect(settled / 60).toBeGreaterThan(0.4); // about half a second to most of the way
     expect(settled / 60).toBeLessThan(1);
     expect(onPos).toHaveBeenLastCalledWith(100 / 46);
+  });
+
+  it("where the browser keeps whole pixels (Chrome) the list makes up the fraction, so the rows move by the eased amount every frame", async () => {
+    const { el, onPos } = setup();
+    let kept = 0;
+    Object.defineProperty(el, "scrollTop", {
+      configurable: true,
+      get: () => kept,
+      set: (v: number) => void (kept = Math.round(v)),
+    });
+    const list = screen.getByTestId("list");
+    const ty = () => Number(/translateY\(([-\d.]+)px\)/.exec(list.style.transform)?.[1] ?? 0);
+    wheel(el, { deltaY: 100 });
+    const shown: number[] = [];
+    let fractional = 0;
+    for (let i = 0; i < 120 && frames.size > 0; i++) {
+      await frame();
+      const at = onPos.mock.lastCall![0] * 46; // where the glide is, in px
+      expect(Number.isInteger(el.scrollTop)).toBe(true);
+      expect(Math.abs(ty())).toBeLessThanOrEqual(0.5);
+      expect(el.scrollTop - ty()).toBeCloseTo(at, 2); // what is shown is where the glide is
+      if (!Number.isInteger(at)) fractional++;
+      shown.push(el.scrollTop - ty());
+    }
+    expect(fractional).toBeGreaterThan(10); // the glide really passed through fractions
+    shown.slice(1).forEach((t, i) => expect(t).toBeGreaterThan(shown[i] - 1e-9)); // smooth and never back
+    expect(el.scrollTop).toBe(100);
+    expect(list.style.transform).toBe(""); // at rest: no shift left, crisp text
   });
 
   it("lets the page scroll at the ends, ignores pinch zoom, and counts lines and pages", async () => {
