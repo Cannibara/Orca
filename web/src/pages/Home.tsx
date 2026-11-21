@@ -831,6 +831,7 @@ function FamousFunds({
               options={listOptions}
               value={shown?.name ?? list}
               onChange={onList}
+              wrap={!phone}
             />
           </div>
         )}
