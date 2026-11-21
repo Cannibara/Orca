@@ -53,6 +53,8 @@ type Mode = typeof DESKTOP;
 /** ms the grow-in takes at most (8): the last row starts at 450ms and its label fades in 450ms after that over
  * 300ms, so 1200ms, plus a margin. After it the animations are taken off, which makes each frame's restyle cheaper. */
 const GROW_MS = 1400;
+/** ms without a change before a screen reader hears the caption: a glide passes many rows. */
+const SETTLE_MS = 300;
 /** Below this width (px) the module lays out for a phone. */
 export const PHONE_BELOW = 560;
 /** The width assumed when it cannot be measured (jsdom): a desktop page. */
@@ -76,6 +78,16 @@ function useDark(): boolean {
     };
   }, []);
   return dark;
+}
+
+/** `value` once it has stopped changing for `ms` (what a polite live region should announce). */
+function useSettled<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return settled;
 }
 
 /** The person's photo, grey until the row is hovered; their initials (or the fund's) on a disc without one. */
@@ -403,6 +415,7 @@ export function FamousChart({
   const first = top + 1;
   const last = Math.min(n, top + M.vis);
   const caption = captionText(first, last, n, scrolls);
+  const said = useSettled(caption, SETTLE_MS);
 
   // The rows' tooltip handlers stay the same function for the chart's life (so the memoised rows keep), and
   // read what they need at the moment of hovering.
@@ -523,8 +536,12 @@ export function FamousChart({
         </div>
         <span className="fade b" aria-hidden="true" />
       </div>
-      <p className="fc-cap" aria-live="polite">
+      {/* the caption follows every row; a screen reader hears it once the window has settled */}
+      <p className="fc-cap" aria-hidden="true">
         {caption}
+      </p>
+      <p className="vh fc-said" aria-live="polite">
+        {said}
       </p>
     </div>
   );

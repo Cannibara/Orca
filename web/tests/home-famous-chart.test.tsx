@@ -166,6 +166,37 @@ describe("Famous funds chart", () => {
     expect(parseFloat(zero.style.left)).toBeGreaterThan(20);
   });
 
+  it("tells a screen reader where the window is once it settles, not at every row it passes", async () => {
+    await openFixture();
+    const said = () => document.querySelector(".fc-said")!;
+    expect(said()).toHaveAttribute("aria-live", "polite");
+    expect(document.querySelector(".fc-cap")).toHaveAttribute("aria-hidden", "true");
+    expect(said()).toHaveTextContent("Showing 1–15 of 50 · scale fits the funds in view");
+    vi.useFakeTimers();
+    try {
+      const heard: string[] = [];
+      const mo = new MutationObserver(() => heard.push(said().textContent ?? ""));
+      mo.observe(said(), { childList: true, characterData: true, subtree: true });
+      // a glide through the list: a new row every 100ms
+      for (const row of [3, 8, 14, 20, 27, 35]) {
+        act(() => {
+          box().scrollTop = row * 46;
+          fireEvent.scroll(box());
+        });
+        act(() => vi.advanceTimersByTime(100));
+      }
+      expect(caption()).toBe("Showing 36–50 of 50 · scale fits the funds in view"); // the visible caption follows
+      expect(said()).toHaveTextContent("Showing 1–15 of 50 · scale fits the funds in view");
+      act(() => vi.advanceTimersByTime(300));
+      await Promise.resolve(); // the observer's callback
+      expect(said()).toHaveTextContent("Showing 36–50 of 50 · scale fits the funds in view");
+      expect(heard).toEqual(["Showing 36–50 of 50 · scale fits the funds in view"]);
+      mo.disconnect();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("moves the window with the keys: a row, a page, the ends (straight there with reduced motion)", async () => {
     document.documentElement.dataset.motion = "reduce";
     const user = await openFixture();
