@@ -1,9 +1,23 @@
 # Worklog
 
-Last verified: 2026-11-20
+Last verified: 2026-11-21
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-21 — Famous chart spec checked against main and made build-ready
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner answered the last two questions: fund estimates include dividends, so the S&P 500 line is SPY total return, computed in the pipeline over the funds' own window and published as `spx` in `home/top_{period}.json` (a contract change the build makes first); each list's chart sorts by return, the Table view keeps popularity order. Spec status: ready to build, with a paste-in prompt for a new session | Owner, 2026-11-21 | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` |
+| The spec now follows #55: Most searched membership and the table's opening order use `popularity()` (owner's `rank`, then `fame`, then AUM); no Search interest column anywhere; 15 style lists (Credit & event-driven added). The mock-ups' Table view dropped the column too. Added a build checklist with done-when checks, phone tick margins, and a CLAUDE.md "Read X when" row | Owner: "ensure this documentation is ready for a new LLM session to implement", then merge it to main | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `…-mock/`, `CLAUDE.md` |
+
+## 2026-11-20 — Home: Famous funds as one ranked return chart (design approved, not built)
+
+| What changed | Why | Files |
+|---|---|---|
+| Design spec for replacing the Famous funds tables with one full-width bar chart per list: sorted by 5y return, zero line (gains right, losses left), shaded blue/orange by size, labels at the bar tips, S&P 500 dotted line (+12.2% a year, SPY Q3 2021–Q3 2026), a 15-row (phone 10) scrolling window whose scale fits the funds in view and glides with an eased scroll. Written so an LLM or developer can build it cold; mock-ups saved beside it | Owner: "make the home page simpler and more visual with a colourful annual return graph"; approved over several rounds on the claude.ai Design canvas RBrW19wJQpU4mToFrVpG8B (v4 boards) | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `docs/superpowers/specs/2026-11-20-home-famous-chart-mock/` |
+| Open: dividends in fund estimates vs SPY price return; sorting by return vs the 2026-11-18 "most popular first" rule in PRODUCT.md | Owner to decide | — |
 
 ## 2026-11-20 — Famous funds: Wikipedia's hedge funds added; rank by the owner's score
 
