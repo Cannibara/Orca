@@ -5,7 +5,17 @@ Last verified: 2026-11-21
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-21 — Famous funds ranked return chart built (awaiting merge)
+## 2026-11-21 — Famous funds chart after launch: one scale per list, wrapped list switch, 20 rows
+
+| What changed | Why | Files |
+|---|---|---|
+| The chart keeps one scale per list: `windowDomains` gives a fixed span (the widest window's need; a window with a loss also keeps room for its labels) and the left end each window allows; `domainAt` slides the axis along a smoothed Catmull-Rom track. Caption "· one scale for the whole list" | Owner: a bar changing length as you scroll (the fitted scale) was misleading | `web/src/home/famousChart.ts`, `FamousChart.tsx` |
+| The list switch wraps onto 2–3 rows above the period and Chart \| Table (`Choice wrap`; Seg's thumb moves in both directions); a phone keeps one swiped row | Owner: the one-row switch overlapped the period | `web/src/components/Choice.tsx`, `web/src/fund/Seg.tsx`, `base.css`, `famousChart.css`, `Home.tsx` |
+| Desktop window shows 20 funds (was 15); PgUp/PgDn 19 rows | Owner request | `FamousChart.tsx` |
+
+Shipped as PR #57 (merged 825b7a5) and the `home_only` run the same morning (S&P 500 3y +22.7%, 5y +13.7%).
+
+## 2026-11-21 — Famous funds ranked return chart built (merged as PR #57)
 
 | What changed | Why | Files |
 |---|---|---|
