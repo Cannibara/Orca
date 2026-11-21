@@ -5,6 +5,14 @@ Last verified: 2026-11-21
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-21 — Sector choice vs stock choice on the fund page: design approved, build spec written
+
+| What changed | Why | Files |
+|---|---|---|
+| Build spec for four Analysis-tab panels that show a fund's sector choice vs stock choice from the existing `engine/skill.py` replays: the map with famous-list peers and a 3-year path, the Annual return stacked graph (AUM style; Stacked ↔ Lines with the S&P 500), sector mix by sector / industry / sub-industry with detected rotations, and the decisions panel (share of money, beat by, Adds). Also the pipeline additions (quarter values and returns of each replay, SPY replay, per-position and per-label IRRs, market share via a new `cap` column, mix), the contract for `sectors/labels.json`, `sectors/scores.json`, `fund/{id}/skill.json`, a `publish` part for `orca.run sectors`, demo data, and phases with done-when checks | Owner: "publish this plan into a document for an LLM to execute", after approving draft v5 ("Wonderful") | `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`, `…-draft.html` |
+| Owner decisions recorded: panels and order, Annual returns stays on Holdings, S&P 500 reference line (R23 override), "sub-industry" wording; default tier Industry (R9); licensing gate before merging to `main` | So the build session does not re-ask | `docs/DECISIONS.md`, `CLAUDE.md` (Read-X row), plan `2026-11-17-sector-indices.md` (phase 6 pointer) |
+| Nothing built; no code changed | Design session only | — |
+
 ## 2026-11-21 — Famous chart spec checked against main and made build-ready
 
 | What changed | Why | Files |

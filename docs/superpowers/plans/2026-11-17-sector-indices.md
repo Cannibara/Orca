@@ -1,5 +1,8 @@
 # Sector indices and the allocator vs picker score: full plan and handoff
 
+> 2026-11-21: phase 6 (contract, publish, web) is now specified in full, with the owner's approved design, in
+> `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`. Build phase 6 from that spec.
+
 Status: phases 1–3 and 5 built on 2026-11-17 (`hierarchy/assign.py`, `shares_hist.py`, `engine/sectors.py`, `engine/skill.py`, `run/sectors_step.py`); phase 4 (the owner's Actions run) checks them on real data; phase 6 (publish, web) waits on it. Work continues on branch `claude/gifted-cannon-e5ihyh`, which is not merged to `main`. The decision log is in `docs/DECISIONS.md` (entries dated 2026-11-16 and 2026-11-17).
 
 ## 1. Terms

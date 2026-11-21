@@ -23,6 +23,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | Building the home page's Famous funds chart (ranked return bars, fitted scale, Chart / Table switch) | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` (approved design, build checklist; mock-ups beside it) |
+| Building the fund page's sector choice vs stock choice panels (map, Annual return stacked graph, sector mix, decisions; publishing the sector scores) | `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md` (approved design, build phases; draft HTML beside it) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
 ## Stack and hosting

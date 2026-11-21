@@ -1,10 +1,18 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-20
+Last verified: 2026-11-21
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-21 — Fund page: how sector choice vs stock choice is shown (owner)
+- Decision (chat): four new panels on the Analysis tab, above the existing ones: "What kind of investor?" (a map of stock choice across, sector choice up, peers from the fund's famous-funds list), "Annual return stacked graph" (each year = market + sector choice + stock choice, in the Assets under management chart's style, switching to Lines), "Sector mix over time" (mix only, Sector / Industry / Sub-industry), "Which decisions made the gap" (stocks vs their sector, sectors vs market, with the share of money as a bar and an Adds column). Approved over five drafts of claude.ai artifact BvTgoeVpWCPrmwDhXF55Wz (v5); the build spec is `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`.
+- Decision (chat): the Annual returns bar chart stays on Holdings, unchanged; the new chart is named "Annual return stacked graph" so the two are not confused.
+- Decision (chat): the Lines view shows the S&P 500 (SPY total return) as a reference line. This overrides R23 ("no SPY benchmark on fund pages") for that line only; the split is always measured against Orca's whole-market index, because the sector indices add up to it.
+- Decision (chat): readers see "sub-industry" for the third hierarchy level; code and docs keep "vertical" / "industry vertical".
+- Default (spec, owner may override): one shared Sector / Industry / Sub-industry switch, default Industry, as R9 says; the drafts were drawn at sector level without one.
+- Open: licensing (Tiingo L1, Damodaran R10) was deferred on 2026-11-16 "until something is shown on the site"; the owner must confirm before this is merged to `main`. Also resolves part of the 2026-11-10 conflict list (R23; "luck vs skill" stays out of the wording, with a "too close to call" band on the map).
 
 ## 2026-11-20 — Fund page: tiles split 4 and 4; Annual returns on Holdings, AUM on Analysis
 - Decision: Holdings = four tiles (annualised return, max drawdown, turnover per year, average hold length), Holdings tree map, Annual returns, Positions. Analysis = four tiles (years positive, volatility, risk-adjusted return, positions profitable), Assets under management, Return constituents, What if they'd kept it. About = About only. Panels, titles, details and formatting unchanged; only their place moved (owner approved draft claude.ai artifact HqU6sXjkXUy91FNa9GoN64, v4) (chat)(code `web/src/pages/Fund.tsx`, `fund/KpiStrip.tsx` `group`, `fund/HoldingsTab.tsx`).

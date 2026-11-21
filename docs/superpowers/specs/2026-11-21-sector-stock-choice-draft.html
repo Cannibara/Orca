@@ -1,0 +1,607 @@
+<!-- Reference only, never served. The approved draft (v5, 2026-11-21) of docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md. Made-up data from one simulated fund; fund and peer names are invented. Open in a browser. -->
+<title>Sector vs Stock Choice Drafts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the proposed Analysis tab, top to bottom, as fund-page panels; a short "why" above each. Tokens from web/src/tokens.css plus a sector palette */
+:root{
+  --page:#FAF3EA;--surface:#FFFCF8;--sunken:#F0E6D8;--band:#F0E6D8;--line:#E6DCCF;--line2:#CDBFAE;--control:#8E8272;
+  --ink:#1B1916;--ink2:#4B463F;--ink3:#6A635A;--inv:#1B1916;--invfg:#FFFCF8;--focus:#0E658C;
+  --gain:#267CAA;--up-text:#0E658C;--loss:#D4561F;
+  --sect:#7A5FA8;--sect-text:#6A4F98;--under:#8E8272;
+  /* sector palette: muted, kept away from the gain blue and loss orange */
+  --c1:#7A5FA8;--c2:#3E8E87;--c3:#B5667A;--c4:#8A8F3C;--c5:#C4A35A;--c6:#6B7B8C;--c7:#8C6A4F;--c8:#A9A196;
+  --f-sans:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#181512;--surface:#28241F;--sunken:#1F1B17;--band:#38322B;--line:#38322B;--line2:#574E44;--control:#948A7C;
+  --ink:#F3ECE3;--ink2:#CBC2B6;--ink3:#AEA498;--inv:#F3ECE3;--invfg:#14110E;--focus:#6BB6E0;
+  --gain:#4F9CC8;--up-text:#5BA3CE;--loss:#F48D60;--sect:#B39DDB;--sect-text:#C3B0E6;--under:#948A7C;
+  --c1:#A58FD0;--c2:#5FB5AD;--c3:#D58A9D;--c4:#B3B862;--c5:#D9BC74;--c6:#93A3B5;--c7:#B48E70;--c8:#7D766C;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#181512;--surface:#28241F;--sunken:#1F1B17;--band:#38322B;--line:#38322B;--line2:#574E44;--control:#948A7C;
+  --ink:#F3ECE3;--ink2:#CBC2B6;--ink3:#AEA498;--inv:#F3ECE3;--invfg:#14110E;--focus:#6BB6E0;
+  --gain:#4F9CC8;--up-text:#5BA3CE;--loss:#F48D60;--sect:#B39DDB;--sect-text:#C3B0E6;--under:#948A7C;
+  --c1:#A58FD0;--c2:#5FB5AD;--c3:#D58A9D;--c4:#B3B862;--c5:#D9BC74;--c6:#93A3B5;--c7:#B48E70;--c8:#7D766C;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--page);color:var(--ink);font-family:var(--f-sans);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+h1{font-size:28px;line-height:1.2;margin:0;text-wrap:balance;font-weight:700;letter-spacing:-.01em}
+h2{font-size:18px;margin:0;text-wrap:balance}
+p{margin:0}
+.lede{color:var(--ink2);max-width:70ch}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;gap:10px}
+.rec ol{margin:0;padding-left:20px;display:grid;gap:4px;color:var(--ink2)}
+.rec b{color:var(--ink)}
+.opt{display:grid;gap:10px}
+.opt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--band);color:var(--ink2)}
+.tag.new{background:var(--inv);color:var(--invfg)}
+.why{color:var(--ink2);font-size:14px;max-width:74ch}
+.why b{color:var(--ink)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:14px;min-width:0}
+.ptop{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center}
+.ptitle{font-weight:600;font-size:16px}
+.sub{color:var(--ink3);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line2);border-radius:999px;padding:2px;gap:2px;background:var(--sunken)}
+.seg button{font:inherit;font-size:13px;border:0;background:none;color:var(--ink2);padding:4px 12px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line2)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.btn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+.btn.primary{background:var(--inv);color:var(--invfg);border-color:var(--inv)}
+.btn[disabled]{opacity:.45;cursor:default}
+.check{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink2);cursor:pointer}
+.say{font-size:17px;line-height:1.45;max-width:64ch;text-wrap:pretty}
+.say .g{color:var(--up-text);font-weight:600}.say .l{color:var(--loss);font-weight:600}.say .s{color:var(--sect-text);font-weight:600}
+.foot{font-size:12.5px;color:var(--ink3);max-width:82ch}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font-family:var(--f-sans);fill:var(--ink2)}
+svg .mono{font-family:var(--f-mono)}
+.chartbox{overflow-x:auto;overflow-y:hidden}
+.chartbox svg.wide{min-width:640px}
+.steps{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.stepnote{min-height:3em;color:var(--ink2);max-width:72ch}
+.stepnote b{color:var(--ink)}
+.dots{display:flex;gap:6px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line2)}
+.dots i.on{background:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:3px;border-radius:2px;display:inline-block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);padding:3px 10px;border-radius:999px;cursor:pointer}
+.chip i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.chip[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);font-weight:600}
+.rot{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:13.5px;color:var(--ink2)}
+.rot li{display:flex;gap:8px;align-items:baseline}
+.rot .n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--inv);color:var(--invfg);font-size:11.5px;font-weight:700;display:inline-grid;place-items:center}
+.tip{position:fixed;pointer-events:none;background:var(--inv);color:var(--invfg);font-size:12.5px;padding:6px 9px;border-radius:6px;max-width:280px;z-index:5;line-height:1.45}
+/* the stacked graph copies the fund page's Assets under management panel (web/src/fund/aum.css, base.css) */
+.fpanel{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;display:flex;flex-direction:column}
+.fpanel .ph{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:space-between;align-items:flex-start;padding:16px 20px 0}
+.fpanel .ph-t{min-width:0;flex:1 1 240px}
+.fpanel .pt{font:600 19.6px/26px var(--f-sans);letter-spacing:-.02em;margin:0}
+.fpanel .ph-c{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fpanel .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:12px 20px 0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.fpanel .stat{padding:8px 12px;border-left:1px solid var(--line);min-width:0}
+.fpanel .stat:first-child{border-left:0}
+.fpanel .stat span{display:block;font-size:11.5px;line-height:15px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fpanel .stat b{display:block;font:600 15px/22px var(--f-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fpanel .strip{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:12px 20px 0}
+.fpanel .legend{gap:6px 16px;font-size:12px;color:var(--ink2)}
+.fpanel .lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fpanel .lg i{width:10px;height:10px;border-radius:2px;display:block;flex:none;box-sizing:border-box}
+.fpanel .lg i.ln{width:16px;height:3px}
+.fpanel .pb{padding:12px 20px 6px;min-width:0}
+.fpanel .pf{padding:6px 20px 16px;font-size:12px;line-height:1.5;color:var(--ink3);max-width:80ch;margin:0}
+.fpanel .chart{position:relative;min-width:0}
+.fpanel .viz{font-family:var(--f-sans);font-variant-numeric:tabular-nums;user-select:none}
+.fpanel .viz .grid{stroke:var(--line);stroke-width:1}
+.fpanel .viz .zero{stroke:var(--ink3);stroke-width:1}
+.fpanel .viz .guide{stroke:var(--line2);stroke-width:1}
+.fpanel .viz .tick{fill:var(--ink3);font-size:11px}
+.fpanel .viz .clab{fill:var(--ink3);font-size:12px}
+.fpanel .viz .blab{fill:var(--ink);font-size:11.5px;font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.fpanel .viz .hovband{fill:var(--band);opacity:0;transition:opacity 80ms linear}
+.fpanel .viz .hovband.on{opacity:.6}
+.fpanel .viz .hit{fill:transparent;outline:none;cursor:default}
+.fpanel .viz .hit:focus-visible{stroke:var(--focus);stroke-width:2}
+.fpanel .viz.grow .bar{transform-box:view-box;transform-origin:0 var(--y0);animation:rgrow 600ms cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i) * 40ms)}
+.fpanel .viz.grow .blab{animation:rfade 300ms ease-out backwards;animation-delay:calc(var(--i) * 40ms + 450ms)}
+@keyframes rgrow{from{transform:scaleY(0)}}
+@keyframes rfade{from{opacity:0}}
+.btn2{font:inherit;font-size:13px;font-weight:500;display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:5px 10px;border-radius:6px;cursor:pointer}
+.btn2:hover{background:var(--sunken)}
+.btn2 .ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round}
+.ptip{position:absolute;top:4px;z-index:3;background:var(--inv);color:var(--invfg);border-radius:8px;padding:10px 12px;min-width:200px;font-size:12.5px;pointer-events:none}
+.ptip .tt{font-size:12.5px;color:color-mix(in srgb,var(--invfg) 75%,transparent);margin-bottom:4px}
+.ptip .r{display:flex;justify-content:space-between;gap:18px;line-height:21px}
+.ptip .k{display:inline-flex;align-items:center;gap:7px}
+.ptip .k i{width:8px;height:2.5px;border-radius:2px;display:block}
+.ptip b{font-weight:700;font-variant-numeric:tabular-nums}
+.ptip .sum{border-top:1px solid color-mix(in srgb,var(--invfg) 25%,transparent);margin-top:5px;padding-top:5px}
+.ptip .ref{color:color-mix(in srgb,var(--invfg) 65%,transparent)}
+.ptip .ref b{font-weight:500}
+.tview{position:absolute;inset:0;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.tview table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.tview th{font:500 12px/1.2 var(--f-sans);color:var(--ink3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line2);background:var(--sunken);position:sticky;top:0;white-space:nowrap}
+.tview td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.tview tbody th{position:static;background:none;color:var(--ink);font-weight:500;border-bottom:1px solid var(--line)}
+.tview :is(th,td):first-child{text-align:left}
+@media (max-width:560px){.fpanel{border-radius:0;border-left:0;border-right:0}.fpanel .stat b{font-size:14px}.fpanel .stat span{white-space:normal}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:520px){.panel{padding:14px}.say{font-size:16px}}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="eyebrow">Orca · Fund page · Analysis tab · Draft 5</div>
+    <h1>Showing sector choice vs stock choice</h1>
+    <p class="lede">The fund's real trades replayed three ways (<span class="mono">engine/skill.py</span>): in the stocks it bought, in each stock's sector index, in the whole market. Every panel below comes from one simulated example fund that rotates sectors several times, so the numbers agree with each other. Fund and peer names are made up.</p>
+  </header>
+
+  <section class="rec" aria-label="Proposed order">
+    <div class="eyebrow">Proposed Analysis tab, top to bottom</div>
+    <ol>
+      <li><b>What kind of investor?</b> The map, with peers from the fund's own famous-funds list. New, at the top.</li>
+      <li><b>KPI strip</b> (existing, not drawn here).</li>
+      <li><b>Annual return stacked graph</b>: Stacked (default) ↔ Lines, in the Assets under management chart's style. New. The Annual returns bar chart stays on Holdings.</li>
+      <li><b>Sector mix over time</b>: Sector → Industry → Sub-industry.</li>
+      <li><b>Which decisions made the gap</b>: stocks vs their sector, sectors vs market.</li>
+      <li>Then the existing Assets under management, Return constituents and What if panels.</li>
+    </ol>
+  </section>
+
+  <!-- ===== 1. Map ===== -->
+  <section class="opt">
+    <div class="opt-head"><h2>1. The map, at the top</h2><span class="tag new">Changed</span></div>
+    <p class="why">Peers come from the famous-funds list the fund is in (Tiger cubs, Tech &amp; growth…). A fund in two lists gets a switch. A fund in no list would use funds of a similar size. <b>New:</b> "Show its path" draws where the fund sat on each rolling 3-year window, so readers see if its style changed.</p>
+    <div class="panel">
+      <div class="ptop">
+        <div><div class="ptitle">What kind of investor?</div><div class="sub">Yearly points gained vs the market, split in two · since 2014 · estimate</div></div>
+        <div class="controls">
+          <div class="seg" role="group" aria-label="Compare with">
+            <button aria-pressed="true" data-list="cubs">Tiger cubs</button><button aria-pressed="false" data-list="tech">Tech &amp; growth</button>
+          </div>
+          <label class="check"><input type="checkbox" id="d-trail"> Show its path</label>
+        </div>
+      </div>
+      <p class="say" id="d-say"></p>
+      <div class="chartbox"><svg id="d-svg" viewBox="0 0 880 460" role="img" aria-label="Map of funds by stock choice and sector choice"></svg></div>
+      <p class="foot"><b>Units.</b> "pts a year" means percentage points of yearly return: +2 pts = 2% a year more, e.g. 12% a year instead of 10%. Measured on every dollar they put in since 2014. Across: how much its stocks beat their own sectors. Up: how much its sectors beat the whole market. The grey cross near zero is "too close to call": a gap that small is often chance. Dot size = number of picks.</p>
+    </div>
+  </section>
+
+  <!-- ===== 2. Annual return stacked graph ===== -->
+  <section class="opt">
+    <div class="opt-head"><h2>2. Annual return stacked graph</h2><span class="tag new">Changed</span></div>
+    <p class="why">Rebuilt in the Assets under management chart's style: the same header, three figures, legend strip, bar look, hover band, pinned tooltip and Table view. The solid bar always ends at the fund's return. A choice that went the other way is a dashed box beyond the bar, the way AUM shows losses. No numbers under the axis.</p>
+    <section class="fpanel" id="stackPanel" aria-labelledby="stackTitle">
+      <div class="ph">
+        <div class="ph-t"><h3 class="pt" id="stackTitle">Annual return stacked graph</h3></div>
+        <div class="ph-c">
+          <label class="check" id="never-wrap" hidden><input type="checkbox" id="a-never"> If they had never rotated</label>
+          <div class="seg" role="group" aria-label="Show">
+            <button aria-pressed="true" data-amode="split">Stacked</button><button aria-pressed="false" data-amode="growth">Lines</button>
+          </div>
+          <button type="button" class="btn2" id="r-table" aria-pressed="false"></button>
+        </div>
+      </div>
+      <div class="stats" id="r-stats" aria-live="polite"></div>
+      <div class="strip"><div class="legend" id="r-legend"></div></div>
+      <div class="pb"><div class="chart"><div class="chartbox"><svg id="r-svg" class="viz wide" viewBox="0 0 880 360" role="group" aria-label="Annual return stacked graph"></svg></div><div class="ptip" id="r-tip" hidden></div><div class="tview" id="r-tview" hidden></div></div></div>
+      <p class="pf" id="r-foot"></p>
+    </section>
+  </section>
+
+  <!-- ===== 3. Mix over time ===== -->
+  <section class="opt">
+    <div class="opt-head"><h2>3. Sector mix over time</h2><span class="tag new">Changed</span></div>
+    <p class="why">Mix only. The switch goes from sector to industry to sub-industry. Finer levels keep their sector's colour in lighter shades, so the big picture stays readable. Tap a sector chip or band to pick it out.</p>
+    <div class="panel">
+      <div class="ptop">
+        <div><div class="ptitle" id="m-title">Sector mix over time</div><div class="sub" id="m-sub"></div></div>
+        <div class="seg" role="group" aria-label="Level">
+          <button aria-pressed="true" data-mlevel="1">Sector</button><button aria-pressed="false" data-mlevel="2">Industry</button><button aria-pressed="false" data-mlevel="3">Sub-industry</button>
+        </div>
+      </div>
+      <div class="chips" id="m-chips"></div>
+      <div class="chartbox"><svg id="m-svg" class="wide" viewBox="0 0 880 324" role="img" aria-label="Portfolio mix over time"></svg></div>
+      <ol class="rot" id="a-rot"></ol>
+      <p class="foot" id="m-foot"></p>
+    </div>
+  </section>
+
+  <!-- ===== 4. Pick by pick ===== -->
+  <section class="opt">
+    <div class="opt-head"><h2>4. Which decisions made the gap</h2><span class="tag new">Changed</span></div>
+    <p class="why"><b>Sectors vs market</b> leaves stock picks out on purpose: each sector's dot is that sector's whole index, bought and sold on the fund's dates, so only the choice of sector counts. Stock picks are the other tab. <b>New in both tabs:</b> the money they put in is a bar instead of words, and the last column multiplies the two (share of money × how much it beat by). So a big bet with a small edge can outrank a small bet with a big one.</p>
+    <div class="panel">
+      <div class="ptop">
+        <div><div class="ptitle">Which decisions made the gap</div><div class="sub" id="c-sub"></div></div>
+        <div class="seg" role="group" aria-label="View">
+          <button aria-pressed="true" data-cview="stock">Stocks vs their sector</button><button aria-pressed="false" data-cview="sector">Sectors vs market</button>
+        </div>
+      </div>
+      <p class="say" id="c-say"></p>
+      <div class="chartbox"><svg id="c-svg" class="wide" viewBox="0 0 880 440" role="img" aria-label="Decisions chart"></svg></div>
+      <p class="foot" id="c-foot"></p>
+    </div>
+  </section>
+
+  <p class="foot">Draft only. Not built, not in <span class="mono">contract.md</span> yet. Wording avoids "skill" and "luck" (rejected idea, H2). The split is measured against Orca's own all-stock index. The S&amp;P 500 line is for reference only, but showing it still changes ruling R23 (no SPY benchmark on fund pages), so it needs a DECISIONS entry. Panel 4 uses separate example stocks.</p>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(()=>{
+const NS="http://www.w3.org/2000/svg";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const el=(tag,attrs={},text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e};
+const MINUS="−";
+const pct=(x,d=1)=>(x<0?MINUS:"")+Math.abs(x*100).toFixed(d)+"%";
+const spct=(x,d=1)=>Math.abs(x*100).toFixed(d)==0?"0%":(x<0?MINUS:"+")+Math.abs(x*100).toFixed(d)+"%";
+const pts=(x,d=1)=>(x<0?MINUS:"+")+Math.abs(x*100).toFixed(d)+" pts";
+const num=(x,d=1)=>(x<0?MINUS:"+")+Math.abs(x*100).toFixed(d);
+const money=x=>{const a=Math.abs(x),s=x<0?MINUS:"";return a>=1000?s+"$"+(a/1000).toFixed(2)+"B":s+"$"+a.toFixed(0)+"m"};
+const smoney=x=>(x<0?MINUS:"+")+money(Math.abs(x));
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const tip=$("#tip");
+function showTip(e,html){tip.innerHTML=html;tip.hidden=false;const x=Math.min(e.clientX+14,innerWidth-290);tip.style.left=Math.max(4,x)+"px";tip.style.top=(e.clientY+14)+"px"}
+function hideTip(){tip.hidden=true}
+const svgX=(svg,e)=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())};
+const qLabel=q=>`Q${q%4+1} ’${String(2014+Math.floor(q/4)).slice(2)}`;
+function seg(sel,attr,fn){$$(`[${attr}]`).forEach(b=>b.addEventListener("click",()=>{$$(`[${attr}]`).forEach(o=>o.setAttribute("aria-pressed",o===b));fn(b.getAttribute(attr))}))}
+
+/* =================== one simulated fund, replayed three (four) ways =================== */
+let seed=11;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+const Q=51; const yearOf=q=>2014+Math.floor(q/4);
+const S=[ // name, colour, beta, fund's stock edge per quarter, market weight in 2014, industries
+  {n:"Technology",c:"var(--c1)",b:1.2,al:.016,w:.20,ind:["Semiconductors","Software","Hardware"]},
+  {n:"Health care",c:"var(--c2)",b:.85,al:-.004,w:.14,ind:["Pharma","Insurers","Devices"]},
+  {n:"Financials",c:"var(--c3)",b:1.05,al:.006,w:.16,ind:["Banks","Payments","Insurance"]},
+  {n:"Energy",c:"var(--c4)",b:1.1,al:.001,w:.08,ind:["Oil & gas","Services"]},
+  {n:"Consumer",c:"var(--c5)",b:.95,al:.002,w:.18,ind:["Retail","Brands","Autos"]},
+  {n:"Communication",c:"var(--c6)",b:1.05,al:.002,w:.08,ind:["Internet","Media"]},
+  {n:"Industrials",c:"var(--c7)",b:1.0,al:0,w:.10,ind:["Aerospace","Machinery"]},
+  {n:"Other",c:"var(--c8)",b:.7,al:0,w:.06,ind:["Utilities","Materials","Real estate"]}];
+const NS_=S.length;
+function drift(s,y){ // sector's extra return per quarter, by year: makes the rotations matter
+  const n=S[s].n;
+  if(n==="Technology")return y===2022?-.035:.013;
+  if(n==="Communication")return y===2022?-.025:.002;
+  if(n==="Health care")return y===2020?.03:y>=2023?-.004:0;
+  if(n==="Financials")return y===2020?-.02:y===2021?.01:-.001;
+  if(n==="Energy")return y===2020?-.05:(y===2021||y===2022)?.07:-.012;
+  if(n==="Other")return -.003;return 0;
+}
+// the fund's target mix: keyframes by quarter, interpolated (Technology, Health, Financials, Energy, Consumer, Comm, Industrials, Other)
+const KEYS=[[0,[.15,.10,.30,.20,.10,.04,.08,.03]],[12,[.30,.10,.18,.04,.12,.18,.06,.02]],[24,[.30,.25,.10,.02,.12,.15,.05,.01]],
+            [30,[.25,.15,.15,.20,.10,.10,.04,.01]],[37,[.42,.12,.12,.03,.10,.15,.05,.01]],[50,[.45,.10,.12,.03,.10,.15,.04,.01]]];
+function target(q){let i=0;while(i<KEYS.length-2&&q>KEYS[i+1][0])i++;const[a,A]=KEYS[i],[b,B]=KEYS[i+1];const t=Math.min(1,Math.max(0,(q-a)/(b-a)));const v=A.map((x,j)=>x+(B[j]-x)*t);const s=v.reduce((x,y)=>x+y);return v.map(x=>x/s)}
+const ROT=[[12,"Out of Energy and Financials, into Technology and Communication"],[24,"Into Health care as Covid hit"],[30,"Back into Energy before its 2021–22 run"],[37,"Technology again, the biggest bet yet"]];
+const SIM=(()=>{
+  const g=[...Array(Q)].map(()=>({m:gauss(),s:S.map(gauss),f:S.map(gauss)}));
+  const buys=[...Array(Q)].map((_,q)=>q<34?12+18*rnd():q<44?4*rnd():0);
+  let wm=S.map(s=>s.w);
+  const H=Array(NS_).fill(0),U=Array(NS_).fill(0),M=Array(NS_).fill(0),N=Array(NS_).fill(0),P=Array(NS_).fill(0);
+  const out={V:{f:[],s:[],m:[],n:[],p:[]},r:{f:[],s:[],m:[],n:[],p:[]},flow:{f:[],s:[],m:[],n:[],p:[]},mixF:[],mixM:[],buys,rs:[],rm:[]};
+  const T0=target(0),k=.5,sum=a=>a.reduce((x,y)=>x+y,0);
+  for(let q=0;q<Q;q++){
+    const y=yearOf(q),mf=.015+.055*g[q].m;
+    const rs=S.map((s,i)=>s.b*mf+drift(i,y)+.028*g[q].s[i]);
+    const rm=sum(wm.map((w,i)=>w*rs[i]));
+    wm=wm.map((w,i)=>w*(1+rs[i]));const tw=sum(wm);wm=wm.map(w=>w/tw);
+    const rf=rs.map((r,i)=>r+S[i].al+.025*g[q].f[i]);
+    const pre={f:sum(H),s:sum(U),m:sum(M),n:sum(N),p:sum(P)};const rsp=rm-.001+.008*Math.sin(q*1.7); // the S&P 500: close to the whole market, a little different
+    for(let i=0;i<NS_;i++){H[i]*=1+rf[i];U[i]*=1+rs[i];M[i]*=1+rm;N[i]*=1+rs[i];P[i]*=1+rsp}
+    const post={f:sum(H),s:sum(U),m:sum(M),n:sum(N),p:sum(P)};
+    for(const p of "fsmnp")out.r[p].push(pre[p]>0?post[p]/pre[p]-1:null);
+    out.rs.push(rs);out.rm.push(rm);
+    // trades at quarter end: part rebalance towards the target, new money by the target
+    const c=buys[q],T=target(q),fl={f:0,s:0,m:0,n:0,p:0};
+    const D=T.map(t=>t*(post.f+c));
+    for(let i=0;i<NS_;i++){
+      const t=k*(D[i]-H[i])+(1-k)*c*T[i];
+      if(t>=0){H[i]+=t;U[i]+=t;M[i]+=t;P[i]+=t;fl.f+=t;fl.s+=t;fl.m+=t;fl.p+=t}
+      else{const f=Math.min(.95,-t/H[i]);fl.f-=f*H[i];fl.s-=f*U[i];fl.m-=f*M[i];fl.p-=f*P[i];H[i]-=f*H[i];U[i]-=f*U[i];M[i]-=f*M[i];P[i]-=f*P[i]}
+    }
+    // never rotated: same new money, kept in the 2014 mix, in sector indices
+    const DN=T0.map(t=>t*(post.n+c));
+    for(let i=0;i<NS_;i++){const t=k*(DN[i]-N[i])+(1-k)*c*T0[i];N[i]+=t;fl.n+=t}
+    for(const p of "fsmnp"){out.flow[p].push(fl[p]);out.V[p].push(sum(p==="f"?H:p==="s"?U:p==="m"?M:p==="n"?N:P))}
+    const tf=sum(H);out.mixF.push(H.map(h=>h/tf));out.mixM.push(wm.slice());
+  }
+  const irr=p=>{const fl=out.flow[p],end=out.V[p][Q-1];let lo=-.5,hi=.5;for(let it=0;it<100;it++){const r=(lo+hi)/2;let v=end/Math.pow(1+r,Q-1);for(let q=0;q<Q;q++)v-=fl[q]/Math.pow(1+r,q);v>0?lo=r:hi=r}return Math.pow(1+(lo+hi)/2,4)-1};
+  out.I={f:irr("f"),s:irr("s"),m:irr("m"),n:irr("n"),p:irr("p")};
+  out.alloc=out.I.s-out.I.m;out.pick=out.I.f-out.I.s;out.put=sum(buys);
+  // calendar-year returns: chain each replay's quarterly returns
+  out.years=[];for(let y=2014;y<=2026;y++){const o={y};for(const p of "fsmnp"){let v=1;for(let q=0;q<Q;q++)if(yearOf(q)===y&&out.r[p][q]!=null)v*=1+out.r[p][q];o[p]=v-1}o.alloc=o.s-o.m;o.pick=o.f-o.s;out.years.push(o)}
+  // rolling 3-year windows ending each Q4 (and the latest quarter), annualised
+  out.trail=[];for(let e=11;e<Q;e++){if(e%4!==3&&e!==Q-1)continue;const ann={};for(const p of "fsm"){let v=1;for(let q=e-11;q<=e;q++)v*=1+(out.r[p][q]??0);ann[p]=Math.pow(v,1/3)-1}out.trail.push({q:e,alloc:ann.s-ann.m,pick:ann.f-ann.s})}
+  return out;
+})();
+
+/* =================== 1. map =================== */
+const LISTS={
+  cubs:{name:"Tiger cubs",peers:[["Northgate Capital",.031,.006,140],["Ridgeline Partners",-.011,.024,60],["Harbor Oak",.007,-.006,45],["Coldwater Global",.019,.017,210],["Ash Grove",-.024,-.012,80],["Kestrel Partners",.012,-.019,55],["Larchmont",-.004,.011,30],["Blue Lantern",.044,.026,170],["Stonebridge",-.015,.031,95]]},
+  tech:{name:"Tech & growth",peers:[["Vantage Peak",.022,.041,120],["Orbit Growth",-.008,.052,70],["Lumen Ridge",.035,.028,150],["Signal Hill",.004,.019,40],["Brightwater Tech",-.019,.034,65],["Quarry Lane",.015,-.004,35],["Cinder Partners",-.027,.012,50]]}};
+let list="cubs",trailOn=false;
+function drawD(){
+  const svg=$("#d-svg");svg.replaceChildren();
+  const P=LISTS[list].peers,me={pick:SIM.pick,alloc:SIM.alloc};
+  const vals=[...P.flatMap(p=>[p[1],p[2]]),me.pick,me.alloc,...(trailOn?SIM.trail.flatMap(t=>[t.pick,t.alloc]):[])];
+  const lim=Math.max(.04,Math.ceil(Math.max(...vals.map(Math.abs))/.02)*.02+.01);
+  const L=70,Rt=850,top=20,bot=400,x=v=>L+(v+lim)/(2*lim)*(Rt-L),y=v=>bot-(v+lim)/(2*lim)*(bot-top),band=.008;
+  svg.append(el("rect",{x:x(-band),y:top,width:x(band)-x(-band),height:bot-top,fill:"var(--band)"}));
+  svg.append(el("rect",{x:L,y:y(band),width:Rt-L,height:y(-band)-y(band),fill:"var(--band)"}));
+  const step=lim>.07?.04:.02;
+  for(let t=-Math.floor(lim/step)*step;t<=lim+1e-9;t+=step){const lab=Math.abs(t)<1e-9?"0":num(t,0);
+    svg.append(el("text",{x:x(t),y:bot+18,"text-anchor":"middle","font-size":12,class:"mono"},lab));svg.append(el("text",{x:L-8,y:y(t)+4,"text-anchor":"end","font-size":12,class:"mono"},lab))}
+  svg.append(el("line",{x1:x(0),x2:x(0),y1:top,y2:bot,stroke:"var(--line2)"}));svg.append(el("line",{x1:L,x2:Rt,y1:y(0),y2:y(0),stroke:"var(--line2)"}));
+  svg.append(el("text",{x:(L+Rt)/2,y:bot+42,"text-anchor":"middle","font-size":13,"font-weight":600},"Stock choice → beating their own sectors, pts a year"));
+  svg.append(el("text",{x:18,y:(top+bot)/2,"text-anchor":"middle","font-size":13,"font-weight":600,transform:`rotate(-90 18 ${(top+bot)/2})`},"Sector choice → sectors vs market"));
+  [["Sector picker",L+12,top+20,"start"],["Both",Rt-12,top+20,"end"],["Neither, so far",L+12,bot-12,"start"],["Stock picker",Rt-12,bot-12,"end"]]
+    .forEach(([t,xx,yy,a])=>svg.append(el("text",{x:xx,y:yy,"text-anchor":a,"font-size":14,"font-weight":700,fill:"var(--ink3)"},t)));
+  P.forEach(p=>{const g=el("g",{style:"cursor:default"});const r=4+Math.sqrt(p[3])/2.4;
+    g.append(el("circle",{cx:x(p[1]),cy:y(p[2]),r,fill:"var(--line2)",stroke:"var(--control)","stroke-width":1}));
+    g.append(el("text",{x:x(p[1])+r+4,y:y(p[2])+4,"font-size":11.5,fill:"var(--ink3)"},p[0]));
+    g.addEventListener("pointermove",e=>showTip(e,`<b>${p[0]}</b><br>Stock choice ${pts(p[1])} a year<br>Sector choice ${pts(p[2])} a year<br>${p[3]} picks`));g.addEventListener("pointerleave",hideTip);svg.append(g)});
+  if(trailOn){
+    const T=SIM.trail,d=T.map((t,i)=>(i?"L":"M")+x(t.pick).toFixed(1)+" "+y(t.alloc).toFixed(1)).join(" ");
+    svg.append(el("path",{d,fill:"none",stroke:"var(--gain)","stroke-width":1.5,"stroke-dasharray":"4 3",opacity:.8}));
+    T.forEach((t,i)=>{const c=el("circle",{cx:x(t.pick),cy:y(t.alloc),r:3.5,fill:"var(--surface)",stroke:"var(--gain)","stroke-width":1.5,opacity:.4+.6*i/(T.length-1)});
+      c.addEventListener("pointermove",e=>showTip(e,`<b>3 years to ${qLabel(t.q)}</b><br>Stock choice ${pts(t.pick)} a year<br>Sector choice ${pts(t.alloc)} a year`));c.addEventListener("pointerleave",hideTip);svg.append(c);
+      if(i===0||i===T.length-1||i%3===0)svg.append(el("text",{x:x(t.pick)+7,y:y(t.alloc)-6,"font-size":11,class:"mono",fill:"var(--up-text)"},String(2014+Math.floor(t.q/4)-(t.q%4===3?0:0))))});
+  }
+  const g=el("g",{});g.append(el("circle",{cx:x(me.pick),cy:y(me.alloc),r:10,fill:"var(--gain)",stroke:"var(--surface)","stroke-width":2.5}));
+  g.append(el("rect",{x:x(me.pick)-138,y:y(me.alloc)-30,width:124,height:22,rx:4,fill:"var(--surface)",opacity:.9}));g.append(el("text",{x:x(me.pick)-16,y:y(me.alloc)-14,"text-anchor":"end","font-size":14,"font-weight":700,fill:"var(--ink)"},"Example Capital"));
+  g.addEventListener("pointermove",e=>showTip(e,`<b>Example Capital</b> (this fund)<br>Stock choice ${pts(me.pick)} a year<br>Sector choice ${pts(me.alloc)} a year<br>214 picks`));g.addEventListener("pointerleave",hideTip);svg.append(g);
+  const zone=(a,b)=>(a>band?1:0)+(b>band?2:0),mz=zone(me.pick,me.alloc),both=P.filter(p=>zone(p[1],p[2])===mz).length;
+  $("#d-say").innerHTML=`Among the ${P.length+1} ${LISTS[list].name}, Example Capital is in the <b>${me.pick>band&&me.alloc>band?"Both":me.pick>band?"Stock picker":me.alloc>band?"Sector picker":"Neither"}</b> corner: its stocks beat their sectors by <span class="g">${pts(me.pick)}</span> a year and its sectors beat the market by <span class="s">${pts(me.alloc)}</span>. ${both} other${both===1?"":"s"} made it there.`;
+}
+seg(null,"data-list",v=>{list=v;drawD()});
+$("#d-trail").addEventListener("change",e=>{trailOn=e.target.checked;drawD()});
+
+/* =================== 2. annual return stacked graph, in the Assets under management chart's style =================== */
+let amode="split",never=false,rTable=false;
+const tint=(c,p)=>`color-mix(in srgb,${c} ${p}%,var(--surface))`;
+const sc=v=>v>=0?"var(--gain)":"var(--loss)";
+function stackPaths(mixes,x,y0,y1,order){ // 100% stacked areas, one path per series
+  const n=mixes.length,acc=Array(n).fill(0),paths=[];
+  order.forEach(i=>{const lo=acc.slice();for(let q=0;q<n;q++)acc[q]+=mixes[q][i];
+    const top=acc.map((a,q)=>`${x(q).toFixed(1)} ${(y0+(y1-y0)*a).toFixed(1)}`),bt=lo.map((a,q)=>`${x(q).toFixed(1)} ${(y0+(y1-y0)*a).toFixed(1)}`).reverse();
+    paths.push({i,d:"M"+top.join(" L")+" L"+bt.join(" L")+"Z",lo,hi:acc.slice()})});
+  return paths;
+}
+// a bar between pixel rows ya (the zero side) and yb (the outer end), rounded at the outer end when r > 0
+function barPath(x,w,ya,yb,r){
+  const top=Math.min(ya,yb),bot=Math.max(ya,yb),h=bot-top;r=Math.min(r,h/2,w/2);
+  if(r<=.5)return `M${x} ${top}H${x+w}V${bot}H${x}Z`;
+  return yb<ya?`M${x} ${bot}V${top+r}Q${x} ${top} ${x+r} ${top}H${x+w-r}Q${x+w} ${top} ${x+w} ${top+r}V${bot}Z`
+              :`M${x} ${top}H${x+w}V${bot-r}Q${x+w} ${bot} ${x+w-r} ${bot}H${x+r}Q${x} ${bot} ${x} ${bot-r}Z`;
+}
+/* The AUM rule: the solid bar always ends at the fund's return. Parts that pushed the same way as the result are stacked
+   (market, then sector choice, then stock choice); a part that pushed the other way is taken off the outer end and drawn
+   beyond it as a dashed box. Units are fractions; a part's sign sets its colour (blue up, orange down). */
+function stackParts(o){
+  const d=o.f>=0?1:-1,comps=[["m",o.m],["s",o.alloc],["p",o.pick]];
+  const withC=comps.filter(c=>c[1]*d>0).map(([k,v])=>({k,v:Math.abs(v),sign:Math.sign(v)}));
+  const against=comps.filter(c=>c[1]*d<0).map(([k,v])=>({k,v:Math.abs(v),sign:Math.sign(v)}));
+  let rem=against.reduce((a,c)=>a+c.v,0);
+  for(let i=withC.length-1;i>=0&&rem>0;i--){const t=Math.min(withC[i].v,rem);withC[i].v-=t;rem-=t}
+  let t=0;const solid=[],boxes=[];
+  withC.forEach(c=>{if(c.v>1e-9)solid.push({...c,a:t*d,b:(t+c.v)*d});t+=c.v});
+  against.forEach(c=>{boxes.push({...c,a:t*d,b:(t+c.v)*d});t+=c.v});
+  return {d,solid,boxes,gross:t*d};
+}
+const NAME={m:"Whole market",s:"Sector choice",p:"Stock choice"};
+const tipRow=(c,k,v,cls="")=>`<div class="r ${cls}"><span class="k">${c?`<i style="background:${c}"></i>`:""}${k}</span><b>${v}</b></div>`;
+function pinTip(html,i,n){const t=$("#r-tip");t.innerHTML=html;t.hidden=false;const left=i>=n/2;t.style.left=left?"62px":"auto";t.style.right=left?"auto":"14px"}
+function unpinTip(){$("#r-tip").hidden=true;const b=$("#r-svg .hovband");if(b)b.classList.remove("on")}
+const ICON_TABLE='<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M6.5 6.5V13"/></svg>';
+const ICON_CHART='<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 13V8.5M8 13V3.5M12.5 13V6.5"/></svg>';
+function drawR(anim){
+  const lines=amode==="growth";
+  $("#never-wrap").hidden=!lines;
+  const span="2014 to 2026 YTD";
+  $("#r-stats").innerHTML=[[`Whole market, ${span}`,`${pct(SIM.I.m)} a year`],[`Sector choice, ${span}`,`${pts(SIM.alloc)} a year`],[`Stock choice, ${span}`,`${pts(SIM.pick)} a year`]]
+    .map(([a,b])=>`<div class="stat"><span>${a}</span><b>${b}</b></div>`).join("");
+  $("#r-foot").textContent=lines
+    ?"What the money they put in would be worth, with the same buys and sells on the same dates. Whole market = Orca's index of every US stock it prices. S&P 500 for reference only."
+    :"Each bar is one calendar year. Light = what the whole market returned, hatched = what their sector choices added, solid = what their stock choices added; a dashed box is a choice that went the other way. pts = percentage points: 15% when the market made 12% is +3 pts. The three figures above count all the money they put in, so they differ a little from the yearly bars.";
+  $("#r-table").innerHTML=(rTable?ICON_CHART:ICON_TABLE)+`<span>${rTable?"Chart view":"Table view"}</span>`;$("#r-table").setAttribute("aria-pressed",rTable);
+  $("#r-svg").style.visibility=rTable?"hidden":"visible";$("#r-tview").hidden=!rTable;
+  unpinTip();
+  lines?drawLines(anim):drawStack(anim);
+  fillTable(lines);
+}
+function drawStack(anim){
+  const svg=$("#r-svg"),Y=SIM.years,n=Y.length,W=880,H=360;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.replaceChildren();
+  const P=Y.map(stackParts),ext=P.flatMap(p=>[0,p.gross]);
+  const raw=[Math.min(...ext),Math.max(...ext)],step=raw[1]-raw[0]>.6?.2:.1;
+  const lo=Math.floor(raw[0]/step-1e-9)*step,hi=Math.ceil(raw[1]/step+1e-9)*step;
+  const ml=52,mr=8,mt=28,mb=34,band=(W-ml-mr)/n,bw=Math.min(56,band*.72),y=v=>mt+(hi-v)/(hi-lo)*(H-mt-mb);
+  const defs=el("defs",{});
+  [["hg","var(--gain)"],["hl","var(--loss)"]].forEach(([id,c])=>{const p=el("pattern",{id:"r-"+id,width:5,height:5,patternUnits:"userSpaceOnUse",patternTransform:"rotate(45)"});p.append(el("rect",{width:1.7,height:5,fill:c}));defs.append(p)});
+  svg.append(defs);
+  for(let t=lo;t<=hi+1e-9;t+=step){svg.append(el("line",{class:"grid",x1:ml,x2:W-mr,y1:y(t),y2:y(t)}));svg.append(el("text",{class:"tick",x:ml-10,y:y(t)+4,"text-anchor":"end"},pct(t,0)))}
+  const hov=el("rect",{class:"hovband",y:2,width:band,height:H-4,rx:6});svg.append(hov);
+  svg.style.setProperty("--y0",y(0).toFixed(1)+"px");svg.classList.toggle("grow",!!anim&&!reduce);
+  P.forEach((p,i)=>{
+    const o=Y[i],x=ml+band*i+(band-bw)/2,g=el("g",{class:"bar",style:`--i:${i}`});
+    p.solid.forEach((s,j)=>{const c=sc(s.sign),outer=j===p.solid.length-1;
+      const attrs=s.k==="m"?{fill:tint(c,34),stroke:c,"stroke-width":1}:s.k==="s"?{fill:`url(#r-${s.sign>0?"hg":"hl"})`,stroke:c,"stroke-width":1.25}:{fill:c,stroke:c,"stroke-width":1};
+      g.append(el("path",{d:barPath(x,bw,y(s.a),y(s.b),outer?3:0),...attrs}))});
+    p.boxes.forEach(b=>{const c=sc(b.sign),y1=y(b.a),y2=y(b.b);
+      g.append(el("rect",{x:x+.6,y:Math.min(y1,y2)+.6,width:bw-1.2,height:Math.max(.5,Math.abs(y2-y1)-1.2),fill:`color-mix(in srgb,${c} 16%,transparent)`,stroke:c,"stroke-width":1.25,"stroke-dasharray":"3 3"}))});
+    svg.append(g);
+    svg.append(el("text",{class:"blab",x:x+bw/2,y:p.d>0?y(p.gross)-7:y(p.gross)+15,"text-anchor":"middle",style:`--i:${i}`},spct(o.f,1)));
+    svg.append(el("text",{class:"clab",x:ml+band*i+band/2,y:H-12,"text-anchor":"middle"},o.y===2026?"2026 YTD":String(o.y)));
+  });
+  svg.append(el("line",{class:"zero",x1:ml,x2:W-mr,y1:y(0),y2:y(0)}));
+  P.forEach((p,i)=>{const o=Y[i],h=el("rect",{class:"hit",x:ml+band*i,y:0,width:band,height:H,rx:6,tabindex:0,role:"img","aria-label":`${o.y}: market ${spct(o.m)}, sector choice ${pts(o.alloc)}, stock choice ${pts(o.pick)}, fund ${spct(o.f)}`});
+    const show=()=>{hov.setAttribute("x",ml+band*i);hov.classList.add("on");
+      pinTip(`<div class="tt">${o.y===2026?"2026 to date":o.y}</div>`+[["m",o.m,spct(o.m)],["s",o.alloc,pts(o.alloc)],["p",o.pick,pts(o.pick)]].map(([k,v,t])=>tipRow(sc(v),NAME[k],t)).join("")+tipRow(null,"Fund",spct(o.f),"sum")+tipRow(null,"S&amp;P 500, for reference",spct(o.p),"ref"),i,n)};
+    h.addEventListener("pointerenter",show);h.addEventListener("focus",show);h.addEventListener("pointerleave",unpinTip);h.addEventListener("blur",unpinTip);svg.append(h)});
+  const offset=P.some(p=>p.boxes.some(b=>b.sign>0));
+  $("#r-legend").innerHTML=`<span class="lg"><i style="background:${tint("var(--gain)",34)};border:1px solid var(--gain)"></i>Whole market</span>`+
+    `<span class="lg"><i style="background:repeating-linear-gradient(135deg,var(--gain) 0 1.6px,transparent 1.6px 3.6px);border:1.5px solid var(--gain)"></i>Sector choice</span>`+
+    `<span class="lg"><i style="background:var(--gain)"></i>Stock choice</span>`+
+    `<span class="lg"><i style="background:color-mix(in srgb,var(--loss) 16%,transparent);border:1.5px dashed var(--loss)"></i>Gave back</span>`+
+    (offset?`<span class="lg"><i style="background:color-mix(in srgb,var(--gain) 16%,transparent);border:1.5px dashed var(--gain)"></i>Cushioned a fall</span>`:"");
+}
+function drawLines(anim){
+  const R=SIM,svg=$("#r-svg"),W=880,H=360;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.replaceChildren();svg.classList.remove("grow");
+  const ml=60,mr=84,mt=16,mb=34,x=q=>ml+q/(Q-1)*(W-ml-mr);
+  const L=[{k:"f",n:"Their stocks",c:"var(--gain)",w:2.5},{k:"s",n:"Their sectors",c:tint("var(--gain)",50),w:2.25},{k:"m",n:"Whole market",c:"var(--ink3)",w:1.75},{k:"p",n:"S&amp;P 500",c:"var(--ink3)",w:1.5,dash:"4 3"},
+    ...(never?[{k:"n",n:"Never rotated",c:tint("var(--gain)",50),w:2,dash:"1 4"}]:[])];
+  const vmax=Math.max(...L.flatMap(l=>R.V[l.k])),tick=vmax>2500?1000:500,top=Math.ceil(vmax/tick)*tick,y=v=>mt+(top-v)/top*(H-mt-mb);
+  for(let t=0;t<=top+1e-9;t+=tick){svg.append(el("line",{class:t?"grid":"zero",x1:ml,x2:W-mr,y1:y(t),y2:y(t)}));svg.append(el("text",{class:"tick",x:ml-10,y:y(t)+4,"text-anchor":"end"},t?(t>=1000?"$"+(t/1000)+"B":"$"+t+"M"):"$0"))}
+  for(let yr=2014;yr<=2026;yr+=2)svg.append(el("text",{class:"clab",x:x((yr-2014)*4),y:H-12,"text-anchor":"middle"},String(yr)));
+  const guide=el("line",{class:"guide",y1:mt,y2:H-mb,opacity:0});svg.append(guide);
+  [...L].reverse().forEach(l=>{const d=R.V[l.k].map((v,q)=>(q?"L":"M")+x(q).toFixed(1)+" "+y(v).toFixed(1)).join(" ");
+    const p=el("path",{d,fill:"none",stroke:l.c,"stroke-width":l.w,"stroke-linejoin":"round","stroke-linecap":"round"});if(l.dash)p.setAttribute("stroke-dasharray",l.dash);svg.append(p);
+    if(anim&&!reduce&&!l.dash){const len=p.getTotalLength();p.style.strokeDasharray=len;p.style.strokeDashoffset=len;p.getBoundingClientRect();p.style.transition="stroke-dashoffset 900ms cubic-bezier(.2,.7,.2,1)";p.style.strokeDashoffset=0}
+    svg.append(el("circle",{cx:x(Q-1),cy:y(R.V[l.k][Q-1]),r:3.5,fill:l.c}))});
+  // end values, nudged apart so they never overlap
+  const ends=L.map(l=>({l,y:y(R.V[l.k][Q-1])})).sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)ends[i].y=Math.max(ends[i].y,ends[i-1].y+15);
+  ends.forEach(e=>svg.append(el("text",{class:"blab",x:x(Q-1)+9,y:e.y+4},money(R.V[e.l.k][Q-1]))));
+  const hit=el("rect",{x:ml,y:0,width:W-ml-mr,height:H,fill:"transparent"});svg.append(hit);
+  hit.addEventListener("pointermove",e=>{const q=Math.max(0,Math.min(Q-1,Math.round((svgX(svg,e).x-ml)/(W-ml-mr)*(Q-1))));guide.setAttribute("x1",x(q));guide.setAttribute("x2",x(q));guide.setAttribute("opacity",1);
+    pinTip(`<div class="tt">${qLabel(q)}</div>`+L.map(l=>tipRow(l.c,l.n,money(R.V[l.k][q]))).join("")+tipRow(null,"Put in that quarter",money(R.buys[q]),"ref"),Q,Q)}); // the lines climb to the right, so the tip stays top left
+  hit.addEventListener("pointerleave",()=>{unpinTip();guide.setAttribute("opacity",0)});
+  $("#r-legend").innerHTML=L.map(l=>`<span class="lg"><i class="ln" style="background:${l.dash?`repeating-linear-gradient(90deg,${l.c} 0 ${l.k==="n"?2:4}px,transparent ${l.k==="n"?2:4}px ${l.k==="n"?5:7}px)`:l.c}"></i>${l.n}</span>`).join("");
+}
+function fillTable(lines){
+  const Y=SIM.years,R=SIM;let head,rows;
+  if(!lines){head=["Year","Whole market","Sector choice","Stock choice","Fund","S&amp;P 500"];rows=Y.map(o=>[o.y===2026?"2026 YTD":o.y,spct(o.m),pts(o.alloc),pts(o.pick),spct(o.f),spct(o.p)])}
+  else{head=["Quarter end","Their stocks","Their sectors","Whole market","S&amp;P 500"];const qs=[...Array(Q).keys()].filter(q=>q%4===3||q===Q-1);rows=qs.map(q=>[qLabel(q),money(R.V.f[q]),money(R.V.s[q]),money(R.V.m[q]),money(R.V.p[q])])}
+  $("#r-tview").innerHTML=`<table><thead><tr>${head.map(h=>`<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>i?`<td>${c}</td>`:`<th scope="row">${c}</th>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+$("#a-rot").innerHTML=ROT.map(([q,t],i)=>`<li><span class="n">${i+1}</span><span><b class="mono">${qLabel(q)}</b> ${t}</span></li>`).join("");
+$("#a-never").addEventListener("change",e=>{never=e.target.checked;drawR(false)});
+$("#r-table").addEventListener("click",()=>{rTable=!rTable;drawR(false)});
+seg(null,"data-amode",v=>{amode=v;drawR(true)});
+/* =================== 3. mix over time: sector → industry → sub-industry =================== */
+const HIER={
+  "Technology":[["Semiconductors",["Chips & GPUs","Chip equipment"]],["Software",["Cloud & infrastructure","Applications"]],["Hardware",["Devices","Networking"]]],
+  "Health care":[["Pharma",["Large pharma","Biotech"]],["Insurers",["Managed care"]],["Med tech",["Medical devices","Tools & diagnostics"]]],
+  "Financials":[["Banks",["Big banks","Regional banks"]],["Payments",["Card networks","Fintech"]],["Insurance",["Property & casualty","Life"]]],
+  "Energy":[["Oil & gas",["Integrated oil","Exploration"]],["Energy services",["Oilfield services"]]],
+  "Consumer":[["Retail",["Discount stores","E-commerce"]],["Brands",["Apparel","Food & drink"]],["Autos",["Carmakers"]]],
+  "Communication":[["Internet",["Search & social","Streaming"]],["Media",["Studios","Publishing"]]],
+  "Industrials":[["Aerospace",["Defence","Aircraft"]],["Machinery",["Heavy equipment","Automation"]]],
+  "Other":[["Utilities",["Electric"]],["Materials",["Chemicals","Mining"]],["Real estate",["REITs"]]]};
+const wob=(n,q,key)=>{const v=[...Array(n)].map((_,j)=>1+.45*Math.sin(q/7+j*2.1+key));const t=v.reduce((a,b)=>a+b);return v.map(x=>x/t)};
+const LEVEL=["Sector","Industry","Sub-industry"];
+let mlevel=1,focus=null;
+function leaves(level){ // one entry per band: its name, path, sector and its share of the sector at quarter q
+  const meta=[];
+  S.forEach((s,i)=>{const H_=HIER[s.n];
+    if(level===1){meta.push({n:s.n,path:s.n,sec:i,f:()=>1});return}
+    H_.forEach(([ind,vs],j)=>{const fi=q=>wob(H_.length,q,i)[j];
+      if(level===2)meta.push({n:ind,path:s.n+" › "+ind,sec:i,f:fi});
+      else vs.forEach((v,k)=>meta.push({n:v,path:s.n+" › "+ind+" › "+v,sec:i,f:q=>fi(q)*wob(vs.length,q,i*10+j)[k]}))})});
+  S.forEach((_,i)=>{const mine=meta.filter(m=>m.sec===i);mine.forEach((m,k)=>m.op=mine.length>1?1-.62*k/(mine.length-1):1)});
+  return meta;
+}
+function drawM(){
+  const svg=$("#m-svg");svg.replaceChildren();
+  $("#m-chips").innerHTML=S.map((s,i)=>`<button class="chip" data-sec="${i}" aria-pressed="${focus===i}"><i style="background:${s.c}"></i>${s.n}</button>`).join("");
+  $$("[data-sec]").forEach(b=>b.addEventListener("click",()=>{const i=+b.dataset.sec;focus=focus===i?null:i;drawM()}));
+  const meta=leaves(mlevel),mixes=SIM.mixF.map((m,q)=>meta.map(x=>m[x.sec]*x.f(q)));
+  const L=44,Rt=720,top=10,bot=280,x=q=>L+(q/(Q-1))*(Rt-L);
+  for(let t=0;t<=1.0001;t+=.25)svg.append(el("text",{x:L-6,y:top+(bot-top)*t+4,"text-anchor":"end","font-size":11.5,class:"mono"},pct(1-t,0)));
+  const minLab=[.04,.045,.05][mlevel-1];
+  stackPaths(mixes,x,top,bot,meta.map((_,k)=>k)).forEach(p=>{
+    const m=meta[p.i],dim=focus!=null&&focus!==m.sec;
+    const path=el("path",{d:p.d,fill:dim?"var(--line2)":S[m.sec].c,"fill-opacity":dim?.45:m.op,stroke:"var(--surface)","stroke-width":mlevel===1?.8:.5});
+    path.style.cursor="pointer";
+    path.addEventListener("pointermove",e=>{const q=Math.max(0,Math.min(Q-1,Math.round((svgX(svg,e).x-L)/(Rt-L)*(Q-1))));showTip(e,`<b>${m.n}</b>${mlevel>1?"<br>"+m.path:""}<br>${qLabel(q)}: ${pct(mixes[q][p.i],1)} of the fund`)});
+    path.addEventListener("pointerleave",hideTip);path.addEventListener("click",()=>{focus=focus===m.sec?null:m.sec;drawM()});svg.append(path);
+    const h=p.hi[Q-1]-p.lo[Q-1];
+    if(h>minLab&&!dim)svg.append(el("text",{x:Rt+8,y:top+(bot-top)*(p.lo[Q-1]+h/2)+4,"font-size":mlevel===1?12:11,fill:"var(--ink2)"},m.n+" "+pct(h,0)));
+  });
+  ROT.forEach(([q],i)=>{svg.append(el("line",{x1:x(q),x2:x(q),y1:top,y2:bot,stroke:"var(--surface)","stroke-width":1.5,"stroke-dasharray":"3 3"}));svg.append(el("circle",{cx:x(q),cy:bot+14,r:8,fill:"var(--inv)"}));svg.append(el("text",{x:x(q),y:bot+18,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"var(--invfg)"},String(i+1)))});
+  for(let yr=2014;yr<=2026;yr+=2)svg.append(el("text",{x:x((yr-2014)*4),y:bot+36,"text-anchor":"middle","font-size":12,class:"mono"},String(yr)));
+  $("#m-title").textContent=LEVEL[mlevel-1]+" mix over time";
+  $("#m-sub").textContent=`Share of the portfolio by ${LEVEL[mlevel-1].toLowerCase()}, each quarter · estimate`+(focus!=null?` · ${S[focus].n} picked out, tap again to clear`:"");
+  $("#m-foot").textContent=(mlevel>1?"Each band keeps its sector's colour; lighter shades are its smaller parts. ":"")+"Shares use quarter-end values. Numbered lines are the big switches listed above."+(mlevel===3?" A sub-industry with only a few stocks would carry a warning.":"");
+}
+seg(null,"data-mlevel",v=>{mlevel=+v;drawM()});
+
+/* =================== 4. which decisions made the gap (separate example) =================== */
+const MKT=.098;
+const MKTW={"Technology":.27,"Health care":.12,"Financials":.13,"Energy":.04,"Consumer":.16,"Communication":.09,"Industrials":.10,"Utilities":.03,"Materials":.03,"Real estate":.03};
+const SECIRR={"Communication":.105,"Industrials":.095,"Utilities":.071,"Materials":.079,"Real estate":.066};
+const STOCKS=[["NVDA","Nvidia","Technology",.162,.412,120],["MSFT","Microsoft","Technology",.162,.198,210],["INTC","Intel","Technology",.162,-.041,90],
+  ["UNH","UnitedHealth","Health care",.121,.143,140],["PFE","Pfizer","Health care",.121,.018,80],["JPM","JPMorgan","Financials",.112,.151,160],["WFC","Wells Fargo","Financials",.112,.067,70],
+  ["XOM","Exxon Mobil","Energy",.061,.088,60],["DIS","Disney","Consumer",.084,.022,95],["COST","Costco","Consumer",.084,.171,75]];
+const PUT=STOCKS.reduce((a,s)=>a+s[5],0);
+const SECT={};STOCKS.forEach(s=>{(SECT[s[2]]??={n:s[2],irr:s[3],put:0}).put+=s[5]});
+const SECTORS=Object.keys(MKTW).map(n=>SECT[n]??{n,irr:SECIRR[n],put:0});
+let cview="stock";
+function drawC(){
+  const svg=$("#c-svg");svg.replaceChildren();const stock=cview==="stock";
+  const rows=(stock?STOCKS.map(s=>({lab:s[0],sub:s[1]+" · "+s[2],b:s[3],v:s[4],sh:s[5]/PUT,put:s[5],mw:null}))
+                    :SECTORS.map(s=>({lab:s.n,sub:"market holds "+pct(MKTW[s.n],0),b:MKT,v:s.irr,sh:s.put/PUT,put:s.put,mw:MKTW[s.n]})))
+    .map(r=>({...r,d:r.v-r.b,add:r.sh*(r.v-r.b)}));
+  stock?rows.sort((a,b)=>b.add-a.add):rows.sort((a,b)=>b.sh-a.sh||b.mw-a.mw);
+  const rh=36,top=56,n=rows.length,H=top+n*rh+40;svg.setAttribute("viewBox",`0 0 880 ${H}`);
+  const NX=8,BX=166,BW=104,DL=340,DR=686,EX=774,AX=868;
+  const smax=Math.max(...rows.map(r=>Math.max(r.sh,r.mw??0)));
+  const vals=rows.flatMap(r=>[r.b,r.v]),lo=Math.floor(Math.min(...vals)/.05)*.05,hi=Math.ceil(Math.max(...vals)/.05)*.05,step=hi-lo>.3?.1:.05;
+  const x=v=>DL+(v-lo)/(hi-lo)*(DR-DL);
+  const head=(t,xx,a,yy=16,sm)=>svg.append(el("text",{x:xx,y:yy,"text-anchor":a,"font-size":sm?11:12,"font-weight":sm?400:600,fill:sm?"var(--ink3)":"var(--ink2)"},t));
+  head("Share of their money",BX,"start");head(stock?"Stock vs its sector, return a year":"Sector vs market, return a year",(DL+DR)/2,"middle");head("Beat by",EX,"end");head("Adds",AX,"end");
+  head("of all they put in",BX,"start",30,1);head("pts",EX,"end",30,1);head("pts a year",AX,"end",30,1);
+  for(let t=Math.ceil(lo/step-1e-9)*step;t<=hi+1e-9;t+=step){svg.append(el("line",{x1:x(t),x2:x(t),y1:top-4,y2:top+n*rh,stroke:Math.abs(t)<1e-9?"var(--line2)":"var(--line)"}));svg.append(el("text",{x:x(t),y:top-10,"text-anchor":"middle","font-size":11.5,class:"mono"},pct(t,0)))}
+  if(!stock){svg.append(el("line",{x1:x(MKT),x2:x(MKT),y1:top-4,y2:top+n*rh,stroke:"var(--ink3)","stroke-width":2,"stroke-dasharray":"5 4"}))}
+  rows.forEach((r,i)=>{
+    const cy=top+i*rh+rh/2,col=r.d>=0?"var(--gain)":"var(--loss)",skipped=!stock&&r.put===0,g=el("g",{});
+    if(i%2===0)g.append(el("rect",{x:0,y:cy-rh/2,width:880,height:rh,fill:"var(--sunken)",opacity:.5}));
+    const body=el("g",{opacity:skipped?.45:1});
+    body.append(el("text",{x:NX,y:cy-1,"font-size":13.5,"font-weight":600,fill:"var(--ink)",class:stock?"mono":""},r.lab));
+    body.append(el("text",{x:NX,y:cy+13,"font-size":11.5,fill:"var(--ink3)"},r.sub));
+    const bw=BW*r.sh/smax;
+    body.append(el("rect",{x:BX,y:cy-6,width:Math.max(bw,r.sh>0?2:0),height:12,rx:2,fill:"var(--ink3)","fill-opacity":.7}));
+    body.append(el("text",{x:BX+Math.max(bw,0)+6,y:cy+4,"font-size":12,class:"mono",fill:"var(--ink)"},r.sh>0?pct(r.sh,0):"0%"));
+    if(r.mw!=null)body.append(el("line",{x1:BX+BW*r.mw/smax,x2:BX+BW*r.mw/smax,y1:cy-10,y2:cy+10,stroke:"var(--ink)","stroke-width":2}));
+    body.append(el("line",{x1:x(r.b),x2:x(r.v),y1:cy,y2:cy,stroke:col,"stroke-width":4,"stroke-linecap":"round"}));
+    if(stock)body.append(el("circle",{cx:x(r.b),cy,r:5,fill:"var(--surface)",stroke:"var(--ink3)","stroke-width":2}));
+    body.append(el("circle",{cx:x(r.v),cy,r:5.5,fill:col,stroke:col,"stroke-width":2}));
+    body.append(el("text",{x:EX,y:cy+4,"text-anchor":"end","font-size":12.5,class:"mono",fill:r.d>=0?"var(--up-text)":"var(--loss)"},num(r.d)));
+    body.append(el("text",{x:AX,y:cy+4,"text-anchor":"end","font-size":13,"font-weight":700,class:"mono",fill:skipped?"var(--ink3)":r.add>=0?"var(--up-text)":"var(--loss)"},skipped?"0":num(r.add)));
+    g.append(body);
+    g.addEventListener("pointermove",e=>showTip(e,stock
+      ?`<b>${r.lab}</b> ${r.sub}<br>${money(r.put)} put in, ${pct(r.sh,0)} of all their buys<br>Their return: ${pct(r.v)} a year<br>${r.sub.split(" · ")[1]} index, same trades: ${pct(r.b)}<br>Beat it by ${pts(r.d)} → adds about ${pts(r.add)} a year to the fund`
+      :`<b>${r.lab}</b><br>${r.put?money(r.put)+" put in, "+pct(r.sh,0)+" of all their buys":"They bought nothing here"}<br>The market holds ${pct(r.mw,0)} here<br>Sector index, their dates: ${pct(r.v)} a year · market ${pct(MKT)}<br>${r.put?"Adds about "+pts(r.add)+" a year to the fund":"Counts only through the market line"}`));
+    g.addEventListener("pointerleave",hideTip);svg.append(g);
+  });
+  const total=rows.reduce((a,r)=>a+r.add,0),yt=top+n*rh;
+  svg.append(el("line",{x1:0,x2:880,y1:yt,y2:yt,stroke:"var(--line2)"}));
+  svg.append(el("text",{x:NX,y:yt+24,"font-size":13,"font-weight":700,fill:"var(--ink)"},stock?"All picks":"All sectors"));
+  svg.append(el("text",{x:BX,y:yt+24,"font-size":12,class:"mono",fill:"var(--ink2)"},money(PUT)+" put in"));
+  svg.append(el("text",{x:AX,y:yt+24,"text-anchor":"end","font-size":13.5,"font-weight":700,class:"mono",fill:total>=0?"var(--up-text)":"var(--loss)"},"≈ "+num(total)));
+  if(stock){const won=rows.filter(r=>r.d>0).length,best=rows[0],worst=rows[n-1];
+    $("#c-sub").textContent="Each stock vs its own sector index, over the time they held it · estimate";
+    $("#c-say").innerHTML=`<b>${won} of ${n}</b> picks beat their own sector. <span class="g">${best.lab}</span> added the most, about ${pts(best.add)} a year to the whole fund; <span class="l">${worst.lab}</span> cost the most (${pts(worst.add)}).`;
+    $("#c-foot").textContent="Share of their money = dollars put into that stock ÷ all dollars they put in. ○ the sector index with the same buys and sells, ● what the stock returned for them. Beat by = the gap in yearly return, in percentage points. Adds ≈ share × beat by: roughly how many points a year it added to the whole fund (≈ because money went in at different times). Sorted by Adds.";
+  }else{const big=rows[0];
+    $("#c-sub").textContent="Each sector's index, bought on their dates, vs the whole market · stock picks left out · estimate";
+    $("#c-say").innerHTML=`${pct(big.sh,0)} of their money went to <b>${big.lab}</b>, where the market holds ${pct(big.mw,0)}. That sector beat the market by ${pts(big.d)} a year, so this one bet added about <span class="g">${pts(big.add)}</span> a year. All sector bets together: about <span class="${total>=0?"g":"l"}">${pts(total)}</span>.`;
+    $("#c-foot").textContent="Bar = share of their money; black tick = the market's share of the same sector, so a bar past its tick is a bet on that sector. Dashed line = the whole market's return. ● = the sector's whole index, bought and sold on their dates. Faded rows: sectors they skipped (they count only through the market line). Adds ≈ share × beat by.";}
+}
+seg(null,"data-cview",v=>{cview=v;drawC()});
+
+drawD();drawR(false);drawM();drawC();
+})();
+</script>
