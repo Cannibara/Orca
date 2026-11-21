@@ -22,7 +22,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | The logo, favicon or app icons | `docs/brand/README.md` (files, colours, rules; `brand-sheet.png` is the guide) |
 | The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
-| Building the home page's Famous funds chart (ranked return bars, fitted scale, Chart / Table switch) | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` (approved design, build checklist; mock-ups beside it) |
+| The home page's Famous funds chart (ranked return bars, fitted scale, Chart / Table switch) | `web/src/home/` (built: `FamousChart.tsx`, `famousChart.ts`), `web/src/lib/famousNames.ts` (short names), `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` (design; mock-ups beside it) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
 ## Stack and hosting
@@ -37,6 +37,7 @@ pipeline/            Python package `orca` (ingest → lake → engine → publi
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
 pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
+web/src/home/        Famous funds ranked return chart (FamousChart.tsx, famousChart.ts pure model, useEasedScroll.ts)
 web/src/fund/        fund-page panels (Holdings/Analysis/About tabs) and pure models: series.ts (returns/KPIs), positions.ts (as-of model, periods),
                      treemap.ts + treemapView.ts (holdings tree map), about.ts,
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css

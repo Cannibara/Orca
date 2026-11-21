@@ -5,6 +5,15 @@ Last verified: 2026-11-21
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-21 — Famous funds ranked return chart built (awaiting merge)
+
+| What changed | Why | Files |
+|---|---|---|
+| Home's Famous funds lists are one ranked return chart each (Most searched + 15 styles): sorted by return, scale fitted to the rows in view, eased scroll, S&P 500 total-return dotted line, Chart \| Table switch (Table keeps popularity order). Pipeline publishes `spx` in `home/top_{period}.json` | Owner-approved design (spec) | `web/src/home/`, `web/src/pages/Home.tsx`, `web/src/lib/famousNames.ts`, `web/src/lib/format.ts` (`fundShortName`), `pipeline/orca/` (spx), `pipeline/contract.md` |
+| Phone pass at 400 px on production data (all six periods, every list): `PHONE_SHORT` names for every name that ellipsised; `SHORT_NAME` for venture filers named by their legal vehicle (IVP, TCV, Kleiner Perkins, Sequoia Growth); phone ticks step by 40 on a span over 60; `fundShortName` never returns "" | Phone checks | `web/src/lib/famousNames.ts`, `web/src/home/famousChart.ts`, `web/src/lib/format.ts` |
+| Playwright smoke for the chart (demo data; a 50-row `top_5y` fixture for the scroll window), 1280/400, light/dark | Done when | `web/e2e/smoke.spec.ts` |
+| **After merge:** production has no `spx` until Actions > Pipeline > Run workflow with `home_only`; until then the chart shows no S&P line. Open: a person's line under a name (`.mg`) still ellipsises on a phone for a few long names (e.g. "Paul Marshall & Ian Wace") | — | — |
+
 ## 2026-11-21 — Famous chart spec checked against main and made build-ready
 
 | What changed | Why | Files |

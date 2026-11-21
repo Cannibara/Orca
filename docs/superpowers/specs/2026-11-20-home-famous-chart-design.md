@@ -1,7 +1,7 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
-Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: approved by
-the owner, all questions answered, ready to build.
+Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: built (branch claude/tender-keller-89qnf1), awaiting merge.
+Approved by the owner, all questions answered.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
 `phone.dc.html` in this folder (claude.ai Design canvas files; the `/_blob/…` photo URLs only resolve on the
