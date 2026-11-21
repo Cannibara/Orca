@@ -1,11 +1,12 @@
-import { useId, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { photoOf } from "../lib/people";
 import { GROUP_LABEL, type IndexGroup, type IndexItem, type IndexLayout } from "./listIndex";
 
 // The Famous funds list switch (layout in ./listIndex). On a wide or mid page: every list as a line of text on
 // the index's grid, the pressed one in the site's pressed chip (the segmented control's thumb), Most searched as
-// one tall cell with a few of its faces. Narrower (a phone): one field naming the list, over the device's own
-// select, grouped the same way, so 16 lists never make a ragged row or a sideways scroll.
+// one tall cell with a few of its faces. Narrower (a phone): the names stay in view as one row you swipe (the
+// next name cut at the edge says there are more), with "All 16" pinned beside it over the device's own select,
+// grouped the same way (owner, 2026-11-21: a closed picker hides the lists and few would open it).
 
 /** A face in Most searched's cell; nothing at all when the photo is missing or fails. */
 function Mini({ manager }: { manager: string }) {
@@ -39,34 +40,73 @@ export function ListIndex({
   /** The line under Most searched's name (wide layout). */
   featNote: string;
 }) {
-  const id = useId();
+  const row = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ l: false, r: false });
+  const readEdge = () => {
+    const el = row.current;
+    if (!el) return;
+    const l = el.scrollLeft > 1;
+    const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdge((e) => (e.l === l && e.r === r ? e : { l, r }));
+  };
+  // The pressed list in view (one chosen in the picker, or Most searched after a period without the list):
+  // scroll the row, never the page (as scrollIntoView could).
+  useLayoutEffect(() => {
+    const el = row.current;
+    const b = el?.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    if (el && b) {
+      const s = el.getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      const pad = 28;
+      if (r.left < s.left + pad) el.scrollLeft -= s.left + pad - r.left;
+      else if (r.right > s.right - pad) el.scrollLeft += r.right - (s.right - pad);
+    }
+    readEdge();
+  }, [value, items, layout]);
+
   if (!layout) {
-    const groups = (["pop", "style", "who"] as IndexGroup[])
-      .map((g) => ({ g, names: items.filter((i) => i.group === g).map((i) => i.name) }))
-      .filter((x) => x.names.length > 0);
+    const order = (["pop", "style", "who"] as IndexGroup[]).map((g) => ({
+      g,
+      names: items.filter((i) => i.group === g).map((i) => i.name),
+    }));
+    const groups = order.filter((x) => x.names.length > 0);
     return (
-      <div className="fam-pick">
-        <span className="pk-k" aria-hidden="true">
-          List
-        </span>
-        <span className="pk-v" aria-hidden="true">
-          {value}
-        </span>
-        <span className="pk-n" aria-hidden="true">
-          {items.length} lists
-        </span>
-        {CHEVRON}
-        <select id={id} aria-label="List" value={value} onChange={(e) => onChange(e.target.value)}>
-          {groups.map(({ g, names }) => (
-            <optgroup key={g} label={GROUP_LABEL[g]}>
-              {names.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </optgroup>
+      <div className="fam-strip">
+        <div
+          ref={row}
+          className={"fam-row" + (edge.l ? " more-l" : "") + (edge.r ? " more-r" : "")}
+          role="group"
+          aria-label="List"
+          onScroll={readEdge}
+        >
+          {order.flatMap((x) => x.names).map((n) => (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={n === value}
+              onClick={() => {
+                if (n !== value) onChange(n);
+              }}
+            >
+              {n}
+            </button>
           ))}
-        </select>
+        </div>
+        <div className="fam-all">
+          <span aria-hidden="true">All {items.length}</span>
+          {CHEVRON}
+          <select aria-label="All lists" value={value} onChange={(e) => onChange(e.target.value)}>
+            {groups.map(({ g, names }) => (
+              <optgroup key={g} label={GROUP_LABEL[g]}>
+                {names.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
       </div>
     );
   }

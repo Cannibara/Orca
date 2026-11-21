@@ -319,19 +319,31 @@ for (const width of widths) {
         return;
       }
 
-      // a phone: one field over the device's select; the choice survives another tab and back
-      const pick = page.getByRole("combobox", { name: "List" });
-      await expect(page.locator("section.famous .fam-pick")).toContainText("Most searched");
-      await pick.selectOption("Sovereign & pension funds");
+      // a phone: the names in one swiped row (the next one cut at the edge), All 16 pinned beside it
+      const row = page.getByRole("group", { name: "List" });
+      const pressedInView = () =>
+        row.evaluate((el) => {
+          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+          const s = el.getBoundingClientRect();
+          return b.left >= s.left - 1 && b.right <= s.right + 1;
+        });
+      expect(await row.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+      await expect(row).toHaveClass(/more-r/);
+      expect(await row.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("none");
+      await expect(page.locator("section.famous .fam-all")).toBeVisible();
+      // the last list from the picker: the row scrolls to it, and keeps it after another tab and back
+      await page.getByRole("combobox", { name: "All lists" }).selectOption("Sovereign & pension funds");
       await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
-      await expect(page.locator("section.famous .fam-pick .pk-v")).toHaveText("Sovereign & pension funds");
+      await expect.poll(pressedInView).toBe(true);
       await page.getByRole("tab", { name: "Top funds" }).click();
       await page.getByRole("tab", { name: "Famous funds" }).click();
-      await expect(page.getByRole("combobox", { name: "List" })).toHaveValue("Sovereign & pension funds");
-      // a period without that list (the demo's 1 year) falls back to Most searched
+      await expect(page.getByRole("combobox", { name: "All lists" })).toHaveValue("Sovereign & pension funds");
+      await expect.poll(pressedInView).toBe(true);
+      // a period without that list (the demo's 1 year) falls back to Most searched, scrolled back into view
       await page.getByRole("button", { name: "1y", exact: true }).click();
       await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
-      await expect(page.getByRole("combobox", { name: "List" })).toHaveValue("Most searched");
+      await expect(row.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(pressedInView).toBe(true);
       await noSideways();
       expect(errors).toEqual([]);
     });

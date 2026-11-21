@@ -31,15 +31,24 @@
 .fp .famous .ix-c.feat[aria-pressed="true"] .ix-face{box-shadow:0 0 0 2px var(--surface)}
 .fp .famous .ix-note{font:400 12.5px/16px var(--f-sans);color:var(--ink3);white-space:normal}
 
-/* ---------- narrower than the index: one field naming the list over the device's own select ---------- */
-.fp .famous .fam-pick{position:relative;display:flex;align-items:center;gap:10px;height:44px;min-width:0;padding:0 12px 0 14px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink)}
-.fp .famous .fam-pick:focus-within{outline:2px solid var(--focus);outline-offset:2px}
-.fp .famous .pk-k{flex:none;font:600 11px/14px var(--f-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
-.fp .famous .pk-v{flex:1 1 auto;min-width:0;font:600 15px/20px var(--f-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp .famous .pk-n{flex:none;font-size:13px;line-height:18px;color:var(--ink3);white-space:nowrap}
-.fp .famous .fam-pick .ico{color:var(--ink2)}
-/* invisible but the whole field: a tap opens the device's picker (iOS: the wheel, with the group headings) */
-.fp .famous .fam-pick select{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;opacity:0;font-size:16px;cursor:pointer;appearance:none;-webkit-appearance:none}
+/* ---------- narrower than the index: the names in one swiped row, "All 16" pinned beside it ----------
+   The next name is cut (and faded) at the edge, so the row says it scrolls without a scrollbar. */
+.fp .famous .fam-strip{display:flex;align-items:center;gap:8px;min-width:0}
+.fp .famous .fam-row{flex:1 1 auto;min-width:0;display:flex;gap:2px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+.fp .famous .fam-row::-webkit-scrollbar{display:none}
+.fp .famous .fam-row.more-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent)}
+.fp .famous .fam-row.more-l{-webkit-mask-image:linear-gradient(to right,transparent,#000 32px);mask-image:linear-gradient(to right,transparent,#000 32px)}
+.fp .famous .fam-row.more-l.more-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 32px,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,transparent,#000 32px,#000 calc(100% - 32px),transparent)}
+.fp .famous .fam-row button{flex:none;height:40px;padding:0 12px;border:0;border-radius:var(--r-2);background:none;color:var(--ink2);font:500 14px/18px var(--f-sans);white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fp .famous .fam-row button:hover{color:var(--ink)}
+/* the pressed chip; its ring is inset so the row's edge never clips it */
+.fp .famous .fam-row button[aria-pressed="true"]{color:var(--ink);font-weight:600;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line2)}
+.fp .famous .fam-row button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.fp .famous .fam-all{position:relative;flex:none;display:flex;align-items:center;gap:4px;height:40px;padding:0 8px 0 12px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:600 13px/18px var(--f-sans);white-space:nowrap}
+.fp .famous .fam-all .ico{color:var(--ink2)}
+.fp .famous .fam-all:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+/* invisible but the whole button: a tap opens the device's picker (iOS: the wheel, with the group headings) */
+.fp .famous .fam-all select{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;opacity:0;font-size:16px;cursor:pointer;appearance:none;-webkit-appearance:none}
 
 /* ---------- the toolbar: the period from the left edge, Chart | Table in the last track ---------- */
 .fp .famous .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}

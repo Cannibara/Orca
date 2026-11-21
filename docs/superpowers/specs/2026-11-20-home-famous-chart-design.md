@@ -164,8 +164,10 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
    (four columns, filled top to bottom, balanced) and Type of investor (Family offices, Big companies, Sovereign &
    pension funds). 16 lists = 1 + 4 + 1 columns × 3 rows at ≥ 1140px of content; a list missing for a period only
    shortens a column; more lists add a row, never a seventh track. 760–1139px: four tracks, Most searched and the
-   investor types on one row, the styles 4 × 3 below. Under 760px: one 44px field ("LIST · Most searched · 16
-   lists ⌄") over the device's own `<select>` with the same groups as `<optgroup>`s (iOS shows its wheel). The
+   investor types on one row, the styles 4 × 3 below. Under 760px (owner: a closed picker hides the names and few
+   would open it): the names in **one swiped row** (index order, the next name cut and faded at the edge, no
+   scrollbar; the pressed one scrolled into view) with **"All 16 ⌄"** pinned beside it over the device's own
+   `<select>` with the same groups as `<optgroup>`s (iOS shows its wheel). The
    pressed list is the `.seg` pressed chip, bled 10px into the gap. Layout: `web/src/home/listIndex.ts` (pure),
    drawn by `ListIndex.tsx`. Below it **one toolbar on the same tracks**: the period from the left edge over half
    the tracks (more until its six options have ~440px), Chart | Table in the last track, both 32px on one centre

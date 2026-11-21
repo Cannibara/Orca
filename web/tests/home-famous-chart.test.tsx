@@ -298,19 +298,27 @@ describe("Famous funds chart", () => {
     expect(screen.getByRole("group", { name: "View" }).parentElement!.style.gridColumn).toBe("6");
   });
 
-  it("narrower than the index, the lists are one field over the device's select, grouped the same way", async () => {
+  it("narrower than the index, the names stay in view in one row, with All 16 beside it over the device's grouped select", async () => {
     Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 700 });
     try {
       const user = await openFixture();
-      expect(screen.queryByRole("group", { name: "List" })).toBeNull();
-      const pick = screen.getByRole("combobox", { name: "List" });
-      expect([...pick.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Popular", "Investing style", "Type of investor"]);
-      expect(pick.querySelectorAll("option")).toHaveLength(16);
-      expect(document.querySelector(".fam-pick")).toHaveTextContent("Most searched16 lists");
-      await user.selectOptions(pick, "Macro");
+      const row = screen.getByRole("group", { name: "List" });
+      expect(row).toHaveClass("fam-row");
+      const names = within(row).getAllByRole("button").map((b) => b.textContent);
+      // the index's order: Most searched, the styles, the investor types
+      expect(names).toHaveLength(16);
+      expect(names[0]).toBe("Most searched");
+      expect(names.slice(-3)).toEqual(["Family offices", "Big companies", "Sovereign & pension funds"]);
+      await user.click(within(row).getByRole("button", { name: "Value" }));
+      expect(screen.getByRole("heading", { level: 3, name: "Value" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Value" })).toHaveAttribute("aria-pressed", "true");
+      const all = screen.getByRole("combobox", { name: "All lists" });
+      expect(document.querySelector(".fam-all")).toHaveTextContent("All 16");
+      expect([...all.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Popular", "Investing style", "Type of investor"]);
+      expect(all).toHaveValue("Value");
+      await user.selectOptions(all, "Macro");
       expect(screen.getByRole("heading", { level: 3, name: "Macro" })).toBeInTheDocument();
-      expect(pick).toHaveValue("Macro");
-      expect(document.querySelector(".fam-pick .pk-v")).toHaveTextContent("Macro");
+      expect(within(row).getByRole("button", { name: "Macro" })).toHaveAttribute("aria-pressed", "true");
       // not a phone: the periods keep their words
       expect(screen.getByRole("button", { name: "Since start" })).toBeInTheDocument();
     } finally {
