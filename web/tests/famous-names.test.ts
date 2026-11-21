@@ -1,3 +1,4 @@
+import fixture from "./fixtures/famous-names-5y.json";
 import { fundShortName } from "../src/lib/format";
 import { MANAGER_LINE, PHONE_SHORT, SHORT_NAME, managerLine, phoneNameOf, shortNameOf } from "../src/lib/famousNames";
 
@@ -29,6 +30,7 @@ describe("fundShortName (spec 3.3 rules 1-5)", () => {
     expect(fundShortName("TRIAN FUND MANAGEMENT, L.P.")).toBe("Trian");
     expect(fundShortName("CVS HEALTH Corp")).toBe("CVS Health");
     expect(fundShortName("STRS OHIO")).toBe("STRS Ohio");
+    expect(fundShortName("AMAZON COM INC")).toBe("Amazon");
   });
 
   it("keeps brand words, an ampersand and an inner 'Co.'", () => {
@@ -123,5 +125,29 @@ describe("managerLine (3.4, Appendix B)", () => {
     expect(managerLine("Some new fund (IV)", "X")).toBeNull();
     expect(managerLine("Alaska's oil fund", "X")).toBeNull();
     expect(managerLine("Acme / Foo", "X")).toBeNull();
+  });
+});
+
+describe("production 5y famous rows", () => {
+  const rows = fixture as { fund_id: number; name: string; group: string; search: number | null }[];
+
+  it("never gives an empty short name", () => {
+    for (const r of rows) expect(shortNameOf(r.fund_id, r.name).trim(), r.name).not.toBe("");
+  });
+
+  it("gives no two funds of one list the same short name", () => {
+    const lists = new Map<string, Map<string, number>>();
+    const seen: string[] = [];
+    for (const r of rows) {
+      for (const list of r.search != null ? [r.group, "Most searched"] : [r.group]) {
+        const names = lists.get(list) ?? new Map<string, number>();
+        lists.set(list, names);
+        const short = shortNameOf(r.fund_id, r.name);
+        const other = names.get(short);
+        if (other !== undefined && other !== r.fund_id) seen.push(`${list}: ${short}`);
+        names.set(short, r.fund_id);
+      }
+    }
+    expect(seen).toEqual([]);
   });
 });

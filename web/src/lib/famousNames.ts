@@ -19,6 +19,24 @@ export const SHORT_NAME: Record<number, string> = {
   1263508: "Baker Bros.", // BAKER BROS. ADVISORS LP
   1510387: "Gotham", // Gotham Asset Management, LLC
   1647251: "TCI", // TCI FUND MANAGEMENT LTD
+  // Brands an all-caps filing name cannot be re-cased into.
+  1537530: "Sequoia Global Equities", // SCGE MANAGEMENT, L.P.
+  1053321: "OMERS", // OMERS ADMINISTRATION Corp
+  1065521: "SoftBank", // SOFTBANK GROUP CORP.
+  1018724: "Amazon", // AMAZON COM INC
+  1055951: "OrbiMed", // ORBIMED ADVISORS LLC
+  1745981: "WorldQuant Millennium", // WORLDQUANT MILLENNIUM ADVISORS LLC
+  // Two filers of one brand in the same list: keep the brand plus what tells them apart.
+  1600213: "Spark Capital II", // Spark Management Partners II, LLC
+  1640445: "Spark Capital III", // Spark Management Partners III (AIV I), LLC
+  1912628: "Ribbit Capital II", // Ribbit Capital GP II, Ltd.
+  1697452: "Ribbit Capital IV", // Ribbit Capital GP IV, Ltd.
+  1569205: "Fundsmith", // Fundsmith LLP
+  1868537: "Fundsmith Investment", // FUNDSMITH INVESTMENT SERVICES LTD.
+  1577133: "Greenwoods", // Greenwoods Asset Management Ltd
+  1848138: "Greenwoods Hong Kong", // Greenwoods Asset Management Hong Kong Ltd.
+  1627436: "Sylebra Capital Ltd", // Sylebra Capital Ltd
+  2003074: "Sylebra Capital LLC", // SYLEBRA CAPITAL LLC
 };
 
 /** Phone only: where the 136px name column is too narrow, keyed by the desktop short name. */

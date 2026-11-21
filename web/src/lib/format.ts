@@ -129,7 +129,7 @@ export function tidyName(name: string): string {
 }
 
 // Endings of a legal name, taken off the end one by one (compared without dots and commas, so "L.P." is LP).
-const SHORT_LEGAL = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LLC", "LP", "LLP", "LTD", "LIMITED", "PLC", "SA", "SAS", "AG", "AS", "NV", "GMBH", "PTE", "PTY", "PJSC", "GP", "I", "II", "III"]);
+const SHORT_LEGAL = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LLC", "LP", "LLP", "LTD", "LIMITED", "PLC", "SA", "SAS", "AG", "AS", "NV", "GMBH", "PTE", "PTY", "PJSC", "COM", "GP", "I", "II", "III"]);
 // Generic tails that say what a firm does, not who it is.
 const SHORT_TAIL = new Set(["MANAGEMENT", "MGMT", "GROUP", "HOLDING", "HOLDINGS", "ASSOCIATES", "ADVISORS", "ADVISERS"]);
 // Weaker tails: a name may be nothing but one of these plus a single word ("Public Investment Fund", "PGGM Investments"),
