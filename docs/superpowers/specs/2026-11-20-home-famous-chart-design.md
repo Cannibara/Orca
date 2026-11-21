@@ -1,6 +1,6 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
-Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv; review fixes noted "build, review fix") · Status: shipped in PR #57; owner's post-launch changes (one scale per list §7.3, wrapped list switch §4, 20 rows §7.1) built on branch claude/tender-keller-89qnf1.
+Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv; review fixes noted "build, review fix") · Status: shipped in PR #57; owner's post-launch changes (one scale per list §7.3, 20 rows §7.1) in #58; the list index and the toolbar on its tracks (§4.3), and the sub-pixel glide (§7.2) on branch claude/clever-ramanujan-whwhni.
 Approved by the owner, all questions answered.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
@@ -69,8 +69,7 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
   2026-11-20): Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare
   specialists, Tech & growth, Venture capital, Activists, Macro, Credit & event-driven, Family offices, Quant &
   multi-strategy, Big companies, Sovereign & pension funds. Each is charted by `ann_return` desc. The mock only
-  wires Most searched and Buffett inspired; the rest join the same list switch: one row that **scrolls
-  sideways** on desktop and phone (do not wrap it: `Seg`'s sliding thumb measures `offsetLeft` on one row),
+  wires Most searched and Buffett inspired; the rest join the same list switch (now the list index, §4.3),
   44px touch targets on phone.
 - The existing per-list `about` lines (e.g. "The famous funds investors look up most.") are not shown in this
   design; the computed lead line (§4) replaces them. Keep them as the list section's accessible description.
@@ -158,10 +157,19 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
    "Estimated return a year {over}, best first. The dotted line is the S&P 500 ({spx})." `{over}` comes from one
    helper used everywhere: "over the last year" (1y), "over the last 3 / 5 / 10 / 15 years", "since each fund's
    first filing" (Max). `{spx}` = `spx.ann_return` formatted `+13.5%`; drop the second sentence when it is null.
-3. Controls (owner, 2026-11-21 after launch: the one-row layout overlapped): the **list switch** (segmented
-   control: Most searched | Buffett inspired | …) on its own rows, **wrapped onto two or three rows** with no
-   scrollbar (`Choice wrap`: the thumb moves down as well as across); below it the **period** control on the left
-   and Chart | Table on the right. The **period** control = **today's `Choice` with all six periods (1y 3y 5y 10y 15y Max), shared with Top funds,
+3. Controls. **List index** (owner, 2026-11-21, second round: the wrapped switch left a ragged second row, 11 + 5,
+   and Chart | Table did not look level with the period; three design concepts were mocked, a side rail, one
+   toolbar with a list menu, and this one): the lists as text on **equal grid tracks** in three labelled groups,
+   Popular (Most searched, one tall cell with five grey faces and "Top 50 by search interest"), Investing style
+   (four columns, filled top to bottom, balanced) and Type of investor (Family offices, Big companies, Sovereign &
+   pension funds). 16 lists = 1 + 4 + 1 columns × 3 rows at ≥ 1140px of content; a list missing for a period only
+   shortens a column; more lists add a row, never a seventh track. 760–1139px: four tracks, Most searched and the
+   investor types on one row, the styles 4 × 3 below. Under 760px: one 44px field ("LIST · Most searched · 16
+   lists ⌄") over the device's own `<select>` with the same groups as `<optgroup>`s (iOS shows its wheel). The
+   pressed list is the `.seg` pressed chip, bled 10px into the gap. Layout: `web/src/home/listIndex.ts` (pure),
+   drawn by `ListIndex.tsx`. Below it **one toolbar on the same tracks**: the period from the left edge over half
+   the tracks (more until its six options have ~440px), Chart | Table in the last track, both 32px on one centre
+   line (equal-width buttons). A phone's periods read 1y 3y 5y 10y 15y Max so the six fit beside the view icons. The **period** control = **today's `Choice` with all six periods (1y 3y 5y 10y 15y Max), shared with Top funds,
    opening on 3y** (owner, 2026-11-21; the mock's 1y | 5y | Max and its 5y default are superseded), and a
    **Chart | Table** segmented
    switch (icon + word, same icons as Annual returns' table toggle) on the right. Chart is the default.
@@ -265,6 +273,10 @@ same pace. Implementation (per 60fps frame, `dt` = frame time / 16.667, capped a
 5. A scroll the spring did not cause (scrollbar drag, touch): sync `T = T2 = C = scrollTop`, `v = 0`, and just
    follow it. **Touch keeps the device's own momentum** (no custom easing on phones).
 6. Reduced motion: jump straight to the target.
+7. Chrome keeps a `scrollTop` set from script in whole CSS pixels (10.25 → 10, also at 2x), which turned the slow
+   start and settle into 1px hops with 33–133ms stalls. The box takes the whole pixels and the list (the box's
+   first child) a sub-pixel `translateY` for the rest; the target is a whole pixel, so nothing stays shifted at
+   rest. Safari keeps the fraction (shift 0).
 
 ### 7.3 One scale per list; the axis slides (domain in percentage points)
 **Owner, 2026-11-21 after launch:** the first build fitted the scale to the rows in view, so a fund's bar changed

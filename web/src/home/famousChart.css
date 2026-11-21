@@ -8,12 +8,46 @@
 .fp .famous .fam-head{display:flex;flex-direction:column;gap:6px;min-width:0}
 .fp .famous h2{font:700 30px/34px var(--f-sans);letter-spacing:-.03em}
 .fp .famous .fam-stand{font-size:15px;line-height:22px;color:var(--ink2);max-width:80ch;text-wrap:pretty}
-/* the sixteen lists on their own rows (two or three, wrapped: owner, 2026-11-21), then the period on the
-   left and Chart | Table on the right, so nothing shares a row with the lists or overlaps them */
-.fp .famous .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
-.fp .famous .fam-lists{min-width:0}
-.fp .famous .fam-lists .seg{width:100%}
+/* the list index, then one toolbar on its tracks (owner, 2026-11-21: the wrapped switch left a ragged second
+   row, and Chart | Table did not look level with the period) */
+.fp .famous .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:22px;min-width:0}
+
+/* ---------- the list index (home/ListIndex.tsx; layout home/listIndex.ts) ----------
+   Groups under a small heading and a hairline, on equal tracks. A list is a line of text; the pressed one is
+   the segmented control's pressed chip, bled 10px into the gap so every name keeps its column's left edge. */
+.fp .famous .ix{--cell:34px;--bleed:10px;display:grid;column-gap:24px;min-width:0}
+.fp .famous .ix-h{align-self:end;margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line2);font:600 11px/14px var(--f-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp .famous .ix-h.later{padding-top:16px}
+.fp .famous .ix-c{position:relative;display:flex;align-items:center;min-width:0;height:var(--cell);margin:0 calc(-1 * var(--bleed));padding:0 var(--bleed);border:0;border-radius:var(--r-2);background:none;color:var(--ink2);font:500 13.5px/18px var(--f-sans);text-align:left;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fp .famous .ix-c .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fp .famous .ix-c:hover{color:var(--ink);background:var(--hover)}
+.fp .famous .ix-c[aria-pressed="true"]{color:var(--ink);font-weight:600;background:var(--surface);box-shadow:0 0 0 1px var(--line2)}
+.fp .famous .ix-c:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* Most searched on a wide page: one tall cell, its name, faces and note on the grid's row lines */
+.fp .famous .ix.wide .ix-c.feat{display:grid;grid-auto-rows:var(--cell);align-content:start;align-items:center;justify-items:start;height:auto}
+.fp .famous .ix-faces{display:flex;align-items:center;padding-left:2px}
+.fp .famous .ix-face{display:block;width:24px;height:24px;margin-left:-6px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:var(--sunken);box-shadow:0 0 0 2px var(--page);filter:grayscale(1) contrast(1.06)}
+.fp .famous .ix-face:first-child{margin-left:0}
+.fp .famous .ix-c.feat[aria-pressed="true"] .ix-face{box-shadow:0 0 0 2px var(--surface)}
+.fp .famous .ix-note{font:400 12.5px/16px var(--f-sans);color:var(--ink3);white-space:normal}
+
+/* ---------- narrower than the index: one field naming the list over the device's own select ---------- */
+.fp .famous .fam-pick{position:relative;display:flex;align-items:center;gap:10px;height:44px;min-width:0;padding:0 12px 0 14px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink)}
+.fp .famous .fam-pick:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+.fp .famous .pk-k{flex:none;font:600 11px/14px var(--f-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+.fp .famous .pk-v{flex:1 1 auto;min-width:0;font:600 15px/20px var(--f-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp .famous .pk-n{flex:none;font-size:13px;line-height:18px;color:var(--ink3);white-space:nowrap}
+.fp .famous .fam-pick .ico{color:var(--ink2)}
+/* invisible but the whole field: a tap opens the device's picker (iOS: the wheel, with the group headings) */
+.fp .famous .fam-pick select{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;opacity:0;font-size:16px;cursor:pointer;appearance:none;-webkit-appearance:none}
+
+/* ---------- the toolbar: the period from the left edge, Chart | Table in the last track ---------- */
 .fp .famous .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}
+.fp .famous .fam-opts.on-grid{display:grid;column-gap:24px}
+.fp .famous .fo-per,.fp .famous .fo-view{display:flex;min-width:0}
+/* on the grid each control fills its tracks with equal buttons; both are the .seg's 32px */
+.fp .famous .fam-opts.on-grid .seg{display:flex;width:100%}
+.fp .famous .fam-opts.on-grid .seg button{flex:1 1 0;min-width:0;justify-content:center}
 
 /* ---------- the module: rule, list name and count, lead line, chart or table, source ---------- */
 .fp .famous .fam-mod{display:flex;flex-direction:column;min-width:0;margin-top:10px}
@@ -107,17 +141,17 @@
 .fp .famous.phone h2{font-size:24px;line-height:28px}
 /* the phone has no standfirst (the axis says "Est. return a year"); it stays for screen readers */
 .fp .famous.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-/* a phone swipes the one-row list switch sideways (sixteen lists would wrap to six rows): no scrollbar under it */
-.fp .famous.phone .fam-lists{flex:none;overflow-x:auto;scrollbar-width:none}
-.fp .famous.phone .fam-lists .seg{width:auto;max-width:none;overflow:visible}
-.fp .famous.phone .fam-lists::-webkit-scrollbar{display:none}
+.fp .famous.phone .fam-ctl{gap:10px}
+/* one row: the short periods (1y … Max) share it evenly, Chart | Table beside them */
 .fp .famous.phone .fam-opts{gap:8px;flex-wrap:nowrap}
-.fp .famous.phone .fam-opts>.seg:first-child{flex:1 1 auto;min-width:0}
-.fp .famous.phone .fam-opts>.seg:last-child{flex:none}
+.fp .famous.phone .fo-per{flex:1 1 auto}
+.fp .famous.phone .fo-per .seg{display:flex;width:100%}
+.fp .famous.phone .fo-per .seg button{flex:1 1 0;min-width:0;padding:0 4px;justify-content:center}
+.fp .famous.phone .fo-view{flex:none}
 /* 44px touch targets: 38px buttons in the 44px control */
 .fp .famous.phone .seg button{height:38px;font-size:13px}
 /* Chart | Table: icon-only buttons (the word stays as each button's name) */
-.fp .famous.phone .fam-opts>.seg:last-child button{width:44px;padding:0;justify-content:center}
+.fp .famous.phone .fo-view .seg button{width:44px;padding:0;justify-content:center}
 .fp .famous.phone .seg .sl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .fp .famous.phone .fam-mod{margin-top:10px}
 .fp .famous.phone .fam-rule{padding-bottom:8px}

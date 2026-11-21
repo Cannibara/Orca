@@ -28,10 +28,6 @@ export function Seg({ label, options, value, onChange, className }: SegProps) {
     if (!b || !t) return;
     t.style.setProperty("--x", b.offsetLeft - 2 + "px");
     t.style.setProperty("--w", b.offsetWidth + "px");
-    // a wrapping control (.seg.wrap) also moves the thumb down to the pressed button's row
-    t.style.setProperty("--x0", b.offsetLeft + "px");
-    t.style.setProperty("--y0", b.offsetTop + "px");
-    t.style.setProperty("--h", b.offsetHeight + "px");
   }, []);
 
   useLayoutEffect(place, [place, value, options]);

@@ -277,6 +277,47 @@ describe("Famous funds chart", () => {
     expect(rows[39].getAttribute("aria-label")).toMatch(new RegExp(`^40 of 40\\. ${esc(shortNameOf(want[39].fund_id, want[39].name))}`));
   });
 
+  it("the list index: three labelled groups on one grid, Most searched one tall cell, the toolbar on the same tracks", async () => {
+    await openFixture();
+    const index = screen.getByRole("group", { name: "List" });
+    expect([...index.querySelectorAll(".ix-h")].map((h) => h.textContent)).toEqual(["Popular", "Investing style", "Type of investor"]);
+    expect(index.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    // the fixture has 12 styles and 3 investor types: three rows, every list in one
+    expect(index.style.gridTemplateRows).toBe("auto repeat(3, var(--cell))");
+    const ms = within(index).getByRole("button", { name: "Most searched" }); // its note and faces are not read
+    expect(ms).toHaveClass("feat");
+    expect(ms.style.gridRow).toBe("2 / span 3");
+    expect(ms).toHaveTextContent("Top 50 by search interest");
+    expect(within(index).getByRole("button", { name: "Sovereign & pension funds" }).style.gridColumn).toBe("6");
+    expect(within(index).getAllByRole("button")).toHaveLength(16);
+    // the period from the left edge over half the tracks, Chart | Table in the last one
+    const opts = document.querySelector<HTMLElement>(".fam-opts")!;
+    expect(opts).toHaveClass("on-grid");
+    expect(opts.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    expect(screen.getByRole("group", { name: "Period" }).parentElement!.style.gridColumn).toBe("1 / span 3");
+    expect(screen.getByRole("group", { name: "View" }).parentElement!.style.gridColumn).toBe("6");
+  });
+
+  it("narrower than the index, the lists are one field over the device's select, grouped the same way", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 700 });
+    try {
+      const user = await openFixture();
+      expect(screen.queryByRole("group", { name: "List" })).toBeNull();
+      const pick = screen.getByRole("combobox", { name: "List" });
+      expect([...pick.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Popular", "Investing style", "Type of investor"]);
+      expect(pick.querySelectorAll("option")).toHaveLength(16);
+      expect(document.querySelector(".fam-pick")).toHaveTextContent("Most searched16 lists");
+      await user.selectOptions(pick, "Macro");
+      expect(screen.getByRole("heading", { level: 3, name: "Macro" })).toBeInTheDocument();
+      expect(pick).toHaveValue("Macro");
+      expect(document.querySelector(".fam-pick .pk-v")).toHaveTextContent("Macro");
+      // not a phone: the periods keep their words
+      expect(screen.getByRole("button", { name: "Since start" })).toBeInTheDocument();
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("a short list has no scroll window", async () => {
     const user = await openFixture();
     await user.click(within(screen.getByRole("group", { name: "List" })).getByRole("button", { name: "Macro" }));
@@ -354,7 +395,7 @@ describe("Famous funds chart", () => {
       const user = userEvent.setup();
       renderHome();
       await screen.findByRole("heading", { level: 3, name: "Most searched" });
-      await user.click(screen.getByRole("button", { name: "5 years" }));
+      await user.click(screen.getByRole("button", { name: "5y" })); // a phone's short periods
       await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
       expect(document.querySelector(".fc")).toHaveClass("phone");
       expect(document.querySelector(".fc-axl")).toHaveTextContent("Est. return a year");
