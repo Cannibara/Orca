@@ -1,9 +1,15 @@
 # Worklog
 
-Last verified: 2026-11-20
+Last verified: 2026-11-21
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-21 — Famous chart spec checked against main and made build-ready
+
+| What changed | Why | Files |
+|---|---|---|
+| The spec now follows #55: Most searched membership and the table's opening order use `popularity()` (owner's `rank`, then `fame`, then AUM); no Search interest column anywhere; 15 style lists (Credit & event-driven added). The mock-ups' Table view dropped the column too. Added a build checklist with done-when checks, phone tick margins, and a CLAUDE.md "Read X when" row | Owner: "ensure this documentation is ready for a new LLM session to implement", then merge it to main | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `…-mock/`, `CLAUDE.md` |
 
 ## 2026-11-20 — Home: Famous funds as one ranked return chart (design approved, not built)
 

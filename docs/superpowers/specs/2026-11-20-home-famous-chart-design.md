@@ -1,6 +1,7 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
-Last verified: 2026-11-20 · Status: approved by the owner as a mock-up, not built.
+Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: approved by
+the owner as a mock-up, not built.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
 `phone.dc.html` in this folder (claude.ai Design canvas files; the `/_blob/…` photo URLs only resolve on the
@@ -45,14 +46,22 @@ After several rounds (v2 3D bars → v3 flat → v4 editorial) the approved desi
 Source file: `home/top_{1y|3y|5y|10y|15y|max}.json` on `https://data.orcaetf.com` (shape in
 `pipeline/contract.md`, types `TopRow` in `web/src/data/types.ts`). The `famous` array has one row per
 (fund, style list): `fund_id, name, book, n_positions, ann_return, max_dd, sharpe, manager, group, until_q,
-search, fame`. Top level: `latest_q`, `period`, `search_asof`.
+search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_rank.csv`, 1 = first). Top level: `latest_q`, `period`, `search_asof`.
 
 ### 3.1 Lists
-- **Most searched** (first, default): famous rows with a non-null `search`, highest first, one row per
-  `fund_id`, the **top 50**. Display order is then **by `ann_return`, best first** (see §11, open question 2).
-- **Style lists** (`group`, order of `FAMOUS_GROUPS` in `pipeline/orca/famous.py`): Buffett inspired, Moat
-  investing, Value, Tiger cubs, … each sorted by `ann_return` desc. The mock only shows Most searched and
-  Buffett inspired; the rest join the same list switch.
+- **Most searched** (first, default): exactly the funds today's site puts in it — reuse `mostSearched(rows, rank)`
+  and `popularity(rows)` in `web/src/pages/Home.tsx`: rows with `search` set (not null; 0 is allowed for an
+  owner-ranked fund with no Google score), one per `fund_id`, in **popularity order** (owner's `rank` ascending,
+  then `fame` descending, then AUM descending), the **top 50** (`MOST_SEARCHED_MAX`). The chart then displays
+  them **by `ann_return`, best first** (see §11, open question 2).
+- **Style lists** (`group`, the order of `FAMOUS_GROUPS` in `Home.tsx` / `pipeline/orca/famous.py`, 15 since
+  2026-11-20): Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare
+  specialists, Tech & growth, Venture capital, Activists, Macro, Credit & event-driven, Family offices, Quant &
+  multi-strategy, Big companies, Sovereign & pension funds. Each is charted by `ann_return` desc. The mock only
+  wires Most searched and Buffett inspired; the rest join the same list switch (on desktop a segmented control
+  that wraps or scrolls sideways; on phone a horizontally scrolling chip row — pick one, keep 44px touch targets).
+- The existing per-list `about` lines (e.g. "The famous funds investors look up most.") are not shown in this
+  design; the computed lead line (§4) replaces them. Keep them as the list section's accessible description.
 - A fund can appear in several lists; that is fine.
 
 ### 3.2 Per-row fields shown
@@ -63,7 +72,7 @@ search, fame`. Top level: `latest_q`, `period`, `search_asof`.
 | Manager | `manager` → manager rules §3.4 | text, may be absent |
 | Photo | `web/src/assets/people/people.json` maps the manager string → `<slug>.jpg` | 28–32px circle; no photo → initials of manager (or fund) on a sand circle |
 | Return | `ann_return` (fraction) | `+30.2%` / `−22.6%`, one decimal, sign always |
-| vs S&P 500 | `ann_return − SPX` | `+18.0 pts` (tooltip, table only) |
+| vs S&P 500 | `ann_return − SPX` | `+18.0 pts` (chart tooltip and screen-reader label only) |
 
 Do **not** show "filed until Qn YYYY" (`until_q`) on this page (owner: not needed here). Keep it in the
 screen-reader label only if cheap; the mock drops it.
@@ -169,7 +178,7 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
   notch pointing at the dotted line; tick labels on the lower line (11px `--ink3`, phone 10.5px), printed like
   Annual returns' `axisPct`: `0%`, `+10%`, `−20%`.
 - **Tick choice**: 0% is always labelled. Others are multiples of the step that sit inside the domain with a
-  margin (≥ 1 pt from the low end, ≥ 0.5 pt from the high end). Desktop step: 5 if span < 25 pts, 10 if span ≤ 60,
+  margin (desktop ≥ 1 pt from the low end and ≥ 0.5 pt from the high end; phone ≥ 2 pts and ≥ 1 pt). Desktop step: 5 if span < 25 pts, 10 if span ≤ 60,
   else 20. **Phone: few labels** (owner): step 10 if span ≤ 25, else 20, so 0% plus one or two numbers.
   Ticks that turn on/off fade over 200ms; their positions follow the scale every frame (no transition on `left`).
 - AUM-inside-the-bar (white text) was tried as an alternative and is a Tweak only; default is AUM next to the name.
@@ -239,7 +248,6 @@ substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `
 | Column | Value | Format (today's helpers) |
 |---|---|---|
 | Fund | photo (26–28px), short name (600), sub line "manager · filed until Qn YYYY" (the table keeps `until_q`) | link to the fund page; full legal name on hover |
-| Search interest | `search` — **Most searched only** | `fSearch` (`100`, `4.8`, `<1`, `—`) |
 | AUM | `book` | `fBook` (`$304.2B`, `$250m`) — note: the table keeps the site's `$…m` below $1B; the chart uses `$X.XB` |
 | Positions | `n_positions` | `count` |
 | Return / yr | `ann_return` | `pct(x, 0)` in `Signed` colours (blue up / orange down), `+12%` |
@@ -247,9 +255,10 @@ substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `
 | Sharpe | `sharpe` | `ratio` (`0.57`, `−0.33`) |
 
 - Every heading sorts (button inside the `th`, `aria-sort`); a new column starts high-to-low, the same column
-  flips. **Fund** steps through A–Z, Z–A and **most popular** (Google Trends `fame`, then AUM), shown as
-  "Fund · most popular". Opening order: Most searched by search interest, other lists most popular first (as
-  today).
+  flips. **Fund** steps through A–Z, Z–A and **most popular** (`popularity()`: owner's `rank`, then `fame`, then
+  AUM), shown as "Fund · most popular". Every list, Most searched included, opens most popular first (as
+  today since #55). There is **no Search interest column** (removed on main in #55: "users need the right funds,
+  not the score").
 - 10 funds a page with "1–10 of 50" and Previous / Next (as today's `FAMOUS_PAGE`). A new sort or a new list
   goes back to page 1.
 - Phone: the same columns in a sideways-scrolling box (table ≥ 640px), the Fund column sticky on the left
@@ -266,11 +275,12 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 
 ## 11. Open questions for the owner
 1. Do the fund return estimates include dividends? If yes, the S&P 500 figure should be total return.
-2. `docs/PRODUCT.md` records the owner's 2026-11-18 rule "every famous list opens with its most popular fund
-   first". This design sorts by return. Confirm, then update PRODUCT.md.
+2. `docs/PRODUCT.md` records the owner's rule "every famous list opens with its most popular fund first" (owner's
+   rank, then Google Trends, then AUM). This design's **chart** sorts by return; its **Table** view keeps the
+   popularity order. Confirm the chart order with the owner, then update PRODUCT.md in the same change.
 3. Lists with extreme returns (some style lists reach −42.7%): the fitted scale handles them, but check the
    phone label room on a narrow plot.
-4. The "Search interest" column of Most searched has no place in the chart; drop it or put it in the tooltip.
+4. Settled: no search score anywhere (main #55).
 
 ## 12. Decisions taken along the way (so they are not re-litigated)
 | Tried | Outcome | Why |
@@ -282,6 +292,7 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 | Average line | Dropped by owner | The S&P line is the meaningful reference |
 | AUM inside the bar | Tweak only | Owner preferred AUM next to the name |
 | Replacing the table outright | Kept as a Table view | Owner wants the old detailed columns one click away |
+| Search interest column / Trends caption | Removed (main #55, owner) | Users need the right funds, not the score |
 | Two lists side by side | Dropped | One chart across the page; lists via a switch |
 | 50 rows on the page | Dropped | A 15-row (phone 10) scrolling window |
 | Scale that waits until scrolling stops, then animates | Dropped | Felt jumpy |
@@ -305,7 +316,34 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 - Playwright smoke (1280 / 400 px, light / dark): rows render, scrolling the box updates the caption, the zero
   line stays at the left edge on the first window, no horizontal page scroll at 400 px.
 
+## 14. Build checklist (in order) and done-when
+1. Read `CLAUDE.md`, this file, `pipeline/contract.md` (home files) and `web/src/pages/Home.tsx` (`FamousFunds`,
+   `FamousGroup`, `famousColumns`, `popularity`, `mostSearched`, `FAMOUS_GROUPS`). Open the two mock files to see
+   the behaviour.
+2. Pure helpers + vitest tests (§13): short names, manager line, `$X.XB`, shade ramp, window domains and
+   Catmull-Rom domain, ticks (desktop/phone), lead line, SPY annualised return from `qclose`.
+3. The chart view component for one list (rows, bars, labels, leader pill, zero + S&P lines, axis header, caption,
+   source), static first (no scroll), then the 15/10-row window with the fitted scale (§7.3), then the eased
+   wheel/keys glide (§7.2), then the grow-in (§8).
+4. The list switch (Most searched + the 15 style lists), the period switch (1y | 5y | Max), the Chart | Table
+   switch with today's table behind Table (§9).
+5. Dark mode, reduced motion, phone layout (§5 phone, §6 phone ticks, §7.1 phone window).
+6. Docs in the same change: `docs/PRODUCT.md` (Famous funds row: chart, sort by return, table view), the
+   `docs/WORKLOG.md` entry, and this file's status line.
+
+Done when:
+- `cd web && npm test` and `npm run typecheck` pass; new helpers have tests; existing `web/tests/home.test.tsx`
+  still passes (update it where the default view changed).
+- `npx playwright test` smoke passes at 1280 and 400 px, light and dark; no horizontal page scroll at 400 px.
+- With demo data (`npm run dev`), and with production data (`VITE_DATA_URL=https://data.orcaetf.com`):
+  Most searched shows the same 50 funds as the Table view; the first window has the zero line at the plot's left
+  edge; scrolling to the bottom brings the losses in with zero moving right smoothly; the S&P line sits at the
+  computed SPY figure; Chart | Table round-trips; reduced motion removes the grow-in and the glide.
+- Owner has answered §11.1 and §11.2, or the PR says they are still open.
+
 ## Appendix A: sample data (Most searched, 5y to Q3 2026, as shown in the mock)
+A snapshot of the live file on 2026-11-20, for sizing and checking the design only. Membership now follows
+`famous_rank.csv` (seeded from the same Trends scores, so it matched on that day); always read the live data.
 Sorted best first. `name | manager | 5y return a year | AUM`. S&P 500 +12.2%.
 
 Duquesne Family Office | Stanley Druckenmiller | +30.3% | $3.6B

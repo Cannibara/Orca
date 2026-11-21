@@ -259,7 +259,6 @@ body{margin:0}
 <sc-for list="{{trows}}" as="r" hint-placeholder-count="10">
 <tr>
 <th scope="row" class="tl"><a href="#" class="fr" title="{{r.full}}"><sc-if value="{{r.hasPhoto}}" hint-placeholder-val="{{ true }}"><img class="tface" src="{{r.photo}}" alt=""></sc-if><sc-if value="{{r.noPhoto}}" hint-placeholder-val="{{ false }}"><span class="tface init" aria-hidden="true">{{r.initials}}</span></sc-if><span class="fn"><span class="tn">{{r.name}}</span><sc-if value="{{r.hasSub}}" hint-placeholder-val="{{ true }}"><span class="ts">{{r.sub}}</span></sc-if></span></a></th>
-<sc-if value="{{isMs}}" hint-placeholder-val="{{ true }}"><td>{{r.search}}</td></sc-if>
 <td>{{r.aumT}}</td><td>{{r.pos}}</td><td><span class="{{r.retCls}}">{{r.ret0}}</span></td><td>{{r.dd}}</td><td>{{r.sharpe}}</td>
 </tr>
 </sc-for>
@@ -599,7 +598,7 @@ class Component extends DCLogic {
       name: (a) => a[0].toLowerCase(), pop: (a) => -popRank.get(a), search: (a) => a[6], book: (a) => a[3],
       positions: (a) => a[7], ret: (a) => a[2], dd: (a) => a[8], sharpe: (a) => a[9]
     };
-    const sort = st.sort || (isMs ? { key: 'search', dir: -1 } : { key: 'pop', dir: -1 });
+    const sort = st.sort || { key: 'pop', dir: -1 }; // every list opens most popular first (main #55: no Search interest column)
     const tSorted = all.slice().sort((x, y) => {
       const a = keyFn[sort.key](x), b = keyFn[sort.key](y);
       if (a == null && b == null) return 0; if (a == null) return 1; if (b == null) return -1;
@@ -608,7 +607,6 @@ class Component extends DCLogic {
     const PAGE = 10, pages = Math.max(1, Math.ceil(n / PAGE));
     const page = Math.min(st.page || 0, pages - 1);
     const colDefs = [{ key: 'name', label: 'Fund', cls: 'tl' }]
-      .concat(isMs ? [{ key: 'search', label: 'Search interest' }] : [])
       .concat([{ key: 'book', label: 'AUM' }, { key: 'positions', label: 'Positions' }, { key: 'ret', label: 'Return / yr' }, { key: 'dd', label: 'Max Drawdown' }, { key: 'sharpe', label: 'Sharpe' }]);
     const nextSort = (k) => {
       if (k === 'name') return sort.key === 'name' && sort.dir === 1 ? { key: 'name', dir: -1 } : sort.key === 'name' ? { key: 'pop', dir: -1 } : { key: 'name', dir: 1 };
