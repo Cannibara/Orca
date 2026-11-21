@@ -367,8 +367,9 @@ plus the new `--zero`. Bars use the dark ramps in §6.
   (stub `requestAnimationFrame`, as `web/tests/idle.ts` does for idle callbacks).
 - Measure the plot width with `ResizeObserver` where available, falling back to the box's `clientWidth` on
   scroll (jsdom has none).
-- Playwright smoke (1280 / 400 px, light / dark): rows render, scrolling the box updates the caption, the zero
-  line stays at the left edge on the first window, no horizontal page scroll at 400 px.
+- Playwright smoke (1280 / 400 px, light / dark): rows render; with the fixture (§14 step 2), scrolling the box
+  updates the caption and the zero line stays at the left edge on the first window; no horizontal page scroll at
+  400 px.
 
 ## 14. Build checklist (in order) and done-when
 1. Read `CLAUDE.md`, this file, `pipeline/contract.md` (home files) and `web/src/pages/Home.tsx` (`FamousFunds`,
@@ -377,9 +378,12 @@ plus the new `--zero`. Bars use the dark ramps in §6.
 2. Pipeline first (§3.5): contract.md → `spx` in `home/top_{period}.json` → pipeline code + test →
    `cd pipeline && uv run pytest -m "not network"` → demo generator + regenerate demo data
    (`uv run python -m orca.run demo --plain --out ../web/public/demo-data`) → `web/src/data/types.ts`.
-   Also grow `DEMO_FAMOUS` in `pipeline/orca/demo.py` so the demo's Most searched has **more than 15 funds with
-   at least 5 losses** (today it has 5 funds and no losses), or the window never scrolls and the loss checks
-   below cannot run on demo data.
+   Leave the demo funds as they are (12 synthetic funds; Most searched there has fewer than 15 rows, so the
+   chart simply does not scroll in the demo — that is the "≤ VIS rows" path and must work).
+   For scrolling and losses, add a **test fixture**: `web/tests/fixtures/famous-top5y.json`, a copy of
+   production's `home/top_5y.json` trimmed to its `famous` rows plus top-level fields (`curl -s --compressed
+   https://data.orcaetf.com/home/top_5y.json`), with an `spx` object added by hand
+   (`{"ann_return": 0.135, "from_q": 34, "to_q": 54}`) until the pipeline publishes one.
 3. Pure helpers + vitest tests (§13): short names, manager line, `$X.XB`, shade ramp, window domains and
    Catmull-Rom domain, ticks (desktop/phone), lead line, period phrase, `SHORT_NAME` / `MANAGER_LINE` /
    `PHONE_SHORT` (Appendix B).
@@ -395,9 +399,13 @@ plus the new `--zero`. Bars use the dark ramps in §6.
 Done when:
 - `cd web && npm test` and `npm run typecheck` pass; new helpers have tests; existing `web/tests/home.test.tsx`
   still passes (update it where the default view changed).
-- `npx playwright test` smoke passes at 1280 and 400 px, light and dark; no horizontal page scroll at 400 px.
-- With demo data (`npm run dev`; after the demo growth in step 2), and with production data
-  (`VITE_DATA_URL=https://data.orcaetf.com`):
+- `npx playwright test` smoke passes at 1280 and 400 px, light and dark (demo data, plus the fixture-backed test
+  above); no horizontal page scroll at 400 px.
+- Vitest renders the chart from the fixture and checks: 50 rows in Most searched, the first window's zero at the
+  plot's left edge, the caption after scrolling the box, a loss row's label on the left of its bar. Playwright
+  serves the fixture for `home/top_5y.json` with `page.route` and checks the same at 1280 and 400 px.
+- With demo data (`npm run dev`): the short lists render without a scroll box. With production data
+  (`VITE_DATA_URL=https://data.orcaetf.com`, reachable from cloud sessions):
   Most searched shows the same 50 funds as the Table view; the first window has the zero line at the plot's left
   edge; scrolling to the bottom brings the losses in with zero moving right smoothly; the S&P line sits at the
   published `spx.ann_return` (before merge: checked by the pipeline test and on demo data; production has no
