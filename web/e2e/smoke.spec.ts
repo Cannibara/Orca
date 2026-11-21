@@ -275,3 +275,31 @@ for (const width of widths) {
     });
   });
 }
+
+// Ticks fading out of a wide scale are parked past the plot's ends; just under the page's 1232px max width
+// they once widened the page. Venture capital's returns are scaled up to a 1-year spread (about −160% to +95%)
+// so the scale shrinks a lot as the window scrolls.
+test.describe("Famous funds chart at 1240px, a wide scale", () => {
+  test.use({ viewport: { width: 1240, height: 900 } });
+
+  test("parked ticks never make the page scroll sideways", async ({ page }) => {
+    const wide = JSON.parse(FAMOUS_5Y) as { famous: { group: string; ann_return: number }[] };
+    for (const r of wide.famous) if (r.group === "Venture capital") r.ann_return *= 4;
+    await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(wide) }));
+    const errors = await open(page, "/");
+    await page.getByRole("button", { name: "5 years", exact: true }).click();
+    await page.getByRole("group", { name: "List" }).getByRole("button", { name: "Venture capital", exact: true }).click();
+    const win = page.locator("section.famous .fc.scrolls .fc-win");
+    await expect(win).toBeVisible();
+    for (const k of [0, 1, 2, 3, 4]) {
+      // two frames: the scroll is reported, then the scale is painted
+      const over = await win.evaluate(async (el, k) => {
+        el.scrollTop = ((el.scrollHeight - el.clientHeight) * k) / 4;
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        return document.documentElement.scrollWidth - document.documentElement.clientWidth;
+      }, k);
+      expect(over).toBeLessThanOrEqual(0);
+    }
+    expect(errors).toEqual([]);
+  });
+});
