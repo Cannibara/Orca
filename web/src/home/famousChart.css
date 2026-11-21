@@ -8,12 +8,12 @@
 .fp .famous .fam-head{display:flex;flex-direction:column;gap:6px;min-width:0}
 .fp .famous h2{font:700 30px/34px var(--f-sans);letter-spacing:-.03em}
 .fp .famous .fam-stand{font-size:15px;line-height:22px;color:var(--ink2);max-width:80ch;text-wrap:pretty}
-.fp .famous .fam-ctl{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;min-width:0}
-/* sixteen lists do not fit one row: the switch scrolls sideways in its own box (never wraps: Seg's thumb
-   measures offsetLeft along one row), with a thin scrollbar so a mouse can reach the last ones */
-.fp .famous .fam-lists{flex:1 1 360px;min-width:0;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;padding-bottom:2px}
-.fp .famous .fam-lists .seg{overflow:visible;max-width:none}
-.fp .famous .fam-opts{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%}
+/* the sixteen lists on their own rows (two or three, wrapped: owner, 2026-11-21), then the period on the
+   left and Chart | Table on the right, so nothing shares a row with the lists or overlaps them */
+.fp .famous .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0}
+.fp .famous .fam-lists{min-width:0}
+.fp .famous .fam-lists .seg{width:100%}
+.fp .famous .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}
 
 /* ---------- the module: rule, list name and count, lead line, chart or table, source ---------- */
 .fp .famous .fam-mod{display:flex;flex-direction:column;min-width:0;margin-top:10px}
@@ -107,12 +107,11 @@
 .fp .famous.phone h2{font-size:24px;line-height:28px}
 /* the phone has no standfirst (the axis says "Est. return a year"); it stays for screen readers */
 .fp .famous.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-/* one column, not wrapped: a wrapping column would stretch the list switch to its full scrolling width */
-.fp .famous.phone .fam-ctl{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}
-/* a phone swipes the switch sideways: no scrollbar under it (the desktop keeps a thin one for the mouse) */
-.fp .famous.phone .fam-lists{flex:none;scrollbar-width:none}
+/* a phone swipes the one-row list switch sideways (sixteen lists would wrap to six rows): no scrollbar under it */
+.fp .famous.phone .fam-lists{flex:none;overflow-x:auto;scrollbar-width:none}
+.fp .famous.phone .fam-lists .seg{width:auto;max-width:none;overflow:visible}
 .fp .famous.phone .fam-lists::-webkit-scrollbar{display:none}
-.fp .famous.phone .fam-opts{gap:8px}
+.fp .famous.phone .fam-opts{gap:8px;flex-wrap:nowrap}
 .fp .famous.phone .fam-opts>.seg:first-child{flex:1 1 auto;min-width:0}
 .fp .famous.phone .fam-opts>.seg:last-child{flex:none}
 /* 44px touch targets: 38px buttons in the 44px control */

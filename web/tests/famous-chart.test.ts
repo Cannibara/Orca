@@ -5,7 +5,6 @@ import {
   initials,
   leadLine,
   periodPhrase,
-  rawDomain,
   retLabel,
   rowLabel,
   shadeFor,
@@ -78,72 +77,74 @@ describe("shadeFor", () => {
   });
 });
 
-describe("rawDomain (7.3)", () => {
-  it("raises hi to a 20-point minimum span", () => {
-    expect(rawDomain([0.06], 0.12, 864, 50)).toEqual({ lo: 0, hi: 20 });
+// One window (a short list): the domain is the list's need, zero at the left edge.
+const one = (rets: number[], spx: number | null, innerW: number, room: number) => domainAt(windowDomains(rets, 15, spx, innerW, room), 0);
+
+describe("one window (7.3)", () => {
+  it("raises the span to a 20-point minimum", () => {
+    expect(one([0.06], 0.12, 864, 50)).toEqual({ lo: 0, hi: 20 });
   });
   it("keeps zero and the S&P line in view and drops the S&P term when null", () => {
-    expect(rawDomain([0.3, 0.1], null, 864, 50)).toEqual({ lo: 0, hi: 30 });
-    expect(rawDomain([0.05, 0.1], 0.25, 864, 50)).toEqual({ lo: 0, hi: 25 });
+    expect(one([0.3, 0.1], null, 864, 50)).toEqual({ lo: 0, hi: 30 });
+    expect(one([0.05, 0.1], 0.25, 864, 50)).toEqual({ lo: 0, hi: 25 });
   });
   it("pushes the low end out for the label room when there are losses", () => {
-    const d = rawDomain([-0.1, -0.3], 0.12, 864, 50);
-    expect(d.hi).toBe(12);
+    const d = one([-0.1, -0.3], 0.12, 864, 50);
+    expect(d.hi).toBeCloseTo(12, 9);
     expect(d.lo).toBeCloseTo(-30 - (50 * 42) / 814, 6);
   });
-  it("keeps the full label room on a phone's narrow plot (the spec's formula, no 200px floor)", () => {
-    // phone: inner plot 138px, ROOM 48. lo -22.6, hi = the S&P's +13.5 (36.1 pts wide, over the 20 minimum),
-    // then room 48 * 36.1 / (138 - 48) = 19.2533…, so lo = -41.8533…
-    // (a 200px floor would give 48 * 36.1 / 200 = 8.664 and lo -31.264: half the room a loss label needs)
-    const d = rawDomain([-0.226, 0.1], 0.135, 138, 48);
+  it("keeps the full label room on a phone's narrow plot", () => {
+    // phone: inner plot 130px, ROOM 48. Need −22.6 … +13.5 (the S&P) = 36.1 pts, then room 48 · 36.1 / (130 − 48)
+    const d = one([-0.226, 0.1], 0.135, 130, 48);
     expect(d.hi).toBeCloseTo(13.5, 6);
-    expect(d.lo).toBeCloseTo(-22.6 - (48 * 36.1) / 90, 6);
+    expect(d.lo).toBeCloseTo(-22.6 - (48 * 36.1) / 82, 6);
   });
   it("uses at least 80px as the plot width denominator, so a tiny or unmeasured width cannot blow up", () => {
-    const d = rawDomain([-0.1], 0.0, 100, 50);
-    // lo -10, hi raised to +10 (20 pts wide), then room 50 * 20 / max(80, 100 - 50) = 12.5
+    // need −10 … 0, raised to 20 pts wide; room 50 · 20 / max(80, 100 − 50) = 12.5
+    const d = one([-0.1], 0.0, 100, 50);
     expect(d.lo).toBeCloseTo(-22.5, 6);
-    expect(d.hi).toBe(10);
+    expect(d.hi).toBeCloseTo(10, 6);
   });
 });
 
 // 50 returns, best first, from +30% down to -25%, like the 5y Most searched list.
 const RETS = Array.from({ length: 50 }, (_, i) => 0.3 - (i * 0.55) / 49);
 
-describe("windowDomains / domainAt", () => {
+describe("windowDomains / domainAt: one scale for the whole list (7.3)", () => {
   const track = windowDomains(RETS, 15, 0.12, 864, 50);
 
   it("has one window per start row", () => {
-    expect(track.raw).toHaveLength(36);
     expect(track.smooth).toHaveLength(36);
-    expect(windowDomains([0.1, 0.2], 15, null, 800, 50).raw).toHaveLength(1);
+    expect(windowDomains([0.1, 0.2], 15, null, 800, 50).smooth).toHaveLength(1);
   });
-  it("starts at zero with no loss in view and ends below zero", () => {
-    expect(track.raw[0].lo).toBe(0);
-    expect(track.smooth[0].lo).toBe(0);
-    expect(track.raw[35].lo).toBeLessThan(0);
-    expect(track.smooth[35].lo).toBeLessThan(0);
+  it("spans the widest window plus the loss-label room", () => {
+    // widest need: the last window, rows 36–50 = −25 … +12 (the S&P) = 37 pts; room 50 · 37 / (864 − 50)
+    expect(track.span).toBeCloseTo(37 + (50 * 37) / 814, 9);
   });
-  it("smooth is never narrower than raw", () => {
-    track.raw.forEach((r, k) => {
-      expect(track.smooth[k].lo).toBeLessThanOrEqual(r.lo + 1e-9);
-      expect(track.smooth[k].hi).toBeGreaterThanOrEqual(r.hi - 1e-9);
-    });
+  it("never changes the scale while scrolling: a bar for a given return keeps its length", () => {
+    for (let p = 0; p <= 35; p += 0.05) {
+      const d = domainAt(track, p);
+      expect(d.hi - d.lo).toBeCloseTo(track.span, 9);
+    }
+  });
+  it("starts with zero at the left edge and slides to show the losses at the end", () => {
+    expect(domainAt(track, 0).lo).toBe(0);
+    expect(domainAt(track, 35).lo).toBeCloseTo(-25 - (50 * 37) / 814, 9);
   });
   it("is continuous in p", () => {
     for (let p = 0; p < 34.99; p += 0.01) {
       const a = domainAt(track, p);
       const b = domainAt(track, p + 0.01);
       expect(Math.abs(a.lo - b.lo)).toBeLessThan(0.6);
-      expect(Math.abs(a.hi - b.hi)).toBeLessThan(0.6);
     }
   });
-  it("always covers the rows that stay in view, and clamps p", () => {
+  it("always fits the rows that stay in view, with their loss labels, and clamps p", () => {
+    const labelRoom = (50 * 37) / 814;
     for (let p = 0; p <= 35; p += 0.05) {
       const d = domainAt(track, p);
       const k = Math.min(35, Math.floor(p));
       for (const r of RETS.slice(k + 1, k + 15)) {
-        expect(r * 100).toBeGreaterThanOrEqual(d.lo - 1e-9);
+        expect(r * 100 - (r < 0 ? labelRoom : 0)).toBeGreaterThanOrEqual(d.lo - 1e-9);
         expect(r * 100).toBeLessThanOrEqual(d.hi + 1e-9);
       }
       expect(d.lo).toBeLessThanOrEqual(0);
@@ -152,9 +153,18 @@ describe("windowDomains / domainAt", () => {
     expect(domainAt(track, -3)).toEqual(domainAt(track, 0));
     expect(domainAt(track, 99)).toEqual(domainAt(track, 35));
   });
-  it("is exactly the smooth domain (or wider) at a whole row", () => {
-    expect(domainAt(track, 0).lo).toBeCloseTo(track.smooth[0].lo, 9);
-    expect(domainAt(track, 10).hi).toBeGreaterThanOrEqual(track.raw[10].hi - 1e-9);
+  it("the label room is paid only by windows with a loss: a wider gain-only top window fills the plot", () => {
+    // 3y Most searched in short: a +53.2% leader, losses to −23.6% at the end, the S&P at +22.7
+    const rets = [0.532, ...Array.from({ length: 28 }, (_, i) => 0.3 - i * 0.01), -0.05, -0.1, -0.236];
+    const t = windowDomains(rets, 20, 0.227, 864, 50);
+    // top window 0 … 53.2 (no loss); last window −23.6 … +22.7 = 46.3 pts, × (1 + 50/814) = 49.1 < 53.2
+    expect(t.span).toBeCloseTo(53.2, 9);
+    expect(domainAt(t, 0)).toEqual({ lo: 0, hi: t.span });
+  });
+  it("a list with no loss never slides: zero stays at the left edge", () => {
+    const gains = Array.from({ length: 40 }, (_, i) => 0.5 - i * 0.01);
+    const t = windowDomains(gains, 15, 0.12, 864, 50);
+    for (let p = 0; p <= 25; p += 0.5) expect(domainAt(t, p)).toEqual({ lo: 0, hi: 50 });
   });
 });
 
@@ -245,7 +255,7 @@ describe("copy", () => {
   });
 
   it("captionText", () => {
-    expect(captionText(1, 15, 50, true)).toBe("Showing 1–15 of 50 · scale fits the funds in view");
+    expect(captionText(1, 15, 50, true)).toBe("Showing 1–15 of 50 · one scale for the whole list");
     expect(captionText(1, 12, 12, false)).toBe("Showing all 12 funds");
     expect(captionText(1, 1, 1, false)).toBe("Showing 1 fund");
   });

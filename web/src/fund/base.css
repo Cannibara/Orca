@@ -63,6 +63,9 @@
 .fp .seg button[aria-pressed="true"],.fp .seg button[aria-selected="true"]{color:var(--ink)}
 .fp .seg button:disabled{opacity:.45;cursor:not-allowed}
 .fp .seg .thumb{position:absolute;z-index:0;left:2px;top:2px;bottom:2px;width:var(--w,60px);transform:translateX(var(--x,0px));background:var(--surface);border-radius:4px;box-shadow:0 0 0 1px var(--line2)}
+/* many options on several rows: the thumb is placed by the pressed button's offset in both directions */
+.fp .seg.wrap{display:flex;flex-wrap:wrap;row-gap:2px}
+.fp .seg.wrap .thumb{left:0;top:0;bottom:auto;height:var(--h,26px);transform:translate(var(--x0,2px),var(--y0,2px))}
 
 /* tag */
 .fp .tag{height:20px;padding:0 6px;border-radius:var(--r-1);border:1px solid var(--line);background:var(--sunken);color:var(--ink2);font:500 11px/1 var(--f-sans);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}

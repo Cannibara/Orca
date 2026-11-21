@@ -274,7 +274,7 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
-    test("the pressed list stays in view in the sideways list switch", async ({ page }) => {
+    test("the list switch: every list reachable, the pressed one in view, never overlapping the period", async ({ page }) => {
       await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
       const errors = await open(page, "/");
       await page.getByRole("button", { name: "5 years", exact: true }).click();
@@ -286,9 +286,35 @@ for (const width of widths) {
           const s = el.getBoundingClientRect();
           return b.left >= s.left - 1 && b.right <= s.right + 1;
         });
-      // a thin scrollbar for a mouse on a desktop, none under a phone's swipe
-      expect(await box.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe(width < 560 ? "none" : "thin");
+      // the lists sit above the period and Chart | Table, never beside or under them
+      const listBottom = await lists.evaluate((el) => el.getBoundingClientRect().bottom);
+      const periodTop = await page.getByRole("group", { name: "Period" }).evaluate((el) => el.getBoundingClientRect().top);
+      expect(periodTop).toBeGreaterThanOrEqual(listBottom);
 
+      if (width >= 560) {
+        // a desktop wraps the lists onto two or three rows: nothing scrolls sideways, every list in view
+        expect(await box.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+        const tops = await lists.evaluate((el) => [...el.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().top)));
+        expect(new Set(tops).size).toBeGreaterThanOrEqual(2);
+        expect(new Set(tops).size).toBeLessThanOrEqual(3);
+        // the thumb follows the pressed list down to its row
+        await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
+        await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
+        await expect
+          .poll(() =>
+            lists.evaluate((el) => {
+              const t = el.querySelector(".thumb")!.getBoundingClientRect();
+              const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+              return Math.max(Math.abs(t.left - b.left), Math.abs(t.top - b.top), Math.abs(t.width - b.width));
+            }),
+          )
+          .toBeLessThanOrEqual(1);
+        expect(errors).toEqual([]);
+        return;
+      }
+
+      // a phone swipes one row sideways, with no scrollbar under it
+      expect(await box.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("none");
       // the last list, then another tab and back: the switch is drawn afresh, scrolled to the pressed list
       await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
       await page.getByRole("tab", { name: "Top funds" }).click();
@@ -308,18 +334,18 @@ for (const width of widths) {
 }
 
 // Ticks fading out of a wide scale are parked past the plot's ends; just under the page's 1232px max width
-// they once widened the page. Venture capital's returns are scaled up to a 1-year spread (about −160% to +95%)
-// so the scale shrinks a lot as the window scrolls.
+// they once widened the page. Fundamental long/short (40 funds, more than a window) has its returns scaled up
+// to a wide spread, so the axis slides a long way as the window scrolls.
 test.describe("Famous funds chart at 1240px, a wide scale", () => {
   test.use({ viewport: { width: 1240, height: 900 } });
 
   test("parked ticks never make the page scroll sideways", async ({ page }) => {
     const wide = JSON.parse(FAMOUS_5Y) as { famous: { group: string; ann_return: number }[] };
-    for (const r of wide.famous) if (r.group === "Venture capital") r.ann_return *= 4;
+    for (const r of wide.famous) if (r.group === "Fundamental long/short") r.ann_return *= 4;
     await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(wide) }));
     const errors = await open(page, "/");
     await page.getByRole("button", { name: "5 years", exact: true }).click();
-    await page.getByRole("group", { name: "List" }).getByRole("button", { name: "Venture capital", exact: true }).click();
+    await page.getByRole("group", { name: "List" }).getByRole("button", { name: "Fundamental long/short", exact: true }).click();
     const win = page.locator("section.famous .fc.scrolls .fc-win");
     await expect(win).toBeVisible();
     for (const k of [0, 1, 2, 3, 4]) {

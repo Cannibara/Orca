@@ -1,6 +1,7 @@
 // The home page's Famous funds chart (spec docs/superpowers/specs/2026-11-20-home-famous-chart-design.md, 5-8):
-// one row per fund, best return first, bars from a zero line, the S&P 500 as a dotted line, and a 15-row
-// (phone 10) scrolling window whose scale fits the funds in view and glides with the scroll.
+// one row per fund, best return first, bars from a zero line, the S&P 500 as a dotted line, and a 20-row
+// (phone 10) scrolling window. The scale is one for the whole list (a bar's length never changes as you
+// scroll); the axis slides with the scroll to keep the funds in view.
 // HTML rows rather than SVG: each row is a link to the fund, and the bars are placed in % of the plot.
 //
 // Speed: the scale moves on every frame of a scroll, so React renders only when the whole-row position
@@ -47,7 +48,7 @@ export const bestFirst = (a: TopRow, b: TopRow): number => b.ann_return - a.ann_
 
 /** The layout of each mode: rows in the window, row height, the plot's right inset (room for the end label),
  * the label room kept left of a loss (7.3), Page Up/Down rows, the fixed columns before the plot, the label gap. */
-const DESKTOP = { vis: 15, row: 46, inset: 56, room: 50, page: 14, cols: 32 + 14 + 252 + 14, gap: 6 };
+const DESKTOP = { vis: 20, row: 46, inset: 56, room: 50, page: 19, cols: 32 + 14 + 252 + 14, gap: 6 };
 const PHONE = { vis: 10, row: 48, inset: 58, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
 type Mode = typeof DESKTOP;
 /** ms the grow-in takes at most (8): the last row starts at 450ms and its label fades in 450ms after that over
@@ -335,9 +336,8 @@ export function FamousChart({
   );
   // Every tick value the scale can show, each kept as one element so it fades in and out instead of popping.
   const candidates = useMemo(() => {
-    const ends = [...track.raw, ...track.smooth];
-    const lo = Math.min(...ends.map((d) => d.lo)) - 10;
-    const hi = Math.max(...ends.map((d) => d.hi)) + 10;
+    const lo = Math.min(...track.floor) - 10;
+    const hi = Math.max(...track.top) + track.span + 10;
     const out: number[] = [];
     for (let t = Math.ceil(lo / 5) * 5; t <= hi; t += 5) out.push(t + 0);
     return out;
