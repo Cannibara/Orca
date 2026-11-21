@@ -159,9 +159,9 @@ describe("windowDomains / domainAt", () => {
 });
 
 describe("ticksFor (6)", () => {
-  // the plot's inner width: desktop at 1280 (1184 − 266 columns − 56 inset), a 400px phone (352 − 164 − 50)
+  // the plot's inner width: desktop at 1280 (1184 − 266 columns − 56 inset), a 400px phone (352 − 164 − 58)
   const DESK = 864;
-  const PH = 138;
+  const PH = 130;
   it("desktop: step by span, margin keeps the end ticks off the edge", () => {
     expect(ticksFor({ lo: 0, hi: 30 }, false, DESK)).toEqual([0, 10, 20]);
     expect(ticksFor({ lo: 0, hi: 20 }, false, DESK)).toEqual([0, 5, 10, 15]);
@@ -172,8 +172,10 @@ describe("ticksFor (6)", () => {
     expect(ticksFor({ lo: 0, hi: 30 }, true, PH)).toEqual([0, 20]);
     expect(ticksFor({ lo: 0, hi: 22 }, true, PH)).toEqual([0, 10, 20]);
   });
-  it("raises the step until labels sit at least 56px apart", () => {
-    expect(ticksFor({ lo: -62, hi: 14 }, true, PH)).toEqual([-40, 0]); // 20 would be 36px apart
+  it("raises the step until labels sit at least 48px apart", () => {
+    expect(ticksFor({ lo: -62, hi: 14 }, true, PH)).toEqual([-40, 0]); // 20 would be 34px apart
+    // a 50-pt phone span keeps step 20 (52px apart), so a number still sits beside 0%
+    expect(ticksFor({ lo: -30, hi: 20 }, true, PH)).toEqual([-20, 0]);
     expect(ticksFor({ lo: -62, hi: 14 }, false, DESK)).toEqual([-60, -40, -20, 0]); // desktop keeps 20
     expect(tickStep(76, true, PH)).toBe(40);
     expect(tickStep(30, false, DESK)).toBe(10);
@@ -190,7 +192,7 @@ describe("ticksFor (6)", () => {
       expect(t).toContain(0);
       expect(t.length).toBeGreaterThan(1);
       const px = t.map((v) => ((v - dom.lo) / (dom.hi - dom.lo)) * w);
-      px.slice(1).forEach((x, i) => expect(x - px[i]).toBeGreaterThanOrEqual(56));
+      px.slice(1).forEach((x, i) => expect(x - px[i]).toBeGreaterThanOrEqual(48));
     }
     expect(ticksFor(dom, true, PH)).toEqual([0, 200]);
     expect(ticksFor(dom, false, 500)).toEqual([0, 40, 80, 120, 160, 200, 240, 280]);

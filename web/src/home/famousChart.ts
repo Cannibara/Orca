@@ -91,7 +91,7 @@ export function domainAt(track: Track, p: number): Dom {
 /** Steps a tick may take, smallest first. */
 const STEPS = [5, 10, 20, 40, 50, 100, 200, 500];
 /** px: the least room between two tick labels ("+300%" is about 30px wide at 11px; this keeps a clear gap). */
-const TICK_GAP = 56;
+const TICK_GAP = 48; // the widest label ("+200%") is ~34px: 48 leaves a clear gap and still keeps a number beside 0% on a phone
 
 /** The tick step: the spec's by span (desktop 5/10/20, phone 10/20), raised until labels sit TICK_GAP px apart. */
 export function tickStep(span: number, phone: boolean, innerW: number): number {

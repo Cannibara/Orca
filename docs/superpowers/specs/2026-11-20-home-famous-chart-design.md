@@ -209,7 +209,7 @@ in view (owner: "start the axis even more on the left").
   for the first two visible rows place it below so the scroll box does not clip it.
 
 ### Phone (row 48px)
-Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **50px** (so the leader pill fits).
+Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **58px** (so the leader pill fits, up to "+313.3%"; built value, was 50px).
 Name block **left of the bar** (owner: not above it): line 1 name (12.5/16px 600, −0.005em, ellipsis);
 line 2 "AUM · manager" (11/14px `--ink3`: AUM, 3px dot, manager with ellipsis). Bar 14px, 2px tip radius.
 Label 11.5px 600. Leader pill 20px tall, 3px radius.
@@ -232,7 +232,7 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
   margin (desktop ≥ 1 pt from the low end and ≥ 0.5 pt from the high end; phone ≥ 2 pts and ≥ 1 pt). Desktop step: 5 if span < 25 pts, 10 if span ≤ 60,
   else 20. **Phone: few labels** (owner): step 10 if span ≤ 25, else 20, so 0% plus one or two numbers.
   Then (build, review fix: labels overlapped on narrow plots and very wide scales) the step is raised to the
-  smallest of 5, 10, 20, 40, 50, 100, 200, 500 that puts labels ≥ 56px apart on the measured plot width.
+  smallest of 5, 10, 20, 40, 50, 100, 200, 500 that puts labels ≥ 48px apart on the measured plot width.
   On a phone the axis's left column reads "Est. return a year" (the standfirst is hidden there).
   Ticks that turn on/off fade over 200ms; their positions follow the scale every frame (no transition on `left`).
 - AUM-inside-the-bar (white text) was tried as an alternative and is a Tweak only; default is AUM next to the name.

@@ -48,7 +48,7 @@ export const bestFirst = (a: TopRow, b: TopRow): number => b.ann_return - a.ann_
 /** The layout of each mode: rows in the window, row height, the plot's right inset (room for the end label),
  * the label room kept left of a loss (7.3), Page Up/Down rows, the fixed columns before the plot, the label gap. */
 const DESKTOP = { vis: 15, row: 46, inset: 56, room: 50, page: 14, cols: 32 + 14 + 252 + 14, gap: 6 };
-const PHONE = { vis: 10, row: 48, inset: 50, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
+const PHONE = { vis: 10, row: 48, inset: 58, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
 type Mode = typeof DESKTOP;
 /** ms the grow-in takes at most (8): the last row starts at 450ms and its label fades in 450ms after that over
  * 300ms, so 1200ms, plus a margin. After it the animations are taken off, which makes each frame's restyle cheaper. */
@@ -221,7 +221,7 @@ type Scene = {
 
 /** Rows painted on each side of the window while scrolling: a fast fling or the compositor's own scroll can
  * bring a row or two into view before the next frame's paint. */
-const NEAR = 3;
+const NEAR = 6;
 
 /**
  * Places everything that follows the scale at fractional row position p. With `all` every row is placed;
