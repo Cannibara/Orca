@@ -26,6 +26,17 @@ export const SHORT_NAME: Record<number, string> = {
   1018724: "Amazon", // AMAZON COM INC
   1055951: "OrbiMed", // ORBIMED ADVISORS LLC
   1745981: "WorldQuant Millennium", // WORLDQUANT MILLENNIUM ADVISORS LLC
+  // Venture filers named by their legal vehicle: the brand plus the fund's vintage.
+  1716997: "IVP XVI", // INSTITUTIONAL VENTURE MANAGEMENT XVI, LLC
+  1640275: "IVP XV", // INSTITUTIONAL VENTURE MANAGEMENT XV, LLC
+  1550304: "IVP XIV", // Institutional Venture Management XIV, LLC
+  1493921: "IVP XIII", // Institutional Venture Management XIII, LLC
+  1626282: "TCV VIII", // Technology Crossover Management VIII, Ltd.
+  1977402: "TCV XI", // Technology Crossover Management XI, Ltd.
+  1500599: "Kleiner Perkins XII", // KPCB XII Associates, LLC
+  1546196: "Kleiner Perkins XIV", // KPCB XIV Associates, LLC
+  1471126: "Sequoia Growth", // SCGF GENPAR LTD (Sequoia Capital Growth Fund)
+  1463559: "AIMCo", // Alberta Investment Management Corp
   // Two filers of one brand in the same list: keep the brand plus what tells them apart.
   1600213: "Spark Capital II", // Spark Management Partners II, LLC
   1640445: "Spark Capital III", // Spark Management Partners III (AIV I), LLC
@@ -44,6 +55,47 @@ export const PHONE_SHORT: Record<string, string> = {
   "Duquesne Family Office": "Duquesne",
   "Pershing Square Capital": "Pershing Square",
   "Renaissance Technologies": "Renaissance",
+  "Alaska Permanent Fund": "Alaska Fund",
+  "Arizona State Retirement System": "Arizona ASRS",
+  "Caisse de depot et placement du Quebec": "CDPQ",
+  "California Public Employees Retirement System": "CalPERS",
+  "California State Teachers Retirement System": "CalSTRS",
+  "Canada Pension Plan Investment Board": "CPP Investments",
+  "Darsana Capital Partners": "Darsana",
+  "Durable Capital Partners": "Durable",
+  "Employees Provident Fund Board": "Malaysia EPF",
+  "Engineers Gate Manager": "Engineers Gate",
+  "Greenwoods Hong Kong": "Greenwoods HK",
+  "Hardman Johnston Global": "Hardman Johnston",
+  "Healthcare of Ontario Pension Plan Trust Fund": "HOOPP",
+  "Hengistbury Investment Partners": "Hengistbury",
+  "Investment Management Corp of Ontario": "IMCO",
+  "Kayne Anderson Rudnick": "Kayne Anderson",
+  "Lighthouse Investment Partners": "Lighthouse",
+  "Lightspeed Opportunity Fund": "Lightspeed Opp.",
+  "National Pension Service": "Korea NPS",
+  "New York State Common Retirement Fund": "NY State Common",
+  "New York State Teachers Retirement System": "NY State Teachers",
+  "Norwest Venture Partners XIII": "Norwest XIII",
+  "Ontario Teachers Pension Plan Board": "Ontario Teachers",
+  "Oregon Public Employees Retirement Fund": "Oregon PERF",
+  "Pantera Capital Partners": "Pantera",
+  "Perseverance Asset Management International": "Perseverance",
+  "Public Employees Retirement System of Ohio": "Ohio OPERS",
+  "Public Investment Fund": "Saudi PIF",
+  "Public Sector Pension Investment Board": "PSP Investments",
+  "Regeneron Pharmaceuticals": "Regeneron",
+  "Ruane, Cunniff & Goldfarb": "Ruane Cunniff",
+  "Sequoia Global Equities": "Sequoia Global",
+  "Spark Growth Management Partners": "Spark Growth",
+  "State Board of Administration of Florida Retirement System": "Florida SBA",
+  "State of Michigan Retirement System": "Michigan Retirement",
+  "State of New Jersey Common Pension Fund D": "NJ Pension Fund D",
+  "State of Wisconsin Investment Board": "Wisconsin SWIB",
+  "Teacher Retirement System of Texas": "Texas Teachers",
+  "Treasurer of the State of North Carolina": "North Carolina",
+  "Virginia Retirement Systems": "Virginia Retirement",
+  "WorldQuant Millennium": "WorldQuant",
 };
 
 /**

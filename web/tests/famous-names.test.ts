@@ -45,6 +45,9 @@ describe("fundShortName (spec 3.3 rules 1-5)", () => {
     expect(fundShortName("ICONIQ Capital, LLC")).toBe("ICONIQ Capital");
     expect(fundShortName("Management Inc")).not.toBe("");
     expect(fundShortName("LLC")).toBe("LLC");
+    expect(fundShortName("/DE")).not.toBe("");
+    expect(fundShortName("LLC, LLC")).not.toBe("");
+    expect(fundShortName("L L C")).not.toBe("");
     expect(fundShortName("")).toBe("");
   });
 
@@ -83,13 +86,21 @@ describe("SHORT_NAME (3.3.6 hand cases, by fund_id)", () => {
   });
 });
 
+describe("SHORT_NAME venture vehicles", () => {
+  it("shows the brand and vintage, not the legal vehicle", () => {
+    expect(shortNameOf(1716997, "INSTITUTIONAL VENTURE MANAGEMENT XVI, LLC")).toBe("IVP XVI");
+    expect(shortNameOf(1626282, "Technology Crossover Management VIII, Ltd.")).toBe("TCV VIII");
+  });
+});
+
 describe("PHONE_SHORT (3.3.7)", () => {
-  it("shortens the three long names on a phone only", () => {
-    expect(PHONE_SHORT).toEqual({
+  it("shortens long names on a phone only, and every phone name is shorter than its key", () => {
+    expect(PHONE_SHORT).toMatchObject({
       "Duquesne Family Office": "Duquesne",
       "Pershing Square Capital": "Pershing Square",
       "Renaissance Technologies": "Renaissance",
     });
+    for (const [k, v] of Object.entries(PHONE_SHORT)) expect(v.length).toBeLessThan(k.length);
     expect(phoneNameOf("Duquesne Family Office")).toBe("Duquesne");
     expect(phoneNameOf("Pershing Square Capital")).toBe("Pershing Square");
     expect(phoneNameOf("Renaissance Technologies")).toBe("Renaissance");

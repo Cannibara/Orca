@@ -180,6 +180,8 @@ export function fundShortName(name: string): string {
     .replace(/\s+Hong Kong(\s+(?:Ltd|Limited)\.?)?$/i, "$1")
     .replace(/\s*\/\s*\S{4,}.*$/, "") // "FJARDE AP-FONDEN /FOURTH SWEDISH …": the translation after the slash
     .replace(/\s*\/\s*[A-Za-z]{0,3}\s*\/?$/, ""); // "/DE", "/NY/", "LTD/ CAN", "CORP/"
+  const whole = name.trim().replace(/\s+/g, " ");
+  if (s === "") return whole; // everything was a tag: keep the name rather than show nothing (spec 3.3 rule 5)
   let lastTail = "";
   for (;;) {
     s = s.replace(/[\s,;]+$/, "");
@@ -203,5 +205,6 @@ export function fundShortName(name: string): string {
     else break;
     lastTail = key;
   }
-  return /[a-z]/.test(s) ? s : shortCase(s);
+  s = /[a-z]/.test(s) ? s : shortCase(s);
+  return s === "" ? whole : s;
 }

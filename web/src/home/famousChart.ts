@@ -90,7 +90,7 @@ export function domainAt(track: Track, p: number): Dom {
 /** Axis tick values (points): 0 always, other multiples of the step that sit inside the domain with a margin. */
 export function ticksFor(dom: Dom, phone: boolean): number[] {
   const span = dom.hi - dom.lo;
-  const step = phone ? (span <= 25 ? 10 : 20) : span < 25 ? 5 : span <= 60 ? 10 : 20;
+  const step = phone ? (span <= 25 ? 10 : span <= 60 ? 20 : 40) : span < 25 ? 5 : span <= 60 ? 10 : 20;
   const mLo = phone ? 2 : 1;
   const mHi = phone ? 1 : 0.5;
   const out = new Set<number>([0]);

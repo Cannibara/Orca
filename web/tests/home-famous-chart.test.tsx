@@ -193,6 +193,15 @@ describe("Famous funds chart", () => {
     expect(screen.getByText("Estimated return a year over the last 5 years, best first.")).toBeInTheDocument();
     expect(screen.getByText("Source: SEC 13F filings; Orca estimates.")).toBeInTheDocument();
     expect(screen.queryByText(/beat the S&P 500/)).toBeNull();
+  });
+
+  it("has no 'vs S&P 500' row in the tooltip when the file has no S&P figure", async () => {
+    const { spx: _, ...noSpx } = FIXTURE;
+    const user = await openFixture(noSpx as TopList);
+    await user.hover(chartRows()[2]);
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("Return a year");
+    expect(tip).not.toHaveTextContent("vs S&P 500");
     expect(chartRows()[0].getAttribute("aria-label")).not.toMatch(/S&P/);
   });
 

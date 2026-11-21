@@ -150,6 +150,10 @@ describe("ticksFor (6)", () => {
     expect(ticksFor({ lo: 0, hi: 30 }, true)).toEqual([0, 20]);
     expect(ticksFor({ lo: 0, hi: 22 }, true)).toEqual([0, 10, 20]);
   });
+  it("phone: a wide range steps by 40 so only 0 and one or two numbers show (spec 6)", () => {
+    expect(ticksFor({ lo: -62, hi: 14 }, true)).toEqual([-40, 0]);
+    expect(ticksFor({ lo: -62, hi: 14 }, false)).toEqual(expect.arrayContaining([-60, -40, 0])); // desktop unchanged
+  });
   it("is ascending, always includes 0, and has no negative zero", () => {
     const t = ticksFor({ lo: -40, hi: 3 }, false);
     expect(t).toContain(0);
