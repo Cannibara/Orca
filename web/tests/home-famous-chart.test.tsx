@@ -10,7 +10,7 @@ import { clearDataCache } from "../src/data/api";
 import type { TopList, TopRow } from "../src/data/types";
 import { aumLabel, retLabel, vsLabel } from "../src/home/famousChart";
 import { useEasedScroll } from "../src/home/useEasedScroll";
-import { shortNameOf } from "../src/lib/famousNames";
+import { phoneNameOf, shortNameOf } from "../src/lib/famousNames";
 import Home from "../src/pages/Home";
 
 // The Famous funds chart on production-shaped data: tests/fixtures/famous-top5y.json is production's
@@ -321,6 +321,33 @@ describe("Famous funds chart", () => {
     expect(tip).toHaveTextContent(`AUM${aumLabel(want[2].book)}`);
     await user.unhover(chartRows()[2]);
     expect(screen.getByRole("tooltip", { hidden: true })).not.toBeVisible();
+  });
+
+  it("on a phone: each row's spoken label holds the shorter name it shows, and the axis says 'Est.'", async () => {
+    // jsdom lays nothing out: give every element a phone's width so the chart measures one
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 400 });
+    try {
+      stubData({ "home/top_5y.json": FIXTURE });
+      const user = userEvent.setup();
+      renderHome();
+      await screen.findByRole("heading", { level: 3, name: "Most searched" });
+      await user.click(screen.getByRole("button", { name: "5 years" }));
+      await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
+      expect(document.querySelector(".fc")).toHaveClass("phone");
+      expect(document.querySelector(".fc-axl")).toHaveTextContent("Est. return a year");
+      const want = mostSearched(famous).sort(bestFirst);
+      let shorter = 0;
+      chartRows().forEach((row, i) => {
+        const short = shortNameOf(want[i].fund_id, want[i].name);
+        const shown = phoneNameOf(short);
+        if (shown !== short) shorter++;
+        expect(row.querySelector(".nm")).toHaveTextContent(shown);
+        expect(row.getAttribute("aria-label")).toMatch(new RegExp(`^${i + 1} of 50\\. ${esc(shown)}[,:]`));
+      });
+      expect(shorter).toBeGreaterThan(0); // Duquesne Family Office, shown as Duquesne
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
   });
 
   it("the chart works on the demo's short lists, without a scroll window", async () => {

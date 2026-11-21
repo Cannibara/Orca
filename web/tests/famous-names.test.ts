@@ -106,6 +106,11 @@ describe("PHONE_SHORT (3.3.7)", () => {
     expect(phoneNameOf("Renaissance Technologies")).toBe("Renaissance");
     expect(phoneNameOf("Bridgewater")).toBe("Bridgewater");
   });
+
+  it("keeps phone names readable as funds: the brand, or a state with what kind of fund it is", () => {
+    expect(phoneNameOf("Lightspeed Opportunity Fund")).toBe("Lightspeed");
+    expect(phoneNameOf("Treasurer of the State of North Carolina")).toBe("N. Carolina pension");
+  });
 });
 
 describe("managerLine (3.4, Appendix B)", () => {

@@ -72,7 +72,7 @@ export const PHONE_SHORT: Record<string, string> = {
   "Investment Management Corp of Ontario": "IMCO",
   "Kayne Anderson Rudnick": "Kayne Anderson",
   "Lighthouse Investment Partners": "Lighthouse",
-  "Lightspeed Opportunity Fund": "Lightspeed Opp.",
+  "Lightspeed Opportunity Fund": "Lightspeed",
   "National Pension Service": "Korea NPS",
   "New York State Common Retirement Fund": "NY State Common",
   "New York State Teachers Retirement System": "NY State Teachers",
@@ -93,7 +93,7 @@ export const PHONE_SHORT: Record<string, string> = {
   "State of New Jersey Common Pension Fund D": "NJ Pension Fund D",
   "State of Wisconsin Investment Board": "Wisconsin SWIB",
   "Teacher Retirement System of Texas": "Texas Teachers",
-  "Treasurer of the State of North Carolina": "North Carolina",
+  "Treasurer of the State of North Carolina": "N. Carolina pension", // the state alone does not read as a fund
   "Virginia Retirement Systems": "Virginia Retirement",
   "WorldQuant Millennium": "WorldQuant",
 };

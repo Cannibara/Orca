@@ -21,6 +21,7 @@ describe("labels", () => {
   it("aumLabel prints billions to one decimal", () => {
     expect(aumLabel(304.2e9)).toBe("$304.2B");
     expect(aumLabel(0.3e9)).toBe("$0.3B");
+    expect(aumLabel(0.05e9)).toBe("$0.1B");
     expect(aumLabel(null)).toBe("—");
     expect(aumLabel(undefined)).toBe("—");
   });
@@ -33,11 +34,28 @@ describe("labels", () => {
     expect(vsLabel(-0.05, 0.1)).toBe("−15.0 pts");
   });
 
+  it("aumLabel says '<$0.1B' below $0.05B, not '$0.0B'", () => {
+    expect(aumLabel(0.049e9)).toBe("<$0.1B");
+    expect(aumLabel(12e6)).toBe("<$0.1B");
+    expect(aumLabel(0)).toBe("<$0.1B");
+  });
+
   it("initials takes the first letters of the first two words", () => {
     expect(initials("Battery Ventures")).toBe("BV");
     expect(initials("Carl Icahn & Co")).toBe("CI");
     expect(initials("Duquesne")).toBe("D");
+    expect(initials("Greylock 15")).toBe("G");
     expect(initials("")).toBe("");
+  });
+
+  it("initials keeps a leading acronym whole, up to 3 letters", () => {
+    expect(initials("IVP XVI")).toBe("IVP");
+    expect(initials("TCV VIII")).toBe("TCV");
+    expect(initials("NEA")).toBe("NEA");
+    expect(initials("AQR Capital")).toBe("AQR");
+    expect(initials("CDPQ")).toBe("CDP");
+    expect(initials("OMERS")).toBe("O"); // five capitals: a name, not an acronym to print whole
+    expect(initials("AIMCo")).toBe("A");
   });
 });
 

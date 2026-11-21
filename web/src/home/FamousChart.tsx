@@ -135,7 +135,8 @@ const Row = memo(function Row({
     <Link
       className="fc-row cols"
       to={`/fund/${m.r.fund_id}`}
-      aria-label={rowLabel({ i: i + 1, n, name: m.short, manager: m.manager, book: m.r.book, ret, spx })}
+      // the name as shown (a phone's shorter one), so the spoken label contains the visible one (WCAG 2.5.3)
+      aria-label={rowLabel({ i: i + 1, n, name: shown, manager: m.manager, book: m.r.book, ret, spx })}
       style={{ ["--dl" as string]: delay }}
       onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => onTip(i, e.currentTarget, e.pointerType === "touch")}
       onPointerLeave={offTip}
@@ -500,7 +501,8 @@ export function FamousChart({
     >
       <div className="fc-axis cols" aria-hidden="true" style={bar ? { paddingRight: bar } : undefined}>
         <span />
-        <span className="fc-axl">{phone ? "Return a year" : ""}</span>
+        {/* on a phone the standfirst is hidden, so the axis says the figures are estimates */}
+        <span className="fc-axl">{phone ? "Est. return a year" : ""}</span>
         <div className="plot">
           <div className="in">
             {tickEls}

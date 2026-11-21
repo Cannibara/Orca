@@ -105,7 +105,7 @@
 /* ---------- phone ---------- */
 .fp .famous.phone{gap:10px;padding-top:4px}
 .fp .famous.phone h2{font-size:24px;line-height:28px}
-/* the phone has no standfirst (the axis says "Return a year"); it stays for screen readers */
+/* the phone has no standfirst (the axis says "Est. return a year"); it stays for screen readers */
 .fp .famous.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* one column, not wrapped: a wrapping column would stretch the list switch to its full scrolling width */
 .fp .famous.phone .fam-ctl{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}

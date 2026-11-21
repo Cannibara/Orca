@@ -2,9 +2,10 @@
 // Domains are in percentage points; returns are fractions.
 import { DASH, pct, pp, qLabel } from "../lib/format";
 
-/** Assets as "$304.2B": one decimal in billions at every size (the table view keeps the site's "$250m"). */
+/** Assets as "$304.2B": one decimal in billions at every size (the table view keeps the site's "$250m"); below
+ * $0.05B, "<$0.1B" rather than a "$0.0B" that reads as nothing. */
 export const aumLabel = (book: number | null | undefined): string =>
-  book == null || !Number.isFinite(book) ? DASH : "$" + (book / 1e9).toFixed(1) + "B";
+  book == null || !Number.isFinite(book) ? DASH : book < 0.05e9 ? "<$0.1B" : "$" + (book / 1e9).toFixed(1) + "B";
 
 export const retLabel = (r: number | null): string => pct(r, 1);
 
@@ -146,16 +147,22 @@ export function captionText(first: number, last: number, n: number, scrolls: boo
   return `Showing ${first}–${last} of ${n} · scale fits the funds in view`;
 }
 
-/** First letters of the first two words, for a photo placeholder. */
-export const initials = (s: string): string =>
-  s
+/**
+ * A photo placeholder: the first letters of the first two words ("Battery Ventures" → "BV"), or a leading
+ * acronym of 2–4 capitals, whole up to 3 letters ("IVP XVI" → "IVP", "TCV VIII" → "TCV"), which is the brand.
+ */
+export function initials(s: string): string {
+  const words = s
     .replace(/[^\p{L} ]/gu, " ")
     .split(/\s+/)
-    .filter(Boolean)
+    .filter(Boolean);
+  if (/^\p{Lu}{2,4}$/u.test(words[0] ?? "")) return words[0].slice(0, 3);
+  return words
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
 
 /** The full spoken label of a chart row (5). */
 export function rowLabel(o: { i: number; n: number; name: string; manager: string | null; book: number; ret: number; spx: number | null }): string {
