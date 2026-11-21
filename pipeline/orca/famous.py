@@ -1,13 +1,15 @@
 """The curated "Famous funds" lists: well-known managers shown on the home page whatever the Top
 funds rules say (a famous fund can be small, young or concentrated), one list per investing style.
-Kept by hand in famous.csv."""
+Kept by hand in famous.csv. The order they show in (Most searched, and each list's most popular
+first) is famous_rank.csv: a score per name, higher first; funds not in it follow by Google score."""
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 FAMOUS_CSV = Path(__file__).with_name("famous.csv")
 SEARCH_CSV = Path(__file__).with_name("famous_search.csv")
+RANK_CSV = Path(__file__).with_name("famous_rank.csv")
 
 # The styles, in the order the home page lists them (the web keeps the same order and adds a
 # line about each; a group it does not know goes last).
@@ -22,6 +24,7 @@ FAMOUS_GROUPS = (
     "Venture capital",
     "Activists",
     "Macro",
+    "Credit & event-driven",
     "Family offices",
     "Quant & multi-strategy",
     "Big companies",
@@ -52,6 +55,9 @@ class Famous:
     # Trends score (famous_search.csv) ranks the Most searched list; rows sharing a keyword
     # (Sequoia's filers) share one place in it. "" = not ranked.
     search: str = ""
+    # The owner's place for this fund from famous_rank.csv's scores, 1 = first; None when not listed.
+    # Listed funds lead Most searched and every list's most popular order, ahead of any score.
+    rank: int | None = None
 
 
 def load_famous(path: Path = FAMOUS_CSV) -> tuple[Famous, ...]:
@@ -92,3 +98,48 @@ def load_search(path: Path = SEARCH_CSV) -> SearchScores:
         rows = list(csv.DictReader(fh))
     asof = max((r["asof"] for r in rows if r.get("asof")), default=None)
     return SearchScores(asof, {r["keyword"]: float(r["score"]) for r in rows if r.get("score")})
+
+
+def load_rank(path: Path = RANK_CSV) -> tuple[str, ...]:
+    """famous_rank.csv's names, best first: by the owner's `score`, higher first (any numbers; a
+    tie keeps file order). A line with no score is not ranked. Empty when the file is missing.
+    Raises ValueError on a score that is not a number, so a typo fails the tests."""
+    if not path.exists():
+        return ()
+    with open(path, newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    scored = []
+    for i, r in enumerate(rows):
+        name, score = (r.get("name") or "").strip(), (r.get("score") or "").strip()
+        if not name or not score:
+            continue
+        try:
+            scored.append((-float(score), i, name))
+        except ValueError:
+            raise ValueError(f"famous_rank.csv: {name!r} has score {score!r}, not a number") from None
+    return tuple(name for _, _, name in sorted(scored))
+
+
+def apply_rank(famous: tuple[Famous, ...], names: tuple[str, ...]) -> tuple[Famous, ...]:
+    """Sets each fund's `rank` from famous_rank.csv's names: a name is a search keyword of
+    famous.csv (every filer of it shares the place, as they share a Google score) or, for a fund
+    with no keyword, its CIK. Raises ValueError on a name listed twice or matching no fund, so a
+    typo fails the tests rather than quietly dropping a fund from the order."""
+    keywords = {f.search for f in famous if f.search}
+    ciks = {str(f.fund_id) for f in famous}
+    place: dict[str, int] = {}
+    for i, name in enumerate(names, 1):
+        if name in place:
+            raise ValueError(f"famous_rank.csv lists {name!r} twice")
+        if name not in keywords and name not in ciks:
+            raise ValueError(f"famous_rank.csv: {name!r} is no search keyword or CIK in famous.csv")
+        place[name] = i
+    return tuple(
+        replace(f, rank=place.get(f.search) or place.get(str(f.fund_id))) if place else f
+        for f in famous
+    )
+
+
+def load_ranked_famous() -> tuple[Famous, ...]:
+    """famous.csv with the owner's order from famous_rank.csv: what a run publishes."""
+    return apply_rank(load_famous(), load_rank())

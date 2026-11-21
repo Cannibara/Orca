@@ -12,6 +12,23 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Design spec for replacing the Famous funds tables with one full-width bar chart per list: sorted by 5y return, zero line (gains right, losses left), shaded blue/orange by size, labels at the bar tips, S&P 500 dotted line (+12.2% a year, SPY Q3 2021–Q3 2026), a 15-row (phone 10) scrolling window whose scale fits the funds in view and glides with an eased scroll. Written so an LLM or developer can build it cold; mock-ups saved beside it | Owner: "make the home page simpler and more visual with a colourful annual return graph"; approved over several rounds on the claude.ai Design canvas RBrW19wJQpU4mToFrVpG8B (v4 boards) | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `docs/superpowers/specs/2026-11-20-home-famous-chart-mock/` |
 | Open: dividends in fund estimates vs SPY price return; sorting by return vs the 2026-11-18 "most popular first" rule in PRODUCT.md | Owner to decide | — |
 
+## 2026-11-20 — Famous funds: Wikipedia's hedge funds added; rank by the owner's score
+
+| What changed | Why | Files |
+|---|---|---|
+| famous_rank.csv orders by its `score` column (renamed from `google_score`), higher first, ties in file order; a blank score is not ranked, a non-number fails the tests | Owner edited the numbers, not the line order, and chose "the number decides" | `orca/famous.py` (`load_rank`), `orca/famous_rank.csv`, `tests/test_search.py` |
+| 86 rows for the firms on Wikipedia's List of hedge funds (revision 1362551728, 4 Jul 2026) that were missing, every one checked on EDGAR (13F-HR filer, match word in its SEC name); renamed or moved filers get one row per CIK. New style list Credit & event-driven, after Macro | Owner: all of them, all regions | `orca/famous.csv`, `orca/famous.py`, `web/src/pages/Home.tsx` |
+| Not added: no 13F filer found for PIMCO, Archegos, Avenue Capital, ESL Investments, K2 Advisors, Revere, SPX Capital, Statar, TGS, Universa, Systematica, G-Research, Navigator Global, SPARX, High-Flyer, Lingjun, Minghong, Ubiquant, Yanfu. Left out on purpose: BlackRock, Goldman Sachs Asset Management, Wellington (their 13F is mostly index and mutual-fund money, not the hedge-fund book). Quantum Fund is Soros Fund Management (already listed) | — | — |
+| New rows have no Google Trends score until the next `scripts/google_trends.py` refresh; they follow by AUM. Data appears after a `home_only` run; funds that stopped filing may need one `full` rebuild | — | — |
+
+## 2026-11-20 — Famous funds: the owner's own order (famous_rank.csv)
+
+| What changed | Why | Files |
+|---|---|---|
+| New `pipeline/orca/famous_rank.csv`: one name per line, top first (a famous.csv `search` keyword, or a CIK for a fund with none). Listed funds lead Most searched and every list's most popular order; the rest follow by Google Trends score, then AUM. A name listed twice or matching nothing fails the tests. Seeded with today's Trends order (108 keywords), so nothing moves until it is edited. Home rows gain `rank` (contract) | Owner wants to rank the famous funds by hand; editing Trends scores would show made-up numbers and be overwritten by the next refresh | `orca/famous.py` (`load_rank`, `apply_rank`, `load_ranked_famous`), `orca/home.py`, `orca/run/sources.py`, `orca/run/weekly.py`, `orca/demo.py`, `contract.md` |
+| Most searched has no "Search interest" column and no Trends caption ("The famous funds investors look up most."); it uses the style lists' columns and order | Owner: users don't need the score, only the right funds | `web/src/pages/Home.tsx`, `homeFmt.ts` (`fSearch` gone), `data/types.ts` |
+| To publish an edit: merge it to main, then Actions > Pipeline > Run workflow with `home_only` | — | — |
+
 ## 2026-11-20 — Home: Famous funds first
 
 | What changed | Why | Files |
