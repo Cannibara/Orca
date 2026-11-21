@@ -842,6 +842,16 @@ def home_lists(latest_q=53) -> HomeLists:
     )
 
 
+def test_home_top_files_carry_spx_per_period_and_null_when_absent(tmp_path):
+    spx = {"1y": {"ann_return": 0.1, "from_q": 49, "to_q": 53}, "max": None}
+    shared(tmp_path / "with", home=replace(home_lists(), spx=spx))
+    for p in PERIODS:
+        assert decoded(tmp_path / "with", f"home/top_{p}.json")["spx"] == spx.get(p)
+    shared(tmp_path / "without")
+    for p in PERIODS:
+        assert decoded(tmp_path / "without", f"home/top_{p}.json")["spx"] is None
+
+
 def securities_frame() -> pl.DataFrame:
     return pl.DataFrame(
         {
@@ -918,7 +928,15 @@ def test_shared_files_follow_the_contract(tmp_path):
 def test_home_files_carry_latest_q_and_the_lists(tmp_path):
     shared(tmp_path)
     top = decoded(tmp_path, "home/top_3y.json")
-    assert set(top) == {"latest_q", "period", "eligible", "giants", "famous", "search_asof"}
+    assert set(top) == {
+        "latest_q",
+        "period",
+        "eligible",
+        "giants",
+        "famous",
+        "search_asof",
+        "spx",
+    }
     assert (top["latest_q"], top["period"], top["giants"]) == (53, "3y", [])
     assert top["eligible"][0]["fund_id"] == 7
     assert decoded(tmp_path, "home/conviction_q.json") == {
