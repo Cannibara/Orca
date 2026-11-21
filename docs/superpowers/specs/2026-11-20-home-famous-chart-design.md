@@ -1,12 +1,18 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
 Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: approved by
-the owner as a mock-up, not built.
+the owner, all questions answered, ready to build.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
 `phone.dc.html` in this folder (claude.ai Design canvas files; the `/_blob/…` photo URLs only resolve on the
 canvas at https://claude.ai/artifact/RBrW19wJQpU4mToFrVpG8B, boards "v4 Desktop" and "v4 Phone").
 Where this text and the mock disagree, this text wins.
+
+> **Start here (new session).** Paste this into a fresh Claude Code session on this repo:
+> "Read `CLAUDE.md`, then `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, and build it,
+> following §14 (Build checklist) in order. The owner has approved the design and answered every open
+> question (§11). Ask me only if something in the spec conflicts with the code."
+> Everything needed is in this file, the code it names, and the two mock files; no earlier chat is required.
 
 ---
 
@@ -49,11 +55,13 @@ Source file: `home/top_{1y|3y|5y|10y|15y|max}.json` on `https://data.orcaetf.com
 search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_rank.csv`, 1 = first). Top level: `latest_q`, `period`, `search_asof`.
 
 ### 3.1 Lists
+- **Each list's chart is sorted by `ann_return`, best first** (owner, 2026-11-21: "sort by return of each
+  sublist"); the Table view keeps today's popularity order (§9).
 - **Most searched** (first, default): exactly the funds today's site puts in it — reuse `mostSearched(rows, rank)`
   and `popularity(rows)` in `web/src/pages/Home.tsx`: rows with `search` set (not null; 0 is allowed for an
   owner-ranked fund with no Google score), one per `fund_id`, in **popularity order** (owner's `rank` ascending,
-  then `fame` descending, then AUM descending), the **top 50** (`MOST_SEARCHED_MAX`). The chart then displays
-  them **by `ann_return`, best first** (see §11, open question 2).
+  then `fame` descending, then AUM descending), the **top 50** (`MOST_SEARCHED_MAX`). The popularity order picks
+  *which* 50; the chart then displays them **by `ann_return`, best first**.
 - **Style lists** (`group`, the order of `FAMOUS_GROUPS` in `Home.tsx` / `pipeline/orca/famous.py`, 15 since
   2026-11-20): Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare
   specialists, Tech & growth, Venture capital, Activists, Macro, Credit & event-driven, Family offices, Quant &
@@ -102,19 +110,36 @@ Catalyst, Summit, Battery, NEA) → no manager line. Same as the fund name (Carl
 manager line, but still use that person's photo. Exceptions seen: Thrive Capital → Josh Kushner; DST Global →
 Yuri Milner; HongShan → Neil Shen; Ruane, Cunniff & Goldfarb → Bill Ruane.
 
-### 3.5 S&P 500 reference
-Annualised **price** return of SPY (`stock_id` 98 in `securities.json`) over the **same window as the fund
-figures**: quarter-end closes from `stock/98/weekly.json` (`q0`, `qclose`), from the quarter-end `period` years
-before `latest_q` to `latest_q`. For 5y with `latest_q` = 54 (Q3 2026): 429.14 → 762.63 = **+12.2% a year**.
-Compute it per period in the client (or publish it). Open question: whether fund estimates include dividends
-(§11.1); if they do, the S&P figure should too (~+1.3 pts a year).
+### 3.5 S&P 500 reference (total return, from the pipeline)
+Owner, 2026-11-21: fund estimates include dividends, so the S&P 500 line must too. The line is SPY's
+**total return** (dividends reinvested) annualised over **the same window as the fund figures**:
+- Fund `ann_return` = `growth ** (4 / n) − 1` over the fund's last `n` quarterly returns (`n` = 4, 12, 20, 40, 60
+  for 1y…15y, `config.PERIODS`; `engine/metrics.performance`), ending at the list's `latest_q`.
+- SPY quarter return `r_q = (close_q + div_ps_q) / close_{q−1} − 1` from `QuarterPx` (`pipeline/orca/quarter_px.py`:
+  `close`, `div_ps`), for `q` in `latest_q − n + 1 … latest_q`; then `growth ** (4 / n) − 1`. The pipeline already
+  loads SPY: `ctx.spy_id` / `ctx.px[ctx.spy_id]` in `pipeline/orca/run/compute.py` (do not look SPY up by
+  ticker: `securities.json` has a second, unrelated "SPY", Bragg Gaming, stock_id 24664; the ETF is 98).
+- Publish it (contract change — edit `pipeline/contract.md` first, then `web/src/data/types.ts`): a top-level
+  `"spx": {"ann_return": number | null, "from_q": int, "to_q": int}` in each `home/top_{period}.json`
+  (`null` for `max`, which has no shared window; also `null` if SPY lacks a quarter). Built in `pipeline/orca/home.py`
+  / the run that writes the top files; add a pipeline test with a hand-checked SPY series. The demo generator
+  (`pipeline/orca/demo.py`) must emit it too, then regenerate `web/public/demo-data`.
+- The web reads `spx.ann_return`. When it is null (Max, or an old file without `spx`): no S&P line, no axis label,
+  no "beat the S&P 500" clause in the lead line, no "vs S&P 500" in tooltips, and the scale rules (§7.3) drop the
+  S&P term.
+- Sanity value: 5y to Q3 2026 SPY price return is +12.2% a year (quarter-end closes 429.14 → 762.63 on
+  `stock/98/weekly.json`); with dividends expect roughly +13.5% (yield ~1.3–1.5%). The mock hard-codes the
+  price-only +12.2%; the pipeline figure wins.
+- A fund that stopped filing (`until_q`) is measured to its own last quarter; it is still compared with the list's
+  S&P figure. Accepted (owner did not ask for per-fund benchmarks).
 
 ## 4. Page structure
 
 Desktop (max width 1232px, 24px side padding, page background `--page`):
 1. Home tabs (unchanged component; Famous funds active).
 2. Header: H2 "Famous funds" (30/34px, 700, −0.03em). Standfirst 15/22px `--ink2`:
-   "Estimated return a year over the last 5 years, best first. The dotted line is the S&P 500 (+12.2%)."
+   "Estimated return a year over the last {period}, best first. The dotted line is the S&P 500 ({spx})."
+   (`{spx}` = `spx.ann_return` formatted `+13.5%`; drop the second sentence when it is null.)
 3. Controls row: **list switch** (segmented control: Most searched | Buffett inspired | …) on the left;
    **period** segmented control (1y | 5y | Max — the owner cut it to three) and a **Chart | Table** segmented
    switch (icon + word, same icons as Annual returns' table toggle) on the right. Chart is the default.
@@ -174,7 +199,7 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
 - **Lines drawn through the chart: only two.** The zero line (1px `--zero` = `#6A635A` light / `#AEA498` dark) and
   the **S&P 500 dotted line** (1px, `repeating-linear-gradient` 1.5px dash / 3.5px gap in `--ink3`, 75% opacity).
   No gridlines at +10%, +20% etc. (owner removed them).
-- Axis header: the S&P label "S&P 500 +12.2%" (11px 600 `--ink`, phone "S&P +12.2%") centred over a 10×6px ▼
+- Axis header: the S&P label "S&P 500 {spx}" (11px 600 `--ink`, phone "S&P {spx}") centred over a 10×6px ▼
   notch pointing at the dotted line; tick labels on the lower line (11px `--ink3`, phone 10.5px), printed like
   Annual returns' `axisPct`: `0%`, `+10%`, `−20%`.
 - **Tick choice**: 0% is always labelled. Others are multiples of the step that sit inside the domain with a
@@ -273,14 +298,14 @@ substance (columns from `TOP_COLUMNS` / `famousColumns` / `searchedColumns` in `
 Tokens as `tokens.css` dark (`--page #181512`, `--ink #F3ECE3`, `--band #38322B`, `--zero #AEA498`, inverted pill
 uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 
-## 11. Open questions for the owner
-1. Do the fund return estimates include dividends? If yes, the S&P 500 figure should be total return.
-2. `docs/PRODUCT.md` records the owner's rule "every famous list opens with its most popular fund first" (owner's
-   rank, then Google Trends, then AUM). This design's **chart** sorts by return; its **Table** view keeps the
-   popularity order. Confirm the chart order with the owner, then update PRODUCT.md in the same change.
-3. Lists with extreme returns (some style lists reach −42.7%): the fitted scale handles them, but check the
-   phone label room on a narrow plot.
-4. Settled: no search score anywhere (main #55).
+## 11. Owner's answers (2026-11-21) — no open questions
+1. Fund return estimates include dividends → the S&P 500 line is SPY **total** return (§3.5).
+2. Each list's chart is sorted by return, best first; the Table view keeps the popularity order. Update the
+   Famous funds row of `docs/PRODUCT.md` accordingly in the build PR (it currently says every list opens most
+   popular first — still true of the Table view).
+3. Lists with extreme returns (some style lists reach −42.7%): handled by the fitted scale; check the phone label
+   room on such a list during the build.
+4. No search score anywhere (main #55).
 
 ## 12. Decisions taken along the way (so they are not re-litigated)
 | Tried | Outcome | Why |
@@ -293,6 +318,8 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 | AUM inside the bar | Tweak only | Owner preferred AUM next to the name |
 | Replacing the table outright | Kept as a Table view | Owner wants the old detailed columns one click away |
 | Search interest column / Trends caption | Removed (main #55, owner) | Users need the right funds, not the score |
+| S&P 500 as price return | Total return (owner, 2026-11-21) | Fund estimates include dividends |
+| Popularity order on the chart | Return order (owner, 2026-11-21) | "Sort by return of each sublist"; Table keeps popularity |
 | Two lists side by side | Dropped | One chart across the page; lists via a switch |
 | 50 rows on the page | Dropped | A 15-row (phone 10) scrolling window |
 | Scale that waits until scrolling stops, then animates | Dropped | Felt jumpy |
@@ -305,7 +332,7 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 ## 13. Building it in this codebase (suggested)
 - New component in `web/src/pages/Home.tsx` (or `web/src/home/FamousChart.tsx` + `famousChart.css` scoped
   like the rest of the home page) replacing `FamousGroup`'s table for the chart view; keep the table as the
-  Table view. Reuse `Seg` for the switches, the shared Tooltip (`useTooltip`), `qOfYear`, `fmt` helpers.
+  Table view. Reuse `Choice` (`web/src/components/Choice.tsx`, the home page's segmented control, a wrapper of `fund/Seg.tsx`) for the list, period and Chart | Table switches, the shared Tooltip (`useTooltip`, `web/src/charts/Tooltip.tsx`), `qOfYear` and the `lib/format.ts` / `pages/homeFmt.ts` helpers.
 - Pure, testable functions (put them in a `.ts` with vitest tests): `fundShortName`, `managerLine`,
   `aumLabel` (`$X.XB`), `shadeFor(ret, dark)`, `windowDomains(rows, VIS, innerW)` (§7.3 smoothing),
   `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone)`, `leadLine(rows, spx)`, `spyReturn(weekly, q0, q1)`.
@@ -320,15 +347,18 @@ uses `--inv #F3ECE3` / `--invfg #1B1916`). Bars use the dark ramps in §6.
 1. Read `CLAUDE.md`, this file, `pipeline/contract.md` (home files) and `web/src/pages/Home.tsx` (`FamousFunds`,
    `FamousGroup`, `famousColumns`, `popularity`, `mostSearched`, `FAMOUS_GROUPS`). Open the two mock files to see
    the behaviour.
-2. Pure helpers + vitest tests (§13): short names, manager line, `$X.XB`, shade ramp, window domains and
+2. Pipeline first (§3.5): contract.md → `spx` in `home/top_{period}.json` → pipeline code + test →
+   `cd pipeline && uv run pytest -m "not network"` → demo generator + regenerate demo data
+   (`uv run python -m orca.run demo --plain --out ../web/public/demo-data`) → `web/src/data/types.ts`.
+3. Pure helpers + vitest tests (§13): short names, manager line, `$X.XB`, shade ramp, window domains and
    Catmull-Rom domain, ticks (desktop/phone), lead line, SPY annualised return from `qclose`.
-3. The chart view component for one list (rows, bars, labels, leader pill, zero + S&P lines, axis header, caption,
+4. The chart view component for one list (rows, bars, labels, leader pill, zero + S&P lines, axis header, caption,
    source), static first (no scroll), then the 15/10-row window with the fitted scale (§7.3), then the eased
    wheel/keys glide (§7.2), then the grow-in (§8).
-4. The list switch (Most searched + the 15 style lists), the period switch (1y | 5y | Max), the Chart | Table
+5. The list switch (Most searched + the 15 style lists), the period switch (1y | 5y | Max), the Chart | Table
    switch with today's table behind Table (§9).
-5. Dark mode, reduced motion, phone layout (§5 phone, §6 phone ticks, §7.1 phone window).
-6. Docs in the same change: `docs/PRODUCT.md` (Famous funds row: chart, sort by return, table view), the
+6. Dark mode, reduced motion, phone layout (§5 phone, §6 phone ticks, §7.1 phone window).
+7. Docs in the same change: `docs/PRODUCT.md` (Famous funds row: chart, sort by return, table view), the
    `docs/WORKLOG.md` entry, and this file's status line.
 
 Done when:
@@ -338,13 +368,16 @@ Done when:
 - With demo data (`npm run dev`), and with production data (`VITE_DATA_URL=https://data.orcaetf.com`):
   Most searched shows the same 50 funds as the Table view; the first window has the zero line at the plot's left
   edge; scrolling to the bottom brings the losses in with zero moving right smoothly; the S&P line sits at the
-  computed SPY figure; Chart | Table round-trips; reduced motion removes the grow-in and the glide.
-- Owner has answered §11.1 and §11.2, or the PR says they are still open.
+  published `spx.ann_return` (total return, about +13.5% for 5y to Q3 2026); Max shows no S&P line; Chart | Table
+  round-trips; reduced motion removes the grow-in and the glide.
+- After merge: production data gets `spx` only after a pipeline run (Actions > Pipeline > Run workflow,
+  `home_only`); until then the site must render without the S&P line (old files have no `spx`).
 
 ## Appendix A: sample data (Most searched, 5y to Q3 2026, as shown in the mock)
 A snapshot of the live file on 2026-11-20, for sizing and checking the design only. Membership now follows
 `famous_rank.csv` (seeded from the same Trends scores, so it matched on that day); always read the live data.
-Sorted best first. `name | manager | 5y return a year | AUM`. S&P 500 +12.2%.
+Sorted best first. `name | manager | 5y return a year | AUM`. (S&P 500 over the window: +12.2% price only;
+the built page uses the pipeline's total-return figure, about +13.5%.)
 
 Duquesne Family Office | Stanley Druckenmiller | +30.3% | $3.6B
 Greenlight Capital | David Einhorn | +28.0% | $1.7B

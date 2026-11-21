@@ -9,6 +9,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 
 | What changed | Why | Files |
 |---|---|---|
+| Owner answered the last two questions: fund estimates include dividends, so the S&P 500 line is SPY total return, computed in the pipeline over the funds' own window and published as `spx` in `home/top_{period}.json` (a contract change the build makes first); each list's chart sorts by return, the Table view keeps popularity order. Spec status: ready to build, with a paste-in prompt for a new session | Owner, 2026-11-21 | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` |
 | The spec now follows #55: Most searched membership and the table's opening order use `popularity()` (owner's `rank`, then `fame`, then AUM); no Search interest column anywhere; 15 style lists (Credit & event-driven added). The mock-ups' Table view dropped the column too. Added a build checklist with done-when checks, phone tick margins, and a CLAUDE.md "Read X when" row | Owner: "ensure this documentation is ready for a new LLM session to implement", then merge it to main | `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md`, `…-mock/`, `CLAUDE.md` |
 
 ## 2026-11-20 — Home: Famous funds as one ranked return chart (design approved, not built)
