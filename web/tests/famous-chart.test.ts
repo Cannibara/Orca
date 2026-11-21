@@ -72,10 +72,18 @@ describe("rawDomain (7.3)", () => {
     expect(d.hi).toBe(12);
     expect(d.lo).toBeCloseTo(-30 - (50 * 42) / 814, 6);
   });
-  it("uses at least 200px as the plot width denominator", () => {
+  it("keeps the full label room on a phone's narrow plot (the spec's formula, no 200px floor)", () => {
+    // phone: inner plot 138px, ROOM 48. lo -22.6, hi = the S&P's +13.5 (36.1 pts wide, over the 20 minimum),
+    // then room 48 * 36.1 / (138 - 48) = 19.2533…, so lo = -41.8533…
+    // (a 200px floor would give 48 * 36.1 / 200 = 8.664 and lo -31.264: half the room a loss label needs)
+    const d = rawDomain([-0.226, 0.1], 0.135, 138, 48);
+    expect(d.hi).toBeCloseTo(13.5, 6);
+    expect(d.lo).toBeCloseTo(-22.6 - (48 * 36.1) / 90, 6);
+  });
+  it("uses at least 80px as the plot width denominator, so a tiny or unmeasured width cannot blow up", () => {
     const d = rawDomain([-0.1], 0.0, 100, 50);
-    // lo -10, hi raised to +10 (20 pts wide), then room 50 * 20 / max(200, 50) = 5
-    expect(d.lo).toBeCloseTo(-15, 6);
+    // lo -10, hi raised to +10 (20 pts wide), then room 50 * 20 / max(80, 100 - 50) = 12.5
+    expect(d.lo).toBeCloseTo(-22.5, 6);
     expect(d.hi).toBe(10);
   });
 });

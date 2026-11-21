@@ -41,7 +41,8 @@ export function rawDomain(rets: number[], spx: number | null, innerW: number, ro
   let lo = Math.min(0, ...v);
   let hi = Math.max(0, spx == null ? 0 : spx * 100, ...v);
   if (hi - lo < 20) hi = lo + 20;
-  if (lo < 0) lo -= (room * (hi - lo)) / Math.max(200, innerW - room);
+  // the floor only guards a tiny or unmeasured width; a phone's ~140px plot keeps its full label room
+  if (lo < 0) lo -= (room * (hi - lo)) / Math.max(80, innerW - room);
   return { lo, hi };
 }
 
