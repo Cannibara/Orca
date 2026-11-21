@@ -2,9 +2,23 @@
 // one row per fund, best return first, bars from a zero line, the S&P 500 as a dotted line, and a 15-row
 // (phone 10) scrolling window whose scale fits the funds in view and glides with the scroll.
 // HTML rows rather than SVG: each row is a link to the fund, and the bars are placed in % of the plot.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+//
+// Speed: the scale moves on every frame of a scroll, so React renders only when the whole-row position
+// changes (caption, region name). The rows are memoised and never take the scale; bar, label, tick and line
+// positions are written straight to the DOM by `paint`, which skips the frame when the scale has not moved.
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { Link } from "react-router";
-import { useTooltip, type TipContent, type TooltipApi } from "../charts/Tooltip";
+import { useTooltip, type TipContent } from "../charts/Tooltip";
 import type { TopRow } from "../data/types";
 import { axisPct } from "../fund/fmt";
 import { stepFor } from "../fund/geometry";
@@ -23,6 +37,7 @@ import {
   ticksFor,
   vsLabel,
   windowDomains,
+  type Track,
 } from "./famousChart";
 import { useEasedScroll } from "./useEasedScroll";
 import "./famousChart.css";
@@ -34,12 +49,17 @@ export const bestFirst = (a: TopRow, b: TopRow): number => b.ann_return - a.ann_
  * the label room kept left of a loss (7.3), Page Up/Down rows, the fixed columns before the plot, the label gap. */
 const DESKTOP = { vis: 15, row: 46, inset: 56, room: 50, page: 14, cols: 32 + 14 + 252 + 14, gap: 6 };
 const PHONE = { vis: 10, row: 48, inset: 50, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
+type Mode = typeof DESKTOP;
+/** ms the grow-in takes at most (8): the last row starts at 450ms and its label fades in 450ms after that over
+ * 300ms, so 1200ms, plus a margin. After it the animations are taken off, which makes each frame's restyle cheaper. */
+const GROW_MS = 1400;
 /** Below this width (px) the module lays out for a phone. */
 export const PHONE_BELOW = 560;
 /** The width assumed when it cannot be measured (jsdom): a desktop page. */
 export const FALLBACK_W = 1184;
 
 const f3 = (x: number) => `${+(x * 100).toFixed(3)}%`;
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /** Dark mode as the page has it now: the theme switch (data-theme) or the device's setting. */
 function useDark(): boolean {
@@ -73,6 +93,186 @@ function Photo({ manager, who }: { manager: string | null | undefined; who: stri
 
 type Model = { r: TopRow; short: string; manager: string | null };
 
+/** One fund's row. It takes nothing that changes while scrolling, so a glide never re-renders it. */
+const Row = memo(function Row({
+  m,
+  i,
+  n,
+  spx,
+  phone,
+  fill,
+  delay,
+  onTip,
+  offTip,
+}: {
+  m: Model;
+  i: number;
+  n: number;
+  spx: number | null;
+  phone: boolean;
+  fill: string;
+  /** The grow-in delay (8). */
+  delay: string;
+  onTip: (i: number, el: HTMLElement, touch: boolean) => void;
+  offTip: () => void;
+}) {
+  const ret = m.r.ann_return;
+  const gain = ret >= 0;
+  const shown = phone ? phoneNameOf(m.short) : m.short;
+  return (
+    <Link
+      className="fc-row cols"
+      to={`/fund/${m.r.fund_id}`}
+      aria-label={rowLabel({ i: i + 1, n, name: m.short, manager: m.manager, book: m.r.book, ret, spx })}
+      style={{ ["--dl" as string]: delay }}
+      onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => onTip(i, e.currentTarget, e.pointerType === "touch")}
+      onPointerLeave={offTip}
+      onFocus={(e) => onTip(i, e.currentTarget, false)}
+      onBlur={offTip}
+    >
+      <Photo manager={m.r.manager} who={m.manager ?? m.short} />
+      <span className="who" aria-hidden="true">
+        {phone ? (
+          <>
+            <span className="nm">{shown}</span>
+            <span className="l2">
+              <span className="am">{aumLabel(m.r.book)}</span>
+              {m.manager && (
+                <>
+                  <span className="sep" />
+                  <span className="mg">{m.manager}</span>
+                </>
+              )}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="l1">
+              <span className="nm">{shown}</span>
+              <span className="sep" />
+              <span className="am">{aumLabel(m.r.book)}</span>
+            </span>
+            {m.manager && <span className="mg">{m.manager}</span>}
+          </>
+        )}
+      </span>
+      {/* left/width (and the label's left/right) come from `paint`, never from here */}
+      <span className="plot" aria-hidden="true">
+        <span className="in">
+          <span className={"bar " + (gain ? "gain" : "loss")} style={{ background: fill }} />
+          <span className={"lab" + (i === 0 ? " lead" : "")}>{retLabel(ret)}</span>
+        </span>
+      </span>
+    </Link>
+  );
+});
+
+// ---- the per-frame painter ----
+
+/** A DOM element and the style values last written to it, so an unchanged value is not written again; a row's
+ * bar also keeps the scale it was last placed on (`lo`/`hi`) and whether it is drawn broken. */
+type Slot = {
+  el: HTMLElement;
+  s: Partial<Record<"left" | "width" | "right" | "opacity", string>>;
+  cut?: boolean;
+  lo?: number;
+  hi?: number;
+};
+const slot = (el: HTMLElement): Slot => ({ el, s: {} });
+function put(x: Slot | null, k: "left" | "width" | "right" | "opacity", v: string) {
+  if (!x || x.s[k] === v) return;
+  x.s[k] = v;
+  x.el.style[k] = v;
+}
+
+/** What `paint` reads: the scale's inputs (set after each render that changes them) and the elements it moves. */
+type Scene = {
+  track: Track;
+  /** Returns in points, best first, one per row. */
+  vals: number[];
+  vis: number;
+  scrolls: boolean;
+  phone: boolean;
+  innerW: number;
+  gap: number;
+  spx: number | null;
+  ticks: { t: number; x: Slot | null }[];
+  bars: Slot[];
+  labs: Slot[];
+  lines: { zl: Slot | null; spl: Slot | null; spx: Slot | null; spxm: Slot | null };
+  fades: [HTMLElement | null, HTMLElement | null];
+  /** The scale last painted (NaN: paint everything). */
+  lo: number;
+  hi: number;
+};
+
+/** Rows painted on each side of the window while scrolling: a fast fling or the compositor's own scroll can
+ * bring a row or two into view before the next frame's paint. */
+const NEAR = 3;
+
+/**
+ * Places everything that follows the scale at fractional row position p. With `all` every row is placed;
+ * otherwise only the rows in or near the window (the rest are placed when they come near), and nothing at
+ * all is written while the scale and the rows near the window are where they were.
+ */
+function paint(sc: Scene, p: number, all = false) {
+  const n = sc.vals.length;
+  const pc = sc.scrolls ? clamp(p, 0, n - sc.vis) : 0;
+  sc.fades[0]?.classList.toggle("on", sc.scrolls && pc > 0.01);
+  sc.fades[1]?.classList.toggle("on", sc.scrolls && pc < n - sc.vis - 0.01);
+  const dom = domainAt(sc.track, pc);
+  const span = dom.hi - dom.lo;
+  const at = (v: number) => (clamp(v, dom.lo, dom.hi) - dom.lo) / span;
+  const zero = at(0);
+  if (all || dom.lo !== sc.lo || dom.hi !== sc.hi) {
+    sc.lo = dom.lo;
+    sc.hi = dom.hi;
+    put(sc.lines.zl, "left", f3(zero));
+    if (sc.spx != null) {
+      const s = f3(at(sc.spx * 100));
+      put(sc.lines.spl, "left", s);
+      put(sc.lines.spx, "left", s);
+      put(sc.lines.spxm, "left", s);
+    }
+    // Ticks: the ones on show, and any still fading near the edges; one beyond 8% of either edge is parked
+    // there (the axis clips it) and, being cached, costs no write while it stays parked.
+    const on = new Set(ticksFor(dom, sc.phone, sc.innerW));
+    for (const { t, x } of sc.ticks) {
+      put(x, "left", f3(clamp((t - dom.lo) / span, -0.08, 1.08)));
+      put(x, "opacity", on.has(t) ? "1" : "0");
+    }
+  }
+  const g = sc.gap;
+  const from = all ? 0 : Math.max(0, Math.floor(pc) - NEAR);
+  const to = all ? n : Math.min(n, Math.floor(pc) + sc.vis + 1 + NEAR);
+  for (let i = from; i < to; i++) {
+    const bar = sc.bars[i];
+    const lab = sc.labs[i];
+    if (!bar || !lab || (bar.lo === dom.lo && bar.hi === dom.hi)) continue;
+    bar.lo = dom.lo;
+    bar.hi = dom.hi;
+    const v = sc.vals[i];
+    const gain = v >= 0;
+    const end = at(v);
+    const left = gain ? zero : end;
+    put(bar, "left", f3(left));
+    put(bar, "width", f3(gain ? end - zero : zero - end));
+    // a bar past the scale's edge (mid-scroll only) is drawn broken there
+    const cut = v > dom.hi + 1e-9 || v < dom.lo - 1e-9;
+    if (bar.cut !== cut) {
+      bar.cut = cut;
+      bar.el.classList.toggle("cut", cut);
+    }
+    if (gain) {
+      put(lab, "left", `calc(${f3(end)} + ${g}px)`);
+      put(lab, "right", "auto");
+    } else {
+      put(lab, "left", "auto");
+      put(lab, "right", `calc(${f3(1 - left)} + ${g}px)`);
+    }
+  }
+}
+
 export function FamousChart({
   name,
   rows,
@@ -93,7 +293,7 @@ export function FamousChart({
   const box = useRef<HTMLDivElement>(null);
   const width = useWidth(root, 280, FALLBACK_W);
   const phone = width < PHONE_BELOW;
-  const M = phone ? PHONE : DESKTOP;
+  const M: Mode = phone ? PHONE : DESKTOP;
   const dark = useDark();
   const tip = useTooltip();
 
@@ -130,9 +330,20 @@ export function FamousChart({
     return out;
   }, [track]);
 
-  // Position in rows from the top (fractional while gliding).
-  const [p, setP] = useState(0);
-  const es = useEasedScroll(box, M.row, setP);
+  // Position in rows from the top (fractional while gliding): kept out of React, painted straight to the DOM.
+  const pos = useRef(0);
+  const scene = useRef<Scene | null>(null);
+  // React state is only the whole row at the top of the window.
+  const [view, setView] = useState(0);
+  const onPos = useCallback((p: number) => {
+    pos.current = p;
+    const sc = scene.current;
+    if (!sc) return;
+    paint(sc, p);
+    const n = sc.vals.length;
+    setView(sc.scrolls ? Math.round(clamp(p, 0, n - sc.vis)) : 0);
+  }, []);
+  const es = useEasedScroll(box, M.row, onPos);
 
   // A new list or period starts at the top with nothing gliding.
   const shownFor = useRef(`${name}|${period}`);
@@ -142,40 +353,110 @@ export function FamousChart({
     shownFor.current = key;
     es.stop();
     if (box.current) box.current.scrollTop = 0;
-    setP(0);
+    pos.current = 0;
+    setView(0);
+    if (scene.current) paint(scene.current, 0);
   }, [name, period, es]);
   useEffect(() => () => tip.hide(), [tip]);
 
-  // The grow-in replays by swapping between two identical animations (g0 / g1) when `run` changes.
-  const [grow, setGrow] = useState({ run, odd: false });
-  if (grow.run !== run) setGrow({ run, odd: !grow.odd });
+  // After a render that can change the scale or the elements it moves: find them again and paint them all.
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const q = (s: string) => el.querySelector<HTMLElement>(s);
+    const one = (s: string) => {
+      const e = q(s);
+      return e ? slot(e) : null;
+    };
+    const tickEls = el.querySelectorAll<HTMLElement>(".fc-axis .tick");
+    scene.current = {
+      track,
+      vals: model.map((m) => m.r.ann_return * 100),
+      vis: M.vis,
+      scrolls,
+      phone,
+      innerW,
+      gap: M.gap,
+      spx,
+      ticks: candidates.map((t, i) => ({ t, x: tickEls[i] ? slot(tickEls[i]) : null })),
+      bars: [...el.querySelectorAll<HTMLElement>(".fc-row .bar")].map(slot),
+      labs: [...el.querySelectorAll<HTMLElement>(".fc-row .lab")].map(slot),
+      lines: { zl: one(".fc-grid .zl"), spl: one(".fc-grid .spl"), spx: one(".fc-axis .spx"), spxm: one(".fc-axis .spx-m") },
+      fades: [q(".fade.t"), q(".fade.b")],
+      lo: NaN,
+      hi: NaN,
+    };
+    paint(scene.current, pos.current, true);
+  }, [model, track, candidates, spx, phone, innerW, scrolls, M]);
 
-  const pc = scrolls ? Math.max(0, Math.min(n - M.vis, p)) : 0;
-  const view = Math.round(pc);
-  const dom = domainAt(track, pc);
-  const span = dom.hi - dom.lo;
-  const at = (v: number) => (Math.max(dom.lo, Math.min(dom.hi, v)) - dom.lo) / span;
-  const zero = at(0);
-  const on = new Set(ticksFor(dom, phone, innerW));
-  const step = stepFor(Math.min(n, M.vis));
-  const first = view + 1;
-  const last = Math.min(n, view + M.vis);
+  // The grow-in replays by swapping between two identical animations (g0 / g1) when `run` changes; once it
+  // has played, neither class is set.
+  const [grow, setGrow] = useState({ run, odd: false, on: true });
+  if (grow.run !== run) setGrow({ run, odd: !grow.odd, on: true });
+  useEffect(() => {
+    if (!grow.on) return;
+    const id = setTimeout(() => setGrow((g) => ({ ...g, on: false })), GROW_MS);
+    return () => clearTimeout(id);
+  }, [grow.on, grow.run]);
 
-  const tipFor = (m: Model, fill: string): TipContent => ({
-    title: m.r.name,
-    rows: [
-      { color: fill, label: "Return a year", value: retLabel(m.r.ann_return) },
-      ...(spx == null ? [] : [{ label: "vs S&P 500", value: vsLabel(m.r.ann_return, spx) }]),
-      { label: "AUM", value: aumLabel(m.r.book) },
-    ],
-  });
-  /** Above the row at the plot's start; below it for the first two rows in view, clear of the axis. */
-  const showTip = (api: TooltipApi, el: HTMLElement, content: TipContent, below: boolean) => {
+  const top = scrolls ? clamp(view, 0, n - M.vis) : 0;
+  const first = top + 1;
+  const last = Math.min(n, top + M.vis);
+  const caption = captionText(first, last, n, scrolls);
+
+  // The rows' tooltip handlers stay the same function for the chart's life (so the memoised rows keep), and
+  // read what they need at the moment of hovering.
+  const live = useRef({ model, spx, dark, phone, M, top, tip });
+  live.current = { model, spx, dark, phone, M, top, tip };
+  const onTip = useCallback((i: number, el: HTMLElement, touch: boolean) => {
+    const { model, spx, dark, phone, M, top, tip } = live.current;
+    const m = model[i];
+    if (phone || touch || !m) return;
+    const content: TipContent = {
+      title: m.r.name,
+      rows: [
+        { color: shadeFor(m.r.ann_return, dark), label: "Return a year", value: retLabel(m.r.ann_return) },
+        ...(spx == null ? [] : [{ label: "vs S&P 500", value: vsLabel(m.r.ann_return, spx) }]),
+        { label: "AUM", value: aumLabel(m.r.book) },
+      ],
+    };
+    // Above the row at the plot's start; below it for the first two rows in view, clear of the axis.
     const b = el.getBoundingClientRect();
     const x = b.left + M.cols - 14; // the tooltip adds its own 14px
-    if (below) api.show(content, x, b.bottom - 10, { place: "cursor" });
-    else api.show(content, x, b.top + 8, { place: "above" });
-  };
+    if (i - top < 2) tip.show(content, x, b.bottom - 10, { place: "cursor" });
+    else tip.show(content, x, b.top + 8, { place: "above" });
+  }, []);
+  const offTip = useCallback(() => live.current.tip.hide(), []);
+
+  const step = stepFor(Math.min(n, M.vis));
+  // Kept as the same elements between renders, so a render for a new row in view does not touch them.
+  const rowEls = useMemo(
+    () =>
+      model.map((m, i) => (
+        <Row
+          key={m.r.fund_id}
+          m={m}
+          i={i}
+          n={n}
+          spx={spx}
+          phone={phone}
+          fill={shadeFor(m.r.ann_return, dark)}
+          delay={`${Math.min(i, M.vis - 1) * step}ms`}
+          onTip={onTip}
+          offTip={offTip}
+        />
+      )),
+    [model, n, spx, phone, dark, M.vis, step, onTip, offTip],
+  );
+  const tickEls = useMemo(
+    () =>
+      candidates.map((t) => (
+        <span key={t} className="tick">
+          {axisPct(t)}
+        </span>
+      )),
+    [candidates],
+  );
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!scrolls || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -185,7 +466,7 @@ export function FamousChart({
     ];
     if (to === undefined) return;
     e.preventDefault();
-    es.glide(Math.max(0, Math.min(n - M.vis, to)) * M.row);
+    es.glide(clamp(to, 0, n - M.vis) * M.row);
   };
 
   const winProps = scrolls
@@ -202,29 +483,21 @@ export function FamousChart({
   return (
     <div
       ref={root}
-      className={"fc" + (phone ? " phone" : "") + (scrolls ? " scrolls" : "") + (grow.odd ? " g1" : " g0")}
+      className={"fc" + (phone ? " phone" : "") + (scrolls ? " scrolls" : "") + (grow.on ? (grow.odd ? " g1" : " g0") : "")}
     >
       <div className="fc-axis cols" aria-hidden="true" style={bar ? { paddingRight: bar } : undefined}>
         <span />
         <span className="fc-axl">{phone ? "Return a year" : ""}</span>
         <div className="plot">
           <div className="in">
-            {candidates.map((t) => (
-              <span
-                key={t}
-                className="tick"
-                style={{ left: f3(Math.max(-0.08, Math.min(1.08, (t - dom.lo) / span))), opacity: on.has(t) ? 1 : 0 }}
-              >
-                {axisPct(t)}
-              </span>
-            ))}
+            {tickEls}
             {spx != null && (
               <>
-                <span className="spx" style={{ left: f3(at(spx * 100)) }}>
+                <span className="spx">
                   {phone ? "S&P " : "S&P 500 "}
                   {retLabel(spx)}
                 </span>
-                <span className="spx-m" style={{ left: f3(at(spx * 100)) }} />
+                <span className="spx-m" />
               </>
             )}
           </div>
@@ -232,7 +505,7 @@ export function FamousChart({
       </div>
 
       <div className="fc-wrap">
-        <span className={"fade t" + (scrolls && pc > 0.01 ? " on" : "")} aria-hidden="true" />
+        <span className="fade t" aria-hidden="true" />
         <div className="fc-win" ref={box} {...winProps}>
           <div className="fc-list">
             <div className="fc-grid cols" aria-hidden="true">
@@ -240,90 +513,18 @@ export function FamousChart({
               <span />
               <div className="plot">
                 <div className="in">
-                  <span className="zl" style={{ left: f3(zero) }} />
-                  {spx != null && <span className="spl" style={{ left: f3(at(spx * 100)) }} />}
+                  <span className="zl" />
+                  {spx != null && <span className="spl" />}
                 </div>
               </div>
             </div>
-            {model.map((m, i) => {
-              const ret = m.r.ann_return;
-              const v = ret * 100;
-              const gain = ret >= 0;
-              const end = at(v);
-              const left = gain ? zero : end;
-              const fill = shadeFor(ret, dark);
-              const cut = v > dom.hi + 1e-9 || v < dom.lo - 1e-9;
-              const below = i - view < 2;
-              const shown = phone ? phoneNameOf(m.short) : m.short;
-              return (
-                <Link
-                  key={m.r.fund_id}
-                  className="fc-row cols"
-                  to={`/fund/${m.r.fund_id}`}
-                  aria-label={rowLabel({ i: i + 1, n, name: m.short, manager: m.manager, book: m.r.book, ret, spx })}
-                  style={{ ["--dl" as string]: `${Math.min(i, M.vis - 1) * step}ms` }}
-                  onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => {
-                    if (!phone && e.pointerType !== "touch") showTip(tip, e.currentTarget, tipFor(m, fill), below);
-                  }}
-                  onPointerLeave={() => tip.hide()}
-                  onFocus={(e) => {
-                    if (!phone) showTip(tip, e.currentTarget, tipFor(m, fill), below);
-                  }}
-                  onBlur={() => tip.hide()}
-                >
-                  <Photo manager={m.r.manager} who={m.manager ?? m.short} />
-                  <span className="who" aria-hidden="true">
-                    {phone ? (
-                      <>
-                        <span className="nm">{shown}</span>
-                        <span className="l2">
-                          <span className="am">{aumLabel(m.r.book)}</span>
-                          {m.manager && (
-                            <>
-                              <span className="sep" />
-                              <span className="mg">{m.manager}</span>
-                            </>
-                          )}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="l1">
-                          <span className="nm">{shown}</span>
-                          <span className="sep" />
-                          <span className="am">{aumLabel(m.r.book)}</span>
-                        </span>
-                        {m.manager && <span className="mg">{m.manager}</span>}
-                      </>
-                    )}
-                  </span>
-                  <span className="plot" aria-hidden="true">
-                    <span className="in">
-                      <span
-                        className={"bar " + (gain ? "gain" : "loss") + (cut ? " cut" : "")}
-                        style={{ left: f3(left), width: f3(gain ? end - zero : zero - end), background: fill }}
-                      />
-                      <span
-                        className={"lab" + (i === 0 ? " lead" : "")}
-                        style={
-                          gain
-                            ? { left: `calc(${f3(end)} + ${M.gap}px)`, right: "auto" }
-                            : { left: "auto", right: `calc(${f3(1 - left)} + ${M.gap}px)` }
-                        }
-                      >
-                        {retLabel(ret)}
-                      </span>
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
+            {rowEls}
           </div>
         </div>
-        <span className={"fade b" + (scrolls && pc < n - M.vis - 0.01 ? " on" : "")} aria-hidden="true" />
+        <span className="fade b" aria-hidden="true" />
       </div>
       <p className="fc-cap" aria-live="polite">
-        {captionText(first, last, n, scrolls)}
+        {caption}
       </p>
     </div>
   );

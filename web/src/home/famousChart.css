@@ -44,7 +44,9 @@
    module each side so a row's hover band is not cut off, and pads that back so the rows line up with the axis. */
 .fp .fc-wrap{position:relative}
 .fp .fc-win{position:relative;margin:0 calc(-1 * var(--band-x));padding:0 var(--band-x)}
-.fp .fc.scrolls .fc-win{overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+/* the page colour behind the rows (the same as the page) makes the box opaque, so Chrome scrolls it on the
+   compositor at 1x pixel ratio too instead of repainting the rows on every frame */
+.fp .fc.scrolls .fc-win{overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;background:var(--page)}
 .fp .fc-win:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .fp .fc .fade{position:absolute;left:0;right:0;height:24px;z-index:6;pointer-events:none;opacity:0}
 .fp .fc .fade.t{top:0;background:linear-gradient(var(--page),transparent)}
