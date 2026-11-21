@@ -227,3 +227,110 @@ test("the page follows the colour scheme", async ({ page, colorScheme }) => {
   const lightness = (r + g + b) / (3 * 255);
   expect(colorScheme === "dark" ? lightness < 0.25 : lightness > 0.75).toBe(true);
 });
+
+// The home page's Famous funds chart, laid out for real (jsdom cannot measure). The demo's lists are short, so
+// the chart shows them whole; a 50-row fixture stands in for a production list and gives it a scroll window.
+const FAMOUS_5Y = readFileSync(join(import.meta.dirname, "..", "tests", "fixtures", "famous-top5y.json"), "utf8");
+
+for (const width of widths) {
+  test.describe(`Famous funds chart at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } });
+
+    test("demo data: rows are drawn, there is no scroll box, and the page does not scroll sideways", async ({ page }) => {
+      const errors = await open(page, "/");
+      const rows = page.locator("section.famous .fc-row");
+      await expect(rows.first()).toBeVisible();
+      expect(await rows.count()).toBeGreaterThan(1);
+      await expect(page.locator("section.famous .fc.scrolls")).toHaveCount(0);
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("a long list scrolls in its own window: zero line at the left edge, the caption follows, no sideways scroll", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: "5 years", exact: true }).click();
+      const win = page.locator("section.famous .fc.scrolls .fc-win");
+      await expect(win).toBeVisible();
+      const rows = page.locator("section.famous .fc-row");
+      await expect(rows).toHaveCount(50); // retries until the list has rendered
+      const cap = page.locator("section.famous .fc-cap");
+      await expect(cap).toHaveText(/^Showing 1–\d+ of 50 /);
+
+      // the best funds all gained: the scale starts at zero, so the zero line sits on the plot's left edge
+      const { zl, plot } = await page.evaluate(() => ({
+        zl: document.querySelector(".fc-grid .zl")!.getBoundingClientRect().left,
+        plot: document.querySelector(".fc-grid .plot .in")!.getBoundingClientRect().left,
+      }));
+      expect(Math.abs(zl - plot)).toBeLessThanOrEqual(2);
+
+      await win.evaluate((el) => (el.scrollTop = el.scrollHeight));
+      await expect(cap).toHaveText(/^Showing \d+–50 of 50 /);
+      await expect(cap).not.toHaveText(/^Showing 1–/);
+
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("the pressed list stays in view in the sideways list switch", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: "5 years", exact: true }).click();
+      const lists = page.getByRole("group", { name: "List" });
+      const box = page.locator("section.famous .fam-lists");
+      const pressedInView = () =>
+        box.evaluate((el) => {
+          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+          const s = el.getBoundingClientRect();
+          return b.left >= s.left - 1 && b.right <= s.right + 1;
+        });
+      // a thin scrollbar for a mouse on a desktop, none under a phone's swipe
+      expect(await box.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe(width < 560 ? "none" : "thin");
+
+      // the last list, then another tab and back: the switch is drawn afresh, scrolled to the pressed list
+      await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("tab", { name: "Famous funds" }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
+      await expect.poll(pressedInView).toBe(true);
+
+      // a period without that list (the demo's 1 year) falls back to Most searched, the first button
+      await box.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+      await page.getByRole("button", { name: "1 year", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
+      await expect(lists.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(pressedInView).toBe(true);
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+// Ticks fading out of a wide scale are parked past the plot's ends; just under the page's 1232px max width
+// they once widened the page. Venture capital's returns are scaled up to a 1-year spread (about −160% to +95%)
+// so the scale shrinks a lot as the window scrolls.
+test.describe("Famous funds chart at 1240px, a wide scale", () => {
+  test.use({ viewport: { width: 1240, height: 900 } });
+
+  test("parked ticks never make the page scroll sideways", async ({ page }) => {
+    const wide = JSON.parse(FAMOUS_5Y) as { famous: { group: string; ann_return: number }[] };
+    for (const r of wide.famous) if (r.group === "Venture capital") r.ann_return *= 4;
+    await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(wide) }));
+    const errors = await open(page, "/");
+    await page.getByRole("button", { name: "5 years", exact: true }).click();
+    await page.getByRole("group", { name: "List" }).getByRole("button", { name: "Venture capital", exact: true }).click();
+    const win = page.locator("section.famous .fc.scrolls .fc-win");
+    await expect(win).toBeVisible();
+    for (const k of [0, 1, 2, 3, 4]) {
+      // two frames: the scroll is reported, then the scale is painted
+      const over = await win.evaluate(async (el, k) => {
+        el.scrollTop = ((el.scrollHeight - el.clientHeight) * k) / 4;
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        return document.documentElement.scrollWidth - document.documentElement.clientWidth;
+      }, k);
+      expect(over).toBeLessThanOrEqual(0);
+    }
+    expect(errors).toEqual([]);
+  });
+});

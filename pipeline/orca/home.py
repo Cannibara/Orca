@@ -36,6 +36,7 @@ from orca.config import (
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.famous import Famous
+from orca.quarter_px import QuarterPx
 
 _BUYS = ("new", "add")
 CALLS_EACH_END = 50  # the calls lists keep this many best and this many worst rows
@@ -521,6 +522,26 @@ def _concentrated(s: FundSnapshot) -> bool:
         and s.book >= CONC_MIN_BOOK
         and not _excluded(s)
     )
+
+
+def spx_window(spy_px: Mapping[int, QuarterPx], latest_q: int, period: str) -> dict | None:
+    """SPY's total return (dividends reinvested), annualised over the same window as the fund
+    figures of `period`: the n quarters ending at `latest_q`, with the close of quarter
+    `latest_q - n` as the base. None for "max" (no shared window). `ann_return` is None when SPY
+    lacks a close in any of those quarters."""
+    n = PERIODS[period]
+    if n is None:
+        return None
+    window = {"from_q": latest_q - n, "to_q": latest_q}
+    closes = {
+        q: spy_px[q].close if q in spy_px else None for q in range(latest_q - n, latest_q + 1)
+    }
+    if any(c is None for c in closes.values()):
+        return {"ann_return": None, **window}
+    growth = 1.0
+    for q in range(latest_q - n + 1, latest_q + 1):
+        growth *= (closes[q] + spy_px[q].div_ps) / closes[q - 1]
+    return {"ann_return": growth ** (4 / n) - 1, **window}
 
 
 def _return_order(ann_return: float | None) -> tuple[bool, float]:

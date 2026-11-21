@@ -1,7 +1,7 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
-Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: approved by
-the owner, all questions answered, ready to build.
+Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv; review fixes noted "build, review fix") · Status: built (branch claude/tender-keller-89qnf1), awaiting merge.
+Approved by the owner, all questions answered.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
 `phone.dc.html` in this folder (claude.ai Design canvas files; the `/_blob/…` photo URLs only resolve on the
@@ -80,9 +80,9 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
 | Field | From | Format |
 |---|---|---|
 | Short name | `name` → short-name rules §3.3 | text |
-| AUM | `book` (dollars) | `$X.XB` always one decimal in billions: `$304.2B`, `$13.7B`, `$0.3B` |
+| AUM | `book` (dollars) | `$X.XB` always one decimal in billions: `$304.2B`, `$13.7B`, `$0.3B`; below $0.05B `<$0.1B` (build, review fix) |
 | Manager | `manager` → manager rules §3.4 | text, may be absent |
-| Photo | `components/Face.tsx` (`photoOf(manager)` from `people.json`) | 28–32px circle; no photo → initials of manager (or fund) on `--sunken` |
+| Photo | `components/Face.tsx` (`photoOf(manager)` from `people.json`) | 28–32px circle; no photo → initials of manager (or fund) on `--sunken`; a leading acronym of 2–4 capitals stays whole, up to 3 letters (`IVP XVI` → IVP) |
 | Return | `ann_return` (fraction) | `+30.2%` / `−22.6%`, one decimal, sign always |
 | vs S&P 500 | `ann_return − SPX` | `+18.0 pts` (chart tooltip and screen-reader label only) |
 
@@ -170,7 +170,9 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
      beat the S&P 500; `{l}` lost money." (or "; none lost money.").
    - Axis header (46px): S&P label + ▼ notch on top, tick labels below (§6).
    - The scrolling window of rows (§5, §7).
-   - Caption under it (12px `--ink3`, `aria-live="polite"`): "Showing 1–15 of 50 · scale fits the funds in view".
+   - Caption under it (12px `--ink3`): "Showing 1–15 of 50 · scale fits the funds in view". It follows every row; a
+     visually hidden `aria-live="polite"` copy takes it only once the window has settled (300ms without a change), so a
+     glide is not read out row by row (build, review fix).
    - Source line above a `--line2` rule: "Source: SEC 13F filings; Orca estimates. S&P 500: SPY total return,
      {from} to {to}." (`from`/`to` = `spx.from_q`/`to_q` as "Q3 2021"; drop the S&P sentence when `spx` or
      `spx.ann_return` is null).
@@ -207,7 +209,7 @@ in view (owner: "start the axis even more on the left").
   for the first two visible rows place it below so the scroll box does not clip it.
 
 ### Phone (row 48px)
-Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **50px** (so the leader pill fits).
+Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **58px** (so the leader pill fits, up to "+313.3%"; built value, was 50px).
 Name block **left of the bar** (owner: not above it): line 1 name (12.5/16px 600, −0.005em, ellipsis);
 line 2 "AUM · manager" (11/14px `--ink3`: AUM, 3px dot, manager with ellipsis). Bar 14px, 2px tip radius.
 Label 11.5px 600. Leader pill 20px tall, 3px radius.
@@ -229,6 +231,9 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
 - **Tick choice**: 0% is always labelled. Others are multiples of the step that sit inside the domain with a
   margin (desktop ≥ 1 pt from the low end and ≥ 0.5 pt from the high end; phone ≥ 2 pts and ≥ 1 pt). Desktop step: 5 if span < 25 pts, 10 if span ≤ 60,
   else 20. **Phone: few labels** (owner): step 10 if span ≤ 25, else 20, so 0% plus one or two numbers.
+  Then (build, review fix: labels overlapped on narrow plots and very wide scales) the step is raised to the
+  smallest of 5, 10, 20, 40, 50, 100, 200, 500 that puts labels ≥ 48px apart on the measured plot width.
+  On a phone the axis's left column reads "Est. return a year" (the standfirst is hidden there).
   Ticks that turn on/off fade over 200ms; their positions follow the scale every frame (no transition on `left`).
 - AUM-inside-the-bar (white text) was tried as an alternative and is a Tweak only; default is AUM next to the name.
 
@@ -362,7 +367,7 @@ plus the new `--zero`. Bars use the dark ramps in §6.
   Table view. Reuse `Choice` (`web/src/components/Choice.tsx`, the home page's segmented control, a wrapper of `fund/Seg.tsx`) for the list, period and Chart | Table switches, the shared Tooltip (`useTooltip`, `web/src/charts/Tooltip.tsx`), `qOfYear` and the `lib/format.ts` / `pages/homeFmt.ts` helpers.
 - Pure, testable functions (put them in a `.ts` with vitest tests): `fundShortName`, `managerLine`,
   `aumLabel` (`$X.XB`), `shadeFor(ret, dark)`, `windowDomains(rows, VIS, innerW)` (§7.3 smoothing),
-  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone)`, `leadLine(rows, spx)`, `periodPhrase(period)`.
+  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone, innerW)`, `leadLine(rows, spx)`, `periodPhrase(period)`.
 - The glide (§7.2) as a small hook (`useEasedScroll(ref, onPosition)`) with rAF; it must no-op cleanly in jsdom
   (stub `requestAnimationFrame`, as `web/tests/idle.ts` does for idle callbacks).
 - Measure the plot width with `ResizeObserver` where available, falling back to the box's `clientWidth` on

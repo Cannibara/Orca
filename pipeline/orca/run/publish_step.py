@@ -19,6 +19,7 @@ from orca.home import (
     conviction_moves,
     crowded_buys,
     just_filed,
+    spx_window,
     top_funds,
     wins_losses,
 )
@@ -140,6 +141,9 @@ def publish_shared_files(
     # the home files change with filings only (the browser shows moves to the latest price).
     candidates = sorted({sid for s in snaps for sid, *_ in s.buys_recent})
     ctx.load(candidates)
+    if ctx.spy_id is not None:
+        ctx.load([ctx.spy_id])
+    spy_px = ctx.px.get(ctx.spy_id, {}) if ctx.spy_id is not None else {}
     q_close = {
         sid: ctx.px[sid][last_q].close
         for sid in candidates
@@ -166,6 +170,7 @@ def publish_shared_files(
         calls_q=calls(snaps, mcap, q_close, px_on_filed, "q", latest_q=last_q),
         calls_y=calls(snaps, mcap, q_close, px_on_filed, "y", latest_q=last_q),
         search_asof=search.asof if search else None,
+        spx={period: spx_window(spy_px, last_q, period) for period in PERIODS},
     )
 
     table = securities.with_columns(

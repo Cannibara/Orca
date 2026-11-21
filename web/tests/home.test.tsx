@@ -125,6 +125,21 @@ const byPopularity = (a: TopRow, b: TopRow) =>
   (a.rank ?? Infinity) - (b.rank ?? Infinity) ||
   (b.fame ?? 0) - (a.fame ?? 0) ||
   b.book - a.book;
+/** Home opens on Famous funds, on its chart: wait for the list to load. */
+const famousReady = () =>
+  screen.findByRole("heading", { level: 3, name: "Most searched" });
+/** Famous funds shows one list at a time: pick it on the list switch. */
+async function showList(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(
+    within(screen.getByRole("group", { name: "List" })).getByRole("button", { name }),
+  );
+}
+/** Famous funds' Chart | Table switch, to today's table. */
+async function showTable(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    within(screen.getByRole("group", { name: "View" })).getByRole("button", { name: "Table" }),
+  );
+}
 /** Home opens on Famous funds: switch to Top funds and wait for its table. */
 async function openTop(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("tab", { name: "Top funds" }));
@@ -151,7 +166,7 @@ describe("Home", () => {
   it("shows six tabs in order", async () => {
     stubData();
     renderHome();
-    await screen.findAllByRole("table"); // Famous funds has loaded
+    await famousReady();
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(TAB_NAMES);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -255,7 +270,11 @@ describe("Home", () => {
     expect(results()).not.toBeNull();
     await user.tab(); // out of the box (the search follows the tabs), onto the page below
     expect(box).not.toHaveFocus();
-    expect(screen.getByRole("button", { name: "1 year" })).toHaveFocus();
+    expect(
+      within(screen.getByRole("group", { name: "List" })).getByRole("button", {
+        name: "Most searched",
+      }),
+    ).toHaveFocus();
     expect(results()).toBeNull();
   });
 
@@ -325,7 +344,7 @@ describe("Home", () => {
     ).toBeGreaterThan(1);
   });
 
-  it("famous funds show one list per style, in order, with Top funds' columns, the manager and links to the fund", async () => {
+  it("the list switch offers Most searched then one list per style, in order; each list's table has Top funds' columns, the manager and links to the fund", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const famous = t3.famous ?? [];
     expect(new Set(famous.map((f) => f.group)).size).toBeGreaterThan(1);
@@ -342,16 +361,24 @@ describe("Home", () => {
     const panel = (
       await screen.findByRole("heading", { level: 2, name: "Famous funds" })
     ).closest("section")!;
-    await within(panel).findAllByRole("table");
+    await famousReady();
     const order = ["Value", "Tiger cubs", "Tech & growth"].filter((g) =>
       famous.some((f) => f.group === g),
     );
     expect(
-      within(panel)
-        .getAllByRole("heading", { level: 3 })
-        .map((h) => h.textContent),
+      within(within(panel).getByRole("group", { name: "List" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
     ).toEqual(["Most searched", ...order]);
+    await showTable(user);
     for (const group of order) {
+      await showList(user, group);
+      // one list at a time
+      expect(
+        within(panel)
+          .getAllByRole("heading", { level: 3 })
+          .map((h) => h.textContent),
+      ).toEqual([group]);
       const table = within(panel).getByRole("table", { name: group });
       expect(
         within(table)
@@ -377,16 +404,20 @@ describe("Home", () => {
         ).toBeInTheDocument();
     }
     // Kelpwood is in two lists, and in Most searched
-    expect(
-      within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" })
-        .length,
-    ).toBe(3);
+    for (const list of ["Tech & growth", "Tiger cubs", "Most searched"]) {
+      await showList(user, list);
+      expect(
+        within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }),
+      ).toHaveLength(1);
+    }
     // a fund that stopped filing is listed, with its last quarter by its manager
+    await showList(user, "Value");
     expect(
       within(within(panel).getByRole("table", { name: "Value" })).getByText(
         "Mara Cobble · filed until Q4 2023",
       ),
     ).toBeInTheDocument();
+    await showList(user, order[0]);
     const first = within(
       within(panel).getByRole("table", { name: order[0] }),
     ).getAllByRole("link")[0];
@@ -409,7 +440,10 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    const table = await screen.findByRole("table", { name: "Value" });
+    await famousReady();
+    await showTable(user);
+    await showList(user, "Value");
+    const table = screen.getByRole("table", { name: "Value" });
     const names = () =>
       within(table)
         .getAllByRole("row")
@@ -445,13 +479,13 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
+    await famousReady();
+    await showTable(user);
     await user.click(screen.getByRole("button", { name: "1 year" }));
+    const table = await screen.findByRole("table", { name: "Most searched" });
     await waitFor(() =>
-      expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent(
-        "Most searched",
-      ),
+      expect(within(table).getAllByRole("row")).toHaveLength(read.length + 1),
     );
-    const table = screen.getByRole("table", { name: "Most searched" });
     expect(
       within(table)
         .getAllByRole("columnheader")
@@ -468,13 +502,17 @@ describe("Home", () => {
     expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
       read.map((r) => r.name),
     );
-    expect(screen.getByText("The famous funds investors look up most.")).toBeInTheDocument();
+    // the list's line is not shown; it describes the section for screen readers
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Famous funds" }).closest("section"),
+    ).toHaveAccessibleDescription("The famous funds investors look up most.");
     expect(screen.queryByText(/Google Trends/)).toBeNull();
   });
 
-  it("famous lists page on their own, 10 funds a page, and all follow the one period switch", async () => {
+  it("a famous list's table pages on its own, 10 funds a page; a new list starts on page 1; the switches survive a tab change", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const row = (t3.famous ?? [])[0];
+    expect(row.search).toBeNull(); // so these lists have no Most searched
     const many = (group: string, n: number, base: number) =>
       Array.from({ length: n }, (_, i) => ({
         ...row,
@@ -492,34 +530,60 @@ describe("Home", () => {
     });
     const user = userEvent.setup();
     renderHome();
-    const value = await screen.findByRole("table", { name: "Value" });
-    const macro = screen.getByRole("table", { name: "Macro" });
-    const names = (t: HTMLElement) =>
-      within(t)
+    // no Most searched: the first list opens, on the chart's scrolling window
+    await screen.findByRole("heading", { level: 3, name: "Value" });
+    expect(
+      screen.getByRole("region", { name: "Funds 1 to 15 of 25, scrollable" }),
+    ).toBeInTheDocument();
+    await showTable(user);
+    const names = () =>
+      within(screen.getByRole("table"))
         .getAllByRole("row")
         .slice(1)
         .map((r) => within(r).getByRole("link").textContent);
-    expect(names(value)).toHaveLength(10);
+    expect(names()).toHaveLength(10);
     expect(screen.getByText("Showing 1–10 of 25 funds")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(names()[0]).toBe("Value 11");
+    await showList(user, "Macro");
     expect(screen.getByText("Showing 1–10 of 12 funds")).toBeInTheDocument();
-    const valuePager = screen
-      .getByText("Showing 1–10 of 25 funds")
-      .closest("nav")!;
-    await user.click(within(valuePager).getByRole("button", { name: "Next" }));
-    expect(names(value)[0]).toBe("Value 11");
-    expect(names(macro)[0]).toBe("Macro 01"); // the other list stays on its page
+    expect(names()[0]).toBe("Macro 01");
+    await showList(user, "Value");
+    expect(names()[0]).toBe("Value 01"); // back on page 1
+    // the one period switch: the 1-year file has no Macro
     await user.click(screen.getByRole("button", { name: "1 year" }));
     await waitFor(() =>
-      expect(screen.queryByRole("table", { name: "Macro" })).toBeNull(),
+      expect(
+        within(screen.getByRole("group", { name: "List" })).queryByRole(
+          "button",
+          { name: "Macro" },
+        ),
+      ).toBeNull(),
     );
     const groups = new Set((t1.famous ?? []).map((f) => f.group));
     for (const g of groups)
-      expect(screen.getByRole("table", { name: g })).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("group", { name: "List" })).getByRole("button", {
+          name: g,
+        }),
+      ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("table", { name: "Value" }),
+    ).toBeInTheDocument(); // Value is in both files, so it stays
     await user.click(screen.getByRole("tab", { name: "Top funds" }));
     expect(screen.getByRole("button", { name: "1 year" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    await user.click(screen.getByRole("tab", { name: "Famous funds" }));
+    expect(
+      await screen.findByRole("table", { name: "Value" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "View" })).getByRole("button", {
+        name: "Table",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("famous funds explain a file built before the list existed", async () => {
@@ -555,7 +619,7 @@ describe("Home", () => {
     expect(
       screen.getByText("Quarterly 13F Data from SEC.gov"),
     ).toBeInTheDocument();
-    await screen.findAllByRole("table");
+    await famousReady();
     expect(screen.queryByText(/Who qualifies/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Orca estimates what they paid/),
@@ -689,7 +753,7 @@ describe("Home", () => {
     stubData();
     const user = userEvent.setup();
     renderHome();
-    await screen.findAllByRole("table");
+    await famousReady();
 
     const rules: [string, RegExp, string[]][] = [
       [
@@ -888,7 +952,7 @@ describe("Home", () => {
     renderHome();
     expect(screen.getByRole("status")).toHaveTextContent("Loading…");
     expect(screen.getByRole("group", { name: "Period" })).toBeInTheDocument();
-    await screen.findAllByRole("table");
+    await famousReady();
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -1185,6 +1249,6 @@ describe("Home", () => {
     expect(
       await screen.findByText(/search isn.t available/i),
     ).toBeInTheDocument();
-    await screen.findAllByRole("table"); // lists unaffected
+    await famousReady(); // lists unaffected
   });
 });

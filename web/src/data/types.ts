@@ -260,6 +260,9 @@ export type TopRow = {
   rank?: number | null;
 };
 
+/** S&P 500 (SPY) total return, dividends reinvested, over the same window as the fund figures. from_q is the quarter of the base close. */
+export type SpxWindow = { ann_return: number | null; from_q: number; to_q: number };
+
 /** top_{1y|3y|5y|10y|15y|max}.json */
 export type TopList = {
   latest_q: number;
@@ -270,6 +273,8 @@ export type TopList = {
   famous?: TopRow[];
   /** The date of the Google Trends snapshot behind Most searched (12 months to it); missing in older files. */
   search_asof?: string | null;
+  /** SPY total return for the period; null for max or when SPY lacks a quarter; missing in files built before 2026-11-21. */
+  spx?: SpxWindow | null;
 };
 
 /** conviction, just_filed, crowded, calls_q, calls_y */
