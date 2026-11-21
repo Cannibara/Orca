@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -724,6 +725,21 @@ function FamousFunds({
   const now = lists.map((l) => l.name);
   if (now.length > 0 && now.join("\n") !== names.join("\n")) setNames(now);
   const listOptions = useMemo(() => names.map((id) => ({ id, label: id })), [names]);
+  // The pressed list can sit out of view in the sideways switch: a list chosen before coming back to this
+  // tab, or Most searched after a period without the list. Scroll the switch, never the page (as
+  // scrollIntoView could), so the pressed one shows whole.
+  const listBox = useRef<HTMLDivElement>(null);
+  const pressed = shown?.name;
+  useLayoutEffect(() => {
+    const box = listBox.current;
+    const b = box?.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    if (!box || !b) return;
+    const s = box.getBoundingClientRect();
+    const r = b.getBoundingClientRect();
+    const pad = 16;
+    if (r.left < s.left) box.scrollLeft -= s.left - r.left + pad;
+    else if (r.right > s.right) box.scrollLeft += r.right - s.right + pad;
+  }, [pressed, names]);
   // The chart's bars grow in again on a new list, new figures, and coming back from the table.
   const [run, setRun] = useState({ n: 0, rows, name: shown?.name, view });
   if (run.rows !== rows || run.name !== shown?.name || run.view !== view)
@@ -809,7 +825,7 @@ function FamousFunds({
       </div>
       <div className="fam-ctl">
         {names.length > 0 && (
-          <div className="fam-lists">
+          <div className="fam-lists" ref={listBox}>
             <Choice
               label="List"
               options={listOptions}

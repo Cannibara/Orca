@@ -109,7 +109,9 @@
 .fp .famous.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* one column, not wrapped: a wrapping column would stretch the list switch to its full scrolling width */
 .fp .famous.phone .fam-ctl{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}
-.fp .famous.phone .fam-lists{flex:none}
+/* a phone swipes the switch sideways: no scrollbar under it (the desktop keeps a thin one for the mouse) */
+.fp .famous.phone .fam-lists{flex:none;scrollbar-width:none}
+.fp .famous.phone .fam-lists::-webkit-scrollbar{display:none}
 .fp .famous.phone .fam-opts{gap:8px}
 .fp .famous.phone .fam-opts>.seg:first-child{flex:1 1 auto;min-width:0}
 .fp .famous.phone .fam-opts>.seg:last-child{flex:none}

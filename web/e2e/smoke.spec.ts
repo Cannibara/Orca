@@ -254,7 +254,7 @@ for (const width of widths) {
       const win = page.locator("section.famous .fc.scrolls .fc-win");
       await expect(win).toBeVisible();
       const rows = page.locator("section.famous .fc-row");
-      expect(await rows.count()).toBe(50);
+      await expect(rows).toHaveCount(50); // retries until the list has rendered
       const cap = page.locator("section.famous .fc-cap");
       await expect(cap).toHaveText(/^Showing 1–\d+ of 50 /);
 
@@ -271,6 +271,37 @@ for (const width of widths) {
 
       const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("the pressed list stays in view in the sideways list switch", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: "5 years", exact: true }).click();
+      const lists = page.getByRole("group", { name: "List" });
+      const box = page.locator("section.famous .fam-lists");
+      const pressedInView = () =>
+        box.evaluate((el) => {
+          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+          const s = el.getBoundingClientRect();
+          return b.left >= s.left - 1 && b.right <= s.right + 1;
+        });
+      // a thin scrollbar for a mouse on a desktop, none under a phone's swipe
+      expect(await box.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe(width < 560 ? "none" : "thin");
+
+      // the last list, then another tab and back: the switch is drawn afresh, scrolled to the pressed list
+      await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("tab", { name: "Famous funds" }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
+      await expect.poll(pressedInView).toBe(true);
+
+      // a period without that list (the demo's 1 year) falls back to Most searched, the first button
+      await box.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+      await page.getByRole("button", { name: "1 year", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
+      await expect(lists.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(pressedInView).toBe(true);
       expect(errors).toEqual([]);
     });
   });
