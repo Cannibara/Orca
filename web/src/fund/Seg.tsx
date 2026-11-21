@@ -70,7 +70,8 @@ export function Seg({ label, options, value, onChange, className }: SegProps) {
           }}
         >
           {o.icon}
-          {o.label}
+          {/* with an icon the word is its own element, so a narrow layout can hide it and keep it as the name */}
+          {o.icon ? <span className="sl">{o.label}</span> : o.label}
         </button>
       ))}
     </div>
