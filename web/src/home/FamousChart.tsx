@@ -156,7 +156,7 @@ export function FamousChart({
   const span = dom.hi - dom.lo;
   const at = (v: number) => (Math.max(dom.lo, Math.min(dom.hi, v)) - dom.lo) / span;
   const zero = at(0);
-  const on = new Set(ticksFor(dom, phone));
+  const on = new Set(ticksFor(dom, phone, innerW));
   const step = stepFor(Math.min(n, M.vis));
   const first = view + 1;
   const last = Math.min(n, view + M.vis);

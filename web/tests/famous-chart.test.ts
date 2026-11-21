@@ -11,6 +11,7 @@ import {
   shadeFor,
   sourceLine,
   standfirst,
+  tickStep,
   ticksFor,
   vsLabel,
   windowDomains,
@@ -140,22 +141,44 @@ describe("windowDomains / domainAt", () => {
 });
 
 describe("ticksFor (6)", () => {
+  // the plot's inner width: desktop at 1280 (1184 − 266 columns − 56 inset), a 400px phone (352 − 164 − 50)
+  const DESK = 864;
+  const PH = 138;
   it("desktop: step by span, margin keeps the end ticks off the edge", () => {
-    expect(ticksFor({ lo: 0, hi: 30 }, false)).toEqual([0, 10, 20]);
-    expect(ticksFor({ lo: 0, hi: 20 }, false)).toEqual([0, 5, 10, 15]);
-    expect(ticksFor({ lo: -66, hi: 128 }, false)).toEqual(expect.arrayContaining([-60, 0, 120]));
-    expect(ticksFor({ lo: -25, hi: 12.5 }, false)).toEqual([-20, -10, 0, 10]);
+    expect(ticksFor({ lo: 0, hi: 30 }, false, DESK)).toEqual([0, 10, 20]);
+    expect(ticksFor({ lo: 0, hi: 20 }, false, DESK)).toEqual([0, 5, 10, 15]);
+    expect(ticksFor({ lo: -66, hi: 128 }, false, DESK)).toEqual(expect.arrayContaining([-60, 0, 120]));
+    expect(ticksFor({ lo: -25, hi: 12.5 }, false, DESK)).toEqual([-20, -10, 0, 10]);
   });
   it("phone: few labels", () => {
-    expect(ticksFor({ lo: 0, hi: 30 }, true)).toEqual([0, 20]);
-    expect(ticksFor({ lo: 0, hi: 22 }, true)).toEqual([0, 10, 20]);
+    expect(ticksFor({ lo: 0, hi: 30 }, true, PH)).toEqual([0, 20]);
+    expect(ticksFor({ lo: 0, hi: 22 }, true, PH)).toEqual([0, 10, 20]);
   });
-  it("phone: a wide range steps by 40 so only 0 and one or two numbers show (spec 6)", () => {
-    expect(ticksFor({ lo: -62, hi: 14 }, true)).toEqual([-40, 0]);
-    expect(ticksFor({ lo: -62, hi: 14 }, false)).toEqual(expect.arrayContaining([-60, -40, 0])); // desktop unchanged
+  it("raises the step until labels sit at least 56px apart", () => {
+    expect(ticksFor({ lo: -62, hi: 14 }, true, PH)).toEqual([-40, 0]); // 20 would be 36px apart
+    expect(ticksFor({ lo: -62, hi: 14 }, false, DESK)).toEqual([-60, -40, -20, 0]); // desktop keeps 20
+    expect(tickStep(76, true, PH)).toBe(40);
+    expect(tickStep(30, false, DESK)).toBe(10);
+  });
+  it("a wide range (1y Venture capital) never overlaps, on a phone or a narrow desktop plot", () => {
+    const dom = { lo: -21, hi: 302 };
+    for (const [phone, w] of [
+      [true, PH],
+      [false, PH],
+      [true, 500],
+      [false, 500],
+    ] as const) {
+      const t = ticksFor(dom, phone, w);
+      expect(t).toContain(0);
+      expect(t.length).toBeGreaterThan(1);
+      const px = t.map((v) => ((v - dom.lo) / (dom.hi - dom.lo)) * w);
+      px.slice(1).forEach((x, i) => expect(x - px[i]).toBeGreaterThanOrEqual(56));
+    }
+    expect(ticksFor(dom, true, PH)).toEqual([0, 200]);
+    expect(ticksFor(dom, false, 500)).toEqual([0, 40, 80, 120, 160, 200, 240, 280]);
   });
   it("is ascending, always includes 0, and has no negative zero", () => {
-    const t = ticksFor({ lo: -40, hi: 3 }, false);
+    const t = ticksFor({ lo: -40, hi: 3 }, false, DESK);
     expect(t).toContain(0);
     expect([...t].sort((a, b) => a - b)).toEqual(t);
     expect(t.some((x) => Object.is(x, -0))).toBe(false);

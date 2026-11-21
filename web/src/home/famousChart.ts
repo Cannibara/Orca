@@ -87,10 +87,23 @@ export function domainAt(track: Track, p: number): Dom {
   return { lo: Math.min(cr("lo"), lin("lo")), hi: Math.max(cr("hi"), lin("hi")) };
 }
 
-/** Axis tick values (points): 0 always, other multiples of the step that sit inside the domain with a margin. */
-export function ticksFor(dom: Dom, phone: boolean): number[] {
-  const span = dom.hi - dom.lo;
-  const step = phone ? (span <= 25 ? 10 : span <= 60 ? 20 : 40) : span < 25 ? 5 : span <= 60 ? 10 : 20;
+/** Steps a tick may take, smallest first. */
+const STEPS = [5, 10, 20, 40, 50, 100, 200, 500];
+/** px: the least room between two tick labels ("+300%" is about 30px wide at 11px; this keeps a clear gap). */
+const TICK_GAP = 56;
+
+/** The tick step: the spec's by span (desktop 5/10/20, phone 10/20), raised until labels sit TICK_GAP px apart. */
+export function tickStep(span: number, phone: boolean, innerW: number): number {
+  const base = phone ? (span <= 25 ? 10 : 20) : span < 25 ? 5 : span <= 60 ? 10 : 20;
+  return STEPS.find((s) => s >= base && (s * innerW) / span >= TICK_GAP) ?? STEPS[STEPS.length - 1];
+}
+
+/**
+ * Axis tick values (points): 0 always, other multiples of the step that sit inside the domain with a margin.
+ * `innerW` is the plot's inner width in px, so labels never crowd on a narrow plot or a wide range.
+ */
+export function ticksFor(dom: Dom, phone: boolean, innerW: number): number[] {
+  const step = tickStep(dom.hi - dom.lo, phone, innerW);
   const mLo = phone ? 2 : 1;
   const mHi = phone ? 1 : 0.5;
   const out = new Set<number>([0]);
