@@ -114,6 +114,26 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
+    // The sector choice vs stock choice panels (spec 2026-11-21): laid out for real at both widths; a fund
+    // without a sector file shows the tab as it was.
+    test("fund page, Analysis: the four sector panels, and none for a fund without a sector file", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}#analysis`);
+      for (const name of ["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]) {
+        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      }
+      await page.getByRole("button", { name: "Lines", exact: true }).click();
+      await expect(page.locator(".stkp path.ln")).toHaveCount(4);
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+
+      await page.route(`**/fund/${fundId}/skill.json`, (route) => route.fulfill({ status: 404, body: "" }));
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Assets under management", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Annual return stacked graph", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("heading", { name: "What kind of investor?", exact: true })).toHaveCount(0);
+    });
+
     // jsdom has no layout, so only here can the landing be watched as a real page runs it (the first draw used to
     // be cut short by the width being measured a moment later, and the tiles began in a neutral colour).
     test("fund page: the tree map forms on landing, every tile in its final colour from its first frame", async ({ page }) => {

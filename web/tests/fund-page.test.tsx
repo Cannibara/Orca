@@ -425,7 +425,7 @@ describe("Fund page", () => {
       expect(within(region("What if they'd kept it")).getAllByRole("row")).toHaveLength(23);
     });
 
-    it("asks for the fund's files and the three shared files, each once, and for nothing else", async () => {
+    it("asks for the fund's files, the three shared files and (on Analysis) the sector files, each once, and for nothing else", async () => {
       const urls = stubData();
       renderAnalysis();
       await loaded("Kelpwood Capital LP");
@@ -438,7 +438,12 @@ describe("Fund page", () => {
         `fund/${FUND}/positions.json`,
         `fund/${FUND}/contrib.json`,
         `fund/${FUND}/exits.json`,
+        // the sector panels: the fund's file, then the map's peers (funds.json is already loaded)
+        `fund/${FUND}/skill.json`,
+        "sectors/scores.json",
+        "home/top_max.json",
       ].map((p) => `${base}/${p}`);
+      await screen.findByRole("heading", { name: "Which decisions made the gap" }, { timeout: 3000 }); // the panels, not their skeletons
       expect([...urls].sort()).toEqual([...expected].sort());
     });
 

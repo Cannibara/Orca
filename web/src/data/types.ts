@@ -353,3 +353,83 @@ export type HomeFiles = {
 };
 
 export type HomeName = keyof HomeFiles;
+
+// ---- sector files (contract.md, Sector files): written by the sector step, so a fund may have none -------
+
+/** fund/{id}/skill.json: the fund's trades replayed in its stocks, its labels' indices, the market and SPY. */
+export type Skill = {
+  last_q: number;
+  first_q: number;
+  quarters: SkillQuarters;
+  years: SkillYears;
+  tiers: Record<"1" | "2" | "3", SkillTier>;
+  mix: SkillMix;
+};
+
+/** One entry per quarter from first_q to last_q: returns are fractions (null where the replay held nothing), values dollars. */
+export type SkillQuarters = {
+  q: number[];
+  bought: number[];
+  fund: (number | null)[];
+  mkt: (number | null)[];
+  spy: (number | null)[];
+  v_fund: (number | null)[];
+  v_mkt: (number | null)[];
+  v_spy: (number | null)[];
+};
+
+/** One entry per calendar year, labelled as summary.json years ("2025", "2026 H1"). */
+export type SkillYears = {
+  name: string[];
+  fund: (number | null)[];
+  mkt: (number | null)[];
+  spy: (number | null)[];
+};
+
+/** One tier: 1 sector, 2 industry, 3 vertical (shown as "sub-industry"). IRRs are fractions a year. */
+export type SkillTier = {
+  irr_fund: number | null;
+  irr_label: number | null;
+  irr_mkt: number | null;
+  irr_spy: number | null;
+  picking: number | null;
+  allocation: number | null;
+  coverage: number | null;
+  n: number | null;
+  quarters: { label: (number | null)[]; v_label: (number | null)[]; v_never: (number | null)[] | null };
+  years: { label: (number | null)[] };
+  /** The 30 biggest positions by dollars bought, then one row (stock_id null) for the rest. */
+  picks: { stock_id: (number | null)[]; label: (string | null)[]; bought: number[]; irr_own: (number | null)[]; irr_label: (number | null)[] };
+  /** Every label bought, most money first (tier 1: every sector, unbought ones with bought 0). */
+  bets: { label: string[]; bought: number[]; irr: (number | null)[]; irr_mkt: (number | null)[]; mkt_share: (number | null)[] };
+};
+
+/** The book by vertical path ("A > B > C"; groupings in parentheses); share[i] runs over q. */
+export type SkillMix = {
+  q: number[];
+  label: string[];
+  share: number[][];
+};
+
+/** sectors/labels.json */
+export type SectorLabels = {
+  last_q: number;
+  label: string[];
+  tier: number[];
+  parent: (string | null)[];
+  name: string[];
+  n: number[];
+  top_weight: (number | null)[];
+};
+
+/** sectors/scores.json: one row per scored fund and tier. */
+export type SectorScores = {
+  last_q: number;
+  fund_id: number[];
+  tier: number[];
+  picking: (number | null)[];
+  allocation: (number | null)[];
+  n: number[];
+  coverage: (number | null)[];
+  span_q: number[];
+};

@@ -46,6 +46,20 @@
   --tm-gain-lo:#C4ECDC;
   --tm-loss:#D60F25;
   --tm-loss-lo:#FBCDD1;
+  /* the fund page's sector mix only: one muted colour per sector, kept away from the gain blue and loss orange */
+  --sec-technology:#7A5FA8;
+  --sec-healthcare:#3E8E87;
+  --sec-financials:#B5667A;
+  --sec-energy:#8A8F3C;
+  --sec-consumer:#C4A35A;
+  --sec-communication:#6B7B8C;
+  --sec-industrials:#8C6A4F;
+  --sec-materials:#5E8C5A;
+  --sec-utilities:#9C5FA0;
+  --sec-property:#7F8A6E;
+  --sec-business-services:#8A7F9E;
+  --sec-defence:#5B6B4E;
+  --sec-none:var(--line2);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --page:#181512;
@@ -84,6 +98,19 @@
   --tm-gain-lo:#1C4538;
   --tm-loss:#FF4155;
   --tm-loss-lo:#4F2227;
+  --sec-technology:#A58FD0;
+  --sec-healthcare:#5FB5AD;
+  --sec-financials:#D58A9D;
+  --sec-energy:#B3B862;
+  --sec-consumer:#D9BC74;
+  --sec-communication:#93A3B5;
+  --sec-industrials:#B48E70;
+  --sec-materials:#86B381;
+  --sec-utilities:#C58AC9;
+  --sec-property:#A7B295;
+  --sec-business-services:#B1A7C4;
+  --sec-defence:#8A9A7B;
+  --sec-none:var(--line2);
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --page:#181512;
@@ -122,4 +149,17 @@
   --tm-gain-lo:#1C4538;
   --tm-loss:#FF4155;
   --tm-loss-lo:#4F2227;
+  --sec-technology:#A58FD0;
+  --sec-healthcare:#5FB5AD;
+  --sec-financials:#D58A9D;
+  --sec-energy:#B3B862;
+  --sec-consumer:#D9BC74;
+  --sec-communication:#93A3B5;
+  --sec-industrials:#B48E70;
+  --sec-materials:#86B381;
+  --sec-utilities:#C58AC9;
+  --sec-property:#A7B295;
+  --sec-business-services:#B1A7C4;
+  --sec-defence:#8A9A7B;
+  --sec-none:var(--line2);
   color-scheme:dark}

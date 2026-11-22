@@ -77,6 +77,9 @@ const MAP: Record<string, string[]> = {
   "fund/{id}/contrib.json": ["Contrib", "ContribYear"],
   "fund/{id}/exits.json": ["Exits", "ExitsRows", "ExitsSummary"],
   "stock/{stock_id}/weekly.json": ["Weekly"],
+  "sectors/labels.json": ["SectorLabels"],
+  "sectors/scores.json": ["SectorScores"],
+  "fund/{id}/skill.json": ["Skill", "SkillQuarters", "SkillYears", "SkillMix"],
 };
 
 describe("the contract's Files section", () => {
@@ -104,6 +107,9 @@ describe("the demo data has the documented top-level keys", () => {
     ["fund/{id}/contrib.json", "fund/9100001/contrib.json"],
     ["fund/{id}/exits.json", "fund/9100001/exits.json"],
     ["stock/{stock_id}/weekly.json", "stock/1/weekly.json"],
+    ["sectors/labels.json", "sectors/labels.json"],
+    ["sectors/scores.json", "sectors/scores.json"],
+    ["fund/{id}/skill.json", "fund/9100001/skill.json"],
   ];
   for (const [path, file] of cases) {
     it(file, () => {

@@ -30,7 +30,7 @@ function tipFor(y: YearPoint): TipContent {
 }
 
 /** The toggle's icon: a table when it offers the numbers, bars when it offers the chart. */
-function ViewIcon({ table }: { table: boolean }) {
+export function ViewIcon({ table }: { table: boolean }) {
   return (
     <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
       {table ? (
