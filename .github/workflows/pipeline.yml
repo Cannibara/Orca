@@ -53,7 +53,7 @@ on:
         type: boolean
         default: false
       sectors_only:
-        description: Sector indices and fund scores only (share counts, indices, scores; nothing published)
+        description: Sector indices, fund scores and the fund page's sector files only (no monthly run)
         type: boolean
         default: false
       backfill:
@@ -128,7 +128,8 @@ jobs:
           access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           endpoint: ${{ secrets.R2_ENDPOINT }}
-      - name: Run the pipeline
+      - id: run
+        name: Run the pipeline
         timeout-minutes: 300
         env:
           ORCA_COMMAND: ${{ inputs.backfill && 'backfill' || (inputs.sectors_only && 'sectors' || (inputs.home_only && 'home' || (inputs.full && 'rebuild' || 'weekly'))) }}
@@ -406,6 +407,73 @@ jobs:
             export "$v=${!v//[[:space:]]/}"
           done
           rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "fund_skill.parquet" --include "etf_ranks.parquet"
+      - id: sector_files
+        name: Sector files (fund page, staged)
+        # The fund page's sector choice vs stock choice panels (spec 2026-11-21): sectors/*.json and each scored
+        # fund's fund/{id}/skill.json, staged in data/out/sectors_staging, and their paths added to
+        # data/out/manifest.json (the one just uploaded, or the restored one in a sectors_only run). Lake only in,
+        # nothing in the lake changes. A failure here never touches the monthly run's files.
+        if: steps.scores.outcome == 'success' || (inputs.sectors_only && steps.run.outcome == 'success')
+        continue-on-error: true
+        timeout-minutes: 90  # a local 640,000-trade chunk took 2.6x the scores' time: ~40 min for every fund
+        env:
+          PART: publish
+        run: |
+          echo 1000 > /proc/self/oom_score_adj
+          (
+            while sleep 30; do
+              echo "resources: memory $(free -m | awk 'NR==2 {print $3 " of " $2 " MB"}'), disk $(df -h --output=used,avail . | tail -n 1 | xargs) used/free"
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor"' EXIT
+          uv run --locked --no-dev python -m orca.run sectors --part "$PART"
+      - id: sector_upload
+        name: Upload the sector files, then the manifest
+        if: steps.sector_files.outcome == 'success'
+        continue-on-error: true
+        env:
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          for v in RCLONE_CONFIG_R2_ACCESS_KEY_ID RCLONE_CONFIG_R2_SECRET_ACCESS_KEY RCLONE_CONFIG_R2_ENDPOINT; do
+            export "$v=${!v//[[:space:]]/}"
+          done
+          headers=(
+            --header-upload "Content-Encoding: br"
+            --header-upload "Content-Type: application/json"
+            --header-upload "Cache-Control: public, max-age=300"
+          )
+          # The same headers as the monthly upload; the manifest last, so it never names a file not yet there.
+          rclone copy data/out/sectors_staging "r2:${R2_SITE_BUCKET}" --include "*.json" --ignore-times \
+            --transfers 64 --checkers 64 --s3-no-head "${headers[@]}"
+          rclone copyto data/out/manifest.json "r2:${R2_SITE_BUCKET}/manifest.json" --ignore-times "${headers[@]}"
+      - name: Clear the Cloudflare cache after the sector files
+        # As "Clear the Cloudflare cache" above (see it for what each failure means), once more for the new files.
+        if: steps.sector_upload.outcome == 'success'
+        continue-on-error: true
+        env:
+          CF_PURGE_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
+          CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
+        run: |
+          token="${CF_PURGE_TOKEN//[[:space:]]/}"
+          zone="${CF_ZONE_ID//[[:space:]]/}"
+          if [ -z "$token" ] || [ -z "$zone" ]; then
+            echo "::notice::The Cloudflare cache was not cleared (CF_PURGE_TOKEN or CF_ZONE_ID is missing)."
+            exit 0
+          fi
+          response="$RUNNER_TEMP/cloudflare-purge-sectors.json"
+          status="$(curl --silent --show-error --max-time 60 --retry 3 \
+            --request POST --header "Authorization: Bearer ${token}" --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}' --output "$response" --write-out '%{http_code}' \
+            "https://api.cloudflare.com/client/v4/zones/${zone}/purge_cache")" || status=000
+          if [[ "$status" =~ ^2[0-9][0-9]$ ]] && jq -e '.success == true' "$response" > /dev/null 2>&1; then
+            echo "The Cloudflare cache is cleared."
+            exit 0
+          fi
+          echo "::error::Cloudflare did not clear the cache (HTTP ${status}); run Actions > Purge cache by hand."
+          exit 1
   verify:
     # These strings must equal the cron entries above.
     if: github.event.schedule == '41 7 1 * *' && vars.ORCA_SCHEDULE_ENABLED == 'true'

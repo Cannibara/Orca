@@ -29,7 +29,7 @@ from orca.engine.position import Trade
 from orca.home import ConvictionQuarter, FundSnapshot
 from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, HISTORY_START, FixtureSource
-from orca.publish import FundMeta, FundOutput, read_json
+from orca.publish import FundMeta, FundOutput, read_json, write_json
 from orca.quarter_px import QuarterPx, close_on
 from orca.quarters import q_end, q_index
 from orca.run import (
@@ -555,6 +555,22 @@ def test_a_run_whose_upload_never_happened_is_republished_by_the_next_run(
     assert not state.pending_funds and not state.pending_weekly
 
 
+def test_the_sector_steps_files_are_carried_over_and_never_owed(fixtures, base_runs, tmp_path, caplog):
+    # The sector step adds its files to the site's manifest after a run (run/sectors_step.publish_sectors); the
+    # lake's published.json never lists them. The next run must neither republish those funds nor drop the files.
+    inc = from_base(base_runs, WEEK2, tmp_path)
+    site = read_json(inc / "out" / "manifest.json")
+    site["files"][f"fund/{KELPWOOD}/skill.json"] = "a" * 64
+    site["files"]["sectors/scores.json"] = "b" * 64
+    write_json(inc / "out" / "manifest.json", site)
+    caplog.set_level(logging.WARNING)
+
+    run(inc, fixture_sources(fixtures), WEEK3)
+
+    assert "the site is behind" not in caplog.text
+    assert manifest(inc)[f"fund/{KELPWOOD}/skill.json"] == "a" * 64 and manifest(inc)["sectors/scores.json"] == "b" * 64
+
+
 def test_a_first_run_whose_upload_never_happened_is_republished_whole(tmp_path):
     widget = Holding("WIDGET CORP", WIDGET, 400.0, 10)
     small = small_fixtures({Q1_24: [widget], Q2_24: [widget]})
@@ -584,6 +600,16 @@ def test_demo_cli_writes_twelve_funds(tmp_path, fixtures):
         p.relative_to(out).as_posix() for p in out.rglob("*.json") if p.name != "manifest.json"
     )
     assert demo.build_fixtures(7).zips == fixtures.zips  # seeded: the same inputs every time
+    # the sector step's files, for every demo fund (contract.md, Sector files)
+    skill = json.loads((out / "fund" / str(funds["id"][0]) / "skill.json").read_text())
+    assert set(skill) == {"last_q", "first_q", "quarters", "years", "tiers", "mix"} and set(skill["tiers"]) == {"1", "2", "3"}
+    assert set(skill["tiers"]["2"]) == {"irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation", "coverage", "n",
+                                        "quarters", "years", "picks", "bets"}  # fmt: skip
+    assert len(skill["quarters"]["q"]) == len(skill["quarters"]["v_fund"]) == len(skill["tiers"]["3"]["quarters"]["label"])
+    assert len(skill["tiers"]["1"]["bets"]["label"]) == len(json.loads((out / "sectors" / "labels.json").read_text())["tier"]) - sum(
+        t > 1 for t in json.loads((out / "sectors" / "labels.json").read_text())["tier"])  # fmt: skip
+    scores = json.loads((out / "sectors" / "scores.json").read_text())
+    assert sorted(set(scores["fund_id"])) == sorted(funds["id"]) and set(scores["tier"]) == {1, 2, 3}
 
     (tmp_path / "other").mkdir()
     (tmp_path / "other" / "notes.txt").write_text("keep me")

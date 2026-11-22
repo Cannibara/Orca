@@ -13,7 +13,8 @@ and new-holdings amendments (one restating a 2019 quarter, filed in October 2026
 missed quarter, a two-quarter gap, a fund gone inactive, a young fund, a late filer, an early
 filer of the next quarter, options and a bond, a reported value off by 100x and a position that
 triples exactly. Each fund but Cobblereef has an invented SEC record and 13F cover pages for the About
-tab (`DEMO_ABOUT`), served in the SEC's shapes to the real `sec.about.fetch_about`.
+tab (`DEMO_ABOUT`), served in the SEC's shapes to the real `sec.about.fetch_about`. The sector files
+(`sectors/*.json`, `fund/{id}/skill.json`) come from the real sector step run on the demo lake.
 """
 
 import io
@@ -935,8 +936,15 @@ def write_demo(out: Path, seed: int = 7, compress: bool = True) -> int:
             compress=compress,
             built=built,
         )
+        # The sector files, as the workflow's sector steps make them after the monthly run (indices, then files)
+        from orca.run.sectors_step import SECTOR_STAGING, publish_sectors, recompute
+        from orca.run.state import State
+
+        recompute(lake, None, part="indices")
+        publish_sectors(lake, out_root, State.load(lake).last_q, [], compress=compress, built=built)
         _clear_demo(out)
         copy_published(stats.staging, out_root, out)
+        copy_published(out_root / SECTOR_STAGING, out_root, out)
     return sum(1 for _ in out.rglob("*.json"))
 
 
