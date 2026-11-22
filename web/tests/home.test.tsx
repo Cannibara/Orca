@@ -376,7 +376,7 @@ describe("Home", () => {
     expect(
       within(within(panel).getByRole("group", { name: "List" }))
         .getAllByRole("button")
-        .map((b) => b.textContent),
+        .map((b) => b.querySelector(".nm")?.textContent),
     ).toEqual(["Most searched", ...order]);
     await showTable(user);
     for (const group of order) {

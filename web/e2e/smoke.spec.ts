@@ -25,6 +25,9 @@ const routes = [
   { name: "not found", path: "/no-such-page" },
 ];
 const widths = [1280, 400];
+/** The period button's name at a width: a phone shows the short ones (1y … Max). */
+const periodName = (width: number, long: string) =>
+  width < 560 ? ({ "1 year": "1y", "3 years": "3y", "5 years": "5y", "10 years": "10y", "15 years": "15y", "Since start": "Max" } as Record<string, string>)[long] : long;
 
 // The fonts are the site's own files (src/fonts.css), so nothing asks Google for them any more. This
 // stub is a leftover safety net: should a font request to Google ever come back, it is answered here
@@ -260,7 +263,7 @@ for (const width of widths) {
       );
       const errors = await open(page, "/");
       await page.getByRole("tab", { name: "Top funds" }).click();
-      await page.getByRole("button", { name: "5 years", exact: true }).click();
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
       const section = page.locator("section.top-funds");
       await expect(section.locator(".fc-row")).toHaveCount(80);
       await expect(section.locator(".fc.scrolls .fc-win")).toBeVisible();
@@ -280,7 +283,7 @@ for (const width of widths) {
     test("a long list scrolls in its own window: zero line at the left edge, the caption follows, no sideways scroll", async ({ page }) => {
       await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
       const errors = await open(page, "/");
-      await page.getByRole("button", { name: "5 years", exact: true }).click();
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
       const win = page.locator("section.famous .fc.scrolls .fc-win");
       await expect(win).toBeVisible();
       const rows = page.locator("section.famous .fc-row");
@@ -304,60 +307,74 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
-    test("the list switch: every list reachable, the pressed one in view, never overlapping the period", async ({ page }) => {
+    test("the list switch: every list reachable on straight rows and columns, the toolbar level", async ({ page }) => {
       await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
       const errors = await open(page, "/");
-      await page.getByRole("button", { name: "5 years", exact: true }).click();
-      const lists = page.getByRole("group", { name: "List" });
-      const box = page.locator("section.famous .fam-lists");
-      const pressedInView = () =>
-        box.evaluate((el) => {
-          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
-          const s = el.getBoundingClientRect();
-          return b.left >= s.left - 1 && b.right <= s.right + 1;
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      await expect(page.getByRole("region", { name: /^Funds 1 to \d+ of 50, scrollable$/ })).toBeVisible();
+      const rect = (name: string) =>
+        page.getByRole("group", { name, exact: true }).evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: r.top, bottom: r.bottom, height: r.height };
         });
-      // the lists sit above the period and Chart | Table, never beside or under them
-      const listBottom = await lists.evaluate((el) => el.getBoundingClientRect().bottom);
-      const periodTop = await page.getByRole("group", { name: "Period" }).evaluate((el) => el.getBoundingClientRect().top);
-      expect(periodTop).toBeGreaterThanOrEqual(listBottom);
+      // the owner saw Chart | Table sit higher than the period: the two share a top and a height
+      const per = await rect("Period");
+      const view = await rect("View");
+      expect(Math.abs(per.top - view.top)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(per.height - view.height)).toBeLessThanOrEqual(0.5);
+      const noSideways = async () => {
+        const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+        expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      };
 
       if (width >= 560) {
-        // a desktop wraps the lists onto two or three rows: nothing scrolls sideways, every list in view
-        expect(await box.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
-        const tops = await lists.evaluate((el) => [...el.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().top)));
-        expect(new Set(tops).size).toBeGreaterThanOrEqual(2);
-        expect(new Set(tops).size).toBeLessThanOrEqual(3);
-        // the thumb follows the pressed list down to its row
+        // every list in view on one grid: three list rows, five columns of names beside Most searched's tall cell
+        const lists = page.getByRole("group", { name: "List" });
+        const cells = await lists.evaluate((el) =>
+          [...el.querySelectorAll<HTMLElement>(".ix-c:not(.feat) .nm")].map((n) => {
+            const r = n.getBoundingClientRect();
+            return { left: Math.round(r.left), top: Math.round(r.top), clipped: n.scrollWidth > n.clientWidth + 1 };
+          }),
+        );
+        expect(cells).toHaveLength(15);
+        expect(new Set(cells.map((c) => c.top)).size).toBe(3);
+        expect(new Set(cells.map((c) => c.left)).size).toBe(5);
+        expect(cells.filter((c) => c.clipped)).toEqual([]); // every name whole
+        expect(per.top).toBeGreaterThanOrEqual(await lists.evaluate((el) => el.getBoundingClientRect().bottom));
         await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
         await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
-        await expect
-          .poll(() =>
-            lists.evaluate((el) => {
-              const t = el.querySelector(".thumb")!.getBoundingClientRect();
-              const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
-              return Math.max(Math.abs(t.left - b.left), Math.abs(t.top - b.top), Math.abs(t.width - b.width));
-            }),
-          )
-          .toBeLessThanOrEqual(1);
+        await expect(lists.getByRole("button", { name: "Sovereign & pension funds", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await noSideways();
         expect(errors).toEqual([]);
         return;
       }
 
-      // a phone swipes one row sideways, with no scrollbar under it
-      expect(await box.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("none");
-      // the last list, then another tab and back: the switch is drawn afresh, scrolled to the pressed list
-      await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
-      await page.getByRole("tab", { name: "Top funds" }).click();
-      await page.getByRole("tab", { name: "Famous funds" }).click();
+      // a phone: the names in one swiped row (the next one cut at the edge), All 16 pinned beside it
+      const row = page.getByRole("group", { name: "List" });
+      const pressedInView = () =>
+        row.evaluate((el) => {
+          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+          const s = el.getBoundingClientRect();
+          return b.left >= s.left - 1 && b.right <= s.right + 1;
+        });
+      expect(await row.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+      await expect(row).toHaveClass(/more-r/);
+      expect(await row.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("none");
+      await expect(page.locator("section.famous .fam-all")).toBeVisible();
+      // the last list from the picker: the row scrolls to it, and keeps it after another tab and back
+      await page.getByRole("combobox", { name: "All lists" }).selectOption("Sovereign & pension funds");
       await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
       await expect.poll(pressedInView).toBe(true);
-
-      // a period without that list (the demo's 1 year) falls back to Most searched, the first button
-      await box.evaluate((el) => (el.scrollLeft = el.scrollWidth));
-      await page.getByRole("button", { name: "1 year", exact: true }).click();
-      await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
-      await expect(lists.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("tab", { name: "Famous funds" }).click();
+      await expect(page.getByRole("combobox", { name: "All lists" })).toHaveValue("Sovereign & pension funds");
       await expect.poll(pressedInView).toBe(true);
+      // a period without that list (the demo's 1 year) falls back to Most searched, scrolled back into view
+      await page.getByRole("button", { name: "1y", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
+      await expect(row.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(pressedInView).toBe(true);
+      await noSideways();
       expect(errors).toEqual([]);
     });
   });

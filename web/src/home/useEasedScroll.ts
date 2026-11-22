@@ -1,6 +1,11 @@
 // Eased scrolling for the Famous funds window (spec 7.2): the wheel and the keys set a target, and the list
 // glides there with a slow start, full speed, then a slow settle, so the fitted axis moves at the same pace
 // as the rows. A scroll the glide did not cause (scrollbar drag, touch with its own momentum) is followed as is.
+//
+// Chrome keeps a scrollTop set from script in whole CSS pixels (10.25 → 10, even at 2x), so the slow start and
+// settle, under 2 px a frame, came out as 1 px hops at uneven gaps: the glide looked unsmoothed there. The box
+// takes the whole pixels and the rest is a sub-pixel translateY on its first child (the list), so the rows move
+// by the exact eased amount every frame. Safari keeps the fraction, so there the shift is 0.
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { reducedMotion } from "../fund/hooks";
 
@@ -17,6 +22,22 @@ const EASE_IN = 0.2; // the target itself eases in: the slow start
 const K = 0.05; // spring stiffness per 60fps frame
 const DAMP = 2 * Math.sqrt(K); // critically damped: no overshoot
 const OWN = 1.5; // px: a scroll event this close to the glide's position is the glide's own
+
+/** Moves the box's first child (the list) by `px`, a fraction of a pixel; 0 takes the shift off. */
+function shift(el: HTMLElement, px: number) {
+  const list = el.firstElementChild as HTMLElement | null;
+  if (!list) return;
+  const v = Math.abs(px) < 0.01 ? "" : `translateY(${+px.toFixed(3)}px)`;
+  if (list.style.transform !== v) list.style.transform = v;
+}
+
+/** Shows the list at `top`: the box scrolls to what it keeps (Chrome: whole pixels) and the list makes up the rest. */
+function place(el: HTMLElement, top: number) {
+  el.scrollTop = top;
+  const kept = el.scrollTop - top;
+  // more than a pixel off is a clamp at an end, not rounding: no shift past the end of the list
+  shift(el, Math.abs(kept) < 1 ? kept : 0);
+}
 
 /**
  * `box` is the scrolling element (it must stay mounted while the hook is); `onPos` gets the position in rows
@@ -42,7 +63,7 @@ export function useEasedScroll(
     const settleAt = (el: HTMLElement, top: number) => {
       halt();
       Object.assign(s.current, { T: top, T2: top, C: top, v: 0 });
-      el.scrollTop = top;
+      place(el, top);
       report.current(top / rowH);
     };
     const step = (now: number) => {
@@ -59,7 +80,7 @@ export function useEasedScroll(
         st.C = st.T2 = st.T;
         st.v = 0;
       }
-      el.scrollTop = st.C;
+      place(el, st.C);
       report.current(st.C / rowH);
       st.anim = st.C === st.T ? 0 : requestAnimationFrame(step);
     };
@@ -68,7 +89,8 @@ export function useEasedScroll(
         const el = box.current;
         if (!el) return;
         const st = s.current;
-        const T = Math.max(0, Math.min(max(el), toTop));
+        // a whole pixel, so the glide comes to rest with no sub-pixel shift left on the rows
+        const T = Math.round(Math.max(0, Math.min(max(el), toTop)));
         if (typeof requestAnimationFrame !== "function" || reducedMotion()) return settleAt(el, T);
         if (!st.anim) {
           if (T === el.scrollTop) return;
@@ -81,6 +103,7 @@ export function useEasedScroll(
         const el = box.current;
         halt();
         const top = el ? el.scrollTop : 0;
+        if (el) shift(el, 0);
         Object.assign(s.current, { T: top, T2: top, C: top, v: 0 });
       },
       target() {
@@ -110,6 +133,7 @@ export function useEasedScroll(
       const top = el.scrollTop;
       if (st.anim && Math.abs(top - st.C) <= OWN) return; // the glide's own frame, already reported
       if (st.anim) cancelAnimationFrame(st.anim);
+      shift(el, 0);
       Object.assign(st, { T: top, T2: top, C: top, v: 0, anim: 0 });
       report.current(top / rowH);
     };

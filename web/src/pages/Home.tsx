@@ -1,7 +1,6 @@
 import {
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -50,7 +49,10 @@ import { qShort } from "../fund/fmt";
 import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
 import { leadLine, sourceLine, standfirst } from "../home/famousChart";
+import { ListIndex } from "../home/ListIndex";
+import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
 import { shortNameOf } from "../lib/famousNames";
+import { photoOf } from "../lib/people";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
@@ -353,6 +355,15 @@ const PERIODS: ChoiceOption<Period>[] = [
   { id: "15y", label: "15 years" },
   { id: "max", label: "Since start" },
 ];
+/** A phone's period switch: the six fit on one row beside Chart | Table (finance sites' 1Y … Max). */
+const PERIODS_SHORT: ChoiceOption<Period>[] = [
+  { id: "1y", label: "1y" },
+  { id: "3y", label: "3y" },
+  { id: "5y", label: "5y" },
+  { id: "10y", label: "10y" },
+  { id: "15y", label: "15y" },
+  { id: "max", label: "Max" },
+];
 
 /** Few funds have a record this long, so its empty list gets its own note. */
 const EMPTY: Partial<Record<Period, string>> = {
@@ -630,6 +641,8 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
 
 /** Rows a page in a famous list's table view. */
 const FAMOUS_PAGE = 10;
+/** A phone's Famous table: 30 rows a page (owner, 2026-11-22), so it pages less on a small screen. */
+const FAMOUS_PAGE_PHONE = 30;
 
 /** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
  * without a group (none should come) goes to a list named "Other", last. */
@@ -676,6 +689,14 @@ const VIEWS: ChoiceOption<RankView>[] = [
   },
 ];
 const MOST_SEARCHED = "Most searched";
+/** Lists named by whose money it is rather than how it is invested: the index's "Type of investor" column. */
+const INVESTOR_TYPES = new Set(["Family offices", "Big companies", "Sovereign & pension funds"]);
+const indexItem = (name: string): IndexItem => ({
+  name,
+  group: name === MOST_SEARCHED ? "pop" : INVESTOR_TYPES.has(name) ? "who" : "style",
+});
+/** Faces in Most searched's cell of the list index. */
+const INDEX_FACES = 5;
 
 type FamousList = { name: string; about?: string; rows: TopRow[] };
 
@@ -720,26 +741,18 @@ function FamousFunds({
   useEffect(() => {
     if (shown && shown.name !== list) onList(shown.name);
   }, [shown, list, onList]);
-  // The switch keeps the last lists while the next period loads, so the controls do not jump.
-  const [names, setNames] = useState<string[]>([]);
-  const now = lists.map((l) => l.name);
-  if (now.length > 0 && now.join("\n") !== names.join("\n")) setNames(now);
-  const listOptions = useMemo(() => names.map((id) => ({ id, label: id })), [names]);
-  // The pressed list can sit out of view in the sideways switch: a list chosen before coming back to this
-  // tab, or Most searched after a period without the list. Scroll the switch, never the page (as
-  // scrollIntoView could), so the pressed one shows whole.
-  const listBox = useRef<HTMLDivElement>(null);
-  const pressed = shown?.name;
-  useLayoutEffect(() => {
-    const box = listBox.current;
-    const b = box?.querySelector<HTMLElement>('button[aria-pressed="true"]');
-    if (!box || !b) return;
-    const s = box.getBoundingClientRect();
-    const r = b.getBoundingClientRect();
-    const pad = 16;
-    if (r.left < s.left) box.scrollLeft -= s.left - r.left + pad;
-    else if (r.right > s.right) box.scrollLeft += r.right - s.right + pad;
-  }, [pressed, names]);
+  // The switch keeps the last lists (and Most searched's faces and size) while the next period loads, so the
+  // controls do not jump.
+  const next = useMemo(() => {
+    const ms = lists.find((l) => l.name === MOST_SEARCHED)?.rows ?? [];
+    const faces = [...new Set(ms.map((r) => r.manager ?? "").filter((m) => !!photoOf(m)))].slice(0, INDEX_FACES);
+    const v = { names: lists.map((l) => l.name), faces, searched: ms.length };
+    return { ...v, key: JSON.stringify(v) };
+  }, [lists]);
+  const [index, setIndex] = useState({ names: [] as string[], faces: [] as string[], searched: 0, key: "" });
+  if (next.names.length > 0 && next.key !== index.key) setIndex(next);
+  const names = index.names;
+  const items = useMemo(() => names.map(indexItem), [names]);
   // The chart's bars grow in again on a new list, new figures, and coming back from the table.
   const [run, setRun] = useState({ n: 0, rows, name: shown?.name, view });
   if (run.rows !== rows || run.name !== shown?.name || run.view !== view)
@@ -754,7 +767,17 @@ function FamousFunds({
     [shown],
   );
   const section = useRef<HTMLElement>(null);
-  const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
+  const width = useWidth(section, 280, FALLBACK_W);
+  const phone = width < PHONE_BELOW;
+  const mode = indexMode(width);
+  const layout = useMemo(() => (mode === "pick" ? null : layoutFor(items, mode)), [items, mode]);
+  // the period takes half the tracks, or more until its six options have room (about 440px)
+  let perSpan = 1;
+  if (layout) {
+    const track = (width - (layout.cols - 1) * 24) / layout.cols;
+    perSpan = Math.max(1, Math.floor(layout.cols / 2));
+    while (perSpan < layout.cols - 1 && perSpan * track + (perSpan - 1) * 24 < 440) perSpan++;
+  }
   const h2 = useId();
   const about = useId();
 
@@ -804,7 +827,7 @@ function FamousFunds({
             initial={MOST_POPULAR}
             rowKey={(r) => r.fund_id}
             paged
-            pageSize={FAMOUS_PAGE}
+            pageSize={phone ? FAMOUS_PAGE_PHONE : FAMOUS_PAGE}
             pagerAbove={false}
           />
         )}
@@ -825,29 +848,37 @@ function FamousFunds({
       </div>
       <div className="fam-ctl">
         {names.length > 0 && (
-          <div className="fam-lists" ref={listBox}>
+          <ListIndex
+            items={items}
+            layout={layout}
+            value={shown?.name ?? list}
+            onChange={onList}
+            faces={index.faces}
+            featNote={`Top ${index.searched} by search interest`}
+          />
+        )}
+        {/* one row on the index's tracks: the period from the left edge, Chart | Table in the last track, both
+            the same height on one centre line */}
+        <div
+          className={"fam-opts" + (layout ? " on-grid" : "")}
+          style={layout ? { gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))` } : undefined}
+        >
+          <div className="fo-per" style={layout ? { gridColumn: `1 / span ${perSpan}` } : undefined}>
             <Choice
-              label="List"
-              options={listOptions}
-              value={shown?.name ?? list}
-              onChange={onList}
-              wrap={!phone}
+              label="Period"
+              options={phone ? PERIODS_SHORT : PERIODS}
+              value={period}
+              onChange={onPeriod}
             />
           </div>
-        )}
-        <div className="fam-opts">
-          <Choice
-            label="Period"
-            options={PERIODS}
-            value={period}
-            onChange={onPeriod}
-          />
-          <Choice
-            label="View"
-            options={VIEWS}
-            value={view}
-            onChange={onView}
-          />
+          <div className="fo-view" style={layout ? { gridColumn: layout.cols } : undefined}>
+            <Choice
+              label="View"
+              options={VIEWS}
+              value={view}
+              onChange={onView}
+            />
+          </div>
         </div>
       </div>
       {body}
@@ -973,9 +1004,14 @@ function TopFunds({
         <p className="fam-stand">{standfirst(period, spx, view, "")}</p>
       </div>
       <div className="fam-ctl">
+        {/* Famous funds' row without its list index: the period on the left, Chart | Table on the right */}
         <div className="fam-opts">
-          <Choice label="Period" options={PERIODS} value={period} onChange={onPeriod} />
-          <Choice label="View" options={VIEWS} value={view} onChange={onView} />
+          <div className="fo-per">
+            <Choice label="Period" options={phone ? PERIODS_SHORT : PERIODS} value={period} onChange={onPeriod} />
+          </div>
+          <div className="fo-view">
+            <Choice label="View" options={VIEWS} value={view} onChange={onView} />
+          </div>
         </div>
       </div>
       {body}

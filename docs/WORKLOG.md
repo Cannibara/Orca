@@ -1,11 +1,11 @@
 # Worklog
 
-Last verified: 2026-11-21
+Last verified: 2026-11-22
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-21 — Top funds made consistent with Famous funds; Index giants removed
+## 2026-11-22 — Top funds made consistent with Famous funds; Index giants removed
 
 | What changed | Why | Files |
 |---|---|---|
@@ -15,6 +15,21 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Index giants list removed from the page (still in `top_{period}.json`) | Owner | `Home.tsx`, `docs/PRODUCT.md`, `docs/DECISIONS.md` |
 | Tests: home.test.tsx (chart, 80-a-page chart and table, person/initials, giants not listed), helper tests, e2e Top funds chart at 1280/400 light/dark (90/90 pass); checked on production data at 1280/400, light and dark | — | `web/tests/`, `web/e2e/smoke.spec.ts` |
 | Open: each page has its own scale, so bars compare within a page, not across pages; individual filers keep SEC word order ("Gendell Jeffrey L"); some short names are bare words ("Main", "Todd") — the full name is in the tooltip and the table | — | — |
+
+## 2026-11-22 — Famous funds table: 30 rows a page on a phone
+
+| What changed | Why | Files |
+|---|---|---|
+| The Famous funds Table view shows 30 funds a page on a phone (< 560 px); desktop stays at 10 | Owner request | `web/src/pages/Home.tsx` (`FAMOUS_PAGE_PHONE`), `web/tests/home-famous-chart.test.tsx` |
+
+## 2026-11-21 — Tree map on a first visit, Chrome's glide, the Famous funds list index
+
+| What changed | Why | Files |
+|---|---|---|
+| The tree map draws on a first visit at any browser zoom. The draw waited until the measured box matched the width hook exactly, but at a zoom other than 100% the box is fractional: clientWidth rounds (1150) where the hook floors the ResizeObserver width (1149), so a cold load whose prices came after the first measure never drew (reproduced at 80/90/110% in Chromium). A return visit drew only because cached prices landed before the observer fired. Within 1 px now counts as the same size | Owner: "the tree map doesn't appear when first opening a fund page; it does the second time, with no animation" | `web/src/fund/HoldingsPanel.tsx`, `web/tests/fund-holdings-ui.test.tsx` |
+| The Famous window's glide moves every frame in Chrome. Chrome keeps a scrollTop set from script in whole CSS pixels (10.25 → 10, also at 2x), so the slow start and settle were 1 px hops with 33–133 ms stalls. The box takes the whole pixels and the list a sub-pixel translateY; the target is a whole pixel so nothing stays shifted at rest | Owner: "the scrolling still feels abrupt and without smoothing in Chrome; smooth on iOS Safari" (iOS scrolls natively) | `web/src/home/useEasedScroll.ts`, `web/tests/home-famous-chart.test.tsx` |
+| The list switch is a list index: equal grid tracks in three labelled groups (Popular: Most searched as one tall cell with five faces; Investing style 4 columns; Type of investor: Family offices, Big companies, Sovereign & pension funds), 1 + 4 + 1 columns × 3 rows from 1140 px of content, four tracks at 760–1139 px; below that the names in one swiped row (the next one cut and faded at the edge) with "All 16" pinned beside it over the device's own grouped select (owner: a closed picker alone hides the names, few would open it). The period and Chart \| Table sit on one toolbar on the same tracks, both 32 px on one line (checked at 90/110/125% zoom too); a phone's periods read 1y … Max. Chosen from three mocked concepts (side rail; one toolbar with a list menu; this) because every list stays in view and the chart keeps its width. `Choice wrap` and the two-way Seg thumb are gone (unused) | Owner: "tidy up the bar ... it isn't symmetrical ... and Chart/Table looks like it sits higher than the period bar"; design agents | `web/src/home/listIndex.ts`, `ListIndex.tsx`, `famousChart.css`, `web/src/pages/Home.tsx`, `web/src/components/Choice.tsx`, `web/src/fund/Seg.tsx`, `base.css`, tests, `e2e/smoke.spec.ts` |
+| Open: the groups (and Tiger cubs under Investing style) are this session's call, for the owner to confirm. Chart \| Table measured level with the period before the change too (y 395.7, 32 px, headless Chrome), so the old offset was not reproduced; the toolbar now shares tracks and a height by construction | — | — |
 
 ## 2026-11-21 — Famous funds chart after launch: one scale per list, wrapped list switch, 20 rows
 

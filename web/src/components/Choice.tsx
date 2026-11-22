@@ -13,15 +13,12 @@ export function Choice<T extends string>({
   options,
   value,
   onChange,
-  wrap = false,
 }: {
   /** Accessible name of the group. */
   label: string;
   options: ChoiceOption<T>[];
   value: T;
   onChange: (id: T) => void;
-  /** Lay the options out on as many rows as they need (the thumb then moves down as well as across). */
-  wrap?: boolean;
 }) {
   return (
     <Seg
@@ -29,7 +26,6 @@ export function Choice<T extends string>({
       options={options}
       value={value}
       onChange={(id) => onChange(id as T)}
-      className={wrap ? "wrap" : undefined}
     />
   );
 }
