@@ -277,6 +277,72 @@ describe("Famous funds chart", () => {
     expect(rows[39].getAttribute("aria-label")).toMatch(new RegExp(`^40 of 40\\. ${esc(shortNameOf(want[39].fund_id, want[39].name))}`));
   });
 
+  it("the list index: three labelled groups on one grid, Most searched one tall cell, the toolbar on the same tracks", async () => {
+    await openFixture();
+    const index = screen.getByRole("group", { name: "List" });
+    expect([...index.querySelectorAll(".ix-h")].map((h) => h.textContent)).toEqual(["Popular", "Investing style", "Type of investor"]);
+    expect(index.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    // the fixture has 12 styles and 3 investor types: three rows, every list in one
+    expect(index.style.gridTemplateRows).toBe("auto repeat(3, var(--cell))");
+    const ms = within(index).getByRole("button", { name: "Most searched" }); // its note and faces are not read
+    expect(ms).toHaveClass("feat");
+    expect(ms.style.gridRow).toBe("2 / span 3");
+    expect(ms).toHaveTextContent("Top 50 by search interest");
+    expect(within(index).getByRole("button", { name: "Sovereign & pension funds" }).style.gridColumn).toBe("6");
+    expect(within(index).getAllByRole("button")).toHaveLength(16);
+    // the period from the left edge over half the tracks, Chart | Table in the last one
+    const opts = document.querySelector<HTMLElement>(".fam-opts")!;
+    expect(opts).toHaveClass("on-grid");
+    expect(opts.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    expect(screen.getByRole("group", { name: "Period" }).parentElement!.style.gridColumn).toBe("1 / span 3");
+    expect(screen.getByRole("group", { name: "View" }).parentElement!.style.gridColumn).toBe("6");
+  });
+
+  it("narrower than the index, the names stay in view in one row, with All 16 beside it over the device's grouped select", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 700 });
+    try {
+      const user = await openFixture();
+      const row = screen.getByRole("group", { name: "List" });
+      expect(row).toHaveClass("fam-row");
+      const names = within(row).getAllByRole("button").map((b) => b.textContent);
+      // the index's order: Most searched, the styles, the investor types
+      expect(names).toHaveLength(16);
+      expect(names[0]).toBe("Most searched");
+      expect(names.slice(-3)).toEqual(["Family offices", "Big companies", "Sovereign & pension funds"]);
+      await user.click(within(row).getByRole("button", { name: "Value" }));
+      expect(screen.getByRole("heading", { level: 3, name: "Value" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Value" })).toHaveAttribute("aria-pressed", "true");
+      const all = screen.getByRole("combobox", { name: "All lists" });
+      expect(document.querySelector(".fam-all")).toHaveTextContent("All 16");
+      expect([...all.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Popular", "Investing style", "Type of investor"]);
+      expect(all).toHaveValue("Value");
+      await user.selectOptions(all, "Macro");
+      expect(screen.getByRole("heading", { level: 3, name: "Macro" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Macro" })).toHaveAttribute("aria-pressed", "true");
+      // not a phone: the periods keep their words
+      expect(screen.getByRole("button", { name: "Since start" })).toBeInTheDocument();
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
+  it("on a phone the table shows 30 funds a page", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 400 });
+    try {
+      stubData({ "home/top_5y.json": FIXTURE });
+      const user = userEvent.setup();
+      renderHome();
+      await screen.findByRole("heading", { level: 3, name: "Most searched" });
+      await user.click(screen.getByRole("button", { name: "5y" }));
+      await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
+      await user.click(within(screen.getByRole("group", { name: "View" })).getByRole("button", { name: "Table" }));
+      expect(screen.getByText("Showing 1–30 of 50 funds")).toBeInTheDocument();
+      expect(within(screen.getByRole("table", { name: "Most searched" })).getAllByRole("row")).toHaveLength(31);
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("a short list has no scroll window", async () => {
     const user = await openFixture();
     await user.click(within(screen.getByRole("group", { name: "List" })).getByRole("button", { name: "Macro" }));
@@ -354,7 +420,7 @@ describe("Famous funds chart", () => {
       const user = userEvent.setup();
       renderHome();
       await screen.findByRole("heading", { level: 3, name: "Most searched" });
-      await user.click(screen.getByRole("button", { name: "5 years" }));
+      await user.click(screen.getByRole("button", { name: "5y" })); // a phone's short periods
       await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
       expect(document.querySelector(".fc")).toHaveClass("phone");
       expect(document.querySelector(".fc-axl")).toHaveTextContent("Est. return a year");
@@ -392,7 +458,9 @@ function Box({ onPos }: { onPos: (p: number) => void }) {
   const es = useEasedScroll(ref, 46, onPos);
   return (
     <div>
-      <div data-testid="box" ref={ref} />
+      <div data-testid="box" ref={ref}>
+        <div data-testid="list" />
+      </div>
       <button type="button" onClick={() => es.glide(46 * 5)}>
         five rows
       </button>
@@ -455,6 +523,34 @@ describe("useEasedScroll", () => {
     expect(settled / 60).toBeGreaterThan(0.4); // about half a second to most of the way
     expect(settled / 60).toBeLessThan(1);
     expect(onPos).toHaveBeenLastCalledWith(100 / 46);
+  });
+
+  it("where the browser keeps whole pixels (Chrome) the list makes up the fraction, so the rows move by the eased amount every frame", async () => {
+    const { el, onPos } = setup();
+    let kept = 0;
+    Object.defineProperty(el, "scrollTop", {
+      configurable: true,
+      get: () => kept,
+      set: (v: number) => void (kept = Math.round(v)),
+    });
+    const list = screen.getByTestId("list");
+    const ty = () => Number(/translateY\(([-\d.]+)px\)/.exec(list.style.transform)?.[1] ?? 0);
+    wheel(el, { deltaY: 100 });
+    const shown: number[] = [];
+    let fractional = 0;
+    for (let i = 0; i < 120 && frames.size > 0; i++) {
+      await frame();
+      const at = onPos.mock.lastCall![0] * 46; // where the glide is, in px
+      expect(Number.isInteger(el.scrollTop)).toBe(true);
+      expect(Math.abs(ty())).toBeLessThanOrEqual(0.5);
+      expect(el.scrollTop - ty()).toBeCloseTo(at, 2); // what is shown is where the glide is
+      if (!Number.isInteger(at)) fractional++;
+      shown.push(el.scrollTop - ty());
+    }
+    expect(fractional).toBeGreaterThan(10); // the glide really passed through fractions
+    shown.slice(1).forEach((t, i) => expect(t).toBeGreaterThan(shown[i] - 1e-9)); // smooth and never back
+    expect(el.scrollTop).toBe(100);
+    expect(list.style.transform).toBe(""); // at rest: no shift left, crisp text
   });
 
   it("lets the page scroll at the ends, ignores pinch zoom, and counts lines and pages", async () => {

@@ -396,6 +396,54 @@ describe("Holdings panel: motion", () => {
     }
   });
 
+  test("a fractional box (browser zoom) still draws when the prices come in after the box is measured", async () => {
+    // At 90% zoom the box is 1149.6 px: clientWidth rounds it to 1150, the width hook floors the
+    // ResizeObserver's 1149.6 to 1149. The two must count as the same size, or nothing is ever drawn.
+    const real = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    const sizes: Record<string, [number, number]> = { "tm-box": [1150, 1149.6], holdPanel: [1192, 1191.6] };
+    const which = (el: Element) => (el.classList.contains("tm-box") ? "tm-box" : el.id === "holdPanel" ? "holdPanel" : null);
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const k = which(this);
+        return k ? sizes[k][0] : 0;
+      },
+    });
+    const observed: { cb: ResizeObserverCallback; el: Element }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private cb: ResizeObserverCallback) {}
+        observe(el: Element) {
+          observed.push({ cb: this.cb, el });
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    weeklyMock.mockImplementation(() => gate.then(() => flat(50)));
+    try {
+      mount();
+      await settle();
+      act(() => {
+        for (const { cb, el } of observed) {
+          const k = which(el);
+          if (k) cb([{ contentRect: { width: sizes[k][1] } } as ResizeObserverEntry], {} as ResizeObserver);
+        }
+      });
+      await settle();
+      expect(tiles()).toHaveLength(0); // prices still loading
+      release();
+      await waitFor(() => expect(tiles().length).toBeGreaterThan(0));
+      expect(document.querySelector("svg.tm")!.getAttribute("width")).toBe("1149");
+    } finally {
+      if (real) Object.defineProperty(HTMLElement.prototype, "clientWidth", real);
+      else delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   test("a period change moves a tile from where it was to where it goes, and its colour changes at once", async () => {
     document.documentElement.removeAttribute("data-motion");
     const { w0, wMid, w1, fillMid, fill1, tkMid, wlab300 } = await stepBack();
