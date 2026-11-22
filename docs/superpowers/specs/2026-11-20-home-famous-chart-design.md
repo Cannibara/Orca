@@ -1,7 +1,7 @@
 # Home page: Famous funds as one ranked return chart (design spec)
 
-Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv) · Status: approved by
-the owner, all questions answered, ready to build.
+Last verified: 2026-11-21 (checked against `main` after #55, the owner's famous_rank.csv; review fixes noted "build, review fix") · Status: shipped in PR #57; owner's post-launch changes (one scale per list §7.3, 20 rows §7.1) in #58; the list index and the toolbar on its tracks (§4.3), and the sub-pixel glide (§7.2) on branch claude/clever-ramanujan-whwhni.
+Approved by the owner, all questions answered.
 Owner sign-off happened in a design session on 2026-11-20; this file is meant to be read cold.
 Reference mock-ups (working, interactive): `2026-11-20-home-famous-chart-mock/desktop.dc.html` and
 `phone.dc.html` in this folder (claude.ai Design canvas files; the `/_blob/…` photo URLs only resolve on the
@@ -30,7 +30,7 @@ After several rounds (v2 3D bars → v3 flat → v4 editorial) the approved desi
   chosen period, **sorted best first**.
 - An honest scale: bars grow from a **zero line**, gains right (blue), losses left (orange).
 - The **S&P 500** over the same window is a dotted reference line.
-- A **scrolling window** (15 rows desktop, 10 phone) over the list's funds (Most searched: 50; a style list: all
+- A **scrolling window** (20 rows desktop, 10 phone; owner, 2026-11-21 after launch) over the list's funds (Most searched: 50; a style list: all
   of its funds, e.g. 87 for Venture capital), with a **scale that fits the funds in
   view** and glides as you scroll.
 - Motion and details borrowed from the fund page's **Annual returns** chart (`web/src/fund/ReturnsPanel.tsx`,
@@ -64,13 +64,12 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
   then `fame` descending, then AUM descending), the **top 50** (`MOST_SEARCHED_MAX`). The popularity order picks
   *which* 50; the chart then displays them **by `ann_return`, best first**.
 - **Style lists show every fund in the list** (owner, 2026-11-21), not a top 50: the window scrolls through all of
-  them and the caption reads e.g. "Showing 1–15 of 87".
+  them and the caption reads e.g. "Showing 1–20 of 87".
 - **Style lists** (`group`, the order of `FAMOUS_GROUPS` in `Home.tsx` / `pipeline/orca/famous.py`, 15 since
   2026-11-20): Buffett inspired, Moat investing, Value, Tiger cubs, Fundamental long/short, Healthcare
   specialists, Tech & growth, Venture capital, Activists, Macro, Credit & event-driven, Family offices, Quant &
   multi-strategy, Big companies, Sovereign & pension funds. Each is charted by `ann_return` desc. The mock only
-  wires Most searched and Buffett inspired; the rest join the same list switch: one row that **scrolls
-  sideways** on desktop and phone (do not wrap it: `Seg`'s sliding thumb measures `offsetLeft` on one row),
+  wires Most searched and Buffett inspired; the rest join the same list switch (now the list index, §4.3),
   44px touch targets on phone.
 - The existing per-list `about` lines (e.g. "The famous funds investors look up most.") are not shown in this
   design; the computed lead line (§4) replaces them. Keep them as the list section's accessible description.
@@ -80,9 +79,9 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
 | Field | From | Format |
 |---|---|---|
 | Short name | `name` → short-name rules §3.3 | text |
-| AUM | `book` (dollars) | `$X.XB` always one decimal in billions: `$304.2B`, `$13.7B`, `$0.3B` |
+| AUM | `book` (dollars) | `$X.XB` always one decimal in billions: `$304.2B`, `$13.7B`, `$0.3B`; below $0.05B `<$0.1B` (build, review fix) |
 | Manager | `manager` → manager rules §3.4 | text, may be absent |
-| Photo | `components/Face.tsx` (`photoOf(manager)` from `people.json`) | 28–32px circle; no photo → initials of manager (or fund) on `--sunken` |
+| Photo | `components/Face.tsx` (`photoOf(manager)` from `people.json`) | 28–32px circle; no photo → initials of manager (or fund) on `--sunken`; a leading acronym of 2–4 capitals stays whole, up to 3 letters (`IVP XVI` → IVP) |
 | Return | `ann_return` (fraction) | `+30.2%` / `−22.6%`, one decimal, sign always |
 | vs S&P 500 | `ann_return − SPX` | `+18.0 pts` (chart tooltip and screen-reader label only) |
 
@@ -158,8 +157,21 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
    "Estimated return a year {over}, best first. The dotted line is the S&P 500 ({spx})." `{over}` comes from one
    helper used everywhere: "over the last year" (1y), "over the last 3 / 5 / 10 / 15 years", "since each fund's
    first filing" (Max). `{spx}` = `spx.ann_return` formatted `+13.5%`; drop the second sentence when it is null.
-3. Controls row: **list switch** (segmented control: Most searched | Buffett inspired | …) on the left;
-   **period** control = **today's `Choice` with all six periods (1y 3y 5y 10y 15y Max), shared with Top funds,
+3. Controls. **List index** (owner, 2026-11-21, second round: the wrapped switch left a ragged second row, 11 + 5,
+   and Chart | Table did not look level with the period; three design concepts were mocked, a side rail, one
+   toolbar with a list menu, and this one): the lists as text on **equal grid tracks** in three labelled groups,
+   Popular (Most searched, one tall cell with five grey faces and "Top 50 by search interest"), Investing style
+   (four columns, filled top to bottom, balanced) and Type of investor (Family offices, Big companies, Sovereign &
+   pension funds). 16 lists = 1 + 4 + 1 columns × 3 rows at ≥ 1140px of content; a list missing for a period only
+   shortens a column; more lists add a row, never a seventh track. 760–1139px: four tracks, Most searched and the
+   investor types on one row, the styles 4 × 3 below. Under 760px (owner: a closed picker hides the names and few
+   would open it): the names in **one swiped row** (index order, the next name cut and faded at the edge, no
+   scrollbar; the pressed one scrolled into view) with **"All 16 ⌄"** pinned beside it over the device's own
+   `<select>` with the same groups as `<optgroup>`s (iOS shows its wheel). The
+   pressed list is the `.seg` pressed chip, bled 10px into the gap. Layout: `web/src/home/listIndex.ts` (pure),
+   drawn by `ListIndex.tsx`. Below it **one toolbar on the same tracks**: the period from the left edge over half
+   the tracks (more until its six options have ~440px), Chart | Table in the last track, both 32px on one centre
+   line (equal-width buttons). A phone's periods read 1y 3y 5y 10y 15y Max so the six fit beside the view icons. The **period** control = **today's `Choice` with all six periods (1y 3y 5y 10y 15y Max), shared with Top funds,
    opening on 3y** (owner, 2026-11-21; the mock's 1y | 5y | Max and its 5y default are superseded), and a
    **Chart | Table** segmented
    switch (icon + word, same icons as Annual returns' table toggle) on the right. Chart is the default.
@@ -170,14 +182,17 @@ Desktop (max width 1232px, 24px side padding, page background `--page`):
      beat the S&P 500; `{l}` lost money." (or "; none lost money.").
    - Axis header (46px): S&P label + ▼ notch on top, tick labels below (§6).
    - The scrolling window of rows (§5, §7).
-   - Caption under it (12px `--ink3`, `aria-live="polite"`): "Showing 1–15 of 50 · scale fits the funds in view".
+   - Caption under it (12px `--ink3`): "Showing 1–20 of 50 · one scale for the whole list". It follows every row; a
+     visually hidden `aria-live="polite"` copy takes it only once the window has settled (300ms without a change), so a
+     glide is not read out row by row (build, review fix).
    - Source line above a `--line2` rule: "Source: SEC 13F filings; Orca estimates. S&P 500: SPY total return,
      {from} to {to}." (`from`/`to` = `spx.from_q`/`to_q` as "Q3 2021"; drop the S&P sentence when `spx` or
      `spx.ann_return` is null).
 
 Phone (designed at 400×844 for the Famous funds module below the home header and tabs; the page scrolls
 normally to bring the module into view, then the list scrolls inside its window):
-1. H2 "Famous funds" 24/28px. 2. List switch (scrolls sideways, 38px tall buttons). 3. Period switch (the six
+1. H2 "Famous funds" 24/28px. 2. List switch (one row that swipes sideways with no scrollbar — sixteen
+   lists would wrap to six rows on a phone — 38px tall buttons). 3. Period switch (the six
    shared periods, as on desktop; scrolls sideways if it does not fit).
 4. Rule + H3 + count + lead line (13/18px). 5. Axis header (36px). 6. Window of **10 rows**.
 7. Caption and source (11–12px). No tooltip (tap opens the fund page). The Chart | Table switch sits beside
@@ -207,7 +222,7 @@ in view (owner: "start the axis even more on the left").
   for the first two visible rows place it below so the scroll box does not clip it.
 
 ### Phone (row 48px)
-Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **50px** (so the leader pill fits).
+Grid: `28px | 136px | 1fr`, gap 8px. Plot inner: left 0, right **58px** (so the leader pill fits, up to "+313.3%"; built value, was 50px).
 Name block **left of the bar** (owner: not above it): line 1 name (12.5/16px 600, −0.005em, ellipsis);
 line 2 "AUM · manager" (11/14px `--ink3`: AUM, 3px dot, manager with ellipsis). Bar 14px, 2px tip radius.
 Label 11.5px 600. Leader pill 20px tall, 3px radius.
@@ -229,19 +244,22 @@ Label 11.5px 600. Leader pill 20px tall, 3px radius.
 - **Tick choice**: 0% is always labelled. Others are multiples of the step that sit inside the domain with a
   margin (desktop ≥ 1 pt from the low end and ≥ 0.5 pt from the high end; phone ≥ 2 pts and ≥ 1 pt). Desktop step: 5 if span < 25 pts, 10 if span ≤ 60,
   else 20. **Phone: few labels** (owner): step 10 if span ≤ 25, else 20, so 0% plus one or two numbers.
+  Then (build, review fix: labels overlapped on narrow plots and very wide scales) the step is raised to the
+  smallest of 5, 10, 20, 40, 50, 100, 200, 500 that puts labels ≥ 48px apart on the measured plot width.
+  On a phone the axis's left column reads "Est. return a year" (the standfirst is hidden there).
   Ticks that turn on/off fade over 200ms; their positions follow the scale every frame (no transition on `left`).
 - AUM-inside-the-bar (white text) was tried as an alternative and is a Tweak only; default is AUM next to the name.
 
-## 7. The scrolling window and the fitted scale
+## 7. The scrolling window and the list's fixed scale
 
 ### 7.1 Window
-- Desktop shows **15 rows** (690px), phone **10 rows** (480px). Lists with ≤ that many rows don't scroll.
+- Desktop shows **20 rows** (920px; owner, 2026-11-21 after launch, was 15), phone **10 rows** (480px). Lists with ≤ that many rows don't scroll.
 - Free scrolling (no scroll-snap; snap felt jumpy). Thin native scrollbar (`scrollbar-width: thin`,
   `--line2`). 24px (phone 20px) page-coloured fades at the top/bottom edges, shown only when more rows exist
   that way. Phone box uses `overscroll-behavior: contain`.
-- The box is focusable (`tabindex=0`, `role=region`, `aria-label="Funds 1 to 15 of 50, scrollable"`,
-  visible focus ring). Keys: ↑/↓ one row, PgUp/PgDn 14 rows (phone 9), Home/End.
-- No minimap (tried; owner removed it). The caption carries the "scale fits the funds in view" message.
+- The box is focusable (`tabindex=0`, `role=region`, `aria-label="Funds 1 to 20 of 50, scrollable"`,
+  visible focus ring). Keys: ↑/↓ one row, PgUp/PgDn 19 rows (phone 9), Home/End.
+- No minimap (tried; owner removed it). The caption carries the "one scale for the whole list" message.
 
 ### 7.2 Eased scrolling (wheel and keys)
 The owner wanted each scroll to start slow, reach full speed, then slow and settle, with the axis moving at the
@@ -257,28 +275,34 @@ same pace. Implementation (per 60fps frame, `dt` = frame time / 16.667, capped a
 5. A scroll the spring did not cause (scrollbar drag, touch): sync `T = T2 = C = scrollTop`, `v = 0`, and just
    follow it. **Touch keeps the device's own momentum** (no custom easing on phones).
 6. Reduced motion: jump straight to the target.
+7. Chrome keeps a `scrollTop` set from script in whole CSS pixels (10.25 → 10, also at 2x), which turned the slow
+   start and settle into 1px hops with 33–133ms stalls. The box takes the whole pixels and the list (the box's
+   first child) a sub-pixel `translateY` for the rest; the target is a whole pixel, so nothing stays shifted at
+   rest. Safari keeps the fraction (shift 0).
 
-### 7.3 The fitted scale (domain in percentage points)
-The scale is a smooth function of the fractional scroll position `p` (rows from the top). The owner chose a
-version that **starts moving slightly before a loss comes into view**, because it reads smoother than one that
-moves only when strictly needed (both were built; the look-ahead one was kept).
+### 7.3 One scale per list; the axis slides (domain in percentage points)
+**Owner, 2026-11-21 after launch:** the first build fitted the scale to the rows in view, so a fund's bar changed
+length as you scrolled (a +30% bar shrank once the +50% leader left the window): misleading. Now **a bar's length
+for a given return never changes while scrolling**; the axis only *slides* (zero moves right as losses come in).
 
-For each whole-row window `k` (rows `k … k+VIS−1`):
-- `lo = min(0, returns)`, `hi = max(0, S&P, returns)` — zero and the S&P line are always in view.
-- Minimum span 20 pts: if `hi − lo < 20`, raise `hi` to `lo + 20` (so a +6% bar never fills the chart).
-- Label room for losses: if `lo < 0`, push it out by `ROOM · (hi − lo) / (innerW − ROOM)` pts, where `ROOM` is
-  50px desktop / 48px phone and `innerW` is the measured plot width (plot width − right inset).
-Then:
-- Smooth the per-window ends with a triangular moving average over ±3 windows (weights 1,2,3,4,3,2,1),
-  but never narrower than that window's own `lo/hi`.
-- Interpolate between windows at fractional `p` with a **Catmull-Rom** curve (no kinks as rows pass), and again
-  take `min(lo, linear-interp of raw lo)` / `max(hi, …)` so the rows in view always fit.
+For each whole-row window `k` (rows `k … k+VIS−1`): need `lo_k = min(0, returns)`, `hi_k = max(0, S&P, returns)`
+— zero and the S&P line always in view.
+- **Span** (points across the plot, one per list and layout): each window needs `max(20, hi_k − lo_k)`, times
+  `f = 1 + ROOM / max(80, innerW − ROOM)` when it has a loss (its loss labels need `ROOM` px: 50px desktop / 48px
+  phone; `innerW` the measured plot width); `S` = the largest need. The label room in points is
+  `R = S · (f − 1) / f`, the same in every window, so a gain-only top window can still fill the plot.
+- **Where the axis sits**: per window the left end may lie between `floor_k = hi_k − S` (gains and S&P fit) and
+  `top_k = lo_k − R` when the window has a loss, else `0` (zero on the left edge). The track uses `top_k`,
+  smoothed with a triangular moving average over ±3 windows (weights 1,2,3,4,3,2,1, which makes it start sliding
+  slightly before a loss arrives, as the owner preferred) and clamped to `[floor_k, top_k]`.
+- At fractional `p`: a **Catmull-Rom** curve through the smoothed left ends, clamped between the linear blends of
+  `floor` and `top` (the rows in view always fit, with their loss labels); `hi = lo + S`.
 - Bars are positioned from this domain every frame (`left`/`width` in % of the plot inner area); no CSS
-  transitions on geometry (they lag behind the scroll). A bar that runs past the edge mid-scroll is clipped and
-  drawn "broken": a 3px page-coloured slash, skewed −20°, 6–7px from the edge; its label keeps the true value.
-- Worked example (Most searched, 5y): rows 1–15 → about 0 to +30%, zero at the left edge; rows 36–50 → about
-  −25% to +12.5% with zero ~two-thirds across.
-- A design Tweak "Same for the whole list" (one fixed domain) exists for comparison only.
+  transitions on geometry. A bar off the window's range mid-scroll is clipped and drawn "broken" (3px
+  page-coloured slash, skewed −20°); its label keeps the true value.
+- A list with no loss never slides. Worked example (Most searched, 3y, 2026-11-21): rows 1–20 → 0 to about +57%
+  with zero on the left edge; rows 31–50 → about −27% to +30%, zero just under half-way, every bar the same length per point.
+- Built in `windowDomains` / `domainAt` (`web/src/home/famousChart.ts`).
 
 ## 8. Motion (same family as Annual returns)
 - **Load / list switch / period switch**: bars grow from the zero line with `transform: scaleX(0 → 1)`
@@ -348,11 +372,14 @@ plus the new `--zero`. Bars use the dark ramps in §6.
 | Famous funds' own 1y / 5y / Max switch | Kept today's six shared periods, opening on 3y (owner, 2026-11-21) | No surprise when moving between tabs |
 | Capping style lists at 50 | Every fund shown (owner, 2026-11-21) | The scrolling window handles long lists |
 | Two lists side by side | Dropped | One chart across the page; lists via a switch |
-| 50 rows on the page | Dropped | A 15-row (phone 10) scrolling window |
+| 50 rows on the page | Dropped | A 20-row (phone 10) scrolling window (15 at first) |
 | Scale that waits until scrolling stops, then animates | Dropped | Felt jumpy |
 | Scroll-snap to rows | Dropped | Tugged at the end of each scroll |
 | Minimap of the whole list | Dropped by owner | Not needed |
 | Scale that moves strictly only when a loss is on screen | Built, then reverted by owner | The slight look-ahead reads smoother |
+| Scale fitted to the rows in view (bars stretch as you scroll) | Shipped in #57, then replaced (owner, 2026-11-21) | A bar changing length while scrolling misleads; one scale per list, the axis slides |
+| List switch on one sideways-scrolling row beside the period | Shipped in #57, then replaced (owner, 2026-11-21) | It overlapped the period; the lists now wrap onto 2–3 rows above it |
+| 15-row desktop window | 20 rows (owner, 2026-11-21) | More funds per screen |
 | Gridlines at every tick | Dropped by owner | Only zero and S&P lines remain |
 | "Filed to Qn" tags | Dropped by owner | Not needed on the home page |
 
@@ -362,7 +389,7 @@ plus the new `--zero`. Bars use the dark ramps in §6.
   Table view. Reuse `Choice` (`web/src/components/Choice.tsx`, the home page's segmented control, a wrapper of `fund/Seg.tsx`) for the list, period and Chart | Table switches, the shared Tooltip (`useTooltip`, `web/src/charts/Tooltip.tsx`), `qOfYear` and the `lib/format.ts` / `pages/homeFmt.ts` helpers.
 - Pure, testable functions (put them in a `.ts` with vitest tests): `fundShortName`, `managerLine`,
   `aumLabel` (`$X.XB`), `shadeFor(ret, dark)`, `windowDomains(rows, VIS, innerW)` (§7.3 smoothing),
-  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone)`, `leadLine(rows, spx)`, `periodPhrase(period)`.
+  `domainAt(p, …)` (Catmull-Rom), `ticksFor(domain, isPhone, innerW)`, `leadLine(rows, spx)`, `periodPhrase(period)`.
 - The glide (§7.2) as a small hook (`useEasedScroll(ref, onPosition)`) with rAF; it must no-op cleanly in jsdom
   (stub `requestAnimationFrame`, as `web/tests/idle.ts` does for idle callbacks).
 - Measure the plot width with `ResizeObserver` where available, falling back to the box's `clientWidth` on

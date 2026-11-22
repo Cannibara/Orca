@@ -7,6 +7,7 @@ import pytest
 from orca.engine.metrics import Performance
 from orca.engine.position import Trade
 from orca.config import CONVICTION_KEEP, CONVICTION_MIN_MOVE, CONVICTION_QUIET
+from orca.quarter_px import QuarterPx
 from orca.famous import FAMOUS_CSV, FAMOUS_GROUPS, Famous, load_famous
 from orca.home import (
     ConvictionQuarter,
@@ -16,6 +17,7 @@ from orca.home import (
     crowded_buys,
     is_excluded_name,
     just_filed,
+    spx_window,
     top_funds,
     wins_losses,
 )
@@ -841,3 +843,45 @@ def test_calls_keep_every_row_up_to_100():
     rows = calls([snap(1, buys_recent=buys)], mcap, latest_px, filed_price, "q")
 
     assert len(rows) == 100
+
+
+# --- spx_window: SPY total return over a home period ----------------------------------------
+
+
+def spy_px(closes: dict[int, float | None], div: float = 0.0) -> dict[int, QuarterPx]:
+    return {q: QuarterPx(c, c, c, c, div, (c, c, c)) for q, c in closes.items()}
+
+
+def test_spx_window_5y_is_the_annualised_growth_of_total_quarter_returns():
+    closes = {q: 100.0 + 2 * q for q in range(34, 55)}
+    px = spy_px(closes, div=0.5)
+    growth = 1.0
+    for q in range(35, 55):
+        growth *= (closes[q] + 0.5) / closes[q - 1]
+    out = spx_window(px, 54, "5y")
+    assert (out["from_q"], out["to_q"]) == (34, 54)
+    assert out["ann_return"] == pytest.approx(growth ** (4 / 20) - 1)
+
+
+def test_spx_window_1y_hand_checked():
+    # Closes 100, 110, 121, 133.1, 146.41 (q 50..54, base q 50) with 1.0 dividend each quarter:
+    # r51 = 111/100, r52 = 122/110, r53 = 134.1/121, r54 = 147.41/133.1.
+    # growth = 1.11 * 1.10909 * 1.10826 * 1.10751 = 1.5112, so the 1y return is +51.1%.
+    px = spy_px({50: 100.0, 51: 110.0, 52: 121.0, 53: 133.1, 54: 146.41}, div=1.0)
+    out = spx_window(px, 54, "1y")
+    assert out["from_q"] == 50 and out["to_q"] == 54
+    assert out["ann_return"] == pytest.approx(0.5112, abs=1e-3)
+
+
+def test_spx_window_is_none_for_max():
+    assert spx_window(spy_px({1: 1.0}), 54, "max") is None
+
+
+def test_spx_window_missing_close_or_quarter_gives_null_return_but_keeps_the_window():
+    closes = {q: 100.0 + q for q in range(34, 55)}
+    closes[40] = None
+    out = spx_window(spy_px(closes), 54, "5y")
+    assert out == {"ann_return": None, "from_q": 34, "to_q": 54}
+    del closes[40]
+    assert spx_window(spy_px(closes), 54, "5y") == {"ann_return": None, "from_q": 34, "to_q": 54}
+    assert spx_window({}, 54, "1y") == {"ann_return": None, "from_q": 50, "to_q": 54}

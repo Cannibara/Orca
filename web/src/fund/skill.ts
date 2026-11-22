@@ -8,7 +8,8 @@
 
 import type { FundsIndex, SectorScores, Skill, SkillTier, TopRow } from "../data/types";
 import { FAMOUS_GROUPS } from "../data/famousGroups";
-import { pp, qOfYear, tidyName } from "../lib/format";
+import { shortNameOf } from "../lib/famousNames";
+import { pp, qOfYear } from "../lib/format";
 
 export type Tier = 1 | 2 | 3;
 export const TIERS: Tier[] = [1, 2, 3];
@@ -173,12 +174,6 @@ export function scoreRows(s: SectorScores, t: Tier): Map<number, ScoreRow> {
   return out;
 }
 
-/** A fund name short enough to sit beside a dot: "Kelpwood Capital LP" → "Kelpwood Capital". */
-export function shortFund(name: string): string {
-  const t = tidyName(name).replace(/[,.]?\s+(L\.?P\.?|LLC|L\.L\.C\.|Inc\.?|Ltd\.?|Co\.?|Corp\.?|N\.A\.)$/i, "").trim();
-  return t.replace(/\s+(Management|Mgmt)$/i, "").trim() || name;
-}
-
 export type Peer = { fund_id: number; name: string; pick: number; alloc: number; n: number };
 export type PeerList = { name: string; peers: Peer[] };
 export type Peers = {
@@ -198,7 +193,7 @@ export function peersFor(fundId: number, t: Tier, famous: TopRow[] | undefined, 
   const peer = (id: number): Peer | null => {
     const r = rows.get(id);
     if (!r || id === fundId || !isEligible(r)) return null;
-    return { fund_id: id, name: shortFund(names.get(id) ?? String(id)), pick: r.picking, alloc: r.allocation, n: r.n };
+    return { fund_id: id, name: shortNameOf(id, names.get(id) ?? String(id)), pick: r.picking, alloc: r.allocation, n: r.n };
   };
   const mine = new Set((famous ?? []).filter((r) => r.fund_id === fundId && r.group).map((r) => r.group as string));
   const order = [...FAMOUS_GROUPS.map((g) => g.name), ...[...mine].sort()];

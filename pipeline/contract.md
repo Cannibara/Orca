@@ -159,7 +159,7 @@ Each file is an object with `latest_q`, the quarter the lists are about. `name` 
 fund's name.
 
 - `top_{period}.json` (`1y`, `3y`, `5y`, `10y`, `15y`, `max`): `{"latest_q", "period", "eligible": [...], "giants": [...],
-  "famous": [...], "search_asof"}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
+  "famous": [...], "search_asof", "spx"}`, each best annualised return first. Row: `{"fund_id", "name", "book", "n_positions", "ann_return",
   "max_dd", "sharpe"}`. `famous` lists the funds of `pipeline/orca/famous.csv` (hand-kept) whatever the Top funds
   rules say, when they have a performance for the period, ≥ 80% of the book priced and a name holding the list's
   match word; its rows add `"manager"` (string or `null`) and `"group"` (the style list it is shown in, one of
@@ -175,6 +175,10 @@ fund's name.
   its one filer, so it has a place in Most searched. The site shows neither score. Funds that stopped filing appear in no other list. `"search_asof"` (top level): the date of the
   Google Trends snapshot (`pipeline/orca/famous_search.csv`), `null` without one. Files built before 2026-11-15
   have no `famous` key; before 2026-11-17 no `search` or `search_asof`; before 2026-11-18 no `fame`; before 2026-11-20 no `rank`.
+  `spx` is the S&P 500 reference: `{"ann_return", "from_q", "to_q"}`, SPY's total return (dividends reinvested)
+  annualised over the same window as the fund figures (the period's `n` quarters ending at `latest_q`); `to_q` =
+  `latest_q`, `from_q` = the quarter whose close is the base (`latest_q − n`). `ann_return` is `null` when SPY lacks
+  a close or quarter in the window. The whole `spx` is `null` for `max`. Files built before 2026-11-21 have no `spx`.
 - `conviction_q.json` (the latest quarter), `conviction_y.json` (each of the last four quarters): `{"latest_q",
   "rows": [...]}`, moves that are large for the fund that made them, the most unusual first, at most 200. Row:
   `{"fund_id", "name", "stock_id", "q", "move", "usd", "weight_after", "change_pts", "est_price", "score"}`. `move`

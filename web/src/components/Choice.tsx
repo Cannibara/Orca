@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import { Seg } from "../fund/Seg";
 
-export type ChoiceOption<T extends string> = { id: T; label: string };
+/** `icon` (an inline svg) goes before the word, as on the fund page's table toggles. */
+export type ChoiceOption<T extends string> = { id: T; label: string; icon?: ReactNode };
 
 /**
  * A single choice among a few: a period, a window, a filter. Drawn as the segmented control with the
@@ -18,5 +20,12 @@ export function Choice<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
-  return <Seg label={label} options={options} value={value} onChange={(id) => onChange(id as T)} />;
+  return (
+    <Seg
+      label={label}
+      options={options}
+      value={value}
+      onChange={(id) => onChange(id as T)}
+    />
+  );
 }

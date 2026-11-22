@@ -286,11 +286,14 @@ export function HoldingsPanel({ h, data, prices }: Props) {
 
   // Every tile's colour is known: its weekly file is in (or it has none). Until then the last drawing stays.
   const ready = !wk.pending;
-  /** The first render reads the box at fallback sizes; the next one has the real ones. Drawing waits for them. */
+  /**
+   * The first render reads the box at fallback sizes; the next one has the real ones. Drawing waits for them.
+   * Within 1 px counts as the same: at a browser zoom the box is fractional (1149.6 px), clientWidth rounds it
+   * (1150) and useWidth floors it (1149), and an exact match kept a cold load from ever drawing.
+   */
   const sized = () => {
-    const bw = boxRef.current?.clientWidth ?? 0;
-    const pw = panelRef.current?.clientWidth ?? 0;
-    return (bw <= 0 || Math.max(200, Math.floor(bw)) === W) && (pw <= 0 || Math.max(280, Math.floor(pw)) === panelW);
+    const near = (measured: number, min: number, have: number) => measured <= 0 || Math.abs(Math.max(min, measured) - have) <= 1;
+    return near(boxRef.current?.clientWidth ?? 0, 200, W) && near(panelRef.current?.clientWidth ?? 0, 280, panelW);
   };
   const drawn = useRef<{ W: number; H: number; theme: number; fonts: number } | null>(null);
   const landedAt = useRef<number | null>(null);

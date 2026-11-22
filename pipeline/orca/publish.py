@@ -21,7 +21,7 @@ import os
 import re
 import shutil
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -123,6 +123,8 @@ class HomeLists:
     calls_q: list[dict]
     calls_y: list[dict]
     search_asof: str | None = None  # the Google Trends snapshot's date (Most searched)
+    # period -> `home.spx_window(...)`: SPY total return over that period's window (None: no figure)
+    spx: Mapping[str, dict | None] = field(default_factory=dict)
 
 
 # --- writing files ----------------------------------------------------------------------------
@@ -531,6 +533,7 @@ def publish_shared(
             "giants": top["giants"],
             "famous": top.get("famous", []),
             "search_asof": home.search_asof,
+            "spx": home.spx.get(period),
         }
     docs["home/wins_losses.json"] = {
         "latest_q": latest_q,

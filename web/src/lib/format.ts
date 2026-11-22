@@ -127,3 +127,85 @@ export function tidyName(name: string): string {
     .map((w) => (NAME_KEEP.has(w) ? (w === "ISHARES" ? "iShares" : w) : w.toLowerCase().replace(/(^|[-'/.])([a-z])/g, (_, b: string, c: string) => b + c.toUpperCase())))
     .join(" ");
 }
+
+// Endings of a legal name, taken off the end one by one (compared without dots and commas, so "L.P." is LP).
+const SHORT_LEGAL = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LLC", "LP", "LLP", "LTD", "LIMITED", "PLC", "SA", "SAS", "AG", "AS", "NV", "GMBH", "PTE", "PTY", "PJSC", "COM", "GP", "I", "II", "III"]);
+// Generic tails that say what a firm does, not who it is.
+const SHORT_TAIL = new Set(["MANAGEMENT", "MGMT", "GROUP", "HOLDING", "HOLDINGS", "ASSOCIATES", "ADVISORS", "ADVISERS"]);
+// Weaker tails: a name may be nothing but one of these plus a single word ("Public Investment Fund", "PGGM Investments"),
+// so they come off only when two words remain, or right after a tail ("Asset Management", "Investment Group").
+const SHORT_WEAK = new Set(["ASSET", "INVESTMENT", "INVESTMENTS", "INVESTORS", "SERVICES", "TRUST"]);
+const SHORT_AFTER_MGMT = new Set(["MANAGEMENT", "MGMT"]);
+const SHORT_AFTER_TAIL = new Set(["MANAGEMENT", "MGMT", "SERVICES", "GROUP", "HOLDING", "HOLDINGS"]);
+// Words that make a name on their own: a tail is not stripped down to just one of these.
+const SHORT_BRAND = new Set(["CAPITAL", "PARTNERS", "FAMILY", "OFFICE", "FOUNDATION"]);
+// Short all-caps words that are ordinary words, not acronyms, when an ALL-CAPS name is re-cased.
+const SHORT_NOT_ACRONYM = new Set(["THE", "AND", "FOR", "NEW", "ONE", "TWO", "AIR", "SEA", "SUN", "BAY", "OAK", "RED", "ALL", "OLD", "TOP", "BIG", "ART", "VAN", "DEN", "VON", "DER", "CAT", "CO", "COM"]);
+const SHORT_JOIN = new Set(["OF", "AND", "THE", "FOR"]);
+
+const shortKey = (token: string): string => token.replace(/[.,]/g, "").toUpperCase();
+
+function shortCase(name: string): string {
+  return name
+    .split(" ")
+    .map((w, i) => {
+      if (/\d/.test(w) || w === "&" || /^[IVX]{2,7}$/.test(w)) return w; // digits, ampersand, roman numerals
+      if (i > 0 && SHORT_JOIN.has(w)) return w.toLowerCase();
+      return w
+        .split("-")
+        .map((part) => {
+          // A short all-caps word is an acronym (AQR, TCI, NEA); so is a longer one with no vowel (STRS, HHLR).
+          if (/^[A-Z]{1,3}$/.test(part) && !SHORT_NOT_ACRONYM.has(part)) return part;
+          if (/^[B-DF-HJ-NP-TV-XZ]{4,5}$/.test(part)) return part;
+          return part.toLowerCase().replace(/(^|[./]|^[a-z]')([a-z])/g, (_, b: string, c: string) => b + c.toUpperCase());
+        })
+        .join("-");
+    })
+    .join(" ");
+}
+
+/**
+ * A fund's name as the home chart prints it: "AQR CAPITAL MANAGEMENT LLC" becomes "AQR Capital". Legal endings, state
+ * tags and generic tails come off the end, brand words (Capital, Partners, Family Office, Foundation) stay, and it
+ * never ends up empty. A name left in ALL CAPS is re-cased (short acronyms stay); a mixed-case name keeps its casing.
+ */
+export function fundShortName(name: string): string {
+  let s = name.trim().replace(/\s+/g, " ");
+  if (s === "") return name;
+  s = s
+    .replace(/^.*?[\s,]+d\.?b\.?a\.?\s+(?=\S)/i, "") // "CUSHING … LP dba NXG …": the name it trades under is the brand
+    .replace(/\s+(?:in its capacity|as trustee)\b.*$/i, "") // "… Pty Ltd as trustee of …"
+    .replace(/[\s,]+ET AL\.?$/i, "")
+    .replace(/\s+A\/S$/i, "")
+    .replace(/\s+L\s+(?:L\s+C|P)$/i, "") // "L P", "L L C"
+    .replace(/\s+Hong Kong(\s+(?:Ltd|Limited)\.?)?$/i, "$1")
+    .replace(/\s*\/\s*\S{4,}.*$/, "") // "FJARDE AP-FONDEN /FOURTH SWEDISH …": the translation after the slash
+    .replace(/\s*\/\s*[A-Za-z]{0,3}\s*\/?$/, ""); // "/DE", "/NY/", "LTD/ CAN", "CORP/"
+  const whole = name.trim().replace(/\s+/g, " ");
+  if (s === "") return whole; // everything was a tag: keep the name rather than show nothing (spec 3.3 rule 5)
+  let lastTail = "";
+  for (;;) {
+    s = s.replace(/[\s,;]+$/, "");
+    const paren = s.replace(/\s*\([^()]*\)$/, "");
+    if (paren !== s && paren !== "") {
+      s = paren;
+      continue;
+    }
+    const m = /^(.*\S)\s+(\S+)$/.exec(s);
+    if (!m) break;
+    const head = m[1].replace(/[\s,;]+$/, "");
+    const key = shortKey(m[2]);
+    const prev = head.split(" ").pop() ?? "";
+    const oneWord = !head.includes(" ");
+    if (head === "" || key === "") break;
+    if (SHORT_LEGAL.has(key) && !(key === "CO" && prev === "&")) s = head;
+    else if (key === "&") s = head;
+    else if (SHORT_TAIL.has(key) && !(oneWord && SHORT_BRAND.has(shortKey(head)))) s = head;
+    else if (SHORT_WEAK.has(key) && (!oneWord || SHORT_AFTER_TAIL.has(lastTail)) && !(oneWord && SHORT_BRAND.has(shortKey(head)))) s = head;
+    else if (key === "FUND" && SHORT_AFTER_MGMT.has(lastTail)) s = head;
+    else break;
+    lastTail = key;
+  }
+  s = /[a-z]/.test(s) ? s : shortCase(s);
+  return s === "" ? whole : s;
+}

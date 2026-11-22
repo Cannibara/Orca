@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FundsIndex, SectorScores, Skill, SkillTier, TopRow } from "../src/data/types";
 import { betRows, returnTicks, stockRows } from "../src/fund/decisions";
 import { mixSeries, rotations, sectorColor } from "../src/fund/mix";
-import { isEligible, peersFor, quadrant, rollingPath, shortFund, stackParts, tierWords, yearRows } from "../src/fund/skill";
+import { isEligible, peersFor, quadrant, rollingPath, stackParts, tierWords, yearRows } from "../src/fund/skill";
 import { linesLayout, roundMoney, stackedLayout } from "../src/fund/stacked";
 
 const near = (a: number, b: number) => expect(a).toBeCloseTo(b, 9);
@@ -113,10 +113,6 @@ describe("years and the map", () => {
     const alone = peersFor(6, 2, famous, scores, funds);
     expect(alone.lists).toEqual([]);
     expect(alone.similar?.map((p) => p.fund_id)).toEqual([1, 2, 3, 4]); // nearest in book first
-  });
-  it("shortens fund names for the map", () => {
-    expect(shortFund("KELPWOOD CAPITAL LP")).toBe("Kelpwood Capital");
-    expect(shortFund("Saltglass Advisors, LLC")).toBe("Saltglass Advisors");
   });
 });
 

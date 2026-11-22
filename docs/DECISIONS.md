@@ -14,6 +14,10 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Built as the spec's defaults: tier switch on Industry; "never rotated" not built (`v_never` published as null; spec §6.9 optional).
 - Still open: licensing sign-off before merging to `main` (entry below).
 
+## 2026-11-21 — Top funds as the Famous funds chart; Index giants not shown
+- Decision: Top funds takes the Famous funds design: chart first with a Chart | Table switch, no card (page background for chart and table), the same heading structure, photo or initials before a short name, a 20-row window (phone 10) and 80 funds a page with a Next button. The Index giants list is no longer shown (owner, chat 2026-11-21) (chat)(code `web/src/pages/Home.tsx` TopFunds, `web/src/home/FamousChart.tsx` `offset`/`total`/`foot`).
+- Context: Top funds has ~1,500 funds; one chart of them all would put #1 and #1,500 on one scale and one 1,500-row window. Each page of 80 has its own scale ("one scale for this page" in the caption), so bars are comparable within a page, not across pages. The person and photo come from the same file's famous rows (by fund_id); no contract change. `giants` is still published (contract unchanged) (code).
+
 ## 2026-11-21 — Fund page: how sector choice vs stock choice is shown (owner)
 - Decision (chat): four new panels on the Analysis tab, above the existing ones: "What kind of investor?" (a map of stock choice across, sector choice up, peers from the fund's famous-funds list), "Annual return stacked graph" (each year = market + sector choice + stock choice, in the Assets under management chart's style, switching to Lines), "Sector mix over time" (mix only, Sector / Industry / Sub-industry), "Which decisions made the gap" (stocks vs their sector, sectors vs market, with the share of money as a bar and an Adds column). Approved over five drafts of claude.ai artifact BvTgoeVpWCPrmwDhXF55Wz (v5); the build spec is `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`.
 - Decision (chat): the Annual returns bar chart stays on Holdings, unchanged; the new chart is named "Annual return stacked graph" so the two are not confused.

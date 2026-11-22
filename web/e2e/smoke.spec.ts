@@ -25,6 +25,9 @@ const routes = [
   { name: "not found", path: "/no-such-page" },
 ];
 const widths = [1280, 400];
+/** The period button's name at a width: a phone shows the short ones (1y … Max). */
+const periodName = (width: number, long: string) =>
+  width < 560 ? ({ "1 year": "1y", "3 years": "3y", "5 years": "5y", "10 years": "10y", "15 years": "15y", "Since start": "Max" } as Record<string, string>)[long] : long;
 
 // The fonts are the site's own files (src/fonts.css), so nothing asks Google for them any more. This
 // stub is a leftover safety net: should a font request to Google ever come back, it is answered here
@@ -246,4 +249,181 @@ test("the page follows the colour scheme", async ({ page, colorScheme }) => {
   });
   const lightness = (r + g + b) / (3 * 255);
   expect(colorScheme === "dark" ? lightness < 0.25 : lightness > 0.75).toBe(true);
+});
+
+// The home page's Famous funds chart, laid out for real (jsdom cannot measure). The demo's lists are short, so
+// the chart shows them whole; a 50-row fixture stands in for a production list and gives it a scroll window.
+const FAMOUS_5Y = readFileSync(join(import.meta.dirname, "..", "tests", "fixtures", "famous-top5y.json"), "utf8");
+
+for (const width of widths) {
+  test.describe(`Famous funds chart at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } });
+
+    test("demo data: rows are drawn, there is no scroll box, and the page does not scroll sideways", async ({ page }) => {
+      const errors = await open(page, "/");
+      const rows = page.locator("section.famous .fc-row");
+      await expect(rows.first()).toBeVisible();
+      expect(await rows.count()).toBeGreaterThan(1);
+      await expect(page.locator("section.famous .fc.scrolls")).toHaveCount(0);
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("Top funds is the same chart, 80 funds a page: a 20-row window (phone 10), Next for the rest, no sideways scroll", async ({ page }) => {
+      // production's famous rows, repeated to a Top funds list of 200 with falling returns
+      const fixture = JSON.parse(FAMOUS_5Y);
+      const eligible = Array.from({ length: 200 }, (_, i) => ({
+        ...fixture.famous[i % fixture.famous.length],
+        fund_id: 500000 + i,
+        ann_return: 0.6 - i / 250,
+      }));
+      await page.route("**/home/top_5y.json", (route) =>
+        route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...fixture, eligible, giants: [] }) }),
+      );
+      const errors = await open(page, "/");
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      const section = page.locator("section.top-funds");
+      await expect(section.locator(".fc-row")).toHaveCount(80);
+      await expect(section.locator(".fc.scrolls .fc-win")).toBeVisible();
+      await expect(section.locator(".fc-cap")).toHaveText(width < 560 ? "Showing 1–10 of 200 · one scale for this page" : "Showing 1–20 of 200 · one scale for this page");
+      // the page buttons sit under the window, and the summary they carry is for screen readers only
+      await expect(section.locator(".fc-foot .pager-sum")).toHaveCSS("position", "absolute");
+      await section.getByRole("button", { name: "Next" }).click();
+      await expect(section.locator(".fc-cap")).toHaveText(/^Showing 81–\d+ of 200 /);
+      await expect(section.getByText("Page 2 of 3")).toBeVisible();
+      // the window is the Famous chart's: page colour behind it, thin scrollbar
+      expect(await section.locator(".fc-win").evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("a long list scrolls in its own window: zero line at the left edge, the caption follows, no sideways scroll", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      const win = page.locator("section.famous .fc.scrolls .fc-win");
+      await expect(win).toBeVisible();
+      const rows = page.locator("section.famous .fc-row");
+      await expect(rows).toHaveCount(50); // retries until the list has rendered
+      const cap = page.locator("section.famous .fc-cap");
+      await expect(cap).toHaveText(/^Showing 1–\d+ of 50 /);
+
+      // the best funds all gained: the scale starts at zero, so the zero line sits on the plot's left edge
+      const { zl, plot } = await page.evaluate(() => ({
+        zl: document.querySelector(".fc-grid .zl")!.getBoundingClientRect().left,
+        plot: document.querySelector(".fc-grid .plot .in")!.getBoundingClientRect().left,
+      }));
+      expect(Math.abs(zl - plot)).toBeLessThanOrEqual(2);
+
+      await win.evaluate((el) => (el.scrollTop = el.scrollHeight));
+      await expect(cap).toHaveText(/^Showing \d+–50 of 50 /);
+      await expect(cap).not.toHaveText(/^Showing 1–/);
+
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("the list switch: every list reachable on straight rows and columns, the toolbar level", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      await expect(page.getByRole("region", { name: /^Funds 1 to \d+ of 50, scrollable$/ })).toBeVisible();
+      const rect = (name: string) =>
+        page.getByRole("group", { name, exact: true }).evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: r.top, bottom: r.bottom, height: r.height };
+        });
+      // the owner saw Chart | Table sit higher than the period: the two share a top and a height
+      const per = await rect("Period");
+      const view = await rect("View");
+      expect(Math.abs(per.top - view.top)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(per.height - view.height)).toBeLessThanOrEqual(0.5);
+      const noSideways = async () => {
+        const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+        expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      };
+
+      if (width >= 560) {
+        // every list in view on one grid: three list rows, five columns of names beside Most searched's tall cell
+        const lists = page.getByRole("group", { name: "List" });
+        const cells = await lists.evaluate((el) =>
+          [...el.querySelectorAll<HTMLElement>(".ix-c:not(.feat) .nm")].map((n) => {
+            const r = n.getBoundingClientRect();
+            return { left: Math.round(r.left), top: Math.round(r.top), clipped: n.scrollWidth > n.clientWidth + 1 };
+          }),
+        );
+        expect(cells).toHaveLength(15);
+        expect(new Set(cells.map((c) => c.top)).size).toBe(3);
+        expect(new Set(cells.map((c) => c.left)).size).toBe(5);
+        expect(cells.filter((c) => c.clipped)).toEqual([]); // every name whole
+        expect(per.top).toBeGreaterThanOrEqual(await lists.evaluate((el) => el.getBoundingClientRect().bottom));
+        await lists.getByRole("button", { name: "Sovereign & pension funds", exact: true }).click();
+        await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
+        await expect(lists.getByRole("button", { name: "Sovereign & pension funds", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await noSideways();
+        expect(errors).toEqual([]);
+        return;
+      }
+
+      // a phone: the names in one swiped row (the next one cut at the edge), All 16 pinned beside it
+      const row = page.getByRole("group", { name: "List" });
+      const pressedInView = () =>
+        row.evaluate((el) => {
+          const b = el.querySelector('button[aria-pressed="true"]')!.getBoundingClientRect();
+          const s = el.getBoundingClientRect();
+          return b.left >= s.left - 1 && b.right <= s.right + 1;
+        });
+      expect(await row.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+      await expect(row).toHaveClass(/more-r/);
+      expect(await row.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("none");
+      await expect(page.locator("section.famous .fam-all")).toBeVisible();
+      // the last list from the picker: the row scrolls to it, and keeps it after another tab and back
+      await page.getByRole("combobox", { name: "All lists" }).selectOption("Sovereign & pension funds");
+      await expect(page.getByRole("heading", { level: 3, name: "Sovereign & pension funds" })).toBeVisible();
+      await expect.poll(pressedInView).toBe(true);
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("tab", { name: "Famous funds" }).click();
+      await expect(page.getByRole("combobox", { name: "All lists" })).toHaveValue("Sovereign & pension funds");
+      await expect.poll(pressedInView).toBe(true);
+      // a period without that list (the demo's 1 year) falls back to Most searched, scrolled back into view
+      await page.getByRole("button", { name: "1y", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 3, name: "Most searched" })).toBeVisible();
+      await expect(row.getByRole("button", { name: "Most searched", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(pressedInView).toBe(true);
+      await noSideways();
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+// Ticks fading out of a wide scale are parked past the plot's ends; just under the page's 1232px max width
+// they once widened the page. Fundamental long/short (40 funds, more than a window) has its returns scaled up
+// to a wide spread, so the axis slides a long way as the window scrolls.
+test.describe("Famous funds chart at 1240px, a wide scale", () => {
+  test.use({ viewport: { width: 1240, height: 900 } });
+
+  test("parked ticks never make the page scroll sideways", async ({ page }) => {
+    const wide = JSON.parse(FAMOUS_5Y) as { famous: { group: string; ann_return: number }[] };
+    for (const r of wide.famous) if (r.group === "Fundamental long/short") r.ann_return *= 4;
+    await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(wide) }));
+    const errors = await open(page, "/");
+    await page.getByRole("button", { name: "5 years", exact: true }).click();
+    await page.getByRole("group", { name: "List" }).getByRole("button", { name: "Fundamental long/short", exact: true }).click();
+    const win = page.locator("section.famous .fc.scrolls .fc-win");
+    await expect(win).toBeVisible();
+    for (const k of [0, 1, 2, 3, 4]) {
+      // two frames: the scroll is reported, then the scale is painted
+      const over = await win.evaluate(async (el, k) => {
+        el.scrollTop = ((el.scrollHeight - el.clientHeight) * k) / 4;
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        return document.documentElement.scrollWidth - document.documentElement.clientWidth;
+      }, k);
+      expect(over).toBeLessThanOrEqual(0);
+    }
+    expect(errors).toEqual([]);
+  });
 });

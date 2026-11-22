@@ -1965,6 +1965,11 @@ def test_home_command_republishes_the_home_lists_from_the_stored_state(
     assert "home/conviction_q.json" in stats.changed
     assert not [p for p in stats.changed if p.startswith(("fund/", "stock/"))]
     assert set(manifest(inc)) == set(manifest(base_runs[WEEK2]))
+    # a home-only run loads SPY itself (it starts with a fresh context): the S&P 500 figure is there
+    top_5y = read_json(inc / "bucket" / "home" / "top_5y.json")
+    assert top_5y["spx"]["ann_return"] is not None
+    assert top_5y["spx"]["to_q"] == top_5y["latest_q"]
+    assert read_json(inc / "bucket" / "home" / "top_max.json")["spx"] is None  # no shared window
 
 
 def test_home_command_refuses_when_a_weekly_run_is_owed(fixtures, base_runs, tmp_path):

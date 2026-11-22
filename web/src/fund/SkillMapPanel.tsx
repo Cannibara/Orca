@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import { tipHandlers, useTooltip } from "../charts/Tooltip";
+import { shortNameOf } from "../lib/famousNames";
 import type { FundsIndex, SectorScores, Skill, TopRow } from "../data/types";
 import { ChartSlot } from "./ChartSlot";
 import { qShort } from "./fmt";
 import { textW } from "./geometry";
 import { useWidth } from "./hooks";
 import { Seg } from "./Seg";
-import { isEligible, peersFor, pts, quadrant, rollingPath, shortFund, tierOf, tierWords, TIERS, type Corner, type Peer, type Tier, type TierWords } from "./skill";
+import { isEligible, peersFor, pts, quadrant, rollingPath, tierOf, tierWords, TIERS, type Corner, type Peer, type Tier, type TierWords } from "./skill";
 import "./skill.css";
 import { SkTable, ViewButton } from "./StackedPanel";
 
@@ -51,7 +52,7 @@ function TierSwitch({ tier, onTier }: { tier: Tier; onTier: (t: Tier) => void })
 export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famous, funds }: MapProps) {
   const w = tierWords(tier);
   const T = tierOf(skill, tier);
-  const me = shortFund(name);
+  const me = shortNameOf(fundId, name); // the home page's short names (lib/famousNames)
   const span = skill.last_q - skill.first_q + 1;
   const firstYear = 2013 + Math.floor(skill.first_q / 4);
   const eligible = T.picking != null && T.allocation != null && isEligible({ span_q: span, n: T.n ?? 0, coverage: T.coverage ?? 0 });
