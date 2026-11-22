@@ -642,6 +642,8 @@ const FAMOUS_GROUPS: { name: string; about: string }[] = [
 
 /** Rows a page in a famous list's table view. */
 const FAMOUS_PAGE = 10;
+/** A phone's Famous table: 30 rows a page (owner, 2026-11-22), so it pages less on a small screen. */
+const FAMOUS_PAGE_PHONE = 30;
 
 /** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
  * without a group (none should come) goes to a list named "Other", last. */
@@ -825,7 +827,7 @@ function FamousFunds({
             initial={MOST_POPULAR}
             rowKey={(r) => r.fund_id}
             paged
-            pageSize={FAMOUS_PAGE}
+            pageSize={phone ? FAMOUS_PAGE_PHONE : FAMOUS_PAGE}
             pagerAbove={false}
           />
         )}

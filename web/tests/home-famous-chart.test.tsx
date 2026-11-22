@@ -326,6 +326,23 @@ describe("Famous funds chart", () => {
     }
   });
 
+  it("on a phone the table shows 30 funds a page", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 400 });
+    try {
+      stubData({ "home/top_5y.json": FIXTURE });
+      const user = userEvent.setup();
+      renderHome();
+      await screen.findByRole("heading", { level: 3, name: "Most searched" });
+      await user.click(screen.getByRole("button", { name: "5y" }));
+      await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
+      await user.click(within(screen.getByRole("group", { name: "View" })).getByRole("button", { name: "Table" }));
+      expect(screen.getByText("Showing 1–30 of 50 funds")).toBeInTheDocument();
+      expect(within(screen.getByRole("table", { name: "Most searched" })).getAllByRole("row")).toHaveLength(31);
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("a short list has no scroll window", async () => {
     const user = await openFixture();
     await user.click(within(screen.getByRole("group", { name: "List" })).getByRole("button", { name: "Macro" }));

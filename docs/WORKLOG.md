@@ -1,9 +1,15 @@
 # Worklog
 
-Last verified: 2026-11-21
+Last verified: 2026-11-22
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-22 — Famous funds table: 30 rows a page on a phone
+
+| What changed | Why | Files |
+|---|---|---|
+| The Famous funds Table view shows 30 funds a page on a phone (< 560 px); desktop stays at 10 | Owner request | `web/src/pages/Home.tsx` (`FAMOUS_PAGE_PHONE`), `web/tests/home-famous-chart.test.tsx` |
 
 ## 2026-11-21 — Tree map on a first visit, Chrome's glide, the Famous funds list index
 
