@@ -4,7 +4,9 @@ Last verified: 2026-11-22 · Status: **built** on branch `claude/blissful-mayer-
 Built differently (DECISIONS 2026-11-22): quarterly returns are time-weighted at the trade, not modified Dietz (§6.2);
 the per-quarter detail is in `engine/skill_detail.py`, recomputed by the publish part rather than stored by the scores step;
 `sector_returns` already had `cap` (§6.5); "never rotated" (§6.9) is not built (`v_never` null); the panels share one
-`fund/skill.css` and `fund/SkillPanels.tsx` loads the data.
+`fund/skill.css` and `fund/SkillPanels.tsx` loads the data. **Placement changed by the owner on 2026-11-22**: the four
+panels are on their own tab, **Specialization** (right of Analysis), in the order map, stacked graph, mix, decisions;
+Analysis is as it was (DECISIONS 2026-11-22). Where §3 and §5 below say "Analysis tab", read "Specialization tab".
 Owner sign-off happened in a design session on 2026-11-21 over five drafts of a private claude.ai artifact
 (https://claude.ai/artifact/BvTgoeVpWCPrmwDhXF55Wz, version 5 = approved). A copy of the approved draft is
 committed beside this file: `2026-11-21-sector-stock-choice-draft.html`. Open it in a browser; it runs on

@@ -119,23 +119,23 @@ describe("FundHeader", () => {
     expect(screen.queryByText(/filed nothing/)).toBeNull();
   });
 
-  test("Holdings, Analysis and About tabs: no others, Holdings open; each tab names its panel", () => {
+  test("Holdings, Analysis, Specialization and About tabs: no others, Holdings open; each tab names its panel", () => {
     render(<Header summary={demo} positionsEver={18} />);
     const list = screen.getByRole("tablist", { name: "Fund sections" });
     const tabs = within(list).getAllByRole("tab");
-    expect(tabs.map((t) => t.getAttribute("data-view"))).toEqual(["holdings", "analysis", "about"]);
-    expect(tabs.map((t) => t.textContent)).toEqual(["Holdings9", "Analysis", "About"]);
-    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
-    expect(tabs.map((t) => t.id)).toEqual(["fund-tab-holdings", "fund-tab-analysis", "fund-tab-about"]);
+    expect(tabs.map((t) => t.getAttribute("data-view"))).toEqual(["holdings", "analysis", "specialization", "about"]);
+    expect(tabs.map((t) => t.textContent)).toEqual(["Holdings9", "Analysis", "Specialization", "About"]);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false", "false"]);
+    expect(tabs.map((t) => t.id)).toEqual(["fund-tab-holdings", "fund-tab-analysis", "fund-tab-specialization", "fund-tab-about"]);
     // one Tab stop: the open tab
-    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1, -1]);
   });
 
   test("a click opens a tab", async () => {
     const onTab = vi.fn();
     const user = userEvent.setup();
     render(<Tabbed onTab={onTab} />);
-    const [, analysis, about] = screen.getAllByRole("tab");
+    const [, analysis, , about] = screen.getAllByRole("tab");
     await user.click(about);
     expect(onTab).toHaveBeenLastCalledWith("about");
     expect(about).toHaveAttribute("aria-selected", "true");
@@ -148,11 +148,13 @@ describe("FundHeader", () => {
   test("arrow keys move between the tabs round the ends, Home and End to the first and last, and open them", async () => {
     const user = userEvent.setup();
     render(<Tabbed />);
-    const [holdings, analysis, about] = screen.getAllByRole("tab");
+    const [holdings, analysis, specialization, about] = screen.getAllByRole("tab");
     act(() => holdings.focus());
     await user.keyboard("{ArrowRight}");
     expect(analysis).toHaveFocus();
     expect(analysis).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowRight}");
+    expect(specialization).toHaveFocus();
     await user.keyboard("{ArrowRight}");
     await user.keyboard("{ArrowRight}");
     expect(holdings).toHaveFocus();
@@ -171,6 +173,7 @@ describe("FundHeader", () => {
     expect(tabOfHash("")).toBe("holdings");
     expect(tabOfHash("#holdings")).toBe("holdings");
     expect(tabOfHash("#analysis")).toBe("analysis");
+    expect(tabOfHash("#specialization")).toBe("specialization");
     expect(tabOfHash("#about")).toBe("about");
     expect(tabOfHash("#positions")).toBe("holdings");
   });

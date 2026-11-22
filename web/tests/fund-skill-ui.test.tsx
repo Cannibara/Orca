@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "../src/charts/Tooltip";
@@ -9,7 +9,7 @@ import { clearDataCache } from "../src/data/api";
 import type { Skill } from "../src/data/types";
 import Fund from "../src/pages/Fund";
 
-// The Analysis tab's sector choice vs stock choice panels on the demo data (spec 2026-11-21 §5).
+// The Specialization tab: the sector choice vs stock choice panels on the demo data (spec 2026-11-21 §5).
 const DEMO = join(dirname(fileURLToPath(import.meta.url)), "../public/demo-data");
 const demo = <T,>(path: string): T => JSON.parse(readFileSync(join(DEMO, path), "utf8")) as T;
 const MISSING = Symbol("missing");
@@ -29,9 +29,9 @@ function stubData(overrides: Record<string, unknown> = {}) {
   );
 }
 
-function renderAnalysis(id = FUND) {
+function renderTab(id = FUND, hash = "#specialization") {
   return render(
-    <MemoryRouter initialEntries={[`/fund/${id}#analysis`]}>
+    <MemoryRouter initialEntries={[`/fund/${id}${hash}`]}>
       <TooltipProvider>
         <Routes>
           <Route path="/fund/:id" element={<Fund />} />
@@ -49,28 +49,33 @@ const h3s = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.text
 beforeEach(() => clearDataCache());
 afterEach(() => vi.unstubAllGlobals());
 
-describe("the sector panels on Analysis", () => {
-  it("come in the spec's order around the existing panels", async () => {
+describe("the Specialization tab", () => {
+  it("holds the four panels in the owner's order, and nothing of Analysis", async () => {
     stubData();
-    renderAnalysis();
+    renderTab();
     await ready();
-    const order = h3s();
-    const at = (t: string) => order.findIndex((x) => x?.startsWith(t));
-    expect(at("What kind of investor?")).toBe(0);
-    expect(at("Annual return stacked graph")).toBeLessThan(at("Sector mix over time"));
-    expect(at("Sector mix over time")).toBeLessThan(at("Which decisions made the gap"));
-    expect(at("Which decisions made the gap")).toBeLessThan(at("Assets under management"));
+    expect(screen.getByRole("tab", { name: "Specialization" })).toHaveAttribute("aria-selected", "true");
+    expect(h3s()).toEqual(["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]);
     expect(document.body.textContent).not.toMatch(/vertical/i);
     expect(document.body.textContent).not.toMatch(/NaN/);
   });
 
-  it("are absent for a fund without a sector file, and for a host that answers it with a web page", async () => {
+  it("leaves Analysis as it was: no sector panels and no sector files asked for", async () => {
+    stubData();
+    renderTab(FUND, "#analysis");
+    await screen.findByRole("heading", { name: "Assets under management" });
+    expect(screen.queryByRole("heading", { name: "What kind of investor?" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Annual return stacked graph" })).toBeNull();
+    const urls = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map((c) => c[0]);
+    expect(urls.some((u) => u.includes("skill.json") || u.includes("sectors/"))).toBe(false);
+  });
+
+  it("says a fund is not scored yet when it has no sector file, or the host answers it with a web page", async () => {
     for (const body of [MISSING, NOT_JSON]) {
       clearDataCache();
       stubData({ [`fund/${FUND}/skill.json`]: body });
-      const r = renderAnalysis();
-      await screen.findByRole("heading", { name: "Assets under management" });
-      await waitFor(() => expect(screen.queryByRole("heading", { name: "What kind of investor?" })).toBeNull());
+      const r = renderTab();
+      expect(await screen.findByText("Not scored yet")).toBeTruthy();
       expect(screen.queryByRole("heading", { name: "Annual return stacked graph" })).toBeNull();
       r.unmount();
     }
@@ -78,7 +83,7 @@ describe("the sector panels on Analysis", () => {
 
   it("judge choices at industry level by default, and the switch renames every panel", async () => {
     stubData();
-    renderAnalysis();
+    renderTab();
     await ready();
     const stacked = panel("Annual return stacked graph");
     expect(within(stacked).getByText(/^Industry choice, /)).toBeTruthy();
@@ -91,7 +96,7 @@ describe("the sector panels on Analysis", () => {
 
   it("stacked graph: one bar per year, a table view, and Lines with the S&P 500", async () => {
     stubData();
-    renderAnalysis();
+    renderTab();
     await ready();
     const p = panel("Annual return stacked graph");
     const years = demo<Skill>(`fund/${FUND}/skill.json`).years.name;
@@ -108,7 +113,7 @@ describe("the sector panels on Analysis", () => {
 
   it("mix: three levels, chips that pick a sector out, and the big switches listed", async () => {
     stubData();
-    renderAnalysis();
+    renderTab();
     await ready();
     const p = panel("Sector mix over time");
     fireEvent.click(within(p).getByRole("button", { name: "Industry" }));
@@ -121,7 +126,7 @@ describe("the sector panels on Analysis", () => {
 
   it("decisions: stocks by what they added, then the industries against the market with a total", async () => {
     stubData();
-    renderAnalysis();
+    renderTab();
     await ready();
     const p = panel("Which decisions made the gap");
     expect(within(p).getByText(/biggest picks beat their own industry/)).toBeTruthy();
@@ -135,7 +140,7 @@ describe("the sector panels on Analysis", () => {
     const s = demo<Skill>(`fund/${FUND}/skill.json`);
     for (const t of ["1", "2", "3"] as const) s.tiers[t].n = 5;
     stubData({ [`fund/${FUND}/skill.json`]: s });
-    renderAnalysis();
+    renderTab();
     await ready();
     expect(within(panel("What kind of investor?")).getByText(/needs 3 years of trades and 20 picks/)).toBeTruthy();
     // the switch still drives the other panels

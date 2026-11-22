@@ -6,6 +6,10 @@ Newest first. Tags: (chat) session conversation, (code) checked in code, (git) c
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
 
+## 2026-11-22 — Fund page: the sector panels get their own tab, Specialization (owner)
+- Decision (chat): the four sector choice vs stock choice panels are not on Analysis. A new tab, **Specialization**, right of Analysis (Holdings, Analysis, Specialization, About), holds them in this order: the map, the Annual return stacked graph (with its Lines view), Sector mix over time, Which decisions made the gap. Analysis keeps its key figures, Assets under management, Return constituents and What if. Replaces the 2026-11-21 placement (below) (code `fund/FundHeader.tsx`, `pages/Fund.tsx`, `fund/SkillPanels.tsx`).
+- Consequences: the KPI strip no longer sits between the map and the stacked graph; a fund without a sector file shows "Not scored yet" on the tab instead of the panels being absent; the tabs are tighter under 420px so four fit at 360px.
+
 ## 2026-11-22 — Sector files: how the yearly split is measured, and what the build chose (build)
 - Decision (code `engine/skill_detail.py`): the replays' quarterly returns are time-weighted at the trade, not modified Dietz as the spec said. A replay trades at the quarter's average level, so the return chains the move from the last quarter end to the trades with the move from the trades to the quarter end. Money in or out then never moves a return; modified Dietz inflated a year with a big sale (selling all of $100 for $110 mid-quarter read as +22%, not +10%). The yearly identity market + sector choice + stock choice = fund still holds exactly. The contract says so.
 - Decision (code): the publish part replays the trades again rather than reading new lake tables from the scores step, so the scores (14 min in run 31) cannot be lost to a longer step; a local 640,000-trade chunk took 2.6x the scores' time, so its step has 90 minutes.

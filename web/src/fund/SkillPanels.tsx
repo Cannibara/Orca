@@ -9,9 +9,8 @@ import { SkillMapPanel } from "./SkillMapPanel";
 import "./skill.css";
 import { StackedPanel } from "./StackedPanel";
 
-// The Analysis tab's sector choice vs stock choice panels (spec 2026-11-21 §5): the map at the top of the tab,
-// then (after the key figures) the stacked graph, the mix and the decisions. They need fund/{id}/skill.json,
-// which only scored funds have: without it the panels are absent and the tab is as it was.
+// The Specialization tab: the sector choice vs stock choice panels (spec 2026-11-21 §5; owner 2026-11-22: their
+// own tab, after Analysis). They need fund/{id}/skill.json, which only scored funds have.
 
 export type SkillData = { skill: Skill; scores: SectorScores | null; famous: TopRow[] | undefined; funds: FundsIndex | null };
 
@@ -29,7 +28,7 @@ async function loadSkillData(id: number): Promise<SkillData | null> {
   return { skill, scores, famous, funds };
 }
 
-/** The fund's sector data, loaded the first time the Analysis tab opens (and kept for later visits). */
+/** The fund's sector data, loaded the first time the Specialization tab opens (and kept for later visits). */
 export function useSkillData(id: number, open: boolean): Load<SkillData | null> | null {
   const [state, setState] = useState<Load<SkillData | null> | null>(null);
   const wanted = open || state !== null;
@@ -69,25 +68,56 @@ function Skeleton({ title }: { title: string }) {
   );
 }
 
-type Shared = { state: Load<SkillData | null> | null; tier: Tier };
-
-/** The map, at the top of the tab. */
-export function SkillTop({ state, tier, onTier, fundId, name }: Shared & { onTier: (t: Tier) => void; fundId: number; name: string }) {
-  if (state === null || state.status === "error") return null;
-  if (state.status === "loading") return <Skeleton title="What kind of investor?" />;
+/**
+ * The Specialization tab: the map, the stacked graph, the mix and the decisions, in that order. A fund the sector
+ * step has not scored (no file) gets a note instead; a failed load says so.
+ */
+export function SpecializationTab({
+  state,
+  tier,
+  onTier,
+  fundId,
+  name,
+  stocks,
+}: {
+  state: Load<SkillData | null> | null;
+  tier: Tier;
+  onTier: (t: Tier) => void;
+  fundId: number;
+  name: string;
+  stocks: Map<number, Stock>;
+}) {
+  if (state === null || state.status === "loading") {
+    return (
+      <>
+        <Skeleton title="What kind of investor?" />
+        <Skeleton title="Annual return stacked graph" />
+      </>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <div className="state err" role="alert">
+        <h4>Couldn't load this tab</h4>
+        <p>Check your connection and reload the page.</p>
+      </div>
+    );
+  }
   const d = state.data;
-  if (!d) return null;
-  return <SkillMapPanel fundId={fundId} name={name} skill={d.skill} tier={tier} onTier={onTier} scores={d.scores} famous={d.famous} funds={d.funds} />;
-}
-
-/** The stacked graph, the mix and the decisions, after the key figures. */
-export function SkillBody({ state, tier, stocks }: Shared & { stocks: Map<number, Stock> }) {
-  if (state === null || state.status === "error") return null;
-  if (state.status === "loading") return <Skeleton title="Annual return stacked graph" />;
-  const d = state.data;
-  if (!d) return null;
+  if (!d) {
+    return (
+      <div className="state">
+        <h4>Not scored yet</h4>
+        <p>
+          This tab shows how much of the fund's return came from the sectors it chose and how much from the stocks it picked inside them. Orca has not
+          scored this fund yet: it needs trades it can replay in each stock's sector index.
+        </p>
+      </div>
+    );
+  }
   return (
     <>
+      <SkillMapPanel fundId={fundId} name={name} skill={d.skill} tier={tier} onTier={onTier} scores={d.scores} famous={d.famous} funds={d.funds} />
       <StackedPanel skill={d.skill} tier={tier} />
       <MixPanel skill={d.skill} />
       <DecisionsPanel skill={d.skill} tier={tier} stocks={stocks} />

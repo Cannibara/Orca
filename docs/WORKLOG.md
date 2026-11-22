@@ -5,7 +5,14 @@ Last verified: 2026-11-22
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
-## 2026-11-22 — Sector choice vs stock choice built: pipeline files and four Analysis panels
+## 2026-11-22 — Sector panels moved to their own tab, Specialization
+
+| What changed | Why | Files |
+|---|---|---|
+| New fund-page tab **Specialization** (`#specialization`), right of Analysis, with the four sector panels in order: map, Annual return stacked graph (Stacked ↔ Lines), Sector mix over time, Which decisions made the gap. Analysis is back to key figures, AUM, Return constituents, What if. A fund without a sector file shows "Not scored yet" there; the file loads when the tab first opens. Tabs tighter under 420px (four fit at 360px) | Owner: "don't put these … in the analysis tab. Make a separate tab to the right called Specialization" (chat) | `web/src/fund/FundHeader.tsx`, `web/src/pages/Fund.tsx`, `web/src/fund/SkillPanels.tsx`, `web/src/fund/returns.css`, tests, `web/e2e/smoke.spec.ts` |
+| Checks: web 1,200 vitest and 102 Playwright (1280/400, light/dark) green; typecheck clean | | |
+
+## 2026-11-22 — Sector choice vs stock choice built: pipeline files and four panels (first on Analysis)
 
 | What changed | Why | Files |
 |---|---|---|

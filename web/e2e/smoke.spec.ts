@@ -20,6 +20,7 @@ const routes = [
   { name: "home", path: "/" },
   { name: "fund page", path: `/fund/${fundId}` },
   { name: "fund page, Analysis tab", path: `/fund/${fundId}#analysis` },
+  { name: "fund page, Specialization tab", path: `/fund/${fundId}#specialization` },
   { name: "fund page, About tab", path: `/fund/${fundId}#about` },
   { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
   { name: "not found", path: "/no-such-page" },
@@ -117,10 +118,11 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
-    // The sector choice vs stock choice panels (spec 2026-11-21): laid out for real at both widths; a fund
-    // without a sector file shows the tab as it was.
-    test("fund page, Analysis: the four sector panels, and none for a fund without a sector file", async ({ page }) => {
-      const errors = await open(page, `/fund/${fundId}#analysis`);
+    // The Specialization tab's sector choice vs stock choice panels (spec 2026-11-21): laid out for real at both
+    // widths; a fund without a sector file gets a note instead.
+    test("fund page, Specialization: the four sector panels in order, and a note for a fund without a sector file", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}#specialization`);
+      await expect(page.locator(".tp h3")).toHaveText(["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]);
       for (const name of ["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]) {
         await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
       }
@@ -132,9 +134,8 @@ for (const width of widths) {
 
       await page.route(`**/fund/${fundId}/skill.json`, (route) => route.fulfill({ status: 404, body: "" }));
       await page.reload();
-      await expect(page.getByRole("heading", { name: "Assets under management", exact: true })).toBeVisible();
+      await expect(page.getByText("Not scored yet")).toBeVisible();
       await expect(page.getByRole("heading", { name: "Annual return stacked graph", exact: true })).toHaveCount(0);
-      await expect(page.getByRole("heading", { name: "What kind of investor?", exact: true })).toHaveCount(0);
     });
 
     // jsdom has no layout, so only here can the landing be watched as a real page runs it (the first draw used to
