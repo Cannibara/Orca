@@ -233,6 +233,8 @@ describe("copy", () => {
     expect(standfirst("3y", 0.1, "table")).toBe(
       "Estimated figures over the last 3 years. Select a heading to sort; Fund steps through A–Z, Z–A and most popular.",
     );
+    // Top funds has no popularity order
+    expect(standfirst("3y", 0.1, "table", "")).toBe("Estimated figures over the last 3 years. Select a heading to sort.");
   });
 
   it("leadLine", () => {
@@ -243,6 +245,9 @@ describe("copy", () => {
     expect(leadLine(fifty, null)).toBe("Duquesne leads with +30.3% a year. 14 of the 50 lost money.");
     expect(leadLine(rows([0.3, 0.2]), null)).toBe("Duquesne leads with +30.0% a year. None of the 2 lost money.");
     expect(leadLine([], 0.1)).toBe("");
+    // Top funds' 1,500 funds read with thousands separators
+    const many = rows([0.5, ...Array.from({ length: 1199 }, () => 0.2), ...Array.from({ length: 1300 }, () => -0.1)]);
+    expect(leadLine(many, 0.12)).toBe("Duquesne leads with +50.0% a year. 1,200 of the 2,500 beat the S&P 500; 1,300 lost money.");
   });
 
   it("sourceLine", () => {
@@ -258,6 +263,9 @@ describe("copy", () => {
     expect(captionText(1, 15, 50, true)).toBe("Showing 1–15 of 50 · one scale for the whole list");
     expect(captionText(1, 12, 12, false)).toBe("Showing all 12 funds");
     expect(captionText(1, 1, 1, false)).toBe("Showing 1 fund");
+    // one page of a longer list (Top funds): places in the whole list, the page's own scale
+    expect(captionText(81, 100, 80, true, 1509)).toBe("Showing 81–100 of 1,509 · one scale for this page");
+    expect(captionText(1481, 1509, 29, false, 1509)).toBe("Showing 1,481–1,509 of 1,509");
   });
 
   it("rowLabel", () => {

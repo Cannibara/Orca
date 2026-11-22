@@ -1,10 +1,14 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-20
+Last verified: 2026-11-21
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-21 — Top funds as the Famous funds chart; Index giants not shown
+- Decision: Top funds takes the Famous funds design: chart first with a Chart | Table switch, no card (page background for chart and table), the same heading structure, photo or initials before a short name, a 20-row window (phone 10) and 80 funds a page with a Next button. The Index giants list is no longer shown (owner, chat 2026-11-21) (chat)(code `web/src/pages/Home.tsx` TopFunds, `web/src/home/FamousChart.tsx` `offset`/`total`/`foot`).
+- Context: Top funds has ~1,500 funds; one chart of them all would put #1 and #1,500 on one scale and one 1,500-row window. Each page of 80 has its own scale ("one scale for this page" in the caption), so bars are comparable within a page, not across pages. The person and photo come from the same file's famous rows (by fund_id); no contract change. `giants` is still published (contract unchanged) (code).
 
 ## 2026-11-20 — Fund page: tiles split 4 and 4; Annual returns on Holdings, AUM on Analysis
 - Decision: Holdings = four tiles (annualised return, max drawdown, turnover per year, average hold length), Holdings tree map, Annual returns, Positions. Analysis = four tiles (years positive, volatility, risk-adjusted return, positions profitable), Assets under management, Return constituents, What if they'd kept it. About = About only. Panels, titles, details and formatting unchanged; only their place moved (owner approved draft claude.ai artifact HqU6sXjkXUy91FNa9GoN64, v4) (chat)(code `web/src/pages/Fund.tsx`, `fund/KpiStrip.tsx` `group`, `fund/HoldingsTab.tsx`).

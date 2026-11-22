@@ -250,6 +250,36 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
+    test("Top funds is the same chart, 80 funds a page: a 20-row window (phone 10), Next for the rest, no sideways scroll", async ({ page }) => {
+      // production's famous rows, repeated to a Top funds list of 200 with falling returns
+      const fixture = JSON.parse(FAMOUS_5Y);
+      const eligible = Array.from({ length: 200 }, (_, i) => ({
+        ...fixture.famous[i % fixture.famous.length],
+        fund_id: 500000 + i,
+        ann_return: 0.6 - i / 250,
+      }));
+      await page.route("**/home/top_5y.json", (route) =>
+        route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...fixture, eligible, giants: [] }) }),
+      );
+      const errors = await open(page, "/");
+      await page.getByRole("tab", { name: "Top funds" }).click();
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      const section = page.locator("section.top-funds");
+      await expect(section.locator(".fc-row")).toHaveCount(80);
+      await expect(section.locator(".fc.scrolls .fc-win")).toBeVisible();
+      await expect(section.locator(".fc-cap")).toHaveText(width < 560 ? "Showing 1–10 of 200 · one scale for this page" : "Showing 1–20 of 200 · one scale for this page");
+      // the page buttons sit under the window, and the summary they carry is for screen readers only
+      await expect(section.locator(".fc-foot .pager-sum")).toHaveCSS("position", "absolute");
+      await section.getByRole("button", { name: "Next" }).click();
+      await expect(section.locator(".fc-cap")).toHaveText(/^Showing 81–\d+ of 200 /);
+      await expect(section.getByText("Page 2 of 3")).toBeVisible();
+      // the window is the Famous chart's: page colour behind it, thin scrollbar
+      expect(await section.locator(".fc-win").evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
     test("a long list scrolls in its own window: zero line at the left edge, the caption follows, no sideways scroll", async ({ page }) => {
       await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
       const errors = await open(page, "/");

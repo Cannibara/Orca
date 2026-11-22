@@ -3,6 +3,7 @@
 // (phone 10) scrolling window. The scale is one for the whole list (a bar's length never changes as you
 // scroll); the axis slides with the scroll to keep the funds in view.
 // HTML rows rather than SVG: each row is a link to the fund, and the bars are placed in % of the plot.
+// Top funds draws the same chart one page (80 funds) at a time: `offset` and `total` place the page in its list.
 //
 // Speed: the scale moves on every frame of a scroll, so React renders only when the whole-row position
 // changes (caption, region name). The rows are memoised and never take the scale; bar, label, tick and line
@@ -17,6 +18,7 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { Link } from "react-router";
 import { useTooltip, type TipContent } from "../charts/Tooltip";
@@ -110,6 +112,7 @@ type Model = { r: TopRow; short: string; manager: string | null };
 const Row = memo(function Row({
   m,
   i,
+  at,
   n,
   spx,
   phone,
@@ -120,6 +123,9 @@ const Row = memo(function Row({
 }: {
   m: Model;
   i: number;
+  /** The row's place in the whole list, 0 = first (a later page of Top funds starts past 0). */
+  at: number;
+  /** Funds in the whole list. */
   n: number;
   spx: number | null;
   phone: boolean;
@@ -137,7 +143,7 @@ const Row = memo(function Row({
       className="fc-row cols"
       to={`/fund/${m.r.fund_id}`}
       // the name as shown (a phone's shorter one), so the spoken label contains the visible one (WCAG 2.5.3)
-      aria-label={rowLabel({ i: i + 1, n, name: shown, manager: m.manager, book: m.r.book, ret, spx })}
+      aria-label={rowLabel({ i: at + 1, n, name: shown, manager: m.manager, book: m.r.book, ret, spx })}
       style={{ ["--dl" as string]: delay }}
       onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => onTip(i, e.currentTarget, e.pointerType === "touch")}
       onPointerLeave={offTip}
@@ -174,7 +180,7 @@ const Row = memo(function Row({
       <span className="plot" aria-hidden="true">
         <span className="in">
           <span className={"bar " + (gain ? "gain" : "loss")} style={{ background: fill }} />
-          <span className={"lab" + (i === 0 ? " lead" : "")}>{retLabel(ret)}</span>
+          <span className={"lab" + (at === 0 ? " lead" : "")}>{retLabel(ret)}</span>
         </span>
       </span>
     </Link>
@@ -293,8 +299,11 @@ export function FamousChart({
   spx,
   period,
   run,
+  offset = 0,
+  total,
+  foot,
 }: {
-  /** The list's name (a new list starts at the top). */
+  /** The list's name (a new list, or a new page of one, starts at the top). */
   name: string;
   rows: TopRow[];
   /** S&P 500 return a year over the same window; null draws no S&P line. */
@@ -302,6 +311,12 @@ export function FamousChart({
   period: string;
   /** Bumped by the page on a list switch, a period switch and Table → Chart: the bars grow in again. */
   run: number;
+  /** Funds before these rows when they are one page of a longer list (Top funds); 0 for a whole list. */
+  offset?: number;
+  /** Funds in the whole list when the rows are one page of it; unset for a whole list. */
+  total?: number;
+  /** Shown beside the caption (Top funds' page buttons). */
+  foot?: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -415,7 +430,8 @@ export function FamousChart({
   const top = scrolls ? clamp(view, 0, n - M.vis) : 0;
   const first = top + 1;
   const last = Math.min(n, top + M.vis);
-  const caption = captionText(first, last, n, scrolls);
+  const all = total ?? n;
+  const caption = captionText(offset + first, offset + last, n, scrolls, total);
   const said = useSettled(caption, SETTLE_MS);
 
   // The rows' tooltip handlers stay the same function for the chart's life (so the memoised rows keep), and
@@ -451,7 +467,8 @@ export function FamousChart({
           key={m.r.fund_id}
           m={m}
           i={i}
-          n={n}
+          at={offset + i}
+          n={all}
           spx={spx}
           phone={phone}
           fill={shadeFor(m.r.ann_return, dark)}
@@ -460,7 +477,7 @@ export function FamousChart({
           offTip={offTip}
         />
       )),
-    [model, n, spx, phone, dark, M.vis, step, onTip, offTip],
+    [model, offset, all, spx, phone, dark, M.vis, step, onTip, offTip],
   );
   const tickEls = useMemo(
     () =>
@@ -487,7 +504,7 @@ export function FamousChart({
     ? {
         tabIndex: 0,
         role: "region",
-        "aria-label": `Funds ${first} to ${last} of ${n}, scrollable`,
+        "aria-label": `Funds ${offset + first} to ${offset + last} of ${all}, scrollable`,
         style: { height: M.vis * M.row },
         onKeyDown: onKey,
         onScroll: () => tip.hide(),
@@ -539,9 +556,12 @@ export function FamousChart({
         <span className="fade b" aria-hidden="true" />
       </div>
       {/* the caption follows every row; a screen reader hears it once the window has settled */}
-      <p className="fc-cap" aria-hidden="true">
-        {caption}
-      </p>
+      <div className="fc-foot">
+        <p className="fc-cap" aria-hidden="true">
+          {caption}
+        </p>
+        {foot}
+      </div>
       <p className="vh fc-said" aria-live="polite">
         {said}
       </p>

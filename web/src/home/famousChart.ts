@@ -1,6 +1,6 @@
 // Pure helpers for the home page's Famous funds ranked return chart (spec docs/superpowers/specs/2026-11-20-home-famous-chart-design.md).
 // Domains are in percentage points; returns are fractions.
-import { DASH, pct, pp, qLabel } from "../lib/format";
+import { count, DASH, pct, pp, qLabel } from "../lib/format";
 
 /** Assets as "$304.2B": one decimal in billions at every size (the table view keeps the site's "$250m"); below
  * $0.05B, "<$0.1B" rather than a "$0.0B" that reads as nothing. */
@@ -136,21 +136,26 @@ export function periodPhrase(period: string): string {
   return n ? `over the last ${n[1]} years` : "since each fund's first filing";
 }
 
-export function standfirst(period: string, spx: number | null, view: "chart" | "table"): string {
+/** The Table view's sorting hint on Famous funds, whose Fund heading also orders by popularity. */
+export const FAMOUS_SORT = "; Fund steps through A–Z, Z–A and most popular";
+
+/** `sort` ends the Table view's "Select a heading to sort" (Top funds passes "", having no popularity order). */
+export function standfirst(period: string, spx: number | null, view: "chart" | "table", sort = FAMOUS_SORT): string {
   const over = periodPhrase(period);
-  if (view === "table") return `Estimated figures ${over}. Select a heading to sort; Fund steps through A–Z, Z–A and most popular.`;
+  if (view === "table") return `Estimated figures ${over}. Select a heading to sort${sort}.`;
   return `Estimated return a year ${over}, best first.` + (spx == null ? "" : ` The dotted line is the S&P 500 (${pct(spx, 1)}).`);
 }
 
 /** The finding, computed: rows best first. */
 export function leadLine(rows: { name: string; ret: number }[], spx: number | null): string {
   if (rows.length === 0) return "";
-  const n = rows.length;
+  // with thousands separators: Top funds counts 1,500 funds
+  const n = count(rows.length);
   const lost = rows.filter((r) => r.ret < 0).length;
   const lead = `${rows[0].name} leads with ${pct(rows[0].ret, 1)} a year.`;
-  if (spx == null) return `${lead} ${lost === 0 ? `None of the ${n} lost money.` : `${lost} of the ${n} lost money.`}`;
+  if (spx == null) return `${lead} ${lost === 0 ? `None of the ${n} lost money.` : `${count(lost)} of the ${n} lost money.`}`;
   const beat = rows.filter((r) => r.ret > spx).length;
-  return `${lead} ${beat} of the ${n} beat the S&P 500; ${lost === 0 ? "none" : lost} lost money.`;
+  return `${lead} ${count(beat)} of the ${n} beat the S&P 500; ${lost === 0 ? "none" : count(lost)} lost money.`;
 }
 
 export function sourceLine(spx: { ann_return: number | null; from_q: number; to_q: number } | null | undefined): string {
@@ -158,7 +163,15 @@ export function sourceLine(spx: { ann_return: number | null; from_q: number; to_
   return spx == null || spx.ann_return == null ? base : `${base} S&P 500: SPY total return, ${qLabel(spx.from_q)} to ${qLabel(spx.to_q)}.`;
 }
 
-export function captionText(first: number, last: number, n: number, scrolls: boolean): string {
+/**
+ * The line under the chart. `first`/`last` are places in the whole list; `total` is set when the chart shows one
+ * page of a longer list (Top funds, 80 a page), whose scale is then the page's.
+ */
+export function captionText(first: number, last: number, n: number, scrolls: boolean, total?: number): string {
+  if (total !== undefined) {
+    const of = `Showing ${count(first)}–${count(last)} of ${count(total)}`;
+    return scrolls ? `${of} · one scale for this page` : of;
+  }
   if (!scrolls) return n === 1 ? "Showing 1 fund" : `Showing all ${n} funds`;
   return `Showing ${first}–${last} of ${n} · one scale for the whole list`;
 }

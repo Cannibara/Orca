@@ -31,6 +31,7 @@ import type {
   ConvictionRow,
   CrowdedRow,
   FundsIndex,
+  SpxWindow,
   TopRow,
   WinLossRow,
 } from "../data/types";
@@ -510,44 +511,42 @@ function popularity(rows: TopRow[]): Map<number, number> {
   return new Map(order.map((r, i) => [r.fund_id, i + 1]));
 }
 
-/**
- * Top funds' columns, with the person behind the fund under its name (people know "Burry", not "Scion").
- * The Fund heading steps through A to Z, Z to A and most popular first (`rank` from `popularity`).
- */
-function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
+/** A table's Fund cell on Famous and Top funds: the person's photo, the fund's name, and under it the person
+ * behind the fund (people know "Burry", not "Scion") and the last quarter of a fund that stopped filing. */
+function PersonFund({ r }: { r: TopRow }) {
+  return (
+    <div className="fund-row">
+      <Face manager={r.manager} />
+      <div className="stk fund">
+        <FundLink id={r.fund_id} name={r.name} />
+        {(r.manager || r.until_q != null) && (
+          <span className="sub">
+            {[r.manager, r.until_q != null && `filed until ${qLabel(r.until_q)}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Top funds' columns with the photo and the person in the Fund cell; `extra` adds to that column. */
+function personColumns(extra: Partial<Col<TopRow>> = {}): Col<TopRow>[] {
   return TOP_COLUMNS.map((c) =>
     c.key !== "name"
       ? c
-      : {
-          ...c,
-          width: FAMOUS_FUND_W,
-          orders: { pop: (r) => -(rank.get(r.fund_id) ?? Infinity) },
-          cycle: [
-            { key: "name", dir: 1 },
-            { key: "name", dir: -1 },
-            MOST_POPULAR,
-          ],
-          alt: { pop: "most popular" },
-          cell: (r) => (
-            <div className="fund-row">
-              <Face manager={r.manager} />
-              <div className="stk fund">
-                <FundLink id={r.fund_id} name={r.name} />
-                {(r.manager || r.until_q != null) && (
-                  <span className="sub">
-                    {[
-                      r.manager,
-                      r.until_q != null && `filed until ${qLabel(r.until_q)}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                )}
-              </div>
-            </div>
-          ),
-        },
+      : { ...c, width: FAMOUS_FUND_W, cell: (r) => <PersonFund r={r} />, ...extra },
   );
+}
+
+/** Famous funds' columns: the Fund heading steps through A to Z, Z to A and most popular first (`rank` from `popularity`). */
+function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
+  return personColumns({
+    orders: { pop: (r) => -(rank.get(r.fund_id) ?? Infinity) },
+    cycle: [{ key: "name", dir: 1 }, { key: "name", dir: -1 }, MOST_POPULAR],
+    alt: { pop: "most popular" },
+  });
 }
 
 /** Funds in Most searched: the head of the ranking, as a list of what people look up should be. */
@@ -665,8 +664,9 @@ function byGroup(
   return [...known, ...rest.map((name) => ({ name, rows: groups.get(name)! }))];
 }
 
-type FamousView = "chart" | "table";
-const FAMOUS_VIEWS: ChoiceOption<FamousView>[] = [
+/** Famous and Top funds open as a chart; Table shows the figures behind it. */
+type RankView = "chart" | "table";
+const VIEWS: ChoiceOption<RankView>[] = [
   {
     id: "chart",
     label: "Chart",
@@ -716,8 +716,8 @@ function FamousFunds({
   onPeriod: (p: Period) => void;
   list: string;
   onList: (name: string) => void;
-  view: FamousView;
-  onView: (v: FamousView) => void;
+  view: RankView;
+  onView: (v: RankView) => void;
 }) {
   const load = useLoad(() => loadHome(`top_${period}`), [period]);
   const data = load.status === "ready" ? load.data : undefined;
@@ -831,14 +831,14 @@ function FamousFunds({
             pagerAbove={false}
           />
         )}
-        <p className="fam-src">{sourceLine(data?.spx)}</p>
+        <SourceNote spx={data?.spx} />
       </div>
     );
 
   return (
     <section
       ref={section}
-      className={"famous" + (phone ? " phone" : "")}
+      className={"ranked famous" + (phone ? " phone" : "")}
       aria-labelledby={h2}
       aria-describedby={shown?.about ? about : undefined}
     >
@@ -874,7 +874,7 @@ function FamousFunds({
           <div className="fo-view" style={layout ? { gridColumn: layout.cols } : undefined}>
             <Choice
               label="View"
-              options={FAMOUS_VIEWS}
+              options={VIEWS}
               value={view}
               onChange={onView}
             />
@@ -886,57 +886,136 @@ function FamousFunds({
   );
 }
 
+/** Funds a page in Top funds, chart and table: the chart's window shows 20 of them (phone 10), then Next. */
+const TOP_PAGE = 80;
+const TOP_LIST = "Funds over $1B";
+/** Who is in the list (pipeline/orca/config.py, docs/PRODUCT.md "Home list rules"). */
+const TOP_RULE =
+  "Funds with AUM ≥ $1B, ≥ 12 quarters of 13F filings, ≥ 4 positions and ≥ 80% of AUM priced; banks, insurers, brokers and index-sized books (≥ 1,000 positions) are left out.";
+
+/** The source note under a ranked list: who is in it (Top funds), then where the figures come from. */
+function SourceNote({ rule, spx }: { rule?: string; spx: SpxWindow | null | undefined }) {
+  return <p className="fam-src">{rule ? `${rule} ${sourceLine(spx)}` : sourceLine(spx)}</p>;
+}
+
+/**
+ * Top funds: every qualifying fund as a chart of returns best first, 80 a page (Next for the rest), or as a
+ * sortable table. Laid out as Famous funds is (heading, standfirst, period and Chart | Table, the module with its
+ * lead line and source); the people behind famous funds keep their photo and name here too.
+ */
 function TopFunds({
   period,
   onPeriod,
+  view,
+  onView,
 }: {
   period: Period;
   onPeriod: (p: Period) => void;
+  view: RankView;
+  onView: (v: RankView) => void;
 }) {
-  const list = useLoad(() => loadHome(`top_${period}`), [period]);
-  return (
-    <>
-      <Panel
-        title="Top funds"
-        subtitle="Estimated return a year over the chosen period. Select a heading to sort."
-        controls={
-          <Choice
-            label="Period"
-            options={PERIODS}
-            value={period}
-            onChange={onPeriod}
+  const load = useLoad(() => loadHome(`top_${period}`), [period]);
+  const data = load.status === "ready" ? load.data : undefined;
+  // The famous rows name the person behind a fund: a famous fund in Top funds shows them (and their photo) too.
+  const rows = useMemo(() => {
+    const people = new Map<number, string>();
+    for (const f of data?.famous ?? []) if (f.manager) people.set(f.fund_id, f.manager);
+    return (data?.eligible ?? [])
+      .map((r) => (people.has(r.fund_id) ? { ...r, manager: people.get(r.fund_id) } : r))
+      .sort(bestFirst);
+  }, [data]);
+  // A new period starts again on the first page.
+  const [page, setPage] = useState(0);
+  const [pageFor, setPageFor] = useState(rows);
+  if (pageFor !== rows) {
+    setPageFor(rows);
+    setPage(0);
+  }
+  const shown = useMemo(() => rows.slice(page * TOP_PAGE, (page + 1) * TOP_PAGE), [rows, page]);
+  // The bars grow in again on new figures, a new page, and coming back from the table.
+  const [run, setRun] = useState({ n: 0, rows, page, view });
+  if (run.rows !== rows || run.page !== page || run.view !== view)
+    setRun({ n: run.n + 1, rows, page, view });
+
+  const spx = data?.spx?.ann_return ?? null;
+  const best = useMemo(
+    () => rows.map((r) => ({ name: shortNameOf(r.fund_id, r.name), ret: r.ann_return })),
+    [rows],
+  );
+  const columns = useMemo(() => personColumns(), []);
+  const section = useRef<HTMLElement>(null);
+  const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
+  const h2 = useId();
+
+  let body: ReactNode;
+  if (load.status !== "ready") body = <Status state={load} />;
+  else if (rows.length === 0)
+    body = (
+      <div className="pb">
+        <State>{EMPTY[period] ?? "No fund qualifies for this period yet."}</State>
+      </div>
+    );
+  else
+    body = (
+      <div className="fam-mod">
+        <div className="fam-rule">
+          <div className="fam-h3">
+            <h3>{TOP_LIST}</h3>
+            <span className="fam-n">{count(rows.length, "fund")}</span>
+          </div>
+          <p className="fam-lead">{leadLine(best, spx)}</p>
+        </div>
+        {view === "chart" ? (
+          <FamousChart
+            name={`top-${page}`}
+            rows={shown}
+            spx={spx}
+            period={period}
+            run={run.n}
+            offset={page * TOP_PAGE}
+            total={rows.length}
+            foot={
+              rows.length > TOP_PAGE && (
+                <Pager page={page} pageSize={TOP_PAGE} total={rows.length} onPage={setPage} noun="funds" />
+              )
+            }
           />
-        }
-      >
-        {list.status !== "ready" ? (
-          <Status state={list} />
         ) : (
           <ListTable
             label="Top funds"
             noun="funds"
-            columns={TOP_COLUMNS}
-            rows={list.data.eligible}
+            columns={columns}
+            rows={rows}
             initial={BEST_RETURN}
             rowKey={(r) => r.fund_id}
-            empty={EMPTY[period] ?? "No fund qualifies for this period yet."}
             paged
+            pageSize={TOP_PAGE}
+            pagerAbove={false}
           />
         )}
-      </Panel>
-      {list.status === "ready" && list.data.giants.length > 0 && (
-        <Panel title="Index giants">
-          <ListTable
-            label="Index giants"
-            noun="funds"
-            columns={TOP_COLUMNS}
-            rows={list.data.giants}
-            initial={BEST_RETURN}
-            rowKey={(r) => r.fund_id}
-            fixed // lined up with the top funds above
-          />
-        </Panel>
-      )}
-    </>
+        <SourceNote rule={TOP_RULE} spx={data?.spx} />
+      </div>
+    );
+
+  return (
+    <section ref={section} className={"ranked top-funds" + (phone ? " phone" : "")} aria-labelledby={h2}>
+      <div className="fam-head">
+        <h2 id={h2}>Top funds</h2>
+        <p className="fam-stand">{standfirst(period, spx, view, "")}</p>
+      </div>
+      <div className="fam-ctl">
+        {/* Famous funds' row without its list index: the period on the left, Chart | Table on the right */}
+        <div className="fam-opts">
+          <div className="fo-per">
+            <Choice label="Period" options={phone ? PERIODS_SHORT : PERIODS} value={period} onChange={onPeriod} />
+          </div>
+          <div className="fo-view">
+            <Choice label="View" options={VIEWS} value={view} onChange={onView} />
+          </div>
+        </div>
+      </div>
+      {body}
+    </section>
   );
 }
 
@@ -1473,14 +1552,16 @@ export default function Home() {
   // The toggles live here so they survive switching to another tab and back.
   const [period, setPeriod] = useState<Period>("3y");
   const [famousList, setFamousList] = useState(MOST_SEARCHED);
-  const [famousView, setFamousView] = useState<FamousView>("chart");
+  const [famousView, setFamousView] = useState<RankView>("chart");
+  const [topView, setTopView] = useState<RankView>("chart");
   const [mode, setMode] = useState<Mode>("best");
   const [win, setWin] = useState<CallWindow>("q");
   const [moveWin, setMoveWin] = useState<CallWindow>("q");
   const lookup = useLoad(loadLookup, []);
 
   let panel: ReactNode;
-  if (tab === "top") panel = <TopFunds period={period} onPeriod={setPeriod} />;
+  if (tab === "top")
+    panel = <TopFunds period={period} onPeriod={setPeriod} view={topView} onView={setTopView} />;
   else if (tab === "famous")
     panel = (
       <FamousFunds
