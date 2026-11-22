@@ -1,9 +1,21 @@
 # Worklog
 
-Last verified: 2026-11-21
+Last verified: 2026-11-22
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-22 — Sector choice vs stock choice built: pipeline files and four Analysis panels
+
+| What changed | Why | Files |
+|---|---|---|
+| Contract: `sectors/labels.json`, `sectors/scores.json`, `fund/{id}/skill.json` (Sector files) | Spec 2026-11-21 phase 1; contract first | `pipeline/contract.md` |
+| `engine/skill_detail.py`: each fund's replays valued every quarter end, time-weighted quarterly returns (fund, label per tier, market, SPY), calendar years with `summary.json` labels, IRRs of the 30 biggest positions and of every label bought (with the market's share when bought), the book's mix by vertical, the label list. `skill.replay` can return units; `irr_by` takes a step count (64 = a double's precision) | Spec §6. Modified Dietz (the spec's formula) inflated years with big sales; time-weighted returns at the trade do not (DECISIONS 2026-11-22) | `pipeline/orca/engine/skill_detail.py`, `engine/skill.py`, `tests/test_skill_detail.py` |
+| `orca.run sectors --part publish` stages the files for every fund the site lists, runs the CUSIP guard and adds them to the manifest. The monthly run never counts them as owed and carries them in its manifest. Workflow: stage, upload, purge after "Save the score tables" (and after a `sectors_only` run), each `continue-on-error`, 90-minute step | Spec §7.2. Without the bookkeeping change every scored fund would be recomputed each month | `run/sectors_step.py`, `run/publish_step.py`, `run/weekly.py`, `run/cli.py`, `.github/workflows/pipeline.yml`, `tests/test_run.py` |
+| Demo: the real sector step runs on the demo lake; `web/public/demo-data` has the three new files (12 funds, ~240 KB plain) | Spec §7.6; dev, vitest and Playwright see the panels | `pipeline/orca/demo.py`, `web/public/demo-data/` |
+| Web: "What kind of investor?" (top of Analysis), then after the key figures "Annual return stacked graph" (AUM twin, Stacked ↔ Lines with the S&P 500), "Sector mix over time", "Which decisions made the gap". One Sector / Industry / Sub-industry switch, default Industry. Table view on every panel; wide charts scroll inside their box on phones. Twelve `--sec-*` colours. Famous lists' order moved to `data/famousGroups.ts` | Spec §5, §7.3–7.5 | `web/src/fund/SkillPanels.tsx`, `SkillMapPanel.tsx`, `StackedPanel.tsx`, `MixPanel.tsx`, `DecisionsPanel.tsx`, `skill.ts`, `stacked.ts`, `mix.ts`, `decisions.ts`, `skill.css`, `web/src/pages/Fund.tsx`, `web/src/data/*`, `web/src/tokens.css` |
+| Checks: pipeline 1,082 + new tests green (offline); web 1,114 vitest and 76 Playwright (1280/400, light/dark) green; typecheck clean. A local 640,000-trade synthetic chunk: detail 14 s (scores 4.4 s), peak 2.1 GB | Spec §8 | `web/tests/fund-skill.test.ts`, `fund-skill-ui.test.tsx`, `web/e2e/smoke.spec.ts` |
+| Not done: "never rotated" (spec §6.9, optional; `v_never` is null). Not run on real data yet: the owner's Actions run (`sectors_only` on the merged branch) gives the first real files; licensing (Tiingo, Damodaran) must be confirmed before merging to `main` | Spec §8 phase 9; DECISIONS 2026-11-21 | — |
 
 ## 2026-11-21 — Sector choice vs stock choice on the fund page: design approved, build spec written
 

@@ -1,10 +1,18 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-21
+Last verified: 2026-11-22
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-22 — Sector files: how the yearly split is measured, and what the build chose (build)
+- Decision (code `engine/skill_detail.py`): the replays' quarterly returns are time-weighted at the trade, not modified Dietz as the spec said. A replay trades at the quarter's average level, so the return chains the move from the last quarter end to the trades with the move from the trades to the quarter end. Money in or out then never moves a return; modified Dietz inflated a year with a big sale (selling all of $100 for $110 mid-quarter read as +22%, not +10%). The yearly identity market + sector choice + stock choice = fund still holds exactly. The contract says so.
+- Decision (code): the publish part replays the trades again rather than reading new lake tables from the scores step, so the scores (14 min in run 31) cannot be lost to a longer step; a local 640,000-trade chunk took 2.6x the scores' time, so its step has 90 minutes.
+- Decision (code `run/publish_step.is_sector_path`): the monthly run treats `sectors/*` and `fund/{id}/skill.json` as the sector step's: never owed in `_reconcile_published` (else every scored fund would be recomputed each month) and carried over into its manifest.
+- Decision (code): the demo builds its sector files with the real sector step on the demo lake, not made-up numbers; its 24-stock market makes every demo fund's sector choice negative.
+- Built as the spec's defaults: tier switch on Industry; "never rotated" not built (`v_never` published as null; spec §6.9 optional).
+- Still open: licensing sign-off before merging to `main` (entry below).
 
 ## 2026-11-21 — Fund page: how sector choice vs stock choice is shown (owner)
 - Decision (chat): four new panels on the Analysis tab, above the existing ones: "What kind of investor?" (a map of stock choice across, sector choice up, peers from the fund's famous-funds list), "Annual return stacked graph" (each year = market + sector choice + stock choice, in the Assets under management chart's style, switching to Lines), "Sector mix over time" (mix only, Sector / Industry / Sub-industry), "Which decisions made the gap" (stocks vs their sector, sectors vs market, with the share of money as a bar and an Adds column). Approved over five drafts of claude.ai artifact BvTgoeVpWCPrmwDhXF55Wz (v5); the build spec is `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`.

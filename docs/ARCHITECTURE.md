@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-20 (`famous_rank.csv` from the code; `fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-22 (the sector files and their publish part from the code; `famous_rank.csv` from the code; `fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -153,11 +153,13 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `rf` | year i32, rate f64 (decimal); from 1999 (`rf.START`), fetched again when the stored table starts later |
 | `fund_about` | cik i64, name, street, city, state, incorporated, sic, tickers list[str], exchanges list[str], former_names list[{name, from date, to date}], signer, signer_title, signed date, other_managers list[str], accession, filed date (the 13F the row was read from; the lake's newest when the record lists none), fetched date. One row per fund, as the SEC gives it; `run/about_step.update_fund_about` (two SEC calls a fund) |
 | `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history` |
-| `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; draft, not published) |
+| `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; not published as such: the sector files below are built from it) |
 | `stock_quarters` | stock_id, q, close, div, vwap (split-adjusted; stocks and ETFs), written with `sector_returns` |
 | `fund_flows`, `fund_flows_run/bNNNNN` | cik, stock_id, q, delta, px, shares_after: each fund's trades over its tracking segment, merged like `fund_state` but streamed (each part sorted, a sorted merge on cik, `Lake.sink`): ~85M rows with the history from 1999 |
 | `fund_skill` | cik, tier (1–3), irr_fund, irr_label, irr_mkt, picking, allocation, coverage, n (`engine/skill.py`; draft, not published) |
 | `etf_ranks` | cik, stock_id, label, irr, rank, of, best, best_irr: each single-sector ETF position's label ranked by IRR against every label at its tier |
+
+Sector files (published since 2026-11-22; contract.md "Sector files"): `orca.run sectors --part publish` (`run/sectors_step.publish_sectors`, maths in `engine/skill_detail.py`) replays every listed fund's trades again from `fund_flows`, `stock_quarters` and `sector_returns`, chunked by trades like the scores, and stages `sectors/labels.json`, `sectors/scores.json` and `fund/{id}/skill.json` in `data/out/sectors_staging`, runs the CUSIP guard and adds their paths to `data/out/manifest.json`. The workflow's "Sector files", "Upload the sector files, then the manifest" and "Clear the Cloudflare cache after the sector files" steps run after "Save the score tables" (and in a `sectors_only` run after the main command), all `continue-on-error`. The monthly run never counts these paths as owed (`publish_step.is_sector_path`, `weekly._reconcile_published`) and carries them over into its own manifest (`weekly.sector_files`). The demo runs the real sector step on its lake (`demo.write_demo`).
 | `fund_state`, `fund_state_run/bNNNNN` | cik, meta JSON, snap JSON |
 | JSON | `ingested.json`, `state.json` (watermarks, pending sets, `last_q`, `rf_stale`, `price_backfilled`, `legacy_done`, `legacy_retry`), `published.json` |
 
@@ -185,7 +187,7 @@ Published files: `fund/{id}/{summary,positions,contrib,exits}.json` (`publish.pu
 
 ## Web (`web/`)
 - Routes (`web/src/App.tsx`): `/`, `/fund/:id`, `/fund/:id/stock/:stockId`, `*` (`/how-it-works` was removed 2026-11-11).
-- Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files. `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
+- Data: `VITE_DATA_URL` (build-time; default `/demo-data`). The fund page loads `funds.json` (to tell an unknown fund from a failed load, R29), `securities.json`, `latest_prices.json` and the fund's 4 files; the Analysis tab, when first opened, also loads `fund/{id}/skill.json` (a 404 means no sector panels), `sectors/scores.json` and `home/top_max.json` (the map's peers). `weekly.json` files load lazily: on demand when a period or row needs them, and prefetched in the background after landing (`web/src/fund/prefetch.ts`).
 - Row budget for big tables: `web/src/fund/loading.ts` (50 / 200 / 25 / 100).
 - Build: `vite build`, then `scripts/prerender.mjs`. Prerender writes `dist/fund/{id}/index.html` for the `PRERENDER_MAX` (15,000) largest funds and `dist/_headers`; the `PRERENDER_RICH` (500) largest also get their holdings written into the HTML from the data site's `summary.json`, `securities.json` and `latest_prices.json` (a file that cannot be read only costs that page its extra text). With `SITE_URL` (PR #3, merged a2a1554) it also writes `sitemap.xml`, `robots.txt` and canonical links. With `SITE_URL` it also adds Open Graph / Twitter tags, with `og:image` when `dist/og-default.png` exists (the logo card from `docs/brand/`, shipped in `web/public/`). With an absolute `VITE_DATA_URL` (PR #3) it removes `dist/demo-data`. Logo and icons: `docs/brand/`.
 

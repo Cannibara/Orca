@@ -18,7 +18,7 @@ Planned features (owner, 2026-11-09):
 | F2 | Columns users can rearrange, and saved views |
 | F3 | Weekly stock picks from online popularity (e.g. Reddit) |
 | F4 | Sector momentum and volume page |
-| F5 | Ranking fund managers as stock pickers (picks vs sub-sector ETF comparables) and as sector pickers (sector returns) |
+| F5 | Ranking fund managers as stock pickers (picks vs sub-sector ETF comparables) and as sector pickers (sector returns). 2026-11-22: each fund's own scores are shown on its page (Analysis tab, spec 2026-11-21) and `sectors/scores.json` holds every fund's; a ranking page is still to come (it needs a shrunk score, as the spec's known limits say) |
 
 ## Facts these priorities rest on
 
