@@ -157,3 +157,16 @@ def test_the_label_list_names_each_labels_parent():
     rows += label_rows(MARKET, 0, {12: (1.0, 1.0)}) + label_rows("Old", 1, {11: (1.0, 1.0)})
     got = sd.label_list(pl.DataFrame(rows, schema=OUT_SCHEMA), 12).select("label", "parent", "name").rows()
     assert got == [("Tech", None, "Tech"), ("Tech > Chips", "Tech", "Chips"), (A, "Tech > Chips", "Memory")]
+
+
+def test_dollar_amounts_never_print_as_a_bare_nine_digit_number(tmp_path):
+    # Run 38: whole-dollar amounts that equal an all-digit CUSIP (Microsoft's is 594918104) tripped the guard
+    from orca.publish import write_json
+    from orca.run.publish_step import cusip_leaks
+    from orca.run.sectors_step import _dollars
+
+    write_json(tmp_path / "bare.json", {"v": [594918104]}, compress=False)
+    assert cusip_leaks(tmp_path, {"594918104"}, compressed=False)  # the guard sees a bare number
+    (tmp_path / "bare.json").unlink()
+    write_json(tmp_path / "fund.json", {"v": [_dollars(594918104.0), _dollars(594918103.996)]}, compress=False)
+    assert cusip_leaks(tmp_path, {"594918104"}, compressed=False) == []

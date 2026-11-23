@@ -269,7 +269,9 @@ def _r(x: float | None, digits: int = 6) -> float | None:
 
 
 def _dollars(x: float | None) -> float | None:
-    return None if x is None else round(x)
+    """Dollars to the cent, always a float: a whole number printed bare can be a 9-digit CUSIP
+    (Microsoft's is 594918104) and trip the CUSIP guard; "594918104.0" is a decimal, which it skips."""
+    return None if x is None else float(round(x, 2))
 
 
 def skill_docs(d: skill_detail.Detail, mix: pl.DataFrame, last_q: int) -> dict[int, dict]:
