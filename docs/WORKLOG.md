@@ -14,6 +14,16 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Removed the old Famous/Top table pieces (`TOP_COLUMNS`, `PersonFund`, `personColumns`, `famousColumns`, `components/Face.tsx`, `.home .face`/`.fund-row` CSS) | Unused after the change | `web/src/pages/Home.tsx`, `web/src/pages/home.css`, `web/src/home/famousChart.css` |
 | Checks: web 1,203 vitest (new: the grid's cells and row click; phone Sort by) and 102 Playwright green; typecheck clean | | `web/tests/home.test.tsx`, `web/tests/home-famous-chart.test.tsx` |
 
+## 2026-11-23 — Run 39 published the sector files; the market index is wrong, so the tab is held
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 39 (`sectors_only`, `main` 6f249d6): indices and scores 24 min, sector files 25 min, upload 4 min, cache cleared. Live: `sectors/scores.json` (15,489 funds; 3,082 eligible for the map at industry level), `sectors/labels.json` (322 labels), every scored fund's `skill.json` | The dollars-as-decimals fix (PR #63) let the CUSIP guard pass | — |
+| The numbers are wrong. Orca's whole-market index swings absurdly (Berkshire's market replay: 2008 −84%, 2011 −84%, 2013 +157%, 2022 −83%; IRR −17% a year) while SPY is sane. `labels.json` at Q3 2026: one stock is 96.6% of Industrials > Transportation & Logistics (91 stocks) and 76.7% of Industrials (544 stocks); Business Services > Other Commercial Services has one at 84%. A bad market cap (likely an ADR counted in ordinary shares, or a share-count unit error) dominates the cap-weighted indices | Found when checking Berkshire after the run; the sector indices were never sanity-checked quarter by quarter (plan phase 4) | — |
+| Proposed hold: the production build sets `VITE_SPECIALIZATION=hold`, and the Specialization tab says "Being checked" and loads nothing, until the indices are fixed. Dev, tests and the demo are unchanged | Wrong numbers should not stay on the site | `web/src/fund/SkillPanels.tsx`, `web/src/pages/Fund.tsx`, `.github/workflows/web.yml`, `web/tests/fund-skill-ui.test.tsx` |
+| Next: find the stock (a diagnostic in the sectors step: per quarter, the biggest weights in Market and each sector, and caps that jump ×5 or more), fix its cap (ADR ratio in `share_overrides.csv`, or a guard that sets such caps aside), re-run, check Berkshire and a few funds, then lift the hold | | |
+
+
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 
 | What changed | Why | Files |

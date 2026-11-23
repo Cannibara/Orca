@@ -30,7 +30,7 @@ import { WeeklyStoreContext, useHoldingsState } from "../fund/usePositionData";
 import { WhatIfPanel } from "../fund/WhatIfPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import type { Tier } from "../fund/skill";
-import { SpecializationTab, useSkillData } from "../fund/SkillPanels";
+import { SPECIALIZATION_HOLD, SpecializationTab, useSkillData } from "../fund/SkillPanels";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
 import type { Span } from "../fund/span";
 import NotFound from "./NotFound";
@@ -119,7 +119,7 @@ function FundView({ data }: { data: FundData }) {
   const [cr, setCr] = useState<Span | null>(null);
   const win = useMemo(() => windowYears(series, range), [series, range]);
   // Specialization: the sector file (loaded when the tab first opens) and the level choices are judged at (R9).
-  const skill = useSkillData(summary.id, tab === "specialization");
+  const skill = useSkillData(summary.id, tab === "specialization" && !SPECIALIZATION_HOLD);
   const [tier, setTier] = useState<Tier>(2);
   // SEC names come in capitals with legal suffixes; the new panels print them tidied.
   const names = useMemo(() => new Map([...stocks].map(([id, s]) => [id, { ...s, name: tidyName(s.name) }])), [stocks]);

@@ -147,3 +147,30 @@ describe("the Specialization tab", () => {
     expect(within(panel("What kind of investor?")).getByRole("button", { name: "Sector" })).toBeTruthy();
   });
 });
+
+describe("the Specialization hold (production build with VITE_SPECIALIZATION=hold)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("says the tab is being checked and asks for no sector file", async () => {
+    vi.stubEnv("VITE_SPECIALIZATION", "hold");
+    vi.resetModules();
+    const { default: HeldFund } = await import("../src/pages/Fund");
+    stubData();
+    render(
+      <MemoryRouter initialEntries={[`/fund/${FUND}#specialization`]}>
+        <TooltipProvider>
+          <Routes>
+            <Route path="/fund/:id" element={<HeldFund />} />
+          </Routes>
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("Being checked")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "What kind of investor?" })).toBeNull();
+    const urls = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map((c) => c[0]);
+    expect(urls.some((u) => u.includes("skill.json") || u.includes("sectors/"))).toBe(false);
+  });
+});
