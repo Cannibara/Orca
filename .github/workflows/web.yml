@@ -124,6 +124,9 @@ jobs:
           SITE_URL: ${{ vars.SITE_URL || 'https://www.orcaetf.com' }}
           # Seconds of the Strict-Transport-Security header; unset means six months. 0 undoes it.
           HSTS_MAX_AGE: ${{ vars.HSTS_MAX_AGE }}
+          # "hold": the fund page's Specialization tab says it is being checked instead of showing the sector
+          # files, whose market index is wrong (WORKLOG 2026-11-23). Remove this line once the indices are fixed.
+          VITE_SPECIALIZATION: hold
         run: npm run build
       - name: Deploy to Cloudflare Pages
         env:

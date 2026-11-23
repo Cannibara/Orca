@@ -12,6 +12,12 @@ import { StackedPanel } from "./StackedPanel";
 // The Specialization tab: the sector choice vs stock choice panels (spec 2026-11-21 §5; owner 2026-11-22: their
 // own tab, after Analysis). They need fund/{id}/skill.json, which only scored funds have.
 
+/**
+ * The production build sets VITE_SPECIALIZATION=hold while the published sector files are wrong (2026-11-23: one
+ * stock's bad market value swings Orca's market index). The tab then says so, and its files are not loaded.
+ */
+export const SPECIALIZATION_HOLD = import.meta.env.VITE_SPECIALIZATION === "hold";
+
 export type SkillData = { skill: Skill; scores: SectorScores | null; famous: TopRow[] | undefined; funds: FundsIndex | null };
 
 async function loadSkillData(id: number): Promise<SkillData | null> {
@@ -87,6 +93,17 @@ export function SpecializationTab({
   name: string;
   stocks: Map<number, Stock>;
 }) {
+  if (SPECIALIZATION_HOLD) {
+    return (
+      <div className="state">
+        <h4>Being checked</h4>
+        <p>
+          This tab will show how much of the fund's return came from the sectors it chose and how much from the stocks it picked inside them. We
+          found an error in the market figures it compares against and are fixing it. It will be back soon.
+        </p>
+      </div>
+    );
+  }
   if (state === null || state.status === "loading") {
     return (
       <>
