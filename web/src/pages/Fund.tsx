@@ -29,6 +29,8 @@ import { KpiStrip } from "../fund/KpiStrip";
 import { WeeklyStoreContext, useHoldingsState } from "../fund/usePositionData";
 import { WhatIfPanel } from "../fund/WhatIfPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
+import type { Tier } from "../fund/skill";
+import { SpecializationTab, useSkillData } from "../fund/SkillPanels";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
 import type { Span } from "../fund/span";
 import NotFound from "./NotFound";
@@ -116,6 +118,9 @@ function FundView({ data }: { data: FundData }) {
   const [br, setBr] = useState<Span | null>(null);
   const [cr, setCr] = useState<Span | null>(null);
   const win = useMemo(() => windowYears(series, range), [series, range]);
+  // Specialization: the sector file (loaded when the tab first opens) and the level choices are judged at (R9).
+  const skill = useSkillData(summary.id, tab === "specialization");
+  const [tier, setTier] = useState<Tier>(2);
   // SEC names come in capitals with legal suffixes; the new panels print them tidied.
   const names = useMemo(() => new Map([...stocks].map(([id, s]) => [id, { ...s, name: tidyName(s.name) }])), [stocks]);
 
@@ -156,6 +161,7 @@ function FundView({ data }: { data: FundData }) {
                 <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
               </>
             )}
+            {tab === "specialization" && <SpecializationTab state={skill} tier={tier} onTier={setTier} fundId={summary.id} name={summary.name} stocks={names} />}
             {tab === "about" && <AboutPanel summary={summary} />}
           </div>
           <p className="fp-foot">

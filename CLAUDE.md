@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-21
+Last verified: 2026-11-22
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -23,6 +23,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
 | The home page's Famous funds and Top funds charts (ranked return bars, one scale per list or page, list index, Chart / Table switch) | `web/src/home/` (built: `FamousChart.tsx`, `famousChart.ts`, `ListIndex.tsx`, `listIndex.ts`), `web/src/lib/famousNames.ts` (short names), `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` (design; mock-ups beside it) |
+| The fund page's Specialization tab: sector choice vs stock choice panels (map, Annual return stacked graph, sector mix, decisions) and the sector files they read | `web/src/fund/SkillPanels.tsx` and its panels (built), `pipeline/orca/engine/skill_detail.py`, `run/sectors_step.publish_sectors`, `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md` (design; draft HTML beside it) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
 ## Stack and hosting
@@ -38,9 +39,10 @@ pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/
 pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
 web/src/home/        ranked return chart for Famous funds and Top funds (FamousChart.tsx, famousChart.ts pure model, useEasedScroll.ts) and Famous funds' list index (ListIndex.tsx, listIndex.ts layout)
-web/src/fund/        fund-page panels (Holdings/Analysis/About tabs) and pure models: series.ts (returns/KPIs), positions.ts (as-of model, periods),
+web/src/fund/        fund-page panels (Holdings/Analysis/Specialization/About tabs) and pure models: series.ts (returns/KPIs), positions.ts (as-of model, periods),
                      treemap.ts + treemapView.ts (holdings tree map), about.ts,
-                     drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css
+                     drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css,
+                     sector panels (SkillPanels.tsx loads skill.json; skill.ts, stacked.ts, mix.ts, decisions.ts)
 web/src/charts/      PriceChart, StepChart, shared Tooltip (one #tip for the app), scale.ts
 web/src/components/  DataTable, Tabs, Panel, Choice (Seg wrapper), Pager, State, Tiles, Signed, StockLabel
 web/src/data/        api.ts (cached fetch per URL, loaders), types.ts (mirrors contract.md)
@@ -63,7 +65,7 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Web e2e | `cd web && npx playwright test` (cloud sessions: prefix `PW_CHROMIUM=/opt/pw-browsers/chromium`) |
 | Pipeline install / tests | `cd pipeline && uv sync --locked && uv run pytest -m "not network"` |
 | Pipeline run (ingest) | Actions > Pipeline > Run workflow (inputs `full`, `home_only`, `backfill`); locally `uv run python -m orca.run {weekly\|rebuild\|backfill\|home\|check-keys\|verify}` (needs the API key env vars) |
-| Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only, nothing published). Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
+| Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`: indices, scores, then the sector files are published); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only), `--part publish` stages the sector files in `data/out/sectors_staging`. Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | People photos (famous funds) | Actions > People photos > Run workflow, **choosing a branch, not `main`** (it commits the photos to that branch; merge it after); locally `cd pipeline && uv run --with pillow --with opencv-python-headless==4.10.0.84 python scripts/fetch_people_images.py`; see `web/src/assets/people/README.md` |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |

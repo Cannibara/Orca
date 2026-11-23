@@ -63,8 +63,10 @@ def label_series(sector_returns: pl.DataFrame) -> pl.DataFrame:
     return sector_returns.select(pl.col("label").alias("key"), "q", "level_avg", "level_end").cast(SERIES_SCHEMA)
 
 
-def replay(trades: pl.DataFrame, series: pl.DataFrame, last_q: int, by: tuple[str, ...] = ()) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """(flows: group columns, t, cf; dropped: the positions with a trade the series has no level for).
+def replay(trades: pl.DataFrame, series: pl.DataFrame, last_q: int, by: tuple[str, ...] = (), units: bool = False):
+    """(flows: group columns, t, cf; dropped: the positions with a trade the series has no level for), and with
+    `units` a third frame: per trade, the group columns, q, u_prev and u (the replay's units before and after it;
+    0 once sold out), which `skill_detail` values quarter by quarter.
 
     `trades` has TRADES_SCHEMA plus `key` (the series to replay through) and the `by` columns."""
     group = ["cik", "stock_id", "key", *by]
@@ -92,12 +94,15 @@ def replay(trades: pl.DataFrame, series: pl.DataFrame, last_q: int, by: tuple[st
     end_level = series.filter(pl.col("q") <= last_q).sort("key", "q").group_by("key").agg(pl.col("level_end").last().alias("le"))
     last = t.group_by(group).agg(pl.col("u").last(), pl.col("gone").last()).filter(~pl.col("gone"))
     end_cf = last.join(end_level, on="key", how="left").select(*group, pl.lit(end_years(last_q)).alias("t"), (pl.col("u") * pl.col("le")).alias("cf"))
-    return pl.concat([trade_cf, end_cf]), dropped.select(group)
+    if not units:
+        return pl.concat([trade_cf, end_cf]), dropped.select(group)
+    held = t.select(*group, "q", "u_prev", pl.when(pl.col("gone")).then(0.0).otherwise(pl.col("u")).alias("u"))
+    return pl.concat([trade_cf, end_cf]), dropped.select(group), held
 
 
-def irr_by(flows: pl.DataFrame, by: list[str]) -> pl.DataFrame:
-    """IRR of each group's (t, cf) flows: bisection on [−0.99, 10], 200 steps, null without a sign change
-    (the web's `irr`). Every group is solved at once."""
+def irr_by(flows: pl.DataFrame, by: list[str], steps: int = 200) -> pl.DataFrame:
+    """IRR of each group's (t, cf) flows: bisection on [−0.99, 10], `steps` steps (200 as the web's `irr`; 64
+    already reach a double's precision), null without a sign change. Every group is solved at once."""
     f = flows.group_by(*by, "t").agg(pl.col("cf").sum())
     keys = f.select(by).unique().sort(by).with_row_index("_g")
     f = f.join(keys, on=by).select(pl.col("_g").cast(pl.Int64), "t", "cf")
@@ -112,7 +117,7 @@ def irr_by(flows: pl.DataFrame, by: list[str]) -> pl.DataFrame:
     lo, hi = pl.Series([-0.99] * n), pl.Series([10.0] * n)
     f_lo, f_hi = npv(lo), npv(hi)
     lo_sign = f_lo.sign()
-    for _ in range(200):
+    for _ in range(steps):
         mid = (lo + hi) / 2
         up = npv(mid).sign() == lo_sign
         lo = pl.select(pl.when(up).then(mid).otherwise(lo)).to_series()
@@ -127,6 +132,16 @@ def irr_by(flows: pl.DataFrame, by: list[str]) -> pl.DataFrame:
 
 def _label_at(path: str, tier: int) -> str:
     return SEP.join(path.split(SEP)[:tier])
+
+
+def tier_labels(stock_paths: dict[int, str], etfs: dict[int, EtfPick | None], nosector: set[str], spy_key: str, tier: int) -> dict[int, str]:
+    """stock_id -> the series key its label replay uses at `tier`: its label's index, a conglomerate's SPY,
+    a single-sector ETF's own label at its tier (finer tiers use that tier). Neutral ETFs are not picks."""
+    label = {sid: spy_key if path in nosector else _label_at(path, tier) for sid, path in stock_paths.items()}
+    for sid, pick in etfs.items():
+        if pick is not None:
+            label[sid] = _label_at(pick.path, min(tier, pick.tier))
+    return label
 
 
 def fund_scores(
@@ -151,12 +166,7 @@ def fund_scores(
     all_flows, all_bad = [], []
     for tier in TIERS:
         keyed = []
-        label = {}
-        for sid, path in stock_paths.items():
-            label[sid] = spy_key if path in nosector else _label_at(path, tier)
-        for sid, pick in etfs.items():
-            if pick is not None:
-                label[sid] = _label_at(pick.path, min(tier, pick.tier))
+        label = tier_labels(stock_paths, etfs, nosector, spy_key, tier)
         picks = trades.filter(pl.col("stock_id").is_in(list(label)))
         lab = pl.DataFrame({"stock_id": list(label), "_label": list(label.values())}, schema={"stock_id": pl.Int32, "_label": pl.String})
         picks = picks.join(lab, on="stock_id").with_columns(tier=pl.lit(tier, pl.Int8))

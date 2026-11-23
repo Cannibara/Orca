@@ -20,6 +20,7 @@ const routes = [
   { name: "home", path: "/" },
   { name: "fund page", path: `/fund/${fundId}` },
   { name: "fund page, Analysis tab", path: `/fund/${fundId}#analysis` },
+  { name: "fund page, Specialization tab", path: `/fund/${fundId}#specialization` },
   { name: "fund page, About tab", path: `/fund/${fundId}#about` },
   { name: "position page", path: `/fund/${fundId}/stock/${stockId}` },
   { name: "not found", path: "/no-such-page" },
@@ -115,6 +116,26 @@ for (const width of widths) {
       await expect(page.getByRole("heading", { name: `Return constituents ${label}`, exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Annual returns", exact: true })).toHaveCount(0);
       expect(errors).toEqual([]);
+    });
+
+    // The Specialization tab's sector choice vs stock choice panels (spec 2026-11-21): laid out for real at both
+    // widths; a fund without a sector file gets a note instead.
+    test("fund page, Specialization: the four sector panels in order, and a note for a fund without a sector file", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}#specialization`);
+      await expect(page.locator(".tp h3")).toHaveText(["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]);
+      for (const name of ["What kind of investor?", "Annual return stacked graph", "Sector mix over time", "Which decisions made the gap"]) {
+        await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      }
+      await page.getByRole("button", { name: "Lines", exact: true }).click();
+      await expect(page.locator(".stkp path.ln")).toHaveCount(4);
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+
+      await page.route(`**/fund/${fundId}/skill.json`, (route) => route.fulfill({ status: 404, body: "" }));
+      await page.reload();
+      await expect(page.getByText("Not scored yet")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Annual return stacked graph", exact: true })).toHaveCount(0);
     });
 
     // jsdom has no layout, so only here can the landing be watched as a real page runs it (the first draw used to

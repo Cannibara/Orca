@@ -9,22 +9,39 @@ gets a null row, so it is asked again only once that row is stale.
 
 from __future__ import annotations
 
+import json
 import logging
+import shutil
 from collections import Counter
 from collections.abc import Callable
-from datetime import date, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import polars as pl
 
-from orca.engine import skill
-from orca.engine.sectors import QUARTER_SCHEMA, index_returns, market_caps, stock_quarters
+from orca.engine import skill, skill_detail
+from orca.engine.sectors import (
+    OUT_SCHEMA,
+    QUARTER_SCHEMA,
+    index_returns,
+    market_caps,
+    stock_quarters,
+)
 from orca.hierarchy import assign, load
 from orca.hierarchy.assign import SicTable
 from orca.hierarchy.matching import kind
 from orca.http import FetchError
+from orca.publish import read_manifest, write_json, write_manifest
 from orca.run.budget import Budget
 from orca.run.market import BENCHMARK_CUSIP, load_daily, stock_of
-from orca.run.state import CUSIP_MAP_SCHEMA, FUND_FLOWS_SCHEMA, SECURITIES_TABLE_SCHEMA, read_table
+from orca.run.publish_step import CusipLeakError, cusip_leaks, is_cusip, is_sector_path
+from orca.run.state import (
+    CUSIP_MAP_SCHEMA,
+    FUND_FLOWS_SCHEMA,
+    SECURITIES_TABLE_SCHEMA,
+    read_table,
+)
 from orca.shares_hist import SCHEMA, frame, load_overrides
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
@@ -176,14 +193,24 @@ def trade_chunks(counts: dict[int, int], max_trades: int = SKILL_TRADES) -> list
     return chunks
 
 
-def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
-    """Score every fund in `fund_flows` against `sector_returns` (`engine/skill.py`) and write `fund_skill`
-    (per fund and tier) and `etf_ranks` (per single-sector ETF position). Labels are read fresh."""
+@dataclass(frozen=True)
+class ScoreInputs:
+    """What every replay needs, read from the lake once (labels read fresh)."""
+
+    sector: pl.DataFrame
+    sq: pl.DataFrame
+    paths: dict[int, str]
+    etfs: dict[int, skill.EtfPick | None]
+    nosector: set[str]
+    spy: int | None
+    series: pl.DataFrame
+
+
+SECTOR_SCHEMA = pl.Schema({"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "level_avg": pl.Float64, "level_end": pl.Float64})
+
+
+def score_inputs(lake: Lake, sector: pl.DataFrame) -> ScoreInputs:
     h = load()
-    sector = read_table(lake, "sector_returns", pl.Schema({"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "level_avg": pl.Float64, "level_end": pl.Float64}))
-    flows = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
-    if sector.is_empty() or flows.is_empty():
-        return {"funds": 0}
     sq = lake.read("stock_quarters")
     labels = assign.load_stock_labels(h=h)
     sic = SicTable.load(h=h)
@@ -200,8 +227,20 @@ def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
     paths, _, _ = stock_paths(stocks, labels, sic)
     spy = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)).get(BENCHMARK_CUSIP)
     nosector = {n.path for n in h.nosector}
-    counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
     series = pl.concat([skill.own_series(sq), skill.label_series(sector)])
+    return ScoreInputs(sector, sq, paths, etfs, nosector, spy, series)
+
+
+def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
+    """Score every fund in `fund_flows` against `sector_returns` (`engine/skill.py`) and write `fund_skill`
+    (per fund and tier) and `etf_ranks` (per single-sector ETF position). Labels are read fresh."""
+    sector = read_table(lake, "sector_returns", SECTOR_SCHEMA)
+    flows = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
+    if sector.is_empty() or flows.is_empty():
+        return {"funds": 0}
+    i = score_inputs(lake, sector)
+    sq, paths, etfs, nosector, spy, series = i.sq, i.paths, i.etfs, i.nosector, i.spy, i.series
+    counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
     scores, ranks, dropped = [], [], 0
     for n, chunk in enumerate(trade_chunks(counts)):
         part = flows.filter(pl.col("cik").is_in(chunk))
@@ -222,6 +261,175 @@ def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
     return stats
 
 
+SECTOR_STAGING = "sectors_staging"  # under the out folder: what the workflow's sector upload copies
+
+
+def _r(x: float | None, digits: int = 6) -> float | None:
+    return None if x is None else round(x, digits)
+
+
+def _dollars(x: float | None) -> float | None:
+    return None if x is None else round(x)
+
+
+def skill_docs(d: skill_detail.Detail, mix: pl.DataFrame, last_q: int) -> dict[int, dict]:
+    """fund id -> its `fund/{id}/skill.json` (contract.md, Sector files) from one chunk's detail and mix."""
+
+    def by_cik(df: pl.DataFrame) -> dict[int, pl.DataFrame]:
+        return {k[0]: v for k, v in df.partition_by("cik", as_dict=True).items()}
+
+    quarters, years, bought, scores = by_cik(d.quarters), by_cik(d.years), by_cik(d.bought), by_cik(d.scores)
+    picks, bets, mixes = by_cik(d.picks), by_cik(d.bets), by_cik(mix)
+    first = dict(d.first_q.iter_rows())
+    docs = {}
+    for cik, sc in scores.items():
+        if cik not in first:
+            continue
+        qs = list(range(first[cik], last_q + 1))
+        qrows = quarters.get(cik, pl.DataFrame(schema=d.quarters.schema))
+        series = {(t, v): {q: (val, r) for q, val, r in g.select("q", "v", "r").iter_rows()}
+                  for (t, v), g in qrows.partition_by("tier", "variant", as_dict=True).items()}  # fmt: skip
+        yrows = years.get(cik, pl.DataFrame(schema=d.years.schema))
+        ys = {(t, v): {yr: ret for yr, ret in g.select("year", "ret").iter_rows()}
+              for (t, v), g in yrows.partition_by("tier", "variant", as_dict=True).items()}  # fmt: skip
+        names = yrows.filter(pl.col("tier") == 1).select("year", "name").unique().sort("year")
+        year_ids, year_names = names["year"].to_list(), names["name"].to_list()
+        buy = dict(bought[cik].select("q", "bought").iter_rows()) if cik in bought else {}
+
+        def ret(t: int, v: str) -> list:
+            s = series.get((t, v), {})
+            return [_r(s.get(q, (None, None))[1]) for q in qs]
+
+        def val(t: int, v: str) -> list:
+            s = series.get((t, v), {})
+            return [_dollars(s.get(q, (None, None))[0]) if (t, v) in series else None for q in qs]
+
+        def yret(t: int, v: str) -> list:
+            s = ys.get((t, v), {})
+            return [_r(s.get(y)) for y in year_ids]
+
+        tiers = {}
+        for row in sc.iter_rows(named=True):
+            t = row["tier"]
+            pk = picks[cik].filter(pl.col("tier") == t) if cik in picks else pl.DataFrame(schema=d.picks.schema)
+            bt = bets[cik].filter(pl.col("tier") == t) if cik in bets else pl.DataFrame(schema=d.bets.schema)
+            tiers[str(t)] = {
+                **{k: _r(row[k]) for k in ("irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation")},
+                "coverage": _r(row["coverage"], 4), "n": row["n"],
+                "quarters": {"label": ret(t, "label"), "v_label": val(t, "label"), "v_never": None},
+                "years": {"label": yret(t, "label")},
+                "picks": {
+                    "stock_id": [None if s == skill_detail.OTHERS else s for s in pk["stock_id"].to_list()],
+                    "label": pk["label"].to_list(), "bought": [_dollars(x) for x in pk["bought"].to_list()],
+                    "irr_own": [_r(x) for x in pk["irr_own"].to_list()], "irr_label": [_r(x) for x in pk["irr_label"].to_list()],
+                },
+                "bets": {
+                    "label": bt["label"].to_list(), "bought": [_dollars(x) for x in bt["bought"].to_list()],
+                    "irr": [_r(x) for x in bt["irr"].to_list()], "irr_mkt": [_r(x) for x in bt["irr_mkt"].to_list()],
+                    "mkt_share": [_r(x, 4) for x in bt["mkt_share"].to_list()],
+                },
+            }  # fmt: skip
+        mq: dict = {"q": [], "label": [], "share": []}
+        if cik in mixes:
+            m = mixes[cik]
+            mq["q"] = sorted(set(m["q"].to_list()))
+            pos = {q: i for i, q in enumerate(mq["q"])}
+            for label, g in m.partition_by("label", as_dict=True, maintain_order=True).items():
+                row = [0.0] * len(mq["q"])
+                for q, share in g.select("q", "share").iter_rows():
+                    row[pos[q]] = share
+                mq["label"].append(label[0])
+                mq["share"].append(row)
+            order = sorted(range(len(mq["label"])), key=lambda i: mq["label"][i])
+            mq["label"], mq["share"] = [mq["label"][i] for i in order], [mq["share"][i] for i in order]
+        docs[cik] = {
+            "last_q": last_q, "first_q": first[cik],
+            "quarters": {"q": qs, "bought": [_dollars(buy.get(q, 0.0)) for q in qs],
+                         "fund": ret(1, "fund"), "mkt": ret(1, "mkt"), "spy": ret(1, "spy"),
+                         "v_fund": val(1, "fund"), "v_mkt": val(1, "mkt"), "v_spy": val(1, "spy")},
+            "years": {"name": year_names, "fund": yret(1, "fund"), "mkt": yret(1, "mkt"), "spy": yret(1, "spy")},
+            "tiers": tiers, "mix": mq,
+        }  # fmt: skip
+    return docs
+
+
+def publish_sectors(lake: Lake, out_root: Path, last_q: int, flags: list, compress: bool = True, built: datetime | None = None) -> dict:
+    """Write `sectors/labels.json`, `sectors/scores.json` and every listed fund's `fund/{id}/skill.json` into
+    `out_root/sectors_staging`, then add them to `out_root/manifest.json` (the site's, as the monthly run left it).
+
+    Funds are those the manifest lists a summary for (all, without a manifest). The CUSIP guard runs over the
+    staged files before the manifest changes; the workflow uploads the folder, then the manifest."""
+    sector = read_table(lake, "sector_returns", OUT_SCHEMA)
+    flows = read_table(lake, "fund_flows", FUND_FLOWS_SCHEMA)
+    if sector.is_empty() or flows.is_empty():
+        return {"funds": 0}
+    i = score_inputs(lake, sector)
+    out_root = Path(out_root)
+    site = read_manifest(out_root, compress)
+    listed = {int(p.split("/")[1]) for p in site if p.startswith("fund/") and p.endswith("/summary.json")}
+    if listed:
+        flows = flows.filter(pl.col("cik").is_in(list(listed)))
+    staging = out_root / SECTOR_STAGING
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    paths = skill_detail.mix_paths(i.paths, i.etfs)
+    files: dict[str, str] = {}
+    scores = []
+    counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
+    for n, chunk in enumerate(trade_chunks(counts)):
+        part = flows.filter(pl.col("cik").is_in(chunk))
+        d = skill_detail.fund_detail(part, sector, i.paths, i.etfs, i.nosector, i.spy, last_q, i.series)
+        mix = skill_detail.fund_mix(part, i.sq, paths, last_q)
+        for cik, doc in skill_docs(d, mix, last_q).items():
+            rel = f"fund/{cik}/skill.json"
+            files[rel] = write_json(staging / rel, doc, compress)
+        scores.append(d.scores.join(d.first_q, on="cik"))
+        if n % 10 == 0:
+            log.info("sector files: chunk %d, %d funds, %d trades, peak %d MB", n, len(chunk), part.height, peak_mb())
+    sc = pl.concat(scores).sort("cik", "tier") if scores else pl.DataFrame()
+    doc = {"last_q": last_q, "fund_id": [], "tier": [], "picking": [], "allocation": [], "n": [], "coverage": [], "span_q": []}
+    for r in sc.iter_rows(named=True):
+        doc["fund_id"].append(r["cik"])
+        doc["tier"].append(r["tier"])
+        doc["picking"].append(_r(r["picking"]))
+        doc["allocation"].append(_r(r["allocation"]))
+        doc["n"].append(r["n"])
+        doc["coverage"].append(_r(r["coverage"], 4))
+        doc["span_q"].append(last_q - r["first_q"] + 1)
+    files["sectors/scores.json"] = write_json(staging / "sectors/scores.json", doc, compress)
+    labels = skill_detail.label_list(sector, last_q)
+    ldoc = {"last_q": last_q, **{c: labels[c].to_list() for c in ("label", "tier", "parent", "name", "n", "top_weight")}}
+    files["sectors/labels.json"] = write_json(staging / "sectors/labels.json", ldoc, compress)
+    cusips = {c for c in read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)["cusip"].to_list() if is_cusip(c)}
+    leaks = cusip_leaks(staging, cusips, compress)
+    if leaks:
+        raise CusipLeakError(f"staged sector files would publish a CUSIP: {', '.join(leaks)}")
+    version = "sectors"
+    path = out_root / "manifest.json"
+    if path.exists():
+        version = read_json_any(path, compress).get("version", version)
+    merged = {p: h for p, h in site.items() if not is_sector_path(p)} | files
+    write_manifest(out_root, version, merged, compress, built=built)
+    sizes = [f.stat().st_size for f in staging.rglob("skill.json")]
+    stats = {"funds": len(sizes), "bytes": sum(sizes), "largest": max(sizes, default=0)}
+    flags.append({"type": "sector_files", **stats})
+    log.info("sector files: %s", stats)
+    return stats
+
+
+def read_json_any(path: Path, compressed: bool) -> dict:
+    """A manifest restored from the site may be plain JSON (R2 decodes br for rclone): read either."""
+    import brotli
+
+    data = path.read_bytes()
+    if compressed:
+        try:
+            data = brotli.decompress(data)
+        except brotli.error:
+            pass
+    return json.loads(data)
+
+
 def peak_mb() -> int:
     """The process's peak memory so far (MB): logged by each step, so a run that dies shows which step grew."""
     import resource
@@ -229,7 +437,9 @@ def peak_mb() -> int:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
 
-def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90, part: str = "all") -> dict:
+def recompute(
+    lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90, part: str = "all", out_root: Path | None = None
+) -> dict:
     """`orca.run sectors`: share-count history (when `fetch_shares` is given), the indices and the scores, from
     the lake. Its own workflow step after the monthly run's lake is saved (so it can never cost that run), and
     the whole job after a relabel (`sectors_only`). `part` = "indices" (share counts and indices) or "scores"
@@ -245,6 +455,10 @@ def recompute(lake: Lake, fetch_shares: Callable[[int], list] | None = None, min
     flags: list = []
     budget = Budget(minutes)
     out: dict = {"flags": flags}
+    if part == "publish":
+        out["files"] = publish_sectors(lake, out_root if out_root is not None else Path("data/out"), last_q, flags)
+        log.info("files: peak %d MB", peak_mb())
+        return out
     if part == "scores":
         out["skill"] = score_funds(lake, last_q, flags)
         log.info("skill: peak %d MB", peak_mb())

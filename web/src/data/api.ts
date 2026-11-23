@@ -9,7 +9,10 @@ import type {
   HomeName,
   LatestPrices,
   Positions,
+  SectorLabels,
+  SectorScores,
   Securities,
+  Skill,
   Summary,
   Weekly,
 } from "./types";
@@ -76,6 +79,23 @@ export const loadContrib = (id: number) => getJson<Contrib>(`fund/${id}/contrib.
 export const loadExits = (id: number) => getJson<Exits>(`fund/${id}/exits.json`);
 export const loadWeekly = (stockId: number, opts?: LoadOptions) => getJson<Weekly>(`stock/${stockId}/weekly.json`, opts);
 export const loadHome = <N extends HomeName>(name: N) => getJson<HomeFiles[N]>(`home/${name}.json`);
+export const loadSectorScores = () => getJson<SectorScores>("sectors/scores.json");
+export const loadSectorLabels = () => getJson<SectorLabels>("sectors/labels.json");
+
+/**
+ * The fund's sector file, or null when it has none (contract: the sector step writes it only for the funds it
+ * scored). A static host's single-page fallback can answer a missing file with index.html (R29), which does
+ * not parse as JSON: that is "none" too. Any other failure is thrown.
+ */
+export async function loadSkill(id: number): Promise<Skill | null> {
+  try {
+    const s = await getJson<Skill>(`fund/${id}/skill.json`);
+    return s && typeof s === "object" && s.tiers ? s : null;
+  } catch (err) {
+    if (err instanceof NotFoundError || err instanceof SyntaxError) return null;
+    throw err;
+  }
+}
 
 /**
  * Whether funds.json lists the fund. The index, not a 404, says whether a fund exists (R29): a static

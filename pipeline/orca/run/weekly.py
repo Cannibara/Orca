@@ -48,6 +48,7 @@ from orca.run.publish_step import (
     cusip_leaks,
     is_cusip,
     is_fund_path,
+    is_sector_path,
     keep_only,
     prune_staging,
     publish_shared_files,
@@ -148,7 +149,8 @@ def _reconcile_published(lake: Lake, out_root: Path, state: State, compress: boo
         return
     recorded = json.loads(path.read_text())
     site = read_manifest(out_root, compress)
-    differ = {p for p in recorded.keys() | site.keys() if recorded.get(p) != site.get(p)}
+    # The sector step's files are its own (it adds them to the site's manifest after this run): never owed here.
+    differ = {p for p in recorded.keys() | site.keys() if recorded.get(p) != site.get(p) and not is_sector_path(p)}
     if not differ:
         return
     funds = {i for p in differ if (i := _path_id(p, "fund")) is not None}
@@ -164,6 +166,12 @@ def _reconcile_published(lake: Lake, out_root: Path, state: State, compress: boo
     state.pending_weekly |= stocks
     state.save(lake)  # before published.json, so a crash in between reconciles again
     write_json_atomic(path, site)
+
+
+def sector_files(out_root: Path, compress: bool) -> dict[str, str]:
+    """The sector step's files in the site's manifest (restored into `out_root`): carried over into this run's
+    manifest, so the site's manifest keeps listing them until the sector step replaces them."""
+    return {p: h for p, h in read_manifest(out_root, compress).items() if is_sector_path(p)}
 
 
 def _path_id(path: str, kind: str) -> int | None:
@@ -515,7 +523,7 @@ def run_weekly(
 
     _log_stage("publish", started, {"files": len(files), "changed": len(changed)})
     dropped = funds.attempted - computed
-    merged = dict(files) if rebuild else {**previous, **files}
+    merged = {**sector_files(out_root, compress), **(dict(files) if rebuild else {**previous, **files})}
     merged = {path: sha for path, sha in merged.items() if not is_fund_path(path, dropped)}
     # A stock whose prices were all dropped has no weekly file any more (contract: no priced
     # day, no file); the old one must leave the site, or its chart shows the dropped prices.
@@ -638,7 +646,7 @@ def run_home(
     leaks = cusip_leaks(staging, {c for c in cusip_map["cusip"].to_list() if is_cusip(c)}, compress)
     if leaks:
         raise CusipLeakError(f"staged files would publish a CUSIP: {', '.join(leaks)}")
-    merged = {**previous, **files}
+    merged = {**sector_files(out_root, compress), **previous, **files}
     write_manifest(out_root, run_id, merged, compress, built=built)
     write_json_atomic(published_path(lake), merged)
     prune_staging(out_root)

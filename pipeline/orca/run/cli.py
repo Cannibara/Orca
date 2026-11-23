@@ -28,9 +28,9 @@ def main(argv: list[str] | None = None) -> int:
         "home", help="republish the home lists from the stored fund state (no fetch, no recompute)"
     )
     sectors_cmd = commands.add_parser(
-        "sectors", help="share counts, sector indices and fund scores from the lake (lake only, nothing published)"
+        "sectors", help="share counts, sector indices and fund scores from the lake (lake only); --part publish stages the sector files"
     )
-    sectors_cmd.add_argument("--part", choices=("all", "indices", "scores"), default="all")
+    sectors_cmd.add_argument("--part", choices=("all", "indices", "scores", "publish"), default="all")
     commands.add_parser(
         "check-keys", help="one test request to OpenFIGI, Tiingo and FRED with the keys set"
     )
@@ -69,11 +69,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sectors":
         from orca.run.sectors_step import recompute
 
-        fetch = production_sources().shares_history if args.part != "scores" else None
-        stats = recompute(Lake(config.LAKE_DIR), fetch, part=args.part)
+        fetch = production_sources().shares_history if args.part in ("all", "indices") else None
+        stats = recompute(Lake(config.LAKE_DIR), fetch, part=args.part, out_root=config.OUT_DIR)
         if "shares" in stats:
             print(f"shares: {json.dumps(stats['shares'], sort_keys=True)}")
-        for key in ("sectors", "skill"):
+        for key in ("sectors", "skill", "files"):
             if key in stats:
                 print(f"{key}: {json.dumps(stats[key], sort_keys=True)}")
         return 0

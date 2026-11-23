@@ -154,7 +154,7 @@ const analysisCaption = (span: string) =>
 const kpiSpan = () => document.querySelector(".kpi-cap b")?.textContent;
 const handle = (name: string) => screen.getByRole("slider", { name });
 /** Open a tab of the fund page by clicking it. */
-const openTab = (user: ReturnType<typeof userEvent.setup>, name: "Holdings" | "Analysis" | "About") =>
+const openTab = (user: ReturnType<typeof userEvent.setup>, name: "Holdings" | "Analysis" | "Specialization" | "About") =>
   user.click(screen.getByRole("tab", { name: name === "Holdings" ? /^Holdings/ : name }));
 
 const COULDNT_LOAD = "Couldn't load this fund. Check your connection and reload the page.";
@@ -263,12 +263,12 @@ describe("Fund page", () => {
   });
 
   describe("the sections", () => {
-    it("three tabs under the header: Holdings (no hash), Analysis and About; the source note on each", async () => {
+    it("four tabs under the header: Holdings (no hash), Analysis, Specialization and About; the source note on each", async () => {
       stubData();
       renderFund();
       await loaded("Kelpwood Capital LP");
       const tabs = within(screen.getByRole("tablist", { name: "Fund sections" })).getAllByRole("tab");
-      expect(tabs.map((t) => t.textContent)).toEqual(["Holdings10", "Analysis", "About"]);
+      expect(tabs.map((t) => t.textContent)).toEqual(["Holdings10", "Analysis", "Specialization", "About"]);
       expect(tabs[0]).toHaveAttribute("aria-selected", "true");
       const panel = screen.getByRole("tabpanel");
       expect(panel).toHaveAttribute("id", "fund-panel-holdings");
@@ -440,6 +440,16 @@ describe("Fund page", () => {
         `fund/${FUND}/exits.json`,
       ].map((p) => `${base}/${p}`);
       expect([...urls].sort()).toEqual([...expected].sort());
+    });
+
+    it("on Specialization it also asks for the sector file and the map's peers, each once", async () => {
+      const urls = stubData();
+      renderFund(FUND, null, "#specialization");
+      await loaded("Kelpwood Capital LP");
+      await screen.findByRole("heading", { name: "Which decisions made the gap" }, { timeout: 3000 }); // the panels, not their skeletons
+      const sector = [`fund/${FUND}/skill.json`, "sectors/scores.json", "home/top_max.json"].map((p) => `/demo-data/${p}`);
+      for (const u of sector) expect(urls.filter((x) => x === u)).toHaveLength(1);
+      expect(new Set(urls).size).toBe(urls.length);
     });
 
     it("on Holdings it also asks for the weekly files of the stocks it holds now (the tree map's colours), each once", async () => {

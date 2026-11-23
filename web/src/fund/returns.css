@@ -20,8 +20,12 @@
 .fp .dot.live::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--good);opacity:0}
 .fp .fh-note{background:var(--surface);border:1px solid var(--line2);border-left:3px solid var(--warn);border-radius:var(--r-2);padding:10px 12px;font-size:13px;line-height:1.5;color:var(--ink);text-wrap:pretty}
 
-/* tabs: Holdings / Analysis / About use the shared .tabs / .tab / .ind of styles.css (one hairline and one bar for every strip); only the count chip is the fund page's */
+/* tabs: Holdings / Analysis / Specialization / About use the shared .tabs / .tab / .ind of styles.css (one hairline and one bar for every strip); only the count chip is the fund page's */
 .fp .tabs .cnt{font:500 11px/1 var(--f-mono);color:var(--ink3);background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-1);padding:3px 5px}
+/* four tabs since Specialization (2026-11-22): tighter on a phone, so About still shows at 360px */
+@container app (max-width:419px){
+  .fp .tabs .tab{padding:0 6px}
+}
 
 
 /* ---------- KPI tiles ---------- */

@@ -209,6 +209,13 @@ def keep_only(staging: Path, keep: set[str]) -> None:
             path.rmdir()
 
 
+def is_sector_path(path: str) -> bool:
+    """A file the sector step publishes (`run/sectors_step.publish_sectors`), not the monthly run: the run's
+    bookkeeping leaves these alone and only carries them over in the manifest."""
+    parts = path.split("/")
+    return parts[0] == "sectors" or (len(parts) == 3 and parts[0] == "fund" and parts[2] == "skill.json")
+
+
 def is_fund_path(path: str, ciks: Iterable[int]) -> bool:
     parts = path.split("/")
     return len(parts) == 3 and parts[0] == "fund" and parts[1].isdigit() and int(parts[1]) in ciks

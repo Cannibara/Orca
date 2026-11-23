@@ -7,15 +7,17 @@ import "./returns.css";
 /** Below this share of the book priced, the header carries a warning pill. */
 const COVERAGE_WARN = 0.8;
 
-export type FundTab = "holdings" | "analysis" | "about";
+export type FundTab = "holdings" | "analysis" | "specialization" | "about";
 
 export const FUND_TABS: { id: FundTab; label: string }[] = [
   { id: "holdings", label: "Holdings" },
   { id: "analysis", label: "Analysis" },
+  // sector choice vs stock choice (owner, 2026-11-22: its own tab, not Analysis)
+  { id: "specialization", label: "Specialization" },
   { id: "about", label: "About" },
 ];
 
-/** The tab a URL hash picks: "#analysis", "#about"; anything else (no hash too) is Holdings. */
+/** The tab a URL hash picks: "#analysis", "#specialization", "#about"; anything else (no hash too) is Holdings. */
 export function tabOfHash(hash: string): FundTab {
   const h = hash.replace(/^#/, "");
   return FUND_TABS.some((t) => t.id === h) ? (h as FundTab) : "holdings";
@@ -23,7 +25,7 @@ export function tabOfHash(hash: string): FundTab {
 
 /**
  * The fund's name, the line under it (reported book, holdings, last filing), the data-quality warnings and
- * the Holdings / Analysis / About tabs (WAI-ARIA tabs: one Tab stop, the arrows, Home and End move and open).
+ * the Holdings / Analysis / Specialization / About tabs (WAI-ARIA tabs: one Tab stop, the arrows, Home and End move and open).
  * Each tab's panel is `fund-panel-{id}`, labelled by its tab `fund-tab-{id}`.
  */
 export function FundHeader({

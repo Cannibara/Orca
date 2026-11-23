@@ -1,9 +1,34 @@
 # Worklog
 
-Last verified: 2026-11-22
+Last verified: 2026-11-23
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-23 — Licensing approved; PR #61 merged
+
+| What changed | Why | Files |
+|---|---|---|
+| The owner approved the licensing gate (Tiingo, Damodaran) and asked for the merge of PR #61 (Specialization tab, sector files). Next: Actions › Pipeline with `sectors_only` publishes the first real sector files; until then every fund's Specialization tab says "Not scored yet" | Owner: "Ok with licensing, go for pr and merge" (chat) | `docs/DECISIONS.md` |
+
+## 2026-11-22 — Sector panels moved to their own tab, Specialization
+
+| What changed | Why | Files |
+|---|---|---|
+| New fund-page tab **Specialization** (`#specialization`), right of Analysis, with the four sector panels in order: map, Annual return stacked graph (Stacked ↔ Lines), Sector mix over time, Which decisions made the gap. Analysis is back to key figures, AUM, Return constituents, What if. A fund without a sector file shows "Not scored yet" there; the file loads when the tab first opens. Tabs tighter under 420px (four fit at 360px) | Owner: "don't put these … in the analysis tab. Make a separate tab to the right called Specialization" (chat) | `web/src/fund/FundHeader.tsx`, `web/src/pages/Fund.tsx`, `web/src/fund/SkillPanels.tsx`, `web/src/fund/returns.css`, tests, `web/e2e/smoke.spec.ts` |
+| Checks: web 1,200 vitest and 102 Playwright (1280/400, light/dark) green; typecheck clean | | |
+
+## 2026-11-22 — Sector choice vs stock choice built: pipeline files and four panels (first on Analysis)
+
+| What changed | Why | Files |
+|---|---|---|
+| Contract: `sectors/labels.json`, `sectors/scores.json`, `fund/{id}/skill.json` (Sector files) | Spec 2026-11-21 phase 1; contract first | `pipeline/contract.md` |
+| `engine/skill_detail.py`: each fund's replays valued every quarter end, time-weighted quarterly returns (fund, label per tier, market, SPY), calendar years with `summary.json` labels, IRRs of the 30 biggest positions and of every label bought (with the market's share when bought), the book's mix by vertical, the label list. `skill.replay` can return units; `irr_by` takes a step count (64 = a double's precision) | Spec §6. Modified Dietz (the spec's formula) inflated years with big sales; time-weighted returns at the trade do not (DECISIONS 2026-11-22) | `pipeline/orca/engine/skill_detail.py`, `engine/skill.py`, `tests/test_skill_detail.py` |
+| `orca.run sectors --part publish` stages the files for every fund the site lists, runs the CUSIP guard and adds them to the manifest. The monthly run never counts them as owed and carries them in its manifest. Workflow: stage, upload, purge after "Save the score tables" (and after a `sectors_only` run), each `continue-on-error`, 90-minute step | Spec §7.2. Without the bookkeeping change every scored fund would be recomputed each month | `run/sectors_step.py`, `run/publish_step.py`, `run/weekly.py`, `run/cli.py`, `.github/workflows/pipeline.yml`, `tests/test_run.py` |
+| Demo: the real sector step runs on the demo lake; `web/public/demo-data` has the three new files (12 funds, ~240 KB plain) | Spec §7.6; dev, vitest and Playwright see the panels | `pipeline/orca/demo.py`, `web/public/demo-data/` |
+| Web: "What kind of investor?" (top of Analysis), then after the key figures "Annual return stacked graph" (AUM twin, Stacked ↔ Lines with the S&P 500), "Sector mix over time", "Which decisions made the gap". One Sector / Industry / Sub-industry switch, default Industry. Table view on every panel; wide charts scroll inside their box on phones. Twelve `--sec-*` colours. Famous lists' order moved to `data/famousGroups.ts` | Spec §5, §7.3–7.5 | `web/src/fund/SkillPanels.tsx`, `SkillMapPanel.tsx`, `StackedPanel.tsx`, `MixPanel.tsx`, `DecisionsPanel.tsx`, `skill.ts`, `stacked.ts`, `mix.ts`, `decisions.ts`, `skill.css`, `web/src/pages/Fund.tsx`, `web/src/data/*`, `web/src/tokens.css` |
+| Checks after merging main (#57–#60): pipeline 1,088 tests green (offline); web 1,198 vitest and 94 Playwright (1280/400, light/dark) green; typecheck clean. The map now uses main's short fund names (`lib/famousNames.shortNameOf`). A local 640,000-trade synthetic chunk: detail 14 s (scores 4.4 s), peak 2.1 GB | Spec §8 | `web/tests/fund-skill.test.ts`, `fund-skill-ui.test.tsx`, `web/e2e/smoke.spec.ts` |
+| Not done: "never rotated" (spec §6.9, optional; `v_never` is null). Not run on real data yet: the owner's Actions run (`sectors_only` on the merged branch) gives the first real files; licensing (Tiingo, Damodaran) must be confirmed before merging to `main` | Spec §8 phase 9; DECISIONS 2026-11-21 | — |
 
 ## 2026-11-22 — Top funds made consistent with Famous funds; Index giants removed
 
@@ -52,6 +77,14 @@ Shipped as PR #57 (merged 825b7a5) and the `home_only` run the same morning (S&P
 | Review fixes: wheel events that are not cancelable and sideways swipes pass through; the caption's live region speaks only once the window settles (300 ms); a phone row's spoken label holds its shown short name (WCAG 2.5.3); phone axis "Est. return a year"; placeholder initials keep a leading acronym (IVP, TCV, NEA); AUM under $0.05B prints "<$0.1B"; phone names "Lightspeed", "N. Carolina pension"; the list switch scrolls the pressed list into view (tab return, fallback) and has no scrollbar on a phone; `run_home` test checks `spx` | Whole-branch review | `web/src/home/`, `web/src/pages/Home.tsx`, `web/src/lib/famousNames.ts`, `pipeline/tests/test_run.py` |
 | Playwright smoke for the chart (demo data; a 50-row `top_5y` fixture for the scroll window), 1280/400, light/dark; the list switch keeps the pressed list in view; no sideways page scroll with a wide scale at 1240 px | Done when | `web/e2e/smoke.spec.ts` |
 | **After merge:** production has no `spx` until Actions > Pipeline > Run workflow with `home_only`; until then the chart shows no S&P line. Open: a person's line under a name (`.mg`) still ellipsises on a phone for a few long names (e.g. "Paul Marshall & Ian Wace"); long Sovereign & pension names are cut at 1280 px (could reuse `PHONE_SHORT` on the desktop); the acronym phone names (Korea NPS, Saudi PIF, Malaysia EPF, Ohio OPERS, Florida SBA, Wisconsin SWIB, Arizona ASRS, Oregon PERF) await the owner's review | — | — |
+
+## 2026-11-21 — Sector choice vs stock choice on the fund page: design approved, build spec written
+
+| What changed | Why | Files |
+|---|---|---|
+| Build spec for four Analysis-tab panels that show a fund's sector choice vs stock choice from the existing `engine/skill.py` replays: the map with famous-list peers and a 3-year path, the Annual return stacked graph (AUM style; Stacked ↔ Lines with the S&P 500), sector mix by sector / industry / sub-industry with detected rotations, and the decisions panel (share of money, beat by, Adds). Also the pipeline additions (quarter values and returns of each replay, SPY replay, per-position and per-label IRRs, market share via a new `cap` column, mix), the contract for `sectors/labels.json`, `sectors/scores.json`, `fund/{id}/skill.json`, a `publish` part for `orca.run sectors`, demo data, and phases with done-when checks | Owner: "publish this plan into a document for an LLM to execute", after approving draft v5 ("Wonderful") | `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md`, `…-draft.html` |
+| Owner decisions recorded: panels and order, Annual returns stays on Holdings, S&P 500 reference line (R23 override), "sub-industry" wording; default tier Industry (R9); licensing gate before merging to `main` | So the build session does not re-ask | `docs/DECISIONS.md`, `CLAUDE.md` (Read-X row), plan `2026-11-17-sector-indices.md` (phase 6 pointer) |
+| Nothing built; no code changed | Design session only | — |
 
 ## 2026-11-21 — Famous chart spec checked against main and made build-ready
 
