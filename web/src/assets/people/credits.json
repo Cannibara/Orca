@@ -120,10 +120,10 @@
  },
  "jim-simons": {
   "name": "Jim Simons",
-  "author": "Gleuschk",
-  "licence": "CC BY-SA 3.0",
-  "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
-  "source": "https://commons.wikimedia.org/wiki/File:Jim_Simons_at_MSRI.jpg"
+  "author": "BillCramer",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Jim_simons_hedge_fund_manager_1_by_bill_cramer.jpg"
  },
  "joe-lonsdale": {
   "name": "Joe Lonsdale",
@@ -204,10 +204,10 @@
  },
  "ray-dalio": {
   "name": "Ray Dalio",
-  "author": "Web Summit",
-  "licence": "CC BY 2.0",
-  "licence_url": "https://creativecommons.org/licenses/by/2.0",
-  "source": "https://commons.wikimedia.org/wiki/File:Web_Summit_2018_-_Forum_-_Day_2,_November_7_HM1_7481_(44858045925).jpg"
+  "author": "Locksteel888",
+  "licence": "CC BY-SA 4.0",
+  "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:DalioBall.jpg"
  },
  "tom-steyer": {
   "name": "Tom Steyer",
