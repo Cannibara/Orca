@@ -68,10 +68,15 @@ const shareText = (x: number | null) => (fin(x) ? pct(x, 0, false) : dash);
 /** Years with one decimal: 8.04 → "8.0"; null when missing. */
 const yearsNum = (x: number | null) => (fin(x) ? x.toFixed(1) : null);
 
+/**
+ * The picture fills the room beside the number (owner, 2026-11-23), whatever its shape: the drawing is
+ * stretched to the box (preserveAspectRatio none) while lines keep their width (non-scaling-stroke, returns.css)
+ * and the last-quarter dot stays round (a zero-length stroke with round caps).
+ */
 function Spark({ children }: { children: ReactNode }) {
   return (
     <div className="kpi-s">
-      <svg viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
         {children}
       </svg>
     </div>
@@ -137,7 +142,8 @@ export function KpiStrip({
             <>
               <line className="spk-zero" x1="2" x2={W - 2} y1={d1(growth.zy)} y2={d1(growth.zy)} />
               <path className="spk-line" d={growth.d} />
-              <circle className="spk-dot" cx={d1(growth.last[0])} cy={d1(growth.last[1])} r="3" />
+              <path className="spk-dot-h" d={`M${d1(growth.last[0])},${d1(growth.last[1])}h0.01`} />
+              <path className="spk-dot" d={`M${d1(growth.last[0])},${d1(growth.last[1])}h0.01`} />
             </>
           )}
         </Spark>

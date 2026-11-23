@@ -518,8 +518,8 @@ export function FamousChart({
     >
       <div className="fc-axis cols" aria-hidden="true" style={bar ? { paddingRight: bar } : undefined}>
         <span />
-        {/* on a phone the standfirst is hidden, so the axis says the figures are estimates */}
-        <span className="fc-axl">{phone ? "Est. return a year" : ""}</span>
+        {/* there is no standfirst (owner, 2026-11-23), so the axis says what the bars are and that they are estimates */}
+        <span className="fc-axl">{phone ? "Est. return a year" : "Estimated return a year"}</span>
         <div className="plot">
           <div className="in">
             {tickEls}

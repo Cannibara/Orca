@@ -111,7 +111,7 @@ describe("Famous funds chart", () => {
     expect(rows[1].querySelector(".lab")).not.toHaveClass("lead");
     expect(rows[0].querySelector(".lab")).toHaveTextContent(retLabel(want[0].ann_return));
     expect(screen.getByRole("heading", { level: 3, name: "Most searched" })).toBeInTheDocument();
-    expect(screen.getByText("50 funds")).toBeInTheDocument();
+    expect(screen.queryByText("50 funds")).toBeNull(); // no count beside the list's name (owner, 2026-11-23)
     expect(caption()).toBe("Showing 1–20 of 50 · one scale for the whole list");
     await user.click(rows[0]);
     expect(await screen.findByText(`Fund page ${want[0].fund_id}`)).toBeInTheDocument();
@@ -129,16 +129,11 @@ describe("Famous funds chart", () => {
     expect(document.querySelector(".fc .spx")).toHaveTextContent("S&P 500 +13.5%");
     const spl = document.querySelector<HTMLElement>(".fc .spl")!;
     expect(parseFloat(spl.style.left)).toBeGreaterThan(0);
-    expect(screen.getByText(/^Estimated return a year over the last 5 years, best first\. The dotted line is the S&P 500 \(\+13\.5%\)\.$/)).toBeInTheDocument();
+    // no standfirst or summary line: the chart's own S&P 500 label says it, the axis says what the bars are
+    expect(screen.queryByText(/^Estimated return a year over/)).toBeNull();
+    expect(document.querySelector(".fc-axl")).toHaveTextContent(/^Estimated return a year$/);
     expect(screen.getByText("Source: SEC 13F filings; Orca estimates. S&P 500: SPY total return, Q3 2021 to Q3 2026.")).toBeInTheDocument();
-    const want = mostSearched(famous).sort(bestFirst);
-    const beat = want.filter((r) => r.ann_return > 0.135).length;
-    const lost = want.filter((r) => r.ann_return < 0).length;
-    expect(
-      screen.getByText(
-        `${shortNameOf(want[0].fund_id, want[0].name)} leads with ${retLabel(want[0].ann_return)} a year. ${beat} of the 50 beat the S&P 500; ${lost} lost money.`,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/ leads with /)).toBeNull();
   });
 
   it("draws a loss to the left of the zero line, with its label on the left of the bar", async () => {
@@ -244,7 +239,6 @@ describe("Famous funds chart", () => {
     await openFixture(noSpx as TopList);
     expect(document.querySelector(".fc .spl")).toBeNull();
     expect(document.querySelector(".fc .spx")).toBeNull();
-    expect(screen.getByText("Estimated return a year over the last 5 years, best first.")).toBeInTheDocument();
     expect(screen.getByText("Source: SEC 13F filings; Orca estimates.")).toBeInTheDocument();
     expect(screen.queryByText(/beat the S&P 500/)).toBeNull();
   });
@@ -268,7 +262,6 @@ describe("Famous funds chart", () => {
     const want = famous.filter((r) => r.group === "Fundamental long/short").sort(bestFirst);
     expect(want).toHaveLength(40);
     expect(screen.getByRole("heading", { level: 3, name: "Fundamental long/short" })).toBeInTheDocument();
-    expect(screen.getByText("40 funds")).toBeInTheDocument();
     expect(box()).toHaveAccessibleName("Funds 1 to 20 of 40, scrollable");
     expect(caption()).toBe("Showing 1–20 of 40 · one scale for the whole list");
     const rows = chartRows();
@@ -378,9 +371,7 @@ describe("Famous funds chart", () => {
       .map((r) => within(r).getByRole("link").textContent);
     expect(names).toEqual(mostSearched(famous).slice(0, 10).map((r) => r.name));
     expect(screen.getByText("Showing 1–10 of 50 funds")).toBeInTheDocument();
-    expect(screen.getByText(/^Estimated figures over the last 5 years\. Select a heading to sort/)).toBeInTheDocument();
-    // the lead line and the source stay in both views
-    expect(screen.getByText(/leads with .* a year\./)).toBeInTheDocument();
+    // the source stays in both views
     expect(screen.getByText(/^Source: SEC 13F filings/)).toBeInTheDocument();
     await user.click(within(view()).getByRole("button", { name: "Chart" }));
     expect(screen.queryByRole("table")).toBeNull();

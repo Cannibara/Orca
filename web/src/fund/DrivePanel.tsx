@@ -155,7 +155,8 @@ export function DrivePanel({ series, win, contrib, stocks, sel, cr, onCr }: Driv
         )}
       </div>
       {has && <PeriodStrip variant="years" names={labels} a={a} b={b} onChange={commit} ariaLabel={STRIP_LABEL} />}
-      <p className="headline">
+      {/* Off the page (owner, 2026-11-23: the chart says it); kept for screen readers. */}
+      <p className="headline vh">
         {head && (
           <>
             <b>{head.span}</b> <span className="hmeta">{head.meta}</span> {head.text}

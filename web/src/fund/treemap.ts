@@ -317,6 +317,20 @@ export type LabelTile = { other: boolean; ticker: string; name: string; weight: 
 /** The labels' inner padding and baselines, px from the tile's top left. */
 export const PADX = 7;
 export const BASE = { tk: 18, w: 33, n: 48 } as const;
+/** Label font sizes at scale 1 (the CSS's .l-tk, .l-w/.l-v, .l-n), so a big tile can scale them up. */
+export const FONT_PX = { tk: 13, w: 12, n: 11.5, v: 12 } as const;
+
+/**
+ * How much bigger a tile's labels are drawn: 1 on small and middling tiles, up to 2.2 on the biggest (owner,
+ * 2026-11-23: a large tile's small print looked lost). Grows with the tile's size (the square root of its
+ * area), held back where its height or width would not fit the three rows; in steps of 0.05 so a resize
+ * does not jitter the text. labelSet then fits the labels into the tile as if it were w/k × h/k.
+ */
+export function labelScale(w: number, h: number): number {
+  const k = Math.min(Math.sqrt(Math.max(0, w * h)) / 170, h / 62, w / 120, 2.2);
+  return k <= 1 ? 1 : Math.floor(k * 20) / 20;
+}
+
 /** The least room between the ticker and a value on the same row. */
 const ROW_GAP = 8;
 

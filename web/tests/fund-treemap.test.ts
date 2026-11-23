@@ -10,6 +10,7 @@ import {
   heldSince,
   holdingReturn,
   inkFor,
+  labelScale,
   labelSet,
   layout,
   neighbour,
@@ -292,6 +293,20 @@ describe("label ink", () => {
 });
 
 // ---- labels ---------------------------------------------------------------------------------
+
+describe("labelScale: bigger labels on big tiles only", () => {
+  it("is 1 on small and middling tiles, grows with the tile, and stops at 2.2", () => {
+    expect(labelScale(80, 40)).toBe(1);
+    expect(labelScale(200, 140)).toBe(1);
+    expect(labelScale(250, 175)).toBeGreaterThan(1);
+    expect(labelScale(250, 175)).toBeLessThan(1.5);
+    expect(labelScale(385, 510)).toBe(2.2);
+    // a wide, short tile is held back by its height
+    expect(labelScale(900, 70)).toBe(1.1);
+    // steps of 0.05
+    expect((labelScale(300, 200) * 20) % 1).toBeCloseTo(0);
+  });
+});
 
 describe("labelSet: only what fits, and always the dollar value where there is room for it", () => {
   const measure: Measure = (_f, s) => s.length * 7; // 7px a character, whatever the font

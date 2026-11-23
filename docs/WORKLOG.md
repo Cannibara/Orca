@@ -5,6 +5,19 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — UI trims from the owner's marked-up screenshots
+
+| What changed | Why | Files |
+|---|---|---|
+| Fund search (with Open fund) and the day / night switch moved into the top bar, on every page. The fund list now loads only when the reader points at or focuses the search, so a fund page fetches no `funds.json` for it; the box empties on a page change; on phones Open fund is hidden (Enter opens the best match) | Owner's mark-up: arrows moving search, Open fund and the switch up; "Search" drawn in the fund page's top bar (chat) | `web/src/components/FundSearch.tsx`, `components/search.css`, `web/src/App.tsx`, `styles.css`, `pages/Home.tsx`, `pages/home.css`, `fund/FundHeader.tsx`, `pages/Position.tsx`, `NotFound.tsx`, `PhotoCredits.tsx`, `state.css` |
+| Fund page: a round Back button before the fund's name (the browser's Back when the reader came from this site, else Home); on screens ≥ 1320px it hangs in the left margin so the name keeps the content edge | Owner circled a "<" left of the title (chat) | `fund/FundHeader.tsx`, `fund/returns.css` |
+| Tree map: labels on big tiles drawn up to 2.2× larger (`labelScale`, fitted as if the tile were w/k × h/k); legend and caption under it removed (kept as hidden text for screen readers) | Owner: "Larger Font"; legend and caption struck out (chat) | `fund/treemap.ts`, `fund/treemapView.ts`, `fund/HoldingsPanel.tsx`, `fund/holdings.css` |
+| Key-figure tiles: the sparkline sits beside the number, not at the bottom by the note (under it on narrow phones); the whole-period tiles' numbers (Turnover, Average hold, Positions profitable) no longer sit 6px lower than the others | Owner's arrows on the sparklines and the 70% (chat). Read as "move up"; the 6px pad was for the risk tile's sub-labels | `fund/returns.css` |
+| Return constituents: the one-line headline is hidden (screen readers keep it) | Struck out (chat) | `fund/DrivePanel.tsx` |
+| Home: Famous funds' heading and standfirst hidden (h2 kept for screen readers), "50 funds" count removed; the "… leads with … beat the S&P 500" line removed from Famous funds and Top funds (`leadLine` deleted) | Struck out (chat) | `pages/Home.tsx`, `home/famousChart.ts` |
+| Follow-up, same day: Top funds trimmed like Famous funds (heading hidden, standfirst and "1,509 funds" count removed; `standfirst`/`periodPhrase` deleted). With no standfirst, the chart's axis now says "Estimated return a year" on every width (it said "Est. return a year" on phones only), so the bars stay labelled as estimates. The key-figure pictures now fill the tile's free space beside the words (stretched SVG, lines keep their width, the dot stays round); under 420px they sit under the number | Owner: "All 3" for Top funds; "make them take up the space in the boxes up top" (chat) | `pages/Home.tsx`, `home/famousChart.ts`, `home/famousChart.css`, `home/FamousChart.tsx`, `fund/KpiStrip.tsx`, `fund/returns.css` |
+| Checks: web 1,198 vitest and 102 Playwright (1280/400, light/dark) green; typecheck clean | | tests, `web/e2e/smoke.spec.ts` |
+
 ## 2026-11-23 — Licensing approved; PR #61 merged
 
 | What changed | Why | Files |

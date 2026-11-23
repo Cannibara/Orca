@@ -3,11 +3,8 @@
    FT-style module on the page background. Both sections are `.ranked` and everything sits under `.fp .ranked`;
    `.phone` (set from the measured width, < 560px) switches the phone layout. Tokens come from tokens.css; motion follows fund/base.css (transform and opacity only). */
 
-/* ---------- the section: heading, standfirst, switches ---------- */
+/* ---------- the section: heading (for screen readers), switches ---------- */
 .fp .ranked{display:flex;flex-direction:column;gap:18px;min-width:0;padding-top:8px}
-.fp .ranked .fam-head{display:flex;flex-direction:column;gap:6px;min-width:0}
-.fp .ranked h2{font:700 30px/34px var(--f-sans);letter-spacing:-.03em}
-.fp .ranked .fam-stand{font-size:15px;line-height:22px;color:var(--ink2);max-width:80ch;text-wrap:pretty}
 /* the list index, then one toolbar on its tracks (owner, 2026-11-21: the wrapped switch left a ragged second
    row, and Chart | Table did not look level with the period) */
 .fp .ranked .fam-ctl{display:flex;flex-direction:column;align-items:stretch;gap:22px;min-width:0}
@@ -64,8 +61,6 @@
 .fp .ranked .fam-rule::before{content:"";display:block;width:40px;height:4px;background:var(--ink);margin-bottom:12px}
 .fp .ranked .fam-h3{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
 .fp .ranked h3{font:700 20px/26px var(--f-sans);letter-spacing:-.015em}
-.fp .ranked .fam-n{flex:none;font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-.fp .ranked .fam-lead{font-size:14px;line-height:20px;color:var(--ink2);text-wrap:pretty}
 .fp .ranked .fam-src{margin-top:14px;padding-top:10px;border-top:1px solid var(--line2);font-size:12px;line-height:16px;color:var(--ink3)}
 
 /* ---------- the chart ---------- */
@@ -151,9 +146,6 @@
 
 /* ---------- phone ---------- */
 .fp .ranked.phone{gap:10px;padding-top:4px}
-.fp .ranked.phone h2{font-size:24px;line-height:28px}
-/* the phone has no standfirst (the axis says "Est. return a year"); it stays for screen readers */
-.fp .ranked.phone .fam-stand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .fp .ranked.phone .fam-ctl{gap:10px}
 /* one row: the short periods (1y … Max) share it evenly, Chart | Table beside them */
 .fp .ranked.phone .fam-opts{gap:8px;flex-wrap:nowrap}
@@ -170,8 +162,6 @@
 .fp .ranked.phone .fam-rule{padding-bottom:8px}
 .fp .ranked.phone .fam-rule::before{width:36px;margin-bottom:10px}
 .fp .ranked.phone h3{font-size:18px;line-height:22px}
-.fp .ranked.phone .fam-n{font-size:11.5px}
-.fp .ranked.phone .fam-lead{font-size:13px;line-height:18px}
 .fp .ranked.phone .fam-src{margin-top:8px;padding-top:8px;font-size:11px;line-height:15px}
 .fp .fc.phone{--row:48px;--c1:28px;--c2:136px;--cg:8px;--inset:58px}
 .fp .fc.phone .fc-axis{height:36px}

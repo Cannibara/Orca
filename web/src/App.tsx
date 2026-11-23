@@ -1,7 +1,9 @@
 import { Link, Route, Routes, useLocation } from "react-router";
 import { TooltipProvider } from "./charts/Tooltip";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { FundSearch } from "./components/FundSearch";
 import { Logo, Mark } from "./components/Logo";
+import { ThemeToggle } from "./components/ThemeToggle";
 import Fund from "./pages/Fund";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
@@ -17,6 +19,10 @@ export default function App() {
           <Link className="brand" to="/" aria-label="Orca home">
             <Logo />
           </Link>
+          <div className="top-tools">
+            <FundSearch />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="wrap">
