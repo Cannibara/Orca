@@ -92,17 +92,18 @@ describe("Holdings panel at the newest quarter", () => {
     expect(tiles().map((t) => t.getAttribute("tabindex"))).toEqual(["0", ...Array(rows.length - 1).fill("-1")]);
   });
 
-  test("the caption and the legend name the prices, the holdings and the two ends the colours compare", async () => {
+  test("no legend or caption on the page; a screen reader still gets the colours' meaning and the caption", async () => {
     const f = fund(9100002);
     mount();
     await settle();
     const book = f.positions.reduce((s, p) => s + p.shares_now * (prices.get(p.stock_id) ?? 0), 0);
-    expect(document.querySelector(".tm-cap")?.textContent).toBe(`${money(book)} at prices of 30 Oct 2026 across 9 holdings`);
-    expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q1 ’26 → 30 Oct 2026");
-    expect(Array.from(document.querySelectorAll(".tm-ticks span")).map((s) => s.textContent)).toEqual(["−25%", "0%", "+25%"]);
-    const keys = document.querySelector(".tm-keys")!;
-    expect(keys).toHaveTextContent("No price data");
-    expect(keys).toHaveTextContent("Other stocks");
+    const cap = document.querySelector(".tm-cap")!;
+    expect(cap.textContent).toBe(`${money(book)} at prices of 30 Oct 2026 across 9 holdings`);
+    // both visually hidden, in one line
+    const said = cap.closest(".vh")!;
+    expect(said.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q1 ’26 → 30 Oct 2026");
+    expect(said.textContent).toContain("from a loss of 25% or more in red");
+    expect(document.querySelector(".tm-leg, .tm-ticks, .tm-keys")).toBeNull();
   });
 
   test("the colours ask only for the weekly files of the tiles; until they are in nothing is drawn, then the tiles come in their colours", async () => {
@@ -259,7 +260,7 @@ describe("Holdings panel: periods", () => {
     fireEvent.click(screen.getByRole("button", { name: "Year" }));
     await settle();
     expect(document.querySelector(".tm-lt")?.textContent).toBe("Colour, and the % after each value: the fund's return on each holding, Q2 ’25 → 30 Oct 2026");
-    expect(Array.from(document.querySelectorAll(".tm-ticks span")).map((s) => s.textContent)).toEqual(["−50%", "0%", "+50%"]);
+    expect(document.querySelector(".tm-sc")?.textContent).toContain("a loss of 50% or more");
     await waitFor(() => expect(tiles()[0].getAttribute("aria-label")).toMatch(/over 12 months$|not available$/));
     act(() => tiles()[0].focus());
     expect(Array.from(document.querySelectorAll("#tip .vl")).map((l) => l.textContent)).toContain("Fund's return, 12 months");

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ThemeToggle } from "../components/ThemeToggle";
+import { Link, useNavigate } from "react-router";
 import type { Summary } from "../data/types";
 import { fmtDate, money, qOfYear } from "../lib/format";
 import "./returns.css";
@@ -21,6 +21,35 @@ export const FUND_TABS: { id: FundTab; label: string }[] = [
 export function tabOfHash(hash: string): FundTab {
   const h = hash.replace(/^#/, "");
   return FUND_TABS.some((t) => t.id === h) ? (h as FundTab) : "holdings";
+}
+
+/**
+ * Back, beside the fund's name (owner, 2026-11-23): to the page the reader came from on this site (the browser's
+ * Back), else to the home page (a fund opened from a link or a bookmark). A plain link underneath, so a
+ * middle-click or Cmd-click opens the home page in a new tab.
+ */
+function BackButton() {
+  const navigate = useNavigate();
+  return (
+    <Link
+      to="/"
+      className="fh-back"
+      aria-label="Back"
+      title="Back"
+      onClick={(e) => {
+        // react-router numbers its own history entries: idx > 0 means an earlier page of this site is behind us
+        const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+        if (idx > 0 && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          navigate(-1);
+        }
+      }}
+    >
+      <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M10 3.25 5.25 8 10 12.75" />
+      </svg>
+    </Link>
+  );
 }
 
 /**
@@ -99,7 +128,10 @@ export function FundHeader({
     <div className="fh-wrap">
       <header className="fh">
         <div className="fh-main">
-          <h1>{s.name}</h1>
+          <div className="fh-title">
+            <BackButton />
+            <h1>{s.name}</h1>
+          </div>
           <div className="meta">
             <span className="mi">
               <span>{money(s.book)} reported book</span>
@@ -123,7 +155,6 @@ export function FundHeader({
             )}
           </div>
         </div>
-        <ThemeToggle className="fh-theme" />
       </header>
       {s.inactive && (
         <p className="fh-note" role="note">

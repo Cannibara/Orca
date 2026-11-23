@@ -175,7 +175,8 @@ for (const width of widths) {
       await page.getByRole("button", { name: "Earlier year" }).click();
       await expect(page.locator("#holdPanel .asof")).toHaveText(/^12 months to /);
       await expect(page.locator(".tm-cap")).toContainText("at quarter-end prices");
-      await expect(page.locator(".tm-ticks")).toContainText("+50%");
+      // the legend is off the page (owner, 2026-11-23); its hidden text still names the Year scale
+      await expect(page.locator(".tm-sc")).toContainText("50% or more");
       expect(errors).toEqual([]);
     });
   });

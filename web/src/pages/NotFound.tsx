@@ -1,6 +1,5 @@
 import { Link } from "react-router";
 import { Mark } from "../components/Logo";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { useTitle } from "../lib/useTitle";
 import "./state.css";
 
@@ -9,9 +8,6 @@ export default function NotFound() {
   useTitle("Not found · Orca");
   return (
     <>
-      <div className="pg-tools">
-        <ThemeToggle />
-      </div>
       <div className="pg-state">
         <span className="ic brand-ic">
           <Mark />

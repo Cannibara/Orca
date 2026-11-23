@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { PriceChart } from "../charts/PriceChart";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { StepChart } from "../charts/StepChart";
 import {
   NotFoundError,
@@ -168,7 +167,6 @@ function Header({ data }: { data: PositionData }) {
           <span className="mono">{security?.ticker ?? `#${p.stock_id}`}</span>
           {security && ` · ${tidyName(security.name)}`}
         </h1>
-        <ThemeToggle />
       </div>
       <div className="pos-meta">
         <span className="pill">

@@ -67,6 +67,12 @@ p{margin:0}
 /* brand: the outlined logo (mark + name, docs/brand), 18px tall: the name's capitals match 16px text */
 .brand{display:flex;align-items:center;flex:none;color:var(--ink);text-decoration:none}
 .brand svg{height:18px;width:auto;flex:none;display:block}
+/* top-tools: the fund search and the day / night switch at the bar's right, on every page (owner, 2026-11-23) */
+.top-tools{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:1 1 auto;min-width:0}
+.top-tools>.search-box{flex:0 1 460px}
+@media (max-width:719px){.topbar{gap:12px}.top-tools{gap:8px}}
+/* vh: visually hidden, still read by screen readers (the pages' own copy is in fund/base.css) */
+.top .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ---------- page frame ---------- */
 main{padding-block:32px 40px}
@@ -139,7 +145,7 @@ details[open] summary{margin-bottom:8px}
    some zoom levels the bar drew shorter than the tab until a zoom re-painted it. */
 .tabs .ind{position:absolute;left:0;bottom:0;height:2px;width:var(--w,40px);background:var(--ink);transform:translateX(var(--x,0px));pointer-events:none}
 
-/* theme-sw: the day / night switch at the top right of every page, level with the page heading. Sun left, moon right;
+/* theme-sw: the day / night switch at the right of the top bar, on every page. Sun left, moon right;
    the knob sits over the side in force and that icon is dark, the other muted. */
 .theme-sw{position:relative;flex:none;width:72px;height:38px;padding:0;border:1px solid var(--line2);border-radius:10px;background:var(--sunken);color:var(--ink3);cursor:pointer}
 .theme-sw:hover{border-color:var(--control)}

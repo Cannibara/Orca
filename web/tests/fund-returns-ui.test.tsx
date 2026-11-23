@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { useState, type ComponentProps } from "react";
+import { MemoryRouter } from "react-router";
 import { TooltipProvider } from "../src/charts/Tooltip";
 import type { Summary } from "../src/data/types";
 import { FundHeader, tabOfHash, type FundTab } from "../src/fund/FundHeader";
@@ -45,22 +46,26 @@ const copy = (mutate: (s: Summary) => void): Summary => {
 
 /** The header on the Holdings tab, as the page mounts it. */
 const Header = ({ summary, positionsEver }: { summary: Summary; positionsEver: number }) => (
-  <FundHeader summary={summary} positionsEver={positionsEver} tab="holdings" onTab={() => {}} />
+  <MemoryRouter>
+    <FundHeader summary={summary} positionsEver={positionsEver} tab="holdings" onTab={() => {}} />
+  </MemoryRouter>
 );
 
 /** The header with the page's tab state: a click or a key opens a tab. */
 function Tabbed({ onTab }: { onTab?: (t: FundTab) => void }) {
   const [tab, setTab] = useState<FundTab>("holdings");
   return (
-    <FundHeader
-      summary={demo}
-      positionsEver={18}
-      tab={tab}
-      onTab={(t) => {
-        onTab?.(t);
-        setTab(t);
-      }}
-    />
+    <MemoryRouter>
+      <FundHeader
+        summary={demo}
+        positionsEver={18}
+        tab={tab}
+        onTab={(t) => {
+          onTab?.(t);
+          setTab(t);
+        }}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -297,7 +302,7 @@ describe("KpiStrip", () => {
     const sparks = Array.from(container.querySelectorAll(".kpi-s svg"));
     expect(sparks).toHaveLength(4);
     expect(sparks[0].querySelector("path.spk-line")).not.toBeNull();
-    expect(sparks[0].querySelector("circle.spk-dot")).not.toBeNull();
+    expect(sparks[0].querySelector("path.spk-dot")).not.toBeNull();
     // Holdings: growth, then the drawdown; Analysis: the year ticks, then the size bars
     expect(sparks[1].querySelector("path.spk-area-loss")).not.toBeNull();
     // 5 gains and 3 losses among the 8 full years

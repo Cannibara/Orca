@@ -1,0 +1,39 @@
+/* The fund search in the top bar (components/FundSearch.tsx), on every page: the artifact's command field
+   (surface, hairline, 36px, icon, "/" hint) and its results menu (name left, muted detail right). Moved from
+   the home page's tab row (owner, 2026-11-23). The top bar is outside the pages' `.fp` frame, so this is
+   scoped under `.top` and sized with media queries, not the `app` container. */
+.top .search-box{position:relative;display:flex;flex-direction:column;justify-content:center;min-width:0;width:min(100%,460px)}
+.top .search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center}
+.top .in-wrap{position:relative;display:flex;align-items:center;min-width:0}
+.top .in-wrap>.ico{position:absolute;left:11px;color:var(--ink3);pointer-events:none}
+.top .in-wrap>.kbd{position:absolute;right:8px;pointer-events:none}
+.top .in-wrap>input{appearance:none;-webkit-appearance:none;height:36px;width:100%;min-width:0;padding:0 36px 0 34px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:400 14px/1 var(--f-sans)}
+.top .in-wrap>input::placeholder{color:var(--ink3);opacity:1}
+.top .in-wrap>input:hover{border-color:var(--control)}
+.top .in-wrap>input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+/* the "/" hint goes while typing or focused, and on touch screens and phones where there is no keyboard to use it */
+.top .in-wrap>input:focus~.kbd,.top .in-wrap>input:not(:placeholder-shown)~.kbd{display:none}
+@media (hover:none),(pointer:coarse),(max-width:719px){.top .in-wrap>.kbd{display:none}}
+.top .in-wrap>input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin:0 0 0 6px;cursor:pointer;background:var(--ink3);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.top .in-wrap>input::-webkit-search-cancel-button:hover{background:var(--ink)}
+.top .search .btn{--h:36px;padding:0 14px}
+/* a phone's bar has room for the field only: Enter opens the best match */
+@media (max-width:719px){.top .search{grid-template-columns:minmax(0,1fr)}.top .search .btn{display:none}}
+
+.top .results{position:absolute;z-index:6;top:100%;left:0;right:0;margin-top:4px;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r-3);padding:6px;box-shadow:var(--shadow-1)}
+.top .results ul{display:flex;flex-direction:column;gap:1px}
+.top .results a{display:flex;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:var(--r-2);color:var(--ink);text-decoration:none;font-size:13.5px}
+.top .results a:hover,.top .results a:focus-visible{background:var(--band)}
+.top .results a:focus-visible{outline-offset:-2px}
+.top .results a .ico{color:var(--ink3)}
+.top .results a:is(:hover,:focus-visible) .ico{color:var(--ink)}
+.top .results .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .results .rt{font:500 12px/1 var(--f-mono);color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.top .results p{padding:10px 10px;font-size:13px;color:var(--ink3)}
+/* the note can't sit under the field in a 56px bar: it hangs below it like the results */
+.top .search-note{position:absolute;top:100%;left:0;right:0;margin-top:4px;padding:8px 10px;font-size:12px;color:var(--ink3);background:var(--raised);border:1px solid var(--line2);border-radius:var(--r-2)}
+
+@media (pointer:coarse){
+  .top .in-wrap>input{height:44px;font-size:16px}
+  .top .search .btn{--h:44px}
+}
