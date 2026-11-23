@@ -5,7 +5,8 @@
 .fp #holdPanel.panel{padding:0}
 .fp .pmodes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
-.fp .tm-pb{padding:0 var(--ppad)}
+/* the tiles end the panel: no legend or caption under them (owner, 2026-11-23) */
+.fp .tm-pb{padding:0 var(--ppad) var(--ppad)}
 .fp .tm-box{position:relative;min-width:0}
 .fp .tm{display:block;overflow:visible;font-variant-numeric:tabular-nums;-webkit-user-select:none;user-select:none}
 .fp .tm .tile{outline:none;cursor:default}
@@ -31,13 +32,3 @@
 .fp .tm-load span{display:inline-block;padding:5px 10px;border-radius:var(--r-2);background:var(--inv);color:var(--invfg);font-size:12px;line-height:16px;font-weight:500;box-shadow:var(--shadow-1)}
 .fp .tm-msg{position:absolute;left:0;top:0;padding:24px 0;font-size:13px;color:var(--ink3)}
 
-.fp .tm-leg{gap:8px 20px}
-.fp .tm-lt{font-size:12px;color:var(--ink2);white-space:normal} /* a long label wraps on a phone (.legend span is nowrap) */
-.fp .tm-scale{display:inline-flex;flex-direction:column;align-items:stretch;gap:3px;width:168px}
-.fp .tm-keys{display:inline-flex;flex-wrap:wrap;gap:6px 16px}
-.fp .tm-grad{display:block;height:8px;border-radius:2px}
-.fp .tm-ticks{display:flex;justify-content:space-between;font-size:11px;line-height:1;color:var(--ink3);font-variant-numeric:tabular-nums}
-.fp .lg i.sw-new{background:var(--surface);border:1px dashed var(--control)}
-.fp .lg i.sw-oth{background:repeating-linear-gradient(135deg,var(--line2) 0 1.2px,var(--band) 1.2px 4.2px)}
-.fp .tm-cap{padding-top:8px}
-.fp .tm-cap:empty{display:none}

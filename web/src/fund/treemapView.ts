@@ -7,7 +7,7 @@
 // come from ./treemap (pure).
 
 import type { TipContent, TooltipApi } from "../charts/Tooltip";
-import { BASE, PADX, labelSet, neighbour, rgbCss, type Direction, type LabelTile, type Measure, type Rect, type RGB } from "./treemap";
+import { BASE, FONT_PX, PADX, labelScale, labelSet, neighbour, rgbCss, type Direction, type LabelTile, type Measure, type Rect, type RGB } from "./treemap";
 
 export type TileDatum = {
   key: string;
@@ -41,6 +41,8 @@ type Node = {
   t0: number;
   leaving: boolean;
   d: TileDatum;
+  /** The labels' scale (labelScale of the tile's final box). */
+  k: number;
 };
 
 /** The same motion as the Analysis charts' bars (--d-grow 600 ms on --ease-out, cubic-bezier(.2,.7,.2,1)): the
@@ -153,7 +155,7 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     n.clipRect.setAttribute("width", w);
     n.clipRect.setAttribute("height", h);
     // the value on the ticker's row hugs the tile's right edge as the edge moves
-    n.labels.v.el.setAttribute("x", String(Math.max(PADX, geo.w - PADX)));
+    n.labels.v.el.setAttribute("x", String(Math.max(PADX * n.k, geo.w - PADX * n.k)));
     const moves = n.from.x !== n.to.x || n.from.y !== n.to.y || n.from.w !== n.to.w || n.from.h !== n.to.h;
     let busy = moves && t < n.t0 + DUR;
     for (const k of KEYS) {
@@ -225,6 +227,7 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       t0: 0,
       leaving: false,
       d,
+      k: 1,
     };
     const show = (e: PointerEvent) => opts.tip.show(n.d.tip(), e.clientX, e.clientY);
     g.addEventListener("pointerenter", show);
@@ -242,7 +245,18 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
 
   /** Sets what the tile's labels say for its new box `nb`, and when each one shows (see LABEL_FULL). */
   const setLabels = (n: Node, nb: Rect, anim: boolean, t: number) => {
-    const fin = labelSet(n.d.label, nb.w, nb.h, opts.measure);
+    // a big tile draws its labels larger: they are fitted at base size into the box shrunk by k, then scaled up
+    const k = labelScale(nb.w, nb.h);
+    const fin = labelSet(n.d.label, nb.w / k, nb.h / k, opts.measure);
+    if (k !== n.k) {
+      n.k = k;
+      for (const key of KEYS) {
+        const el = n.labels[key].el;
+        el.style.fontSize = k === 1 ? "" : FONT_PX[key] * k + "px";
+        if (key !== "v") el.setAttribute("x", String(PADX * k));
+        el.setAttribute("y", String((key === "v" ? BASE.tk : BASE[key]) * k));
+      }
+    }
     for (const k of KEYS) {
       const l = n.labels[k];
       settleTexts(l, t);

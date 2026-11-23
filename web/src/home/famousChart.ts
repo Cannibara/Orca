@@ -146,18 +146,6 @@ export function standfirst(period: string, spx: number | null, view: "chart" | "
   return `Estimated return a year ${over}, best first.` + (spx == null ? "" : ` The dotted line is the S&P 500 (${pct(spx, 1)}).`);
 }
 
-/** The finding, computed: rows best first. */
-export function leadLine(rows: { name: string; ret: number }[], spx: number | null): string {
-  if (rows.length === 0) return "";
-  // with thousands separators: Top funds counts 1,500 funds
-  const n = count(rows.length);
-  const lost = rows.filter((r) => r.ret < 0).length;
-  const lead = `${rows[0].name} leads with ${pct(rows[0].ret, 1)} a year.`;
-  if (spx == null) return `${lead} ${lost === 0 ? `None of the ${n} lost money.` : `${count(lost)} of the ${n} lost money.`}`;
-  const beat = rows.filter((r) => r.ret > spx).length;
-  return `${lead} ${count(beat)} of the ${n} beat the S&P 500; ${lost === 0 ? "none" : count(lost)} lost money.`;
-}
-
 export function sourceLine(spx: { ann_return: number | null; from_q: number; to_q: number } | null | undefined): string {
   const base = "Source: SEC 13F filings; Orca estimates.";
   return spx == null || spx.ann_return == null ? base : `${base} S&P 500: SPY total return, ${qLabel(spx.from_q)} to ${qLabel(spx.to_q)}.`;

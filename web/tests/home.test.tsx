@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MemoryRouter, Route, Routes, useParams } from "react-router";
+import { FundSearch } from "../src/components/FundSearch";
 import { clearDataCache } from "../src/data/api";
 import type {
   CallRow,
@@ -95,6 +96,10 @@ function StockStub() {
 function renderHome() {
   return render(
     <MemoryRouter initialEntries={["/"]}>
+      {/* the search lives in the app's top bar, above every page */}
+      <header className="top">
+        <FundSearch />
+      </header>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/fund/:id" element={<FundStub />} />
@@ -276,13 +281,9 @@ describe("Home", () => {
     expect(results()).not.toBeNull();
     await user.tab(); // the second result
     expect(results()).not.toBeNull();
-    await user.tab(); // out of the box (the search follows the tabs), onto the page below
+    await user.tab(); // out of the box (the search is in the top bar), onto the page below: its open tab
     expect(box).not.toHaveFocus();
-    expect(
-      within(screen.getByRole("group", { name: "List" })).getByRole("button", {
-        name: "Most searched",
-      }),
-    ).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Famous funds" })).toHaveFocus();
     expect(results()).toBeNull();
   });
 
@@ -701,7 +702,7 @@ describe("Home", () => {
     expect(pager()).toHaveTextContent("Showing 1–80 of 250 funds");
   });
 
-  it("top funds open on a chart like Famous funds: heading, standfirst, the list's count and lead, short names, S&P line, source and rules", async () => {
+  it("top funds open on a chart like Famous funds: heading, standfirst, the list's count (no lead line), short names, S&P line, source and rules", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     stubData();
     const user = userEvent.setup();
@@ -725,7 +726,7 @@ describe("Home", () => {
     expect(rows).toHaveLength(best.length);
     expect(rows[0]).toHaveAttribute("href", `/fund/${best[0].fund_id}`);
     expect(rows[0].getAttribute("aria-label")).toMatch(new RegExp(`^1 of ${best.length}\\. `));
-    expect(section.querySelector(".fam-lead")?.textContent).toMatch(/ leads with \+\d+\.\d% a year\./);
+    expect(section.querySelector(".fam-lead")).toBeNull(); // no summary line under the list's name
     const kelp = [...rows].find((r) => r.getAttribute("href") === "/fund/9100001")!;
     expect(kelp.querySelector(".nm")).toHaveTextContent(/^Kelpwood Capital$/);
     // every row has its photo or initials: a fund that is not famous has its own name's initials
@@ -1339,7 +1340,10 @@ describe("Home", () => {
 
   it("search says so when the fund index fails to load", async () => {
     stubData({}, ["funds.json"]);
+    const user = userEvent.setup();
     renderHome();
+    // the fund list is fetched when the reader reaches for the search
+    await user.click(screen.getByRole("searchbox", { name: /search a fund/i }));
     expect(
       await screen.findByText(/search isn.t available/i),
     ).toBeInTheDocument();

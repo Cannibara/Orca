@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { photoCredits } from "../lib/people";
 import { useTitle } from "../lib/useTitle";
 import "./credits.css";
@@ -10,9 +9,6 @@ export default function PhotoCredits() {
   const rows = photoCredits();
   return (
     <div className="credits">
-      <div className="pg-tools">
-        <ThemeToggle />
-      </div>
       <h1>Photo credits</h1>
       <p>
         Photos on the Famous funds lists come from Wikimedia Commons, under public domain or Creative Commons licences.

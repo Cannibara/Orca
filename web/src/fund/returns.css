@@ -6,9 +6,17 @@
 /* ---------- header ---------- */
 .fp .fh-wrap{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
 .fp .fh{display:flex;flex-wrap:wrap;gap:14px 24px;justify-content:space-between;align-items:flex-end;min-width:0}
-/* the theme switch sits at the top right, level with the fund's name (a little below its top edge) rather than with the line under it */
-.fp .fh .fh-theme{align-self:flex-start;margin-left:auto;margin-top:8px}
 .fp .fh-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+/* Back, a round button before the fund's name; where the page has a margin wide enough it hangs out in it,
+   so the name keeps the content's left edge */
+.fp .fh-title{display:flex;align-items:center;gap:8px;min-width:0}
+.fp .fh-back{flex:none;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:999px;background:var(--surface);color:var(--ink2);text-decoration:none}
+.fp .fh-back .ico{width:18px;height:18px;stroke-width:1.75}
+.fp .fh-back:hover{color:var(--ink);border-color:var(--control);background:var(--hover)}
+.fp .fh-back:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (min-width:1320px){.fp .fh-back{margin-left:-44px}}
+@media (pointer:coarse){.fp .fh-back{width:44px;height:44px}}
+@media (min-width:1320px) and (pointer:coarse){.fp .fh-back{margin-left:-52px}}
 .fp .fh h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;text-wrap:balance;overflow-wrap:anywhere}
 .fp .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:var(--ink2)}
 /* a separator stays with the item before it, so a wrapped line never starts with a dot */
@@ -52,12 +60,20 @@
 .fp .spk-neutral{fill:var(--ink3)}
 .fp .spk-neutral.hi{fill:var(--ink)}
 
+/* A tile with a picture: the picture sits beside the number, not down by the note (owner, 2026-11-23). The
+   row wrapper steps aside (display:contents) so the note and the picture can take their own grid cells. */
+.fp .kpi:not(.kpi-w){display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l l" "v s" "n n";gap:4px 10px;align-content:start}
+.fp .kpi:not(.kpi-w)>.kpi-l{grid-area:l}
+.fp .kpi:not(.kpi-w)>.kpi-v{grid-area:v;min-width:0}
+.fp .kpi:not(.kpi-w)>.kpi-b{display:contents}
+.fp .kpi:not(.kpi-w) .kpi-n{grid-area:n}
+.fp .kpi:not(.kpi-w) .kpi-s{grid-area:s;align-self:center}
+
 /* row 2, the whole tracked period: no pictures, only the profitable share's bar */
 .fp .kpi-w .kpi-b{min-height:0}
 .fp .kpi-wp{margin-left:auto;flex:none;font:400 11px/16px var(--f-sans);color:var(--ink3);white-space:nowrap}
 /* only where label and tag fit on one line */
 @container (max-width:214px){.fp .kpi-wp{display:none}}
-.fp .kpi-w:not(.kpi-risk) .kpi-v{padding-top:6px}
 /* Sharpe, Sortino and Calmar side by side: a small label over each number */
 .fp .kpi-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
 .fp .kpi-trio dt{font:500 11px/14px var(--f-sans);color:var(--ink3)}
@@ -81,6 +97,9 @@
   .fp .kpi-b{flex-direction:column;align-items:flex-start;gap:6px}
   .fp .kpi-w .kpi-b{gap:0}
   .fp .kpi-s{width:80px}
+  /* too narrow for the picture beside the number: it goes under it */
+  .fp .kpi:not(.kpi-w){grid-template-columns:minmax(0,1fr);grid-template-areas:"l" "v" "s" "n"}
+  .fp .kpi:not(.kpi-w) .kpi-s{align-self:start}
 }
 @container app (max-width:359px){
   .fp .kpis{grid-template-columns:minmax(0,1fr)}

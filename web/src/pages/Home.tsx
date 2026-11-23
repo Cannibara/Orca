@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
 import { Face } from "../components/Face";
@@ -16,7 +16,6 @@ import { Signed } from "../components/Signed";
 import { State } from "../components/State";
 import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
-import { ThemeToggle } from "../components/ThemeToggle";
 import {
   loadFunds,
   loadHome,
@@ -30,7 +29,6 @@ import type {
   CallRow,
   ConvictionRow,
   CrowdedRow,
-  FundsIndex,
   SpxWindow,
   TopRow,
   WinLossRow,
@@ -48,10 +46,9 @@ import {
 import { qShort } from "../fund/fmt";
 import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
-import { leadLine, sourceLine, standfirst } from "../home/famousChart";
+import { sourceLine, standfirst } from "../home/famousChart";
 import { ListIndex } from "../home/ListIndex";
 import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
-import { shortNameOf } from "../lib/famousNames";
 import { photoOf } from "../lib/people";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
@@ -188,160 +185,6 @@ function SinceBox({ v }: { v: number | null }) {
     <span className={"lc" + (printsZero(text) ? "" : v > 0 ? " add" : " trim")}>
       <b>{text}</b>
     </span>
-  );
-}
-
-// ---- search ---------------------------------------------------------------------
-
-const MAX_MATCHES = 8;
-type Match = { id: number; name: string; book: number; n: number };
-
-/** Case-insensitive substring match on fund names; names that start with the text come first, then larger books. */
-function matchFunds(funds: FundsIndex, query: string): Match[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const hits: (Match & { rank: number })[] = [];
-  funds.name.forEach((name, i) => {
-    const at = name.toLowerCase().indexOf(q);
-    if (at >= 0)
-      hits.push({
-        id: funds.id[i],
-        name,
-        book: funds.book[i],
-        n: funds.n[i],
-        rank: at === 0 ? 0 : 1,
-      });
-  });
-  hits.sort((a, b) => a.rank - b.rank || b.book - a.book);
-  return hits.slice(0, MAX_MATCHES);
-}
-
-function FundSearch() {
-  const navigate = useNavigate();
-  const funds = useLoad(loadFunds, []);
-  const [query, setQuery] = useState("");
-  // The results can be put away (Escape, or focus leaving the box) without losing the text; typing or focus brings them back.
-  const [open, setOpen] = useState(true);
-  const input = useRef<HTMLInputElement>(null);
-  const matches = useMemo(
-    () => (funds.status === "ready" ? matchFunds(funds.data, query) : []),
-    [funds, query],
-  );
-  const typed = query.trim() !== "";
-  const showing = typed && open && funds.status !== "error";
-
-  // "/" jumps to the search from anywhere that is not a text field (the hint in the field says so).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (
-        e.key !== "/" ||
-        e.ctrlKey ||
-        e.metaKey ||
-        e.altKey ||
-        e.defaultPrevented
-      )
-        return;
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
-      )
-        return;
-      e.preventDefault();
-      input.current?.focus();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
-  return (
-    <div
-      className="search-box"
-      onFocus={() => setOpen(true)}
-      onBlur={(e) => {
-        // Focus moving to something else inside the box (the button, a result) keeps the results open.
-        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || !showing) return;
-        e.preventDefault(); // a search field would otherwise clear itself
-        input.current?.focus(); // (before closing: focusing the box opens the results)
-        setOpen(false);
-      }}
-    >
-      <form
-        className="search"
-        role="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (matches.length > 0) navigate(`/fund/${matches[0].id}`);
-        }}
-      >
-        {/* Hidden: the field sits in the tab row, which has no room for a caption above it. */}
-        <label htmlFor="fund-search" className="vh">
-          Search a fund or manager
-        </label>
-        <div className="in-wrap">
-          <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.25" />
-            <path d="M10.2 10.2 13.5 13.5" />
-          </svg>
-          <input
-            ref={input}
-            id="fund-search"
-            type="search"
-            placeholder="Type a fund name"
-            autoComplete="off"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setOpen(true);
-            }}
-          />
-          <kbd className="kbd" aria-hidden="true">
-            /
-          </kbd>
-        </div>
-        <button
-          className="btn btn-secondary"
-          type="submit"
-          disabled={matches.length === 0}
-        >
-          Open fund
-        </button>
-      </form>
-      {funds.status === "error" && (
-        <p className="search-note" role="status">
-          Search isn't available right now. The fund list didn't load.
-        </p>
-      )}
-      {showing && (
-        // A press on the results must not take focus from the box, or the results would close before the click lands.
-        <div className="results" onMouseDown={(e) => e.preventDefault()}>
-          {funds.status === "loading" ? (
-            <p role="status">Loading funds…</p>
-          ) : matches.length === 0 ? (
-            <p role="status">No fund matches "{query.trim()}".</p>
-          ) : (
-            <ul aria-label="Matching funds">
-              {matches.map((m) => (
-                <li key={m.id}>
-                  <Link to={`/fund/${m.id}`}>
-                    <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
-                      <path d="M2.5 13.5h11M4 13.5v-10h8v10M6.5 6h3M6.5 8.5h3M6.5 11h3" />
-                    </svg>
-                    <span className="nm">{m.name}</span>
-                    <span className="rt">
-                      {fBook(m.book)} · {count(m.n, "position")}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -689,13 +532,6 @@ function FamousFunds({
     setRun({ n: run.n + 1, rows, name: shown?.name, view });
 
   const spx = data?.spx?.ann_return ?? null;
-  const best = useMemo(
-    () =>
-      [...(shown?.rows ?? [])]
-        .sort(bestFirst)
-        .map((r) => ({ name: shortNameOf(r.fund_id, r.name), ret: r.ann_return })),
-    [shown],
-  );
   const section = useRef<HTMLElement>(null);
   const width = useWidth(section, 280, FALLBACK_W);
   const phone = width < PHONE_BELOW;
@@ -728,11 +564,10 @@ function FamousFunds({
     body = (
       <div className="fam-mod">
         <div className="fam-rule">
+          {/* no count or summary line under the list's name (owner, 2026-11-23) */}
           <div className="fam-h3">
             <h3>{shown.name}</h3>
-            <span className="fam-n">{count(shown.rows.length, "fund")}</span>
           </div>
-          <p className="fam-lead">{leadLine(best, spx)}</p>
           {shown.about && (
             <p id={about} className="vh">
               {shown.about}
@@ -773,8 +608,11 @@ function FamousFunds({
       aria-describedby={shown?.about ? about : undefined}
     >
       <div className="fam-head">
-        <h2 id={h2}>Famous funds</h2>
-        <p className="fam-stand">{standfirst(period, spx, view)}</p>
+        {/* The tab already says Famous funds, and the chart labels the S&P 500 line (owner, 2026-11-23): the
+            heading stays for screen readers, the standfirst goes. */}
+        <h2 id={h2} className="vh">
+          Famous funds
+        </h2>
       </div>
       <div className="fam-ctl">
         {names.length > 0 && (
@@ -868,10 +706,6 @@ function TopFunds({
     setRun({ n: run.n + 1, rows, page, view });
 
   const spx = data?.spx?.ann_return ?? null;
-  const best = useMemo(
-    () => rows.map((r) => ({ name: shortNameOf(r.fund_id, r.name), ret: r.ann_return })),
-    [rows],
-  );
   const columns = useMemo(() => personColumns(), []);
   const section = useRef<HTMLElement>(null);
   const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
@@ -893,7 +727,6 @@ function TopFunds({
             <h3>{TOP_LIST}</h3>
             <span className="fam-n">{count(rows.length, "fund")}</span>
           </div>
-          <p className="fam-lead">{leadLine(best, spx)}</p>
         </div>
         {view === "chart" ? (
           <FamousChart
@@ -1535,10 +1368,9 @@ export default function Home() {
             <p className="eyebrow">Quarterly 13F Data from SEC.gov</p>
             <h1>Fund Manager Research</h1>
           </div>
-          <ThemeToggle className="hero-theme" />
         </header>
 
-        {/* The search sits level with the tabs, at the right. */}
+        {/* The fund search and the theme switch are in the top bar (App), on every page. */}
         <div className="tabrow">
           <Tabs
             tabs={TABS}
@@ -1547,7 +1379,6 @@ export default function Home() {
             label="Home lists"
             idPrefix="home"
           />
-          <FundSearch />
         </div>
         <div className="home-body" {...tabPanelProps("home", tab)}>
           {panel}

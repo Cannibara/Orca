@@ -8,7 +8,6 @@ import { PeriodPicker } from "./PeriodPicker";
 import { periodAsOf, priceAt, quarterClose, type PosRow, type Timeline } from "./positions";
 import {
   OTHER_KEY,
-  gradientCss,
   groupTiles,
   heldSince,
   holdingReturn,
@@ -364,29 +363,16 @@ export function HoldingsPanel({ h, data, prices }: Props) {
           )}
         </div>
       </div>
-      <div className="strip legend tm-leg">
-        <span className="tm-lt">{shown ? `Colour, and the % after each value: the fund's return on each holding, ${startLabel} → ${endLabel}` : "Colour, and the % after each value: the fund's return on each holding"}</span>
-        <span className="tm-scale" aria-hidden="true">
-          <span className="tm-grad" style={{ background: gradientCss(colours.scale) }} />
-          <span className="tm-ticks">
-            <span>{"−" + clampText}</span>
-            <span>0%</span>
-            <span>{"+" + clampText}</span>
-          </span>
+      {/* The legend and caption are off the page (owner, 2026-11-23: the tiles and their tooltips say enough);
+          a screen reader still gets what the colours mean and what the tiles add up to. */}
+      <p className="vh">
+        <span className="tm-lt">
+          {shown ? `Colour, and the % after each value: the fund's return on each holding, ${startLabel} → ${endLabel}` : "Colour, and the % after each value: the fund's return on each holding"}
         </span>
-        <span className="vh">{`, from a loss of ${clampText} or more in red, through grey at 0%, to a gain of ${clampText} or more in green.`}</span>
-        <span className="tm-keys">
-          <span className="lg">
-            <i className="sw-new" aria-hidden="true" />
-            No price data
-          </span>
-          <span className="lg">
-            <i className="sw-oth" aria-hidden="true" />
-            Other stocks
-          </span>
-        </span>
-      </div>
-      <p className="pf tm-cap">{caption}</p>
+        <span className="tm-sc">{`, from a loss of ${clampText} or more in red, through grey at 0%, to a gain of ${clampText} or more in green. Hatched: Other stocks. Dashed outline: no price data.`}</span>
+        {caption && " "}
+        <span className="tm-cap">{caption}</span>
+      </p>
     </section>
   );
 }
