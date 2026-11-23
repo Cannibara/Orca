@@ -1,67 +1,62 @@
-/* The ranked lists' Table view (home/RankTable.tsx): the chart's look in table form (owner, 2026-11-23). On the
-   page background, no card, no grid lines; one hairline under the headings; a row is 52px with the chart's
-   photo (--c1), name and hover band. Everything sits under `.fp .rk`, over the shared .tbl-wrap rules in
-   styles.css. */
-.fp .rk{--c1:32px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.fp .rk-top{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-height:18px}
-.fp .rk-key{display:inline-flex;align-items:center;gap:6px;font:400 11px/14px var(--f-sans);color:var(--ink3);white-space:nowrap}
-.fp .rk-key i{width:0;height:12px;border-left:1px dashed var(--ink2)}
+/* The ranked lists' Table view (home/RankTable.tsx), on the chart's grid (famousChart.css .fc) so Chart | Table
+   switch without anything moving (owner, 2026-11-23): photo 32px, 14px gap, name column 252px, the return column
+   where the plot starts; a 42px header strip with one hairline; 46px rows, no row lines, the hover band 8px past
+   each side. The table reaches 8px past the module each side and pads that back, as the chart's window does. */
+.fp .rk{--row:46px;--c1:32px;--c2:252px;--cg:14px;--band-x:8px;min-width:0;font-variant-numeric:tabular-nums}
+.fp .rk table{width:calc(100% + 2 * var(--band-x));margin:0 calc(-1 * var(--band-x));border-collapse:separate;border-spacing:0;table-layout:fixed}
+.fp .rk :is(th,td){padding:0 0 0 12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp .rk :is(th,td).c-fund{width:calc(var(--band-x) + var(--c1) + var(--cg) + var(--c2));padding-left:var(--band-x);text-align:left}
+.fp .rk :is(th,td):last-child{padding-right:var(--band-x)}
+/* the return sits at the start of the plot, the others share what is left */
+.fp .rk :is(th,td).c-ret{width:13%;padding-left:var(--cg)}
 
-.fp .rk .tbl-wrap{--tpad:0px;border:0;border-radius:0;background:var(--page)}
-.fp .rk table{--row:52px;font-size:13.5px}
-.fp .rk :is(th,td){border-bottom:0}
-.fp .rk thead th{height:32px;background:var(--page);font:400 11.5px/14px var(--f-sans);color:var(--ink3);box-shadow:0 1px 0 var(--line2)}
-.fp .rk :is(thead th,tbody td):first-child{box-shadow:none}
-.fp .rk thead th:first-child{box-shadow:0 1px 0 var(--line2)}
-.fp .rk tbody td{background:var(--page);color:var(--ink2)}
-/* the chart's hover band, round at the row's ends; the photo comes into colour as on the chart */
-.fp .rk tbody tr:hover>td{background:color-mix(in srgb,var(--band) 60%,var(--page))}
-.fp .rk tbody tr>td:first-child{border-radius:6px 0 0 6px}
-.fp .rk tbody tr>td:last-child{border-radius:0 6px 6px 0}
-.fp .rk tbody tr:is(:hover,:focus-visible) .fc-face{filter:none}
-.fp .rk tbody tr:first-child>td{padding-top:4px}
+/* header: the chart's axis strip, labels on its foot, the S&P 500 figure on top of the return heading */
+.fp .rk thead th{position:relative;height:42px;vertical-align:bottom;padding-bottom:7px;box-shadow:0 1px 0 var(--line2);font:400 11px/14px var(--f-sans);color:var(--ink3)}
+.fp .rk thead th.c-fund{padding-left:calc(var(--band-x) + var(--c1) + var(--cg))}
+.fp .rk .rk-spx{position:absolute;top:2px;right:0;font:600 11px/14px var(--f-sans);color:var(--ink);white-space:nowrap}
+.fp .rk th .sort{display:inline-flex;align-items:center;gap:3px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;white-space:nowrap}
+.fp .rk th .sort:hover{color:var(--ink)}
+.fp .rk th[aria-sort] .sort{color:var(--ink);font-weight:600}
+.fp .rk th .sort .ico{width:11px;height:11px;stroke-width:2;order:-1}
+.fp .rk th.c-fund .sort .ico{order:1}
+.fp .rk th .sort .alt{padding:1px 6px;border-radius:9px;background:color-mix(in srgb,var(--ink) 9%,var(--page));color:var(--ink);font-size:10.5px;font-weight:600}
+.fp .rk th .sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:2px}
 
-.fp .rk-fund{display:flex;align-items:center;gap:14px;min-width:0}
+/* rows: the chart's height, band and type; no lines */
+.fp .rk tbody tr{cursor:pointer}
+.fp .rk tbody td{height:var(--row);font-size:13px;color:var(--ink2);background:transparent}
+.fp .rk tbody tr:hover td{background:color-mix(in srgb,var(--band) 60%,var(--page))}
+.fp .rk tbody td:first-child{border-radius:6px 0 0 6px}
+.fp .rk tbody td:last-child{border-radius:0 6px 6px 0}
+.fp .rk tbody tr:hover .fc-face{filter:none}
+.fp .rk td.c-ret{font-weight:600;font-size:12.5px;color:var(--ink)}
+.fp .rk-fund{display:flex;align-items:center;gap:var(--cg);min-width:0}
 .fp .rk-fund .fc-face{flex:none}
-.fp .rk .stk{max-width:100%}
-.fp .rk .tbl-wrap .stk>a.nm{max-width:100%;font:600 14px/18px var(--f-sans);letter-spacing:-.005em;color:var(--ink)}
-.fp .rk .stk>.sub{font-size:12px;line-height:15px;color:var(--ink3)}
+.fp .rk .who{display:flex;flex-direction:column;gap:1px;min-width:0}
+.fp .rk .who .nm{font:600 14px/18px var(--f-sans);color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp .rk .who .nm:hover{text-decoration:underline;text-underline-offset:3px}
+.fp .rk .who .mg{font-size:12.5px;line-height:16px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the foot as the chart's: the caption on the left, page buttons on the right, 10px under the rows */
+.fp .rk-foot{margin-top:10px}
+.fp .rk-foot .pager{padding:0;border:0}
 
-/* the return: bar (zero line, S&P 500 mark) then the figure, as the chart's label */
-.fp .rk-ret{display:flex;align-items:center;justify-content:flex-end;gap:10px}
-.fp .rk-bar{position:relative;flex:1 1 auto;min-width:48px;max-width:240px;height:14px}
-.fp .rk-bar i{position:absolute;top:0;bottom:0;min-width:2px}
-.fp .rk-bar i.gain{border-radius:0 3px 3px 0}
-.fp .rk-bar i.loss{border-radius:3px 0 0 3px}
-.fp .rk-bar .rk-zero{position:absolute;top:-6px;bottom:-6px;width:0;border-left:1px solid var(--line2)}
-.fp .rk-bar .rk-spx{position:absolute;top:-6px;bottom:-6px;width:0;border-left:1px dashed var(--ink2)}
-.fp .rk-v{flex:none;min-width:4.2em;text-align:right;font:600 13px/18px var(--f-sans);color:var(--ink)}
-
-.fp .rk .pager{border-top:1px solid var(--line);padding:10px 0}
-
-/* ---------- phone: one block per fund, no sideways scroll ---------- */
-.fp .rk.phone .rk-top{flex-wrap:wrap;justify-content:space-between;row-gap:8px}
-.fp .rk-sort{display:inline-flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:var(--ink3);white-space:nowrap}
-.fp .rk-sort select{height:34px;padding:0 28px 0 10px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:500 13px/1 var(--f-sans)}
-.fp .rk.phone .tbl-wrap{overflow:visible;max-height:none}
-.fp .rk.phone table{display:block}
-/* the headings stay for screen readers; the Sort by menu does their job */
+/* ---------- phone: the chart's phone grid (photo 28px, 8px gap, 48px rows) ---------- */
+.fp .rk.phone{--row:48px;--c1:28px;--cg:8px}
+.fp .rk-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:36px;padding:0 0 4px calc(var(--c1) + var(--cg));box-shadow:0 1px 0 var(--line2);font-size:10.5px;line-height:13px;color:var(--ink3)}
+.fp .rk-head select{height:26px;max-width:58%;padding:0 22px 0 8px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:500 12px/1 var(--f-sans)}
 .fp .rk.phone thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.fp .rk.phone tbody{display:block}
-.fp .rk.phone tbody tr{display:grid;grid-template-columns:var(--c1) auto auto auto auto minmax(0,1fr);column-gap:10px;row-gap:6px;padding:12px 0}
-.fp .rk.phone tbody tr+tr{box-shadow:0 -1px 0 var(--line)}
-/* no hover band on a touch screen (it would stick after a tap) */
-.fp .rk.phone tbody tr:hover>td,.fp .rk.phone tbody td{display:block;height:auto;padding:0;border-radius:0;background:transparent;text-align:left;font-size:12px;line-height:15px;color:var(--ink3)}
-.fp .rk.phone tbody tr:first-child>td{padding-top:0}
-.fp .rk.phone td:nth-child(1){grid-column:1/-1;grid-row:1}
-.fp .rk.phone .rk-fund{gap:10px}
-.fp .rk.phone .stk>.sub{display:none}
-.fp .rk.phone td:nth-child(4){grid-column:2/-1;grid-row:2}
-.fp .rk.phone .rk-bar{max-width:none}
-.fp .rk.phone td:nth-child(2){grid-column:2;grid-row:3}
-.fp .rk.phone td:nth-child(3){grid-column:3;grid-row:3}
-.fp .rk.phone td:nth-child(5){grid-column:4;grid-row:3}
-.fp .rk.phone td:nth-child(6){grid-column:5;grid-row:3}
-.fp .rk.phone td:nth-child(3)::after{content:" pos"}
-.fp .rk.phone td:nth-child(5)::before{content:"Max DD "}
-.fp .rk.phone td:nth-child(6)::before{content:"Sharpe "}
+.fp .rk.phone :is(table,tbody){display:block}
+.fp .rk.phone table{width:auto}
+/* a fund: photo, name and (under it) its figures, the return on the right; the figure columns are folded into
+   that second line (RankTable phoneLine), where the chart puts AUM and the person */
+.fp .rk.phone tbody tr{display:flex;align-items:center;gap:8px;height:var(--row);padding:0 var(--band-x);border-radius:6px}
+.fp .rk.phone tbody td{display:block;height:auto;padding:0;border:0;border-radius:0;background:none;overflow:visible}
+.fp .rk.phone td.c-fund{flex:1 1 0;min-width:0;width:auto}
+.fp .rk.phone td.c-ret{flex:none;width:auto;font-size:11.5px;line-height:18px;color:var(--ink)}
+.fp .rk.phone td:is(.c-aum,.c-pos,.c-dd,.c-sh){display:none}
+.fp .rk .l2{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;font-size:11px;line-height:14px;color:var(--ink3);white-space:nowrap}
+.fp .rk .l2>span{display:inline-flex;align-items:center;gap:5px}
+.fp .rk .sep{flex:none;width:3px;height:3px;border-radius:50%;background:var(--control)}
+.fp .rk.phone .who .nm{font-size:12.5px;line-height:16px;letter-spacing:-.005em}
+.fp .rk.phone .rk-fund .fc-face.init{font-size:10px}
+.fp .rk.phone .rk-foot{margin-top:8px}

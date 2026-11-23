@@ -392,12 +392,12 @@ describe("Home", () => {
       expect(
         within(table)
           .getAllByRole("columnheader")
-          .map((h) => h.textContent),
+          .map((h) => h.querySelector(".sort")?.textContent),
       ).toEqual([
         "Fund most popular",
+        "Return / yr",
         "AUM",
         "Positions",
-        "Return / yr",
         "Max drawdown",
         "Sharpe",
       ]);
@@ -499,12 +499,12 @@ describe("Home", () => {
     expect(
       within(table)
         .getAllByRole("columnheader")
-        .map((h) => h.textContent),
+        .map((h) => h.querySelector(".sort")?.textContent),
     ).toEqual([
       "Fund most popular",
+      "Return / yr",
       "AUM",
       "Positions",
-      "Return / yr",
       "Max drawdown",
       "Sharpe",
     ]);
@@ -685,9 +685,8 @@ describe("Home", () => {
     // the page buttons come after the table, not before it
     expect(table.compareDocumentPosition(pager()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    // fixed layout with a sized Fund column, so the columns keep their widths from page to page
-    expect(table).toHaveClass("fixed");
-    expect(table.querySelector("col")?.style.width).toBe("34%");
+    // the Fund column has the chart's width (rankTable.css), so the columns keep their places from page to page
+    expect(table.querySelector("th.c-fund")).not.toBeNull();
 
     await user.click(within(pager()).getByRole("button", { name: "Next" }));
     expect(pager()).toHaveTextContent("Showing 81–160 of 250 funds");
@@ -804,7 +803,7 @@ describe("Home", () => {
     expect(within(table).getAllByText(famous.manager!).length).toBeGreaterThan(0);
   });
 
-  it("the ranked table looks like the chart: short names, a return bar from zero with the S&P 500 marked, one decimal; a row opens its fund", async () => {
+  it("the ranked table sits on the chart's grid: short names and photos, the return to one decimal, the S&P 500 over its heading; a row opens its fund", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     stubData();
     const user = userEvent.setup();
@@ -815,20 +814,16 @@ describe("Home", () => {
     const first = rows[0];
     expect(within(first).getAllByRole("link")[0]).toHaveTextContent(shortNameOf(best[0].fund_id, best[0].name));
     expect(within(first).getAllByRole("link")[0]).toHaveAttribute("title", best[0].name);
-    expect(first.querySelector(".rk-v")).toHaveTextContent(retLabel(best[0].ann_return));
-    const bar = first.querySelector<HTMLElement>(".rk-bar i")!;
-    expect(bar).toHaveClass(best[0].ann_return < 0 ? "loss" : "gain");
-    expect(bar.style.background).not.toBe("");
-    // the best fund's bar (or the S&P 500, if higher) reaches the end of the scale
-    if (best[0].ann_return >= (t3.spx?.ann_return ?? 0)) expect(bar.style.right).toMatch(/^calc\(0%\)$|100\.000%/); // jsdom folds calc(100% - 100%)
-    if (t3.spx?.ann_return != null) {
-      expect(first.querySelector(".rk-spx")).not.toBeNull();
-      expect(screen.getByText(/^S&P 500 \+\d+\.\d% a year$/)).toBeInTheDocument();
-    }
+    expect(first.querySelector("td.c-ret")).toHaveTextContent(retLabel(best[0].ann_return));
+    expect(first.querySelector(".rk-bar")).toBeNull(); // the bars are the chart's
+    if (t3.spx?.ann_return != null)
+      expect(within(table).getByRole("columnheader", { name: /Return \/ yr/ }).querySelector(".rk-spx")).toHaveTextContent(
+        /^S&P 500 \+\d+\.\d%$/,
+      );
     // every fund has its photo or its initials
     rows.forEach((r) => expect(r.querySelector(".fc-face")).not.toBeNull());
     // a click anywhere on the row opens the fund
-    await user.click(first.querySelector(".rk-bar")!);
+    await user.click(first.querySelector("td.c-aum")!);
     expect(await screen.findByText(`Fund page ${best[0].fund_id}`)).toBeInTheDocument();
   });
 
@@ -877,12 +872,12 @@ describe("Home", () => {
     expect(
       within(main)
         .getAllByRole("columnheader")
-        .map((h) => h.textContent),
+        .map((h) => h.querySelector(".sort")?.textContent),
     ).toEqual([
       "Fund",
+      "Return / yr",
       "AUM",
       "Positions",
-      "Return / yr",
       "Max drawdown",
       "Sharpe",
     ]);
@@ -954,7 +949,7 @@ describe("Home", () => {
       expect(
         within(table)
           .getAllByRole("columnheader")
-          .map((h) => h.textContent),
+          .map((h) => h.querySelector(".sort")?.textContent),
       ).toEqual(headers);
       // no SPY benchmark column or rule anywhere on Home
       expect(

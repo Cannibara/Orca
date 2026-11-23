@@ -1,86 +1,69 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
-import { DataTable, type SortState } from "../components/DataTable";
+import type { SortState } from "../components/DataTable";
 import { Pager } from "../components/Pager";
 import { State } from "../components/State";
 import type { TopRow } from "../data/types";
 import { count, pct, qLabel, ratio } from "../lib/format";
 import { shortNameOf } from "../lib/famousNames";
 import { useSortedRows, type Col } from "../lib/sort";
-import { Photo, useDark } from "./FamousChart";
-import { aumLabel, retLabel, shadeFor } from "./famousChart";
+import { Photo } from "./FamousChart";
+import { aumLabel, retLabel } from "./famousChart";
 import "./rankTable.css";
 
-// The Table view of the ranked lists (Famous funds, Top funds), drawn like their chart (owner, 2026-11-23): the
-// chart's photo or initials, short names and fonts, no grid lines, and the return as a small bar in the chart's
-// shades with the S&P 500 marked, to one decimal. Every column still sorts and the list still pages. On a phone
-// each fund is one block (name; return bar; AUM, positions, drawdown and Sharpe in a line) with a Sort by menu,
-// so nothing hides off to the side.
+// The Table view of the ranked lists (Famous funds, Top funds), laid out on the chart's own grid so switching
+// Chart | Table keeps everything in place (owner, 2026-11-23): the same 42px header strip with one hairline under
+// it, the S&P 500 figure on top of the return heading as on the chart's axis, 46px rows with the photo (or
+// initials), short name and person where the chart has them, no lines between rows, the chart's hover band. The
+// return column starts where the chart's bars do. Every heading sorts; Famous funds' Fund heading also steps to
+// most popular. On a phone a fund is one block (name and return; AUM, positions, drawdown, Sharpe under it) and the
+// sort is a menu in the header strip.
 
 export const BEST_RETURN: SortState = { key: "ret", dir: -1 };
 /** Famous lists open with the most popular fund first. */
 export const MOST_POPULAR: SortState = { key: "pop", dir: -1 };
 
-/** The return bar's scale: zero, every fund's return and the S&P 500 in view, in fractions. */
-type Dom = { lo: number; hi: number };
+type RCol = Col<TopRow> & { cls: string };
 
-function domainOf(rows: TopRow[], spx: number | null): Dom {
-  let lo = 0;
-  let hi = spx != null && spx > 0 ? spx : 0;
-  for (const r of rows) {
-    lo = Math.min(lo, r.ann_return);
-    hi = Math.max(hi, r.ann_return);
-  }
-  return hi - lo > 0 ? { lo, hi } : { lo: 0, hi: 1 };
-}
-
-const at = (x: number, d: Dom) => `${(((x - d.lo) / (d.hi - d.lo)) * 100).toFixed(3)}%`;
+/** A phone's second line under the name, where the chart has AUM · person: the figures the columns hold. */
+const phoneLine = (r: TopRow) => [aumLabel(r.book), `${count(r.n_positions)} pos`, `Max DD ${pct(r.max_dd, 1, false)}`, `Sharpe ${ratio(r.sharpe)}`];
 
 /** The fund as the chart shows it: photo (or initials), short name (the filer's name on hover), the person. */
-function RankFund({ r }: { r: TopRow }) {
+function RankFund({ r, phone }: { r: TopRow; phone: boolean }) {
   const short = shortNameOf(r.fund_id, r.name);
   const sub = [r.manager, r.until_q != null && `filed until ${qLabel(r.until_q)}`].filter(Boolean).join(" · ");
   return (
-    <div className="rk-fund">
+    <span className="rk-fund">
       <Photo manager={r.manager} who={r.manager ?? short} />
-      <div className="stk">
+      <span className="who">
         <Link className="nm" to={`/fund/${r.fund_id}`} title={r.name}>
           {short}
         </Link>
-        {sub && <span className="sub">{sub}</span>}
-      </div>
-    </div>
-  );
-}
-
-/** The return: a bar from zero in the chart's shade, a mark at the S&P 500, the figure to one decimal. */
-function RetCell({ ret, spx, dom, dark }: { ret: number; spx: number | null; dom: Dom; dark: boolean }) {
-  const a = Math.min(0, ret);
-  const b = Math.max(0, ret);
-  return (
-    <span className="rk-ret">
-      <span className="rk-bar" aria-hidden="true">
-        <i
-          className={ret < 0 ? "loss" : "gain"}
-          style={{ left: at(a, dom), right: `calc(100% - ${at(b, dom)})`, background: shadeFor(ret, dark) }}
-        />
-        <b className="rk-zero" style={{ left: at(0, dom) }} />
-        {spx != null && <b className="rk-spx" style={{ left: at(spx, dom) }} />}
+        {phone ? (
+          <span className="l2">
+            {phoneLine(r).map((s, i) => (
+              <span key={i}>
+                {i > 0 && <i className="sep" aria-hidden="true" />}
+                {s}
+              </span>
+            ))}
+          </span>
+        ) : (
+          sub && <span className="mg">{sub}</span>
+        )}
       </span>
-      <span className="rk-v">{retLabel(ret)}</span>
     </span>
   );
 }
 
-/** The columns: Fund, AUM, Positions, Return / yr, Max drawdown, Sharpe. `rank` adds Famous funds' popularity order. */
-function rankColumns(dom: Dom, spx: number | null, dark: boolean, rank?: Map<number, number>): Col<TopRow>[] {
-  const fund: Col<TopRow> = {
+function rankColumns(phone: boolean, rank?: Map<number, number>): RCol[] {
+  const fund: RCol = {
+    cls: "c-fund",
     header: "Fund",
     key: "name",
     align: "l",
-    width: "34%",
     by: (r) => shortNameOf(r.fund_id, r.name).toLowerCase(),
-    cell: (r) => <RankFund r={r} />,
+    cell: (r) => <RankFund r={r} phone={phone} />,
   };
   if (rank)
     Object.assign(fund, {
@@ -90,32 +73,34 @@ function rankColumns(dom: Dom, spx: number | null, dark: boolean, rank?: Map<num
     });
   return [
     fund,
-    { header: "AUM", key: "book", width: "10%", by: (r) => r.book, cell: (r) => aumLabel(r.book) },
-    { header: "Positions", key: "positions", width: "10%", by: (r) => r.n_positions, cell: (r) => count(r.n_positions) },
-    {
-      header: "Return / yr",
-      key: "ret",
-      width: "26%",
-      by: (r) => r.ann_return,
-      cell: (r) => <RetCell ret={r.ann_return} spx={spx} dom={dom} dark={dark} />,
-    },
-    { header: "Max drawdown", key: "dd", width: "11%", by: (r) => r.max_dd, cell: (r) => pct(r.max_dd, 1, false) },
-    { header: "Sharpe", key: "sharpe", width: "9%", by: (r) => r.sharpe, cell: (r) => ratio(r.sharpe) },
+    { cls: "c-ret", header: "Return / yr", key: "ret", by: (r) => r.ann_return, cell: (r) => retLabel(r.ann_return) },
+    { cls: "c-aum", header: "AUM", key: "book", by: (r) => r.book, cell: (r) => aumLabel(r.book) },
+    { cls: "c-pos", header: "Positions", key: "positions", by: (r) => r.n_positions, cell: (r) => count(r.n_positions) },
+    { cls: "c-dd", header: "Max drawdown", key: "dd", by: (r) => r.max_dd, cell: (r) => pct(r.max_dd, 1, false) },
+    { cls: "c-sh", header: "Sharpe", key: "sharpe", by: (r) => r.sharpe, cell: (r) => ratio(r.sharpe) },
   ];
 }
 
-/** A phone's Sort by menu: the orders the headings give on a wider screen. */
+/** A phone's sort menu: the orders the headings give on a wider screen. */
 const SORTS: { label: string; sort: SortState; famous?: true }[] = [
   { label: "Most popular", sort: MOST_POPULAR, famous: true },
-  { label: "Return, highest first", sort: BEST_RETURN },
-  { label: "Return, lowest first", sort: { key: "ret", dir: 1 } },
+  { label: "Return, highest", sort: BEST_RETURN },
+  { label: "Return, lowest", sort: { key: "ret", dir: 1 } },
   { label: "Name, A–Z", sort: { key: "name", dir: 1 } },
-  { label: "AUM, largest first", sort: { key: "book", dir: -1 } },
-  { label: "Positions, most first", sort: { key: "positions", dir: -1 } },
-  { label: "Max drawdown, smallest first", sort: { key: "dd", dir: -1 } },
-  { label: "Sharpe, highest first", sort: { key: "sharpe", dir: -1 } },
+  { label: "AUM, largest", sort: { key: "book", dir: -1 } },
+  { label: "Positions, most", sort: { key: "positions", dir: -1 } },
+  { label: "Drawdown, smallest", sort: { key: "dd", dir: -1 } },
+  { label: "Sharpe, highest", sort: { key: "sharpe", dir: -1 } },
 ];
 const sortId = (s: SortState) => `${s.key}:${s.dir}`;
+
+function SortIcon({ desc }: { desc: boolean }) {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+      <path d={desc ? "M4 6.25 8 10.25l4-4" : "M4 9.75l4-4 4 4"} />
+    </svg>
+  );
+}
 
 export function RankTable({
   rows,
@@ -135,11 +120,8 @@ export function RankTable({
   /** Famous funds' popularity places (1 = most popular): adds that order to the Fund heading and the menu. */
   rank?: Map<number, number>;
 }) {
-  const dark = useDark();
   const navigate = useNavigate();
-  // one scale for the whole list, as on the chart, so a bar keeps its length from page to page and sort to sort
-  const dom = useMemo(() => domainOf(rows, spx), [rows, spx]);
-  const columns = useMemo(() => rankColumns(dom, spx, dark, rank), [dom, spx, dark, rank]);
+  const columns = useMemo(() => rankColumns(phone, rank), [phone, rank]);
   const { sorted, sort, onSort, setSort } = useSortedRows(rows, columns, initial);
   const [page, setPage] = useState(0);
   const [shownFor, setShownFor] = useState(sorted);
@@ -155,47 +137,80 @@ export function RankTable({
       </div>
     );
   const sorts = SORTS.filter((o) => !o.famous || rank);
+  // a click anywhere on a row opens the fund (its name is the link, for the keyboard and a new tab)
+  const open = (r: TopRow) => (e: MouseEvent) => {
+    if (!(e.target instanceof Element && e.target.closest("a, button, select"))) navigate(`/fund/${r.fund_id}`);
+  };
+
   return (
     <div className={"rk" + (phone ? " phone" : "")}>
-      <div className="rk-top">
-        {phone && (
-          <label className="rk-sort">
-            <span>Sort by</span>
-            <select
-              value={sortId(sort)}
-              onChange={(e) => {
-                const o = sorts.find((x) => sortId(x.sort) === e.target.value);
-                if (o) setSort(o.sort);
-              }}
-            >
-              {/* an order set by a heading on a wider screen that the menu lacks still shows as chosen */}
-              {!sorts.some((o) => sortId(o.sort) === sortId(sort)) && <option value={sortId(sort)}>—</option>}
-              {sorts.map((o) => (
-                <option key={sortId(o.sort)} value={sortId(o.sort)}>
-                  {o.label}
-                </option>
+      {phone && (
+        // the phone's header strip: where the chart has its axis, the column name and the sort menu
+        <div className="rk-head">
+          <span>Fund</span>
+          <select aria-label="Sort by" value={sortId(sort)} onChange={(e) => {
+            const o = sorts.find((x) => sortId(x.sort) === e.target.value);
+            if (o) setSort(o.sort);
+          }}>
+            {!sorts.some((o) => sortId(o.sort) === sortId(sort)) && <option value={sortId(sort)}>—</option>}
+            {sorts.map((o) => (
+              <option key={sortId(o.sort)} value={sortId(o.sort)}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <table aria-label={label}>
+        <thead>
+          <tr>
+            {columns.map((c) => {
+              const dir = sort.key === c.key ? sort.dir : 0;
+              const alt = c.alt?.[sort.key];
+              const on = dir !== 0 || alt !== undefined;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  className={c.cls}
+                  aria-sort={!on ? undefined : (dir || -1) > 0 ? "ascending" : "descending"}
+                >
+                  {c.key === "ret" && spx != null && (
+                    <span className="rk-spx" aria-hidden="true">
+                      S&amp;P 500 {pct(spx, 1)}
+                    </span>
+                  )}
+                  <button type="button" className="sort" onClick={() => onSort(c.key)}>
+                    {c.header}
+                    {dir !== 0 && <SortIcon desc={dir < 0} />}
+                    {alt && (
+                      <>
+                        {" "}
+                        <span className="alt">{alt}</span>
+                      </>
+                    )}
+                  </button>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r) => (
+            <tr key={r.fund_id} onClick={open(r)}>
+              {columns.map((c) => (
+                <td key={c.key} className={c.cls}>
+                  {c.cell(r)}
+                </td>
               ))}
-            </select>
-          </label>
-        )}
-        {spx != null && (
-          <span className="rk-key">
-            <i aria-hidden="true" />
-            S&amp;P 500 {pct(spx, 1)} a year
-          </span>
-        )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {spx != null && <p className="vh">{`The S&P 500 returned ${pct(spx, 1)} a year over the same period.`}</p>}
+      <div className="rk-foot">
+        <Pager page={page} pageSize={pageSize} total={sorted.length} onPage={setPage} noun="funds" />
       </div>
-      <DataTable
-        label={label}
-        columns={columns}
-        rows={shown}
-        rowKey={(r) => r.fund_id}
-        sort={sort}
-        onSort={onSort}
-        onRow={(r) => navigate(`/fund/${r.fund_id}`)}
-        fixed={!phone}
-      />
-      <Pager page={page} pageSize={pageSize} total={sorted.length} onPage={setPage} noun="funds" />
     </div>
   );
 }
