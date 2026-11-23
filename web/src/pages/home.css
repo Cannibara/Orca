@@ -40,11 +40,6 @@
 .home .tbl-wrap{--nm-w:19em;--stk-w:14em}
 .home .tbl-wrap a.nm,.home .tbl-wrap .stk.fund{max-width:var(--nm-w)}
 @container app (max-width:559px){.home .tbl-wrap{--nm-w:10em;--stk-w:10em}}
-/* Famous funds (its own module and chart: home/famousChart.css). The table view's Fund cell: the person's
-   photo before the fund name. --face and --face-gap (set in famousChart.css) also size the name column
-   (Home.tsx FAMOUS_FUND_W); a fund with no photo has no circle and its name starts at the left edge. */
-.home .fund-row{display:flex;align-items:center;gap:var(--face-gap);min-width:0}
-.home .face{flex:none;width:var(--face);height:var(--face);border-radius:50%;object-fit:cover;object-position:50% 20%;background:var(--sunken);box-shadow:0 0 0 1px var(--line2),0 1px 3px rgba(0,0,0,.12)}
 /* two lists side by side (wins and losses) when the panel is wide enough, stacked otherwise */
 .home .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px var(--gap);align-items:start}
 .home .duo>div{display:flex;flex-direction:column;gap:8px;min-width:0}

@@ -67,7 +67,7 @@ const f3 = (x: number) => `${+(x * 100).toFixed(3)}%`;
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /** Dark mode as the page has it now: the theme switch (data-theme) or the device's setting. */
-function useDark(): boolean {
+export function useDark(): boolean {
   const [dark, setDark] = useState(() => currentTheme() === "dark");
   useEffect(() => {
     const read = () => setDark(currentTheme() === "dark");
@@ -94,7 +94,7 @@ function useSettled<T>(value: T, ms: number): T {
 }
 
 /** The person's photo, grey until the row is hovered; their initials (or the fund's) on a disc without one. */
-function Photo({ manager, who }: { manager: string | null | undefined; who: string }) {
+export function Photo({ manager, who }: { manager: string | null | undefined; who: string }) {
   const [failed, setFailed] = useState(false);
   const src = photoOf(manager);
   if (!src || failed)

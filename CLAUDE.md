@@ -38,7 +38,7 @@ pipeline/            Python package `orca` (ingest → lake → engine → publi
 pipeline/orca/workbook/  per-fund Excel workbook builder (inputs, model/outputs/summary tabs; private, owner-only)
 pipeline/orca/hierarchy/ sector → industry → industry vertical labels (labels.txt is the source of truth; parser, name matching, labelling and review-page tools; draft, not in the pipeline yet)
 web/src/pages/       Home, Fund (assembles the fund page), Position, NotFound (+ page css)
-web/src/home/        ranked return chart for Famous funds and Top funds (FamousChart.tsx, famousChart.ts pure model, useEasedScroll.ts) and Famous funds' list index (ListIndex.tsx, listIndex.ts layout)
+web/src/home/        ranked return chart for Famous funds and Top funds (FamousChart.tsx, famousChart.ts pure model, useEasedScroll.ts), their Table view (RankTable.tsx, rankTable.css) and Famous funds' list index (ListIndex.tsx, listIndex.ts layout)
 web/src/fund/        fund-page panels (Holdings/Analysis/Specialization/About tabs) and pure models: series.ts (returns/KPIs), positions.ts (as-of model, periods),
                      treemap.ts + treemapView.ts (holdings tree map), about.ts,
                      drive.ts, aum.ts, whatif.ts, loading.ts (row budget), prefetch.ts (price queue), base.css,

@@ -5,6 +5,15 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Famous funds and Top funds: the table drawn like the chart
+
+| What changed | Why | Files |
+|---|---|---|
+| The ranked lists' Table view is its own component, `RankTable`: the chart's photo or initials disc, short names (legal name as the link's title), 14px names, no grid or column lines (one hairline under the headings), the chart's hover band, AUM as "$3.6B", return as a mini bar from zero in the chart's shade with a dashed S&P 500 mark and the figure to one decimal (one scale for the whole list), max drawdown to one decimal, "S&P 500 +x% a year" key above; a click anywhere on a row opens the fund. Sorting (incl. Famous funds' A–Z / Z–A / most popular cycle) and paging unchanged | Owner: "make the UI for the table look better, more consistent in design to the chart yet retaining good detail"; chose mini bar + number, no row lines (chat) | `web/src/home/RankTable.tsx`, `web/src/home/rankTable.css`, `web/src/pages/Home.tsx`, `web/src/lib/sort.ts` (`setSort`), `web/src/home/FamousChart.tsx` (exports `Photo`, `useDark`) |
+| Phone (< 560px): each fund is one block (photo and name; return bar and figure; "$3.6B 56 pos Max DD −12.4% Sharpe 2.31") with a Sort by menu in place of the headings (kept for screen readers); no sideways scroll | Owner chose two-line rows (chat) | same |
+| Removed the old Famous/Top table pieces (`TOP_COLUMNS`, `PersonFund`, `personColumns`, `famousColumns`, `components/Face.tsx`, `.home .face`/`.fund-row` CSS) | Unused after the change | `web/src/pages/Home.tsx`, `web/src/pages/home.css`, `web/src/home/famousChart.css` |
+| Checks: web 1,203 vitest (2 new: chart-like cells and row click; phone Sort by) and 102 Playwright green; typecheck clean | | `web/tests/home.test.tsx`, `web/tests/home-famous-chart.test.tsx` |
+
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 
 | What changed | Why | Files |
