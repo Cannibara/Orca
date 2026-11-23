@@ -5,6 +5,12 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Tree map: big tiles' text glides with the box
+
+| What changed | Why | Files |
+|---|---|---|
+| The larger labels on big tiles (PR #62) changed size at once when a period step resized the tile, while the box still glided, so big tiles looked like they jumped. The label scale now tweens with the box (same 600 ms curve) | Owner: "treemap animations don't work consistently … worked before the last push" (chat). Checked live in headless Chrome (1440 px, 1.25× and 1.5× scale, real scrollbars, direct load, search, Back, browser back/forward, quarter and year steps): the boxes moved every time; the snapping text was the one change to the motion. Not reproduced otherwise: owner asked what exactly they see | `web/src/fund/treemapView.ts`, `web/tests/fund-treemap-view.test.ts` |
+
 ## 2026-11-23 — UI trims from the owner's marked-up screenshots
 
 | What changed | Why | Files |

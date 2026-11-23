@@ -162,6 +162,24 @@ describe("a step to another period", () => {
   });
 });
 
+describe("big tiles' larger labels", () => {
+  const size = (key: string) => parseFloat(lab(key, "tk").style.fontSize || "13");
+  test("a big tile draws its ticker larger, and the size glides with the box on a step instead of jumping", () => {
+    view.render([tile("AAA", { x: 0, y: 0, w: 600, h: 440 })], false);
+    step(0);
+    expect(size("AAA")).toBeCloseTo(13 * 2.2); // labelScale(600, 440) = 2.2
+    view.render([tile("AAA", { x: 0, y: 0, w: 200, h: 140 })], true); // labelScale = 1
+    step(0);
+    expect(size("AAA")).toBeCloseTo(13 * 2.2); // not snapped at the start
+    step(150);
+    const mid = size("AAA");
+    expect(mid).toBeLessThan(13 * 2.2);
+    expect(mid).toBeGreaterThan(13);
+    step(DUR);
+    expect(lab("AAA", "tk").style.fontSize).toBe(""); // back to the stylesheet's 13px
+  });
+});
+
 describe("no animation: everything is in place at once", () => {
   test("box, colour and words", () => {
     view.render([tile("AAA", { x: 10, y: 20, w: 300, h: 200 })], false);
