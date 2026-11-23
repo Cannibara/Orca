@@ -11,6 +11,9 @@ It writes into web/src/assets/people/:
   <slug>.jpg      a 192 px square around the face (OpenCV finds it), one per person
   people.json     the manager text shown under a fund name -> slug (a person with several filers shares one)
   credits.json    slug -> photographer, licence and the Commons page (the site's Photo credits page)
+  --pin slug=File.jpg[@x0,y0,x1,y1]   use that exact Commons file for that person (replacing the photo), cropped to the
+                      box (fractions of the image) or around the one face found; repeatable; with --only-pinned
+                      nothing else is fetched. For hand-picking a better photo than Wikipedia's lead image.
 A person who already has a <slug>.jpg is skipped (so a photo you swapped in by hand survives), unless
 --refresh. A person with no free photo is listed at the end and simply shows no picture on the site.
 Wikimedia rate-limits (HTTP 429): the script waits and retries, so a full run takes a few minutes."""
@@ -288,12 +291,66 @@ def save(credits: dict) -> None:
     (OUT / "credits.json").write_text(json.dumps(dict(sorted(credits.items())), indent=1, ensure_ascii=False) + "\n")
 
 
+def pinned(specs: list[str], credits: dict) -> None:
+    """Fetch exact Commons files for chosen people: "slug=File name.jpg" or "slug=File name.jpg@x0,y0,x1,y1" where the
+    box (fractions of the image, 0-1) frames the head; without a box the one face OpenCV finds is used."""
+    for spec in specs:
+        slug, _, rest = spec.partition("=")
+        name, _, box = rest.partition("@")
+        name = name.strip().removeprefix("File:").replace(" ", "_")
+        info = commons_info_wide([name]).get(name)
+        if not info:
+            print(f"PIN {slug}: {name} not found or its licence is not usable", flush=True)
+            continue
+        raw = get(info["thumb"]).content
+        if box:
+            x0, y0, x1, y1 = (float(v) for v in box.split(","))
+            im = Image.open(io.BytesIO(raw)).convert("RGB")
+            w, h = im.size
+            side = min(max((x1 - x0) * w, (y1 - y0) * h), w, h)
+            cx, cy = (x0 + x1) / 2 * w, (y0 + y1) / 2 * h
+            left, top = min(max(cx - side / 2, 0), w - side), min(max(cy - side / 2, 0), h - side)
+            out = im.crop((int(left), int(top), int(left + side), int(top + side))).resize((SIZE, SIZE), Image.LANCZOS)
+            buf = io.BytesIO()
+            out.save(buf, "JPEG", quality=84, optimize=True, progressive=True)
+            jpg, why = buf.getvalue(), ""
+        else:
+            jpg, why = square(raw)
+        if jpg is None:
+            print(f"PIN {slug}: {name}: {why}", flush=True)
+            continue
+        (OUT / f"{slug}.jpg").write_bytes(jpg)
+        person = credits.get(slug, {}).get("name") or slug.replace("-", " ").title()
+        credits[slug] = dict(
+            name=person, author=info["author"][:200], licence=info["licence"],
+            licence_url=info["licence_url"], source=info["page"],
+        )
+        print(f"ok   {person} | {info['licence']} | {name} (pinned)", flush=True)
+        save(credits)
+
+
+def commons_info_wide(files: list[str]) -> dict[str, dict]:
+    """commons_info with a large thumbnail (2000 px), for pinned photos cropped by hand from a big picture."""
+    old = INFO["iiurlwidth"]
+    INFO["iiurlwidth"] = 2000
+    try:
+        return commons_info(files)
+    finally:
+        INFO["iiurlwidth"] = old
+
+
 MAX_TRIES = 10  # downloads per person before giving up
 
 
 def main() -> None:
     refresh = "--refresh" in sys.argv
     OUT.mkdir(parents=True, exist_ok=True)
+    pins = [sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--pin"]
+    if pins:
+        c = json.loads((OUT / "credits.json").read_text()) if (OUT / "credits.json").exists() else {}
+        pinned(pins, c)
+        if "--only-pinned" in sys.argv:
+            return
     managers = sorted({r["manager"].strip() for r in csv.DictReader(FAMOUS.open(encoding="utf-8")) if r["manager"].strip()})
     who = {m: person_of(m) for m in managers}
     names = sorted(set(who.values()))

@@ -17,6 +17,14 @@ on:
         description: Fetch everyone again, replacing photos already there (hand-replaced ones too)
         type: boolean
         default: false
+      pins:
+        description: 'Exact Commons files to use, one per line: slug=File name.jpg or slug=File name.jpg@x0,y0,x1,y1 (head box as fractions of the picture)'
+        type: string
+        default: ""
+      only_pinned:
+        description: Fetch only the pinned files above, nothing else
+        type: boolean
+        default: false
 
 concurrency:
   group: people-photos
@@ -49,10 +57,17 @@ jobs:
       - name: Fetch the photos
         env:
           REFRESH: ${{ inputs.refresh }}
+          PINS: ${{ inputs.pins }}
+          ONLY_PINNED: ${{ inputs.only_pinned }}
         run: |
           set -o pipefail # a crashed script must fail the step, not hide behind tee
           args=()
           if [ "$REFRESH" = "true" ]; then args+=(--refresh); fi
+          if [ "$ONLY_PINNED" = "true" ]; then args+=(--only-pinned); fi
+          # PINS is data, not shell: read it line by line into --pin arguments.
+          while IFS= read -r line; do
+            [ -n "$line" ] && args+=(--pin "$line")
+          done <<< "$PINS"
           # No project install: the script needs only these packages. OpenCV is pinned to 4.10 (5.x dropped the face finder it uses).
           uv run --no-project --with httpx --with pillow --with "opencv-python-headless==4.10.0.84" \
             python pipeline/scripts/fetch_people_images.py "${args[@]}" 2>&1 | tee fetch.log
@@ -63,7 +78,7 @@ jobs:
             echo "### People photos"
             echo
             echo '```'
-            grep -E "photos saved|^WHY " fetch.log || echo "no summary (the run stopped early; see the log)"
+            grep -E "photos saved|^WHY |^PIN |^ok " fetch.log || echo "no summary (the run stopped early; see the log)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Commit the photos to this branch
