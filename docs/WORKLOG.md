@@ -5,6 +5,13 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Run 38 (`sectors_only`): the CUSIP guard stopped the sector files; dollars now keep their decimals
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 38 (`main` 4b9a157, started by Claude at the owner's request): indices and scores in the main step (27 min, saved). "Sector files" computed every chunk (29 min, peak 7.1 GB of 16 GB) and then the CUSIP guard refused 80 staged `skill.json` files, so nothing was uploaded: the site and its manifest are unchanged | Dollar amounts were rounded to whole dollars, and a bare 9-digit number can equal an all-digit CUSIP (Microsoft's is 594918104); the other files keep decimals, which the guard skips | — |
+| Dollars in the sector files are rounded to the cent and always written as decimals; a regression test runs the guard on such a value. Contract notes it. Demo data rebuilt | So the next run publishes | `pipeline/orca/run/sectors_step.py` (`_dollars`), `pipeline/tests/test_skill_detail.py`, `pipeline/contract.md`, `web/public/demo-data/` |
+
 ## 2026-11-23 — Licensing approved; PR #61 merged
 
 | What changed | Why | Files |

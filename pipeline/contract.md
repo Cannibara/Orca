@@ -219,6 +219,8 @@ the whole market (`mkt`); a fourth replay through SPY's total-return series (`sp
 
 - `label` everywhere is a full hierarchy path joined by `" > "` ("Technology > Semiconductors"); `"Market"` is the
   whole market. Tier 1 is the sector, 2 the industry, 3 the vertical (the site calls it a sub-industry).
+- Dollar amounts are rounded to the cent and always written with a decimal point ("594918104.0"): a bare
+  whole number of nine digits can equal an all-digit CUSIP, which the publish step's CUSIP guard refuses.
 - All IRRs and scores are fractions a year, `null` where the IRR has no root in [−0.99, 10]. `fund_id` is the CIK,
   as in every fund file. `last_q` is the quarter the replays are valued at.
 - `sectors/labels.json`: one entry per label of the indices at `last_q` (tiers 1–3), ordered by `label`.
