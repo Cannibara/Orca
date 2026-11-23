@@ -1,9 +1,15 @@
 # Worklog
 
-Last verified: 2026-11-22
+Last verified: 2026-11-23
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-23 — Licensing approved; PR #61 merged
+
+| What changed | Why | Files |
+|---|---|---|
+| The owner approved the licensing gate (Tiingo, Damodaran) and asked for the merge of PR #61 (Specialization tab, sector files). Next: Actions › Pipeline with `sectors_only` publishes the first real sector files; until then every fund's Specialization tab says "Not scored yet" | Owner: "Ok with licensing, go for pr and merge" (chat) | `docs/DECISIONS.md` |
 
 ## 2026-11-22 — Sector panels moved to their own tab, Specialization
 

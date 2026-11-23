@@ -1,10 +1,13 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-22
+Last verified: 2026-11-23
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-23 — Licensing for the sector panels: approved (owner)
+- Decision (chat): the owner is "Ok with licensing" for showing figures built from Tiingo prices (L1) and Damodaran's industry lists (R10) on the site, the gate DECISIONS 2026-11-16 deferred "until something is shown on the site" and 2026-11-21 left open. PR #61 (the Specialization tab and the sector files) may merge.
 
 ## 2026-11-22 — Fund page: the sector panels get their own tab, Specialization (owner)
 - Decision (chat): the four sector choice vs stock choice panels are not on Analysis. A new tab, **Specialization**, right of Analysis (Holdings, Analysis, Specialization, About), holds them in this order: the map, the Annual return stacked graph (with its Lines view), Sector mix over time, Which decisions made the gap. Analysis keeps its key figures, Assets under management, Return constituents and What if. Replaces the 2026-11-21 placement (below) (code `fund/FundHeader.tsx`, `pages/Fund.tsx`, `fund/SkillPanels.tsx`).
@@ -16,7 +19,7 @@ Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 - Decision (code `run/publish_step.is_sector_path`): the monthly run treats `sectors/*` and `fund/{id}/skill.json` as the sector step's: never owed in `_reconcile_published` (else every scored fund would be recomputed each month) and carried over into its manifest.
 - Decision (code): the demo builds its sector files with the real sector step on the demo lake, not made-up numbers; its 24-stock market makes every demo fund's sector choice negative.
 - Built as the spec's defaults: tier switch on Industry; "never rotated" not built (`v_never` published as null; spec §6.9 optional).
-- Still open: licensing sign-off before merging to `main` (entry below).
+- Licensing sign-off: given 2026-11-23 (entry above).
 
 ## 2026-11-21 — Top funds as the Famous funds chart; Index giants not shown
 - Decision: Top funds takes the Famous funds design: chart first with a Chart | Table switch, no card (page background for chart and table), the same heading structure, photo or initials before a short name, a 20-row window (phone 10) and 80 funds a page with a Next button. The Index giants list is no longer shown (owner, chat 2026-11-21) (chat)(code `web/src/pages/Home.tsx` TopFunds, `web/src/home/FamousChart.tsx` `offset`/`total`/`foot`).
