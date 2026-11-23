@@ -5,6 +5,14 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — People photos: Dalio and Simons replaced; Buffett, Ackman, Pabrai still open
+
+| What changed | Why | Files |
+|---|---|---|
+| Ray Dalio: front-facing 2012 photo in black tie (CC BY-SA 4.0, Locksteel888). Jim Simons: 2007 portrait looking at the camera (CC BY-SA 4.0, BillCramer) | Owner found the old Dalio (slouched, speaking) and Simons (profile) shots poor; wanted upright, forward-facing, business attire (chat) | `web/src/assets/people/ray-dalio.jpg`, `jim-simons.jpg`, `credits.json` |
+| Not done: Buffett (current photo is old but not wrong; wanted 70s), Ackman (only the 2016 Senate-hearing set exists free; he looks away or has a hand raised), Pabrai (Commons' main file is a caricature, the other has sunglasses, so no photo) | Wikimedia returned 429 to this session's IP for hours, so no further candidates could be fetched (chat) | `pipeline/scripts/fetch_people_images.py` (unchanged) |
+| Free photos of Dalio and Simons in their 40s–50s do not exist on Commons; both new ones are older (Dalio 63, Simons 69) | Licence limits the pool (chat) | |
+
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 
 | What changed | Why | Files |
