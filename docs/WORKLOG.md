@@ -5,6 +5,13 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Tree map: wheel and swipe change the period
+
+| What changed | Why | Files |
+|---|---|---|
+| The mouse wheel over the tree map steps periods, as over the picker's header and tools (down = back in time; only from rest, so a page scroll passing over the map keeps scrolling). On touch screens a sideways swipe on the tree map, the period tools or the header steps one period (left = later, right = earlier); `touch-action: pan-y pinch-zoom` keeps up-and-down scrolling and pinch zoom with the page; the lift after a swipe does not also press a pill | Owner: "when i scroll with my mouse on the treemap itself, it should scroll between quarters … on mobile, i should be able to swipe" (chat). The earlier "animations don't work" was Windows' Animation effects being off (owner turned it on); the label-glide fix stays | `web/src/fund/PeriodPicker.tsx` (`alsoOn`), `web/src/fund/HoldingsPanel.tsx`, `web/src/fund/holdings.css`, `web/tests/fund-holdings-ui.test.tsx` |
+| Checks: web 1,201 vitest green, typecheck clean; in Chromium the wheel over the map steps without scrolling the page, and on an emulated iPhone 13 swipes step one period each while a vertical swipe scrolls | | |
+
 ## 2026-11-23 — Tree map: big tiles' text glides with the box
 
 | What changed | Why | Files |

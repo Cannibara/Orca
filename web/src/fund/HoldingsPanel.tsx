@@ -329,7 +329,7 @@ export function HoldingsPanel({ h, data, prices }: Props) {
 
   return (
     <section className="panel" id="holdPanel" aria-labelledby="holdTitle" ref={panelRef}>
-      <PeriodPicker state={period} onChange={setPeriod} tl={tl} title="Holdings" titleId="holdTitle" asOf={asOf} />
+      <PeriodPicker state={period} onChange={setPeriod} tl={tl} title="Holdings" titleId="holdTitle" asOf={asOf} alsoOn={boxRef} />
       <div className="tm-pb">
         <div className={"tm-box" + (loading ? " is-loading" : "")} ref={boxRef} style={{ height: H }}>
           <svg

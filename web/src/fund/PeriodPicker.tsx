@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { Seg } from "./Seg";
 import { qShort } from "./fmt";
 import { reducedMotion } from "./hooks";
@@ -10,6 +10,8 @@ import "./positions.css";
 // ones either side peeking in, arrows, mouse-wheel hint). One picker drives the tree map and the Positions
 // table. The mouse wheel over the header or the tools steps through periods (down goes back in time) once the
 // page is at rest, and trying to go past the newest or oldest one makes the selected pill nudge and spring back.
+// The same goes for the element passed as `alsoOn` (the tree map, owner 2026-11-23). On a touch screen a sideways
+// swipe on any of them steps one period: left for a later one, right for an earlier one (the pills run old → new).
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "quarter", label: "Quarter" },
@@ -21,6 +23,8 @@ const WHEEL_STEP = 24;
 const WHEEL_GAP = 60;
 /** Within this long (ms) of a page scroll the wheel keeps scrolling the page: the picker only steps from rest. */
 const WHEEL_REST = 300;
+/** A swipe: the finger travels this far (px) sideways, and more sideways than up or down, before it steps. */
+const SWIPE_STEP = 40;
 
 type Props = {
   state: PeriodState;
@@ -31,9 +35,11 @@ type Props = {
   titleId: string;
   /** The as-of line, already printed: "Holdings and prices as of 30 Oct 2026". */
   asOf: string;
+  /** Another element whose wheel and swipes step the periods too: the tree map. */
+  alsoOn?: RefObject<HTMLElement | null>;
 };
 
-export function PeriodPicker({ state, onChange, tl, title, titleId, asOf }: Props) {
+export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn }: Props) {
   const { mode } = state;
   const ys = mode === "year";
   const vals = periodValues(state, tl);
@@ -108,13 +114,61 @@ export function PeriodPicker({ state, onChange, tl, title, titleId, asOf }: Prop
       stepRef.current(acc > 0 ? -1 : 1);
       acc = 0;
     };
+
+    // Touch: one step per sideways swipe, taken as soon as the finger has gone far enough. Up-and-down stays the
+    // page's (touch-action: pan-y in CSS; the browser then cancels the pointer and scrolls).
+    let sx = 0;
+    let sy = 0;
+    let sid: number | null = null;
+    let swiped = 0;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" || !e.isPrimary) return;
+      sid = e.pointerId;
+      sx = e.clientX;
+      sy = e.clientY;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerId !== sid) return;
+      const dx = e.clientX - sx;
+      const dy = e.clientY - sy;
+      if (Math.abs(dx) < SWIPE_STEP || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      sid = null;
+      swiped = Date.now();
+      stepRef.current(dx < 0 ? 1 : -1);
+    };
+    const onEnd = (e: PointerEvent) => {
+      if (e.pointerId === sid) sid = null;
+    };
+    // the lift after a swipe must not also press the pill or button it ended on
+    const onClick = (e: MouseEvent) => {
+      if (Date.now() - swiped < 400) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
-    const els = [phRef.current, toolsRef.current].filter((el): el is HTMLDivElement => el !== null);
-    els.forEach((el) => el.addEventListener("wheel", onWheel, { passive: false }));
+    const els = [phRef.current, toolsRef.current, alsoOn?.current ?? null].filter((el): el is HTMLElement => el != null);
+    els.forEach((el) => {
+      el.addEventListener("wheel", onWheel, { passive: false });
+      el.addEventListener("pointerdown", onDown);
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onEnd);
+      el.addEventListener("pointercancel", onEnd);
+      el.addEventListener("click", onClick, true);
+    });
     return () => {
       window.removeEventListener("scroll", onScroll);
-      els.forEach((el) => el.removeEventListener("wheel", onWheel));
+      els.forEach((el) => {
+        el.removeEventListener("wheel", onWheel);
+        el.removeEventListener("pointerdown", onDown);
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerup", onEnd);
+        el.removeEventListener("pointercancel", onEnd);
+        el.removeEventListener("click", onClick, true);
+      });
     };
+    // `alsoOn` is a ref: its element is in place when this runs (rendered with the picker), and never swapped
   }, []);
 
   // A pick from the list keeps the focus on the list: the selected pill is a different element afterwards.
