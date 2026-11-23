@@ -702,7 +702,7 @@ describe("Home", () => {
     expect(pager()).toHaveTextContent("Showing 1–80 of 250 funds");
   });
 
-  it("top funds open on a chart like Famous funds: heading, standfirst, the list's count (no lead line), short names, S&P line, source and rules", async () => {
+  it("top funds open on a chart like Famous funds: heading for screen readers (no standfirst, count or lead line), short names, S&P line, source and rules", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     stubData();
     const user = userEvent.setup();
@@ -710,10 +710,10 @@ describe("Home", () => {
     await openTopChart(user);
     const section = screen.getByRole("region", { name: "Top funds" });
     expect(within(section).getByRole("heading", { level: 2, name: "Top funds" })).toBeInTheDocument();
-    expect(section).toHaveTextContent(
-      /Estimated return a year over the last 3 years, best first\. The dotted line is the S&P 500 \(\+\d+\.\d%\)\./,
-    );
-    expect(section).toHaveTextContent(`${t3.eligible.length} funds`);
+    // no standfirst or fund count (owner, 2026-11-23): the axis says what the bars are
+    expect(section).not.toHaveTextContent(/Estimated return a year over/);
+    expect(section).not.toHaveTextContent(`${t3.eligible.length} funds`);
+    expect(section.querySelector(".fc-axl")).toHaveTextContent("Estimated return a year");
     // no card: the same module as Famous funds, and Chart is the pressed view
     expect(section).toHaveClass("ranked");
     expect(section.querySelector(".panel")).toBeNull();

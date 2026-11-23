@@ -46,7 +46,7 @@ import {
 import { qShort } from "../fund/fmt";
 import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
-import { sourceLine, standfirst } from "../home/famousChart";
+import { sourceLine } from "../home/famousChart";
 import { ListIndex } from "../home/ListIndex";
 import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
 import { photoOf } from "../lib/people";
@@ -607,13 +607,12 @@ function FamousFunds({
       aria-labelledby={h2}
       aria-describedby={shown?.about ? about : undefined}
     >
-      <div className="fam-head">
-        {/* The tab already says Famous funds, and the chart labels the S&P 500 line (owner, 2026-11-23): the
-            heading stays for screen readers, the standfirst goes. */}
-        <h2 id={h2} className="vh">
-          Famous funds
-        </h2>
-      </div>
+      {/* The tab already says Famous funds, and the chart labels the S&P 500 line (owner, 2026-11-23): the
+          heading stays for screen readers, the standfirst goes. */}
+      {/* (out of the layout: no wrapper, so it adds no gap above the switches) */}
+      <h2 id={h2} className="vh">
+        Famous funds
+      </h2>
       <div className="fam-ctl">
         {names.length > 0 && (
           <ListIndex
@@ -668,8 +667,8 @@ function SourceNote({ rule, spx }: { rule?: string; spx: SpxWindow | null | unde
 
 /**
  * Top funds: every qualifying fund as a chart of returns best first, 80 a page (Next for the rest), or as a
- * sortable table. Laid out as Famous funds is (heading, standfirst, period and Chart | Table, the module with its
- * lead line and source); the people behind famous funds keep their photo and name here too.
+ * sortable table. Laid out as Famous funds is (heading for screen readers, period and Chart | Table, the module with its
+ * name and source); the people behind famous funds keep their photo and name here too.
  */
 function TopFunds({
   period,
@@ -725,7 +724,6 @@ function TopFunds({
         <div className="fam-rule">
           <div className="fam-h3">
             <h3>{TOP_LIST}</h3>
-            <span className="fam-n">{count(rows.length, "fund")}</span>
           </div>
         </div>
         {view === "chart" ? (
@@ -762,10 +760,12 @@ function TopFunds({
 
   return (
     <section ref={section} className={"ranked top-funds" + (phone ? " phone" : "")} aria-labelledby={h2}>
-      <div className="fam-head">
-        <h2 id={h2}>Top funds</h2>
-        <p className="fam-stand">{standfirst(period, spx, view, "")}</p>
-      </div>
+      {/* As on Famous funds (owner, 2026-11-23): the tab names it, the chart labels the S&P 500 line; the
+          heading stays for screen readers, the standfirst and the fund count go. */}
+      {/* (out of the layout: no wrapper, so it adds no gap above the switches) */}
+      <h2 id={h2} className="vh">
+        Top funds
+      </h2>
       <div className="fam-ctl">
         {/* Famous funds' row without its list index: the period on the left, Chart | Table on the right */}
         <div className="fam-opts">

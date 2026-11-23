@@ -129,23 +129,6 @@ export function ticksFor(dom: Dom, phone: boolean, innerW: number): number[] {
 }
 
 // ---- copy ----
-/** The period as it reads inside a sentence. */
-export function periodPhrase(period: string): string {
-  if (period === "1y") return "over the last year";
-  const n = /^(\d+)y$/.exec(period);
-  return n ? `over the last ${n[1]} years` : "since each fund's first filing";
-}
-
-/** The Table view's sorting hint on Famous funds, whose Fund heading also orders by popularity. */
-export const FAMOUS_SORT = "; Fund steps through A–Z, Z–A and most popular";
-
-/** `sort` ends the Table view's "Select a heading to sort" (Top funds passes "", having no popularity order). */
-export function standfirst(period: string, spx: number | null, view: "chart" | "table", sort = FAMOUS_SORT): string {
-  const over = periodPhrase(period);
-  if (view === "table") return `Estimated figures ${over}. Select a heading to sort${sort}.`;
-  return `Estimated return a year ${over}, best first.` + (spx == null ? "" : ` The dotted line is the S&P 500 (${pct(spx, 1)}).`);
-}
-
 export function sourceLine(spx: { ann_return: number | null; from_q: number; to_q: number } | null | undefined): string {
   const base = "Source: SEC 13F filings; Orca estimates.";
   return spx == null || spx.ann_return == null ? base : `${base} S&P 500: SPY total return, ${qLabel(spx.from_q)} to ${qLabel(spx.to_q)}.`;

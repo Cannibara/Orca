@@ -129,8 +129,9 @@ describe("Famous funds chart", () => {
     expect(document.querySelector(".fc .spx")).toHaveTextContent("S&P 500 +13.5%");
     const spl = document.querySelector<HTMLElement>(".fc .spl")!;
     expect(parseFloat(spl.style.left)).toBeGreaterThan(0);
-    // no standfirst or summary line: the chart's own S&P 500 label says it
-    expect(screen.queryByText(/^Estimated return a year/)).toBeNull();
+    // no standfirst or summary line: the chart's own S&P 500 label says it, the axis says what the bars are
+    expect(screen.queryByText(/^Estimated return a year over/)).toBeNull();
+    expect(document.querySelector(".fc-axl")).toHaveTextContent(/^Estimated return a year$/);
     expect(screen.getByText("Source: SEC 13F filings; Orca estimates. S&P 500: SPY total return, Q3 2021 to Q3 2026.")).toBeInTheDocument();
     expect(screen.queryByText(/ leads with /)).toBeNull();
   });

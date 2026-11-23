@@ -3,12 +3,10 @@ import {
   captionText,
   domainAt,
   initials,
-  periodPhrase,
   retLabel,
   rowLabel,
   shadeFor,
   sourceLine,
-  standfirst,
   tickStep,
   ticksFor,
   vsLabel,
@@ -215,26 +213,6 @@ describe("ticksFor (6)", () => {
 });
 
 describe("copy", () => {
-  it("periodPhrase", () => {
-    expect(periodPhrase("1y")).toBe("over the last year");
-    expect(periodPhrase("3y")).toBe("over the last 3 years");
-    expect(periodPhrase("5y")).toBe("over the last 5 years");
-    expect(periodPhrase("10y")).toBe("over the last 10 years");
-    expect(periodPhrase("15y")).toBe("over the last 15 years");
-    expect(periodPhrase("max")).toBe("since each fund's first filing");
-  });
-
-  it("standfirst, chart and table", () => {
-    expect(standfirst("5y", 0.1352, "chart")).toBe(
-      "Estimated return a year over the last 5 years, best first. The dotted line is the S&P 500 (+13.5%).",
-    );
-    expect(standfirst("max", null, "chart")).toBe("Estimated return a year since each fund's first filing, best first.");
-    expect(standfirst("3y", 0.1, "table")).toBe(
-      "Estimated figures over the last 3 years. Select a heading to sort; Fund steps through A–Z, Z–A and most popular.",
-    );
-    // Top funds has no popularity order
-    expect(standfirst("3y", 0.1, "table", "")).toBe("Estimated figures over the last 3 years. Select a heading to sort.");
-  });
 
 
   it("sourceLine", () => {

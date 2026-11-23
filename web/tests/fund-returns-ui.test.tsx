@@ -302,7 +302,7 @@ describe("KpiStrip", () => {
     const sparks = Array.from(container.querySelectorAll(".kpi-s svg"));
     expect(sparks).toHaveLength(4);
     expect(sparks[0].querySelector("path.spk-line")).not.toBeNull();
-    expect(sparks[0].querySelector("circle.spk-dot")).not.toBeNull();
+    expect(sparks[0].querySelector("path.spk-dot")).not.toBeNull();
     // Holdings: growth, then the drawdown; Analysis: the year ticks, then the size bars
     expect(sparks[1].querySelector("path.spk-area-loss")).not.toBeNull();
     // 5 gains and 3 losses among the 8 full years
