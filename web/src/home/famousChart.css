@@ -140,14 +140,7 @@
 /* loading, empty and error states: no card, so no side padding */
 .fp .ranked :is(.skl,.pb){padding-inline:0}
 
-/* ---------- table view: today's table on the page, no card ---------- */
-.fp .ranked{--face:28px;--face-gap:10px}
-.fp .ranked .tbl-wrap{--tpad:0px;border:0;border-radius:0;background:var(--page)}
-.fp .ranked .tbl-wrap thead th{background:var(--page)}
-.fp .ranked .tbl-wrap tbody td{background:var(--page)}
-.fp .ranked .tbl-wrap tbody tr:hover>td{background:var(--hover)}
-.fp .ranked .tbl-wrap table{--row:52px}
-.fp .ranked .tbl-wrap+.pager{border-top:1px solid var(--line);padding:10px 0}
+/* ---------- table view: home/RankTable.tsx, styled in home/rankTable.css ---------- */
 
 /* ---------- phone ---------- */
 .fp .ranked.phone{gap:10px;padding-top:4px}
@@ -188,10 +181,6 @@
 .fp .fc.phone .lab.lead{top:calc((var(--row) - 20px) / 2);height:20px;padding:0 5px;border-radius:3px;line-height:20px}
 .fp .fc.phone .fc-foot{margin-top:8px}
 .fp .fc.phone .fc-cap{font-size:12px;color:var(--ink2)}
-/* the table scrolls sideways under a sticky 168px Fund column */
-.fp .ranked.phone{--face:26px}
-.fp .ranked.phone .tbl-wrap{--nm-w:124px}
-.fp .ranked.phone .tbl-wrap table{--row:44px}
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion:no-preference){

@@ -15,7 +15,7 @@ import type {
   TopList,
   TopRow,
 } from "../src/data/types";
-import { initials } from "../src/home/famousChart";
+import { initials, retLabel } from "../src/home/famousChart";
 import { shortNameOf } from "../src/lib/famousNames";
 import Home from "../src/pages/Home";
 import { fBook } from "../src/pages/homeFmt";
@@ -330,7 +330,7 @@ describe("Home", () => {
     const tMax = demo<TopList>("home/top_max.json");
     renderHome();
     await openTop(user);
-    expect(firstFund()).toBe(t3.eligible[0].name); // 3 years is the pressed chip
+    expect(firstFund()).toBe(shortNameOf(t3.eligible[0].fund_id, t3.eligible[0].name)); // 3 years is the pressed chip
 
     for (const [chip, file, list] of [
       ["1 year", "top_1y", t1],
@@ -344,7 +344,7 @@ describe("Home", () => {
         "aria-pressed",
         "true",
       );
-      await waitFor(() => expect(firstFund()).toBe(list.eligible[0].name));
+      await waitFor(() => expect(firstFund()).toBe(shortNameOf(list.eligible[0].fund_id, list.eligible[0].name)));
       expect(urls).toContain(`/demo-data/home/${file}.json`);
     }
     // the demo lists lead with different funds, so the checks above could not pass by accident
@@ -392,20 +392,20 @@ describe("Home", () => {
       expect(
         within(table)
           .getAllByRole("columnheader")
-          .map((h) => h.textContent),
+          .map((h) => h.querySelector(".sort")?.textContent),
       ).toEqual([
         "Fund most popular",
+        "Return / yr",
         "AUM",
         "Positions",
-        "Return / yr",
-        "Max Drawdown",
+        "Max drawdown",
         "Sharpe",
       ]);
       // a list opens with its most popular fund first: the owner's rank, Google Trends score, then size
       const best = famous.filter((f) => f.group === group).sort(byPopularity);
       const rows = within(table).getAllByRole("row").slice(1);
       expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
-        best.map((f) => f.name),
+        best.map((f) => shortNameOf(f.fund_id, f.name)),
       );
       if (best[0].manager)
         expect(
@@ -416,7 +416,7 @@ describe("Home", () => {
     for (const list of ["Tech & growth", "Tiger cubs", "Most searched"]) {
       await showList(user, list);
       expect(
-        within(panel).getAllByRole("link", { name: "Kelpwood Capital LP" }),
+        within(panel).getAllByRole("link", { name: "Kelpwood Capital" }), // the short name; the legal one is its title
       ).toHaveLength(1);
     }
     // a fund that stopped filing is listed, with its last quarter by its manager
@@ -430,7 +430,7 @@ describe("Home", () => {
     const first = within(
       within(panel).getByRole("table", { name: order[0] }),
     ).getAllByRole("link")[0];
-    const id = famous.find((f) => f.name === first.textContent)!.fund_id;
+    const id = famous.find((f) => f.name === first.getAttribute("title"))!.fund_id; // the legal name is the title
     await user.click(first);
     expect(await screen.findByText(`Fund page ${id}`)).toBeInTheDocument();
   });
@@ -439,13 +439,14 @@ describe("Home", () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const value = (t3.famous ?? []).filter((f) => f.group === "Value");
     expect(value.length).toBeGreaterThan(2);
+    // the table shows the chart's short names (owner, 2026-11-23)
     const byName = value
-      .map((f) => f.name)
+      .map((f) => shortNameOf(f.fund_id, f.name))
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     const popular = value
       .slice()
       .sort(byPopularity)
-      .map((f) => f.name);
+      .map((f) => shortNameOf(f.fund_id, f.name));
     stubData();
     const user = userEvent.setup();
     renderHome();
@@ -498,18 +499,18 @@ describe("Home", () => {
     expect(
       within(table)
         .getAllByRole("columnheader")
-        .map((h) => h.textContent),
+        .map((h) => h.querySelector(".sort")?.textContent),
     ).toEqual([
       "Fund most popular",
+      "Return / yr",
       "AUM",
       "Positions",
-      "Return / yr",
-      "Max Drawdown",
+      "Max drawdown",
       "Sharpe",
     ]);
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
-      read.map((r) => r.name),
+      read.map((r) => shortNameOf(r.fund_id, r.name)),
     );
     // the list's line is not shown; it describes the section for screen readers
     expect(
@@ -648,7 +649,7 @@ describe("Home", () => {
         .map((r) => within(r).getAllByRole("link")[0].textContent);
     const byBook = [...t3.eligible]
       .sort((a, b) => b.book - a.book)
-      .map((r) => r.name);
+      .map((r) => shortNameOf(r.fund_id, r.name));
     await user.click(within(table).getByRole("button", { name: "AUM" }));
     expect(names()).toEqual(byBook);
     expect(
@@ -659,7 +660,7 @@ describe("Home", () => {
     await user.click(within(table).getByRole("button", { name: "Fund" }));
     expect(names()).toEqual(
       [...t3.eligible]
-        .map((r) => r.name)
+        .map((r) => shortNameOf(r.fund_id, r.name))
         .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
     );
   });
@@ -684,9 +685,8 @@ describe("Home", () => {
     // the page buttons come after the table, not before it
     expect(table.compareDocumentPosition(pager()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    // fixed layout with a sized Fund column, so the columns keep their widths from page to page
-    expect(table).toHaveClass("fixed");
-    expect(table.querySelector("col")?.style.width).toContain("var(--nm-w)");
+    // the Fund column has the chart's width (rankTable.css), so the columns keep their places from page to page
+    expect(table.querySelector("th.c-fund")).not.toBeNull();
 
     await user.click(within(pager()).getByRole("button", { name: "Next" }));
     expect(pager()).toHaveTextContent("Showing 81–160 of 250 funds");
@@ -803,6 +803,56 @@ describe("Home", () => {
     expect(within(table).getAllByText(famous.manager!).length).toBeGreaterThan(0);
   });
 
+  it("the ranked table sits on the chart's grid: short names and photos, the return to one decimal, the S&P 500 over its heading; a row opens its fund", async () => {
+    const t3 = demo<TopList>("home/top_3y.json");
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    const table = await openTop(user);
+    const best = [...t3.eligible].sort((a, b) => b.ann_return - a.ann_return);
+    const rows = within(table).getAllByRole("row").slice(1);
+    const first = rows[0];
+    expect(within(first).getAllByRole("link")[0]).toHaveTextContent(shortNameOf(best[0].fund_id, best[0].name));
+    expect(within(first).getAllByRole("link")[0]).toHaveAttribute("title", best[0].name);
+    expect(first.querySelector("td.c-ret")).toHaveTextContent(retLabel(best[0].ann_return));
+    expect(first.querySelector(".rk-bar")).toBeNull(); // the bars are the chart's
+    if (t3.spx?.ann_return != null)
+      expect(within(table).getByRole("columnheader", { name: /Return \/ yr/ }).querySelector(".rk-spx")).toHaveTextContent(
+        /^S&P 500 \+\d+\.\d%$/,
+      );
+    // every fund has its photo or its initials
+    rows.forEach((r) => expect(r.querySelector(".fc-face")).not.toBeNull());
+    // a click anywhere on the row opens the fund
+    await user.click(first.querySelector("td.c-aum")!);
+    expect(await screen.findByText(`Fund page ${best[0].fund_id}`)).toBeInTheDocument();
+  });
+
+  it("on a phone the ranked table sorts from a Sort by menu", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 400 });
+    try {
+      const t3 = demo<TopList>("home/top_3y.json");
+      stubData();
+      const user = userEvent.setup();
+      renderHome();
+      await user.click(screen.getByRole("tab", { name: "Top funds" }));
+      await screen.findByRole("heading", { level: 3, name: "Funds over $1B" });
+      await user.click(within(screen.getByRole("group", { name: "View" })).getAllByRole("button")[1]);
+      const table = await screen.findByRole("table", { name: "Top funds" });
+      expect(document.querySelector(".rk")).toHaveClass("phone");
+      const menu = screen.getByRole("combobox", { name: "Sort by" });
+      expect(menu).toHaveValue("ret:-1");
+      expect(within(menu).queryByRole("option", { name: "Most popular" })).toBeNull(); // Famous funds only
+      await user.selectOptions(menu, "book:-1");
+      const names = within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getAllByRole("link")[0].textContent);
+      expect(names).toEqual([...t3.eligible].sort((a, b) => b.book - a.book).map((r) => shortNameOf(r.fund_id, r.name)));
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("top funds' table has the list's columns, and index giants are not listed", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const giant: TopRow = {
@@ -822,13 +872,13 @@ describe("Home", () => {
     expect(
       within(main)
         .getAllByRole("columnheader")
-        .map((h) => h.textContent),
+        .map((h) => h.querySelector(".sort")?.textContent),
     ).toEqual([
       "Fund",
+      "Return / yr",
       "AUM",
       "Positions",
-      "Return / yr",
-      "Max Drawdown",
+      "Max drawdown",
       "Sharpe",
     ]);
     await user.click(screen.getByRole("button", { name: "Chart" }));
@@ -899,7 +949,7 @@ describe("Home", () => {
       expect(
         within(table)
           .getAllByRole("columnheader")
-          .map((h) => h.textContent),
+          .map((h) => h.querySelector(".sort")?.textContent),
       ).toEqual(headers);
       // no SPY benchmark column or rule anywhere on Home
       expect(

@@ -9,7 +9,6 @@ import {
 import { Link } from "react-router";
 import { Choice, type ChoiceOption } from "../components/Choice";
 import { DataTable, type SortState } from "../components/DataTable";
-import { Face } from "../components/Face";
 import { Pager } from "../components/Pager";
 import { Panel } from "../components/Panel";
 import { Signed } from "../components/Signed";
@@ -40,7 +39,6 @@ import {
   pct,
   printsZero,
   qLabel,
-  ratio,
   tidyName,
 } from "../lib/format";
 import { qShort } from "../fund/fmt";
@@ -48,6 +46,7 @@ import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
 import { sourceLine } from "../home/famousChart";
 import { ListIndex } from "../home/ListIndex";
+import { BEST_RETURN, MOST_POPULAR, RankTable } from "../home/RankTable";
 import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
 import { photoOf } from "../lib/people";
 import { useSortedRows, type Col } from "../lib/sort";
@@ -129,8 +128,6 @@ function change(price: number | undefined, base: number): number | null {
  */
 const FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px)";
 const STOCK_W = "calc(var(--stk-w) + var(--tpad) + 8px)";
-/** Famous funds' name column: the same, plus the round photo before the name (home/famousChart.css: --face, --face-gap). */
-const FAMOUS_FUND_W = "calc(var(--nm-w) + var(--tpad) + 8px + var(--face) + var(--face-gap))";
 
 /** A fund's name, bold, cut with an ellipsis (the full name on hover). */
 function FundLink({ id, name }: { id: number; name: string }) {
@@ -214,41 +211,6 @@ const EMPTY: Partial<Record<Period, string>> = {
   "15y": "No fund has 15 years of 13F history that meets the list's rules.",
 };
 
-const TOP_COLUMNS: Col<TopRow>[] = [
-  {
-    header: "Fund",
-    key: "name",
-    align: "l",
-    width: FUND_W,
-    by: (r) => r.name.toLowerCase(),
-    cell: (r) => <FundLink id={r.fund_id} name={r.name} />,
-  },
-  { header: "AUM", key: "book", by: (r) => r.book, cell: (r) => fBook(r.book) },
-  {
-    header: "Positions",
-    key: "positions",
-    by: (r) => r.n_positions,
-    cell: (r) => count(r.n_positions),
-  },
-  {
-    header: "Return / yr",
-    key: "ret",
-    by: (r) => r.ann_return,
-    cell: (r) => <Signed v={r.ann_return}>{pct(r.ann_return, 0)}</Signed>,
-  },
-  {
-    header: "Max Drawdown",
-    key: "dd",
-    by: (r) => r.max_dd,
-    cell: (r) => pct(r.max_dd, 0, false),
-  },
-  {
-    header: "Sharpe",
-    key: "sharpe",
-    by: (r) => r.sharpe,
-    cell: (r) => ratio(r.sharpe),
-  },
-];
 
 /** Rows shown on one page of a long list. */
 const PAGE_SIZE = 100;
@@ -330,9 +292,6 @@ function ListTable<R>({
   );
 }
 
-const BEST_RETURN: SortState = { key: "ret", dir: -1 };
-/** Famous lists open with the most popular fund first. */
-const MOST_POPULAR: SortState = { key: "pop", dir: -1 };
 
 /**
  * Every famous fund's place in the popularity order, 1 = most popular: the owner's order first
@@ -357,42 +316,6 @@ function popularity(rows: TopRow[]): Map<number, number> {
 
 /** A table's Fund cell on Famous and Top funds: the person's photo, the fund's name, and under it the person
  * behind the fund (people know "Burry", not "Scion") and the last quarter of a fund that stopped filing. */
-function PersonFund({ r }: { r: TopRow }) {
-  return (
-    <div className="fund-row">
-      <Face manager={r.manager} />
-      <div className="stk fund">
-        <FundLink id={r.fund_id} name={r.name} />
-        {(r.manager || r.until_q != null) && (
-          <span className="sub">
-            {[r.manager, r.until_q != null && `filed until ${qLabel(r.until_q)}`]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Top funds' columns with the photo and the person in the Fund cell; `extra` adds to that column. */
-function personColumns(extra: Partial<Col<TopRow>> = {}): Col<TopRow>[] {
-  return TOP_COLUMNS.map((c) =>
-    c.key !== "name"
-      ? c
-      : { ...c, width: FAMOUS_FUND_W, cell: (r) => <PersonFund r={r} />, ...extra },
-  );
-}
-
-/** Famous funds' columns: the Fund heading steps through A to Z, Z to A and most popular first (`rank` from `popularity`). */
-function famousColumns(rank: Map<number, number>): Col<TopRow>[] {
-  return personColumns({
-    orders: { pop: (r) => -(rank.get(r.fund_id) ?? Infinity) },
-    cycle: [{ key: "name", dir: 1 }, { key: "name", dir: -1 }, MOST_POPULAR],
-    alt: { pop: "most popular" },
-  });
-}
-
 /** Funds in Most searched: the head of the ranking, as a list of what people look up should be. */
 const MOST_SEARCHED_MAX = 50;
 const MOST_SEARCHED_ABOUT = "The famous funds investors look up most.";
@@ -505,7 +428,6 @@ function FamousFunds({
       ...byGroup(rows ?? []),
     ];
   }, [rows, rank]);
-  const columns = useMemo(() => famousColumns(rank), [rank]);
   const shown =
     lists.find((l) => l.name === list) ??
     lists.find((l) => l.name === MOST_SEARCHED) ??
@@ -583,17 +505,15 @@ function FamousFunds({
             run={run.n}
           />
         ) : (
-          <ListTable
+          <RankTable
             key={shown.name} // each list opens most popular first, on its first page
             label={shown.name}
-            noun="funds"
-            columns={columns}
             rows={shown.rows}
             initial={MOST_POPULAR}
-            rowKey={(r) => r.fund_id}
-            paged
             pageSize={phone ? FAMOUS_PAGE_PHONE : FAMOUS_PAGE}
-            pagerAbove={false}
+            spx={spx}
+            phone={phone}
+            rank={rank}
           />
         )}
         <SourceNote spx={data?.spx} />
@@ -705,7 +625,6 @@ function TopFunds({
     setRun({ n: run.n + 1, rows, page, view });
 
   const spx = data?.spx?.ann_return ?? null;
-  const columns = useMemo(() => personColumns(), []);
   const section = useRef<HTMLElement>(null);
   const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
   const h2 = useId();
@@ -742,17 +661,7 @@ function TopFunds({
             }
           />
         ) : (
-          <ListTable
-            label="Top funds"
-            noun="funds"
-            columns={columns}
-            rows={rows}
-            initial={BEST_RETURN}
-            rowKey={(r) => r.fund_id}
-            paged
-            pageSize={TOP_PAGE}
-            pagerAbove={false}
-          />
+          <RankTable label="Top funds" rows={rows} initial={BEST_RETURN} pageSize={TOP_PAGE} spx={spx} phone={phone} />
         )}
         <SourceNote rule={TOP_RULE} spx={data?.spx} />
       </div>
