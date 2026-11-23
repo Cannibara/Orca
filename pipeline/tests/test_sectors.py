@@ -108,3 +108,32 @@ def test_market_caps_use_the_count_filed_by_then_and_fall_back_to_todays_count()
     assert (3, 11) not in got  # company 9's other share class: counted once, on its lowest stock id
     assert fallback == {2}
     assert q_end(10) == date(2015, 9, 30)
+
+
+def test_an_outsized_cap_sits_out_and_is_reported_but_a_small_universe_is_left_alone():
+    # 120 stocks of $10bn each and one read as $21tn (LATAM in run 39: ordinary shares, not ADRs)
+    rows = []
+    for sid in range(1, 121):
+        rows += [(sid, 10, 10.0, 0, 10.0, 1e10, False), (sid, 11, 11.0, 0, 10.5, 1.1e10, False)]
+    rows += [(999, 10, 30.0, 0, 30.0, 2.1e13, False), (999, 11, 6.0, 0, 20.0, 4.2e12, False)]
+    labels = {sid: A for sid in range(1, 121)} | {999: C}
+    gone: list = []
+    out = sectors.index_returns(quarters(rows), labels, last_q=11, set_aside=gone)
+    assert series(out, sectors.MARKET)[11]["ret"] == pytest.approx(0.10)  # the giant's −80% does not move the market
+    assert 11 not in series(out, "Energy")  # its sector has no other stock that quarter
+    assert pl.concat(gone)["stock_id"].to_list() == [999]
+    report = sectors.cap_report(quarters(rows), labels, last_q=11)
+    assert report["market"]["stock_id"][0] == 999 and report["jumps"].is_empty()  # the close fell with the cap
+    # the same giant among two stocks is not set aside: the share means nothing in a universe that small
+    few = [r for r in rows if r[0] in (1, 999)]
+    out = sectors.index_returns(quarters(few), {1: A, 999: C}, last_q=11, set_aside=(none := []))
+    assert none == [] and series(out, sectors.MARKET)[11]["ret"] == pytest.approx((1e10 * 0.10 + 2.1e13 * -0.8) / (1e10 + 2.1e13))
+
+
+def test_the_cap_report_names_a_share_count_slip():
+    rows = [(sid, q, 10.0, 0, 10.0, 1e9, False) for sid in range(1, 12) for q in (10, 11)]
+    rows += [(50, 10, 10.0, 0, 10.0, 1e9, False), (50, 11, 10.5, 0, 10.0, 1e12, False)]  # count x1000, price flat
+    labels = {sid: A for sid in range(1, 12)} | {50: A}
+    r = sectors.cap_report(quarters(rows), labels, last_q=11)
+    assert r["jumps"]["stock_id"].to_list() == [50]
+    assert r["sector"]["stock_id"].to_list() == [50]  # half or more of a sector of 12

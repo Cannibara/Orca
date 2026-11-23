@@ -5,6 +5,15 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — The culprit: LATAM Airlines' ADR ratio; a guard and a cap report for the indices
+
+| What changed | Why | Files |
+|---|---|---|
+| `labels.json` put the giant in Industrials > Transportation & Logistics > Airlines (98.98% of 19 stocks). LATAM (LTM, stock 1334) is an ADR of 2,000 common shares with ~604bn shares out, and `share_overrides.csv` had no row for it: its cap read as ~$21tn. Added `LTM,2000` | Run 39's absurd market index (WORKLOG below) | `pipeline/orca/hierarchy/data/share_overrides.csv` |
+| Guard: in a quarter with 100+ stocks, a stock whose start-of-quarter cap is over 15% of all labelled caps (the biggest real ones are ~7%) sits out of every index that quarter, repeated until none is; the sectors step logs each with ticker, name and quarters ("caps set aside") and flags it | So the next missing ADR ratio or unit slip cannot swing the market again | `pipeline/orca/engine/sectors.py` (`_set_aside_outsized`, `index_returns(..., set_aside)`), `run/sectors_step.py` |
+| Cap report in every indices run's log ("caps market/sector/jumps"): the 15 biggest shares of the market in any quarter, stocks that are half or more of a sector of 10+, and caps that jumped 5x in a quarter with the close under 2x. Tickers and caps only | Names the next bad count instead of hiding it | `engine/sectors.cap_report`, `run/sectors_step._log_caps` |
+| Checks: pipeline 1,091 tests green (two new); demo unchanged (24 stocks, the guard does not apply). Next: merge, run `sectors_only`, read the "caps" lines, check Berkshire's market replay, then lift the Specialization hold | | |
+
 ## 2026-11-23 — Run 39 published the sector files; the market index is wrong, so the tab is held
 
 | What changed | Why | Files |

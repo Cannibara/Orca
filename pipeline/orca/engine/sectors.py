@@ -32,7 +32,13 @@ OUT_SCHEMA = pl.Schema(
     {"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "ret": pl.Float64, "level_end": pl.Float64, "level_avg": pl.Float64,
      "n": pl.Int32, "cap": pl.Float64, "top_weight": pl.Float64}
 )  # fmt: skip
-__all__ = ["MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "index_returns", "market_caps", "stock_quarters"]
+__all__ = ["MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_returns", "market_caps", "stock_quarters"]
+# No real stock has come near 15% of the US market (the biggest are ~7%), so a cap above it is a data error: an ADR
+# counted in ordinary shares (LATAM: 604bn shares, 2,000 to an ADR, read as $21tn in run 39) or a unit slip. Such a
+# stock sits out of every index that quarter, and the sectors step logs it. Only where the market has enough stocks
+# for the share to mean that (a tiny universe, as in the demo, is left alone).
+MAX_MARKET_WEIGHT = 0.15
+MIN_MARKET_STOCKS = 100
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
@@ -83,11 +89,33 @@ def market_caps(sq: pl.DataFrame, hist: pl.DataFrame, securities: pl.DataFrame, 
     return out.select("stock_id", pl.col("q").cast(pl.Int32), "cap"), set(out.filter("fallback")["stock_id"].to_list())
 
 
-def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int) -> pl.DataFrame:
+def _set_aside_outsized(r: pl.DataFrame, report: list | None) -> pl.DataFrame:
+    """`r` without the stock-quarters whose start-of-quarter cap is over MAX_MARKET_WEIGHT of the quarter's total,
+    in quarters with MIN_MARKET_STOCKS or more; repeated, as setting one aside raises the others' shares. The rows
+    set aside (stock_id, q, cap, weight) go to `report`."""
+    gone = []
+    for _ in range(5):
+        w = r.with_columns(
+            _w=pl.col("cap_p") / pl.col("cap_p").sum().over("q"),
+            _n=pl.len().over("q"),
+        )
+        big = (pl.col("_w") > MAX_MARKET_WEIGHT) & (pl.col("_n") >= MIN_MARKET_STOCKS)
+        out = w.filter(big)
+        if out.is_empty():
+            break
+        gone.append(out.select("stock_id", "q", pl.col("cap_p").alias("cap"), pl.col("_w").alias("weight")))
+        r = w.filter(~big).drop("_w", "_n")
+    if report is not None and gone:
+        report.append(pl.concat(gone))
+    return r.drop("_w", "_n", strict=False)
+
+
+def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int, set_aside: list | None = None) -> pl.DataFrame:
     """One row per hierarchy label (every tier, and MARKET) and quarter with a return, up to `last_q`.
 
     `sq` has QUARTER_SCHEMA columns (cap = market cap at that quarter's end); `labels` maps stock_id to its
-    vertical path. Stocks without a label are left out."""
+    vertical path. Stocks without a label are left out, and so are outsized caps (`_set_aside_outsized`; the rows
+    go to `set_aside` when a list is given)."""
     lab = pl.DataFrame({"stock_id": list(labels), "path": list(labels.values())}, schema={"stock_id": pl.Int32, "path": pl.String})
     s = sq.filter(pl.col("q") <= last_q).join(lab, on="stock_id").sort("stock_id", "q")
     prev = s.select("stock_id", (pl.col("q") + 1).alias("q"), pl.col("close").alias("close_p"), pl.col("cap").alias("cap_p"), pl.col("stale").alias("stale_p"))
@@ -105,6 +133,7 @@ def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int) -> pl.D
             market=pl.lit(MARKET),
         )
     )  # fmt: skip
+    r = _set_aside_outsized(r, set_aside)
     parts = []
     for tier, key in enumerate(("market", "sector", "industry", "vertical")):
         g = r.group_by(key, "q").agg(
@@ -121,3 +150,36 @@ def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int) -> pl.D
         level_avg=pl.col("level_end").shift(1, fill_value=1.0).over("label") * pl.col("avg")
     )
     return out.select(*OUT_SCHEMA.names()).cast(OUT_SCHEMA)
+
+
+def cap_report(sq: pl.DataFrame, labels: dict[int, str], last_q: int, top: int = 15) -> dict[str, pl.DataFrame]:
+    """What to look at when an index looks wrong (the sectors step logs it): `market`, the stocks with the biggest
+    share of all labelled caps in any quarter; `sector`, stocks that are half or more of a sector of 10 or more stocks;
+    `jumps`, caps that moved 5x or more in a quarter while the close moved under 2x (a share-count slip). Each has
+    stock_id, q, cap and the figure that put it there."""
+    lab = pl.DataFrame({"stock_id": list(labels), "path": list(labels.values())}, schema={"stock_id": pl.Int32, "path": pl.String})
+    s = (
+        sq.filter((pl.col("q") <= last_q) & pl.col("cap").is_not_null() & (pl.col("cap") > 0)).join(lab, on="stock_id")
+        .with_columns(sector=pl.col("path").str.split(SEP).list.first())
+    )  # fmt: skip
+    s = s.with_columns(
+        mkt_w=pl.col("cap") / pl.col("cap").sum().over("q"),
+        sec_w=pl.col("cap") / pl.col("cap").sum().over("q", "sector"),
+        sec_n=pl.len().over("q", "sector"),
+    )
+    best = lambda col: s.sort(col, descending=True).group_by("stock_id", maintain_order=True).first()  # noqa: E731
+    market = best("mkt_w").head(top).select("stock_id", "q", "cap", "sector", pl.col("mkt_w").round(4).alias("weight"))
+    sector = (
+        best("sec_w").filter((pl.col("sec_w") >= 0.5) & (pl.col("sec_n") >= 10))
+        .select("stock_id", "q", "cap", "sector", pl.col("sec_w").round(4).alias("weight")).head(top)
+    )  # fmt: skip
+    s = s.sort("stock_id", "q").with_columns(
+        cap_x=pl.col("cap") / pl.col("cap").shift(1).over("stock_id"),
+        px_x=pl.col("close") / pl.col("close").shift(1).over("stock_id"),
+    )
+    jump = ((pl.col("cap_x") >= 5) | (pl.col("cap_x") <= 0.2)) & (pl.col("px_x") < 2) & (pl.col("px_x") > 0.5)
+    jumps = (
+        s.filter(jump).sort("cap", descending=True).group_by("stock_id", maintain_order=True).first()
+        .select("stock_id", "q", "cap", "sector", pl.col("cap_x").round(2).alias("weight")).head(top)
+    )  # fmt: skip
+    return {"market": market, "sector": sector, "jumps": jumps}
