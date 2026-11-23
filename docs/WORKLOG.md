@@ -5,12 +5,35 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Home: tighter top, no group names, "Search" button
+
+| What changed | Why | Files |
+|---|---|---|
+| The top bar's button reads "Search" (was "Open fund"; it still opens the best match, as Enter does) | Owner struck "Open fund" and wrote "Search"; chose a button named Search (chat) | `web/src/components/FundSearch.tsx`, `web/tests/home.test.tsx` |
+| Famous funds' group names (Popular, Investing style, Type of investor) and the lines under them are gone; the names stay for screen readers. Their grid rows collapse, so the lists sit straight under the tabs; on mid-width pages a later group keeps a 12px gap | Struck out; owner chose to drop the lines too (chat) | `web/src/home/famousChart.css` |
+| Gaps tightened: top bar → page 32 → 20px on every page (`main`), home title → tabs 24 → 12px, a list's name → its chart 38 → 22px (the axis header 46 → 42px) | Owner's ↕ marks, "tighten them all" (chat) | `web/src/styles.css`, `web/src/pages/home.css`, `web/src/home/famousChart.css` |
+| Checks: web 1,201 vitest and 102 Playwright green; typecheck clean | | |
+
+## 2026-11-23 — Tree map: wheel and swipe change the period
+
+| What changed | Why | Files |
+|---|---|---|
+| The mouse wheel over the tree map steps periods, as over the picker's header and tools (down = back in time; only from rest, so a page scroll passing over the map keeps scrolling). On touch screens a sideways swipe on the tree map, the period tools or the header steps one period (left = later, right = earlier); `touch-action: pan-y pinch-zoom` keeps up-and-down scrolling and pinch zoom with the page; the lift after a swipe does not also press a pill | Owner: "when i scroll with my mouse on the treemap itself, it should scroll between quarters … on mobile, i should be able to swipe" (chat). The earlier "animations don't work" was Windows' Animation effects being off (owner turned it on); the label-glide fix stays | `web/src/fund/PeriodPicker.tsx` (`alsoOn`), `web/src/fund/HoldingsPanel.tsx`, `web/src/fund/holdings.css`, `web/tests/fund-holdings-ui.test.tsx` |
+| Checks: web 1,201 vitest green, typecheck clean; in Chromium the wheel over the map steps without scrolling the page, and on an emulated iPhone 13 swipes step one period each while a vertical swipe scrolls | | |
+
+## 2026-11-23 — Tree map: big tiles' text glides with the box
+
+| What changed | Why | Files |
+|---|---|---|
+| The larger labels on big tiles (PR #62) changed size at once when a period step resized the tile, while the box still glided, so big tiles looked like they jumped. The label scale now tweens with the box (same 600 ms curve) | Owner: "treemap animations don't work consistently … worked before the last push" (chat). Checked live in headless Chrome (1440 px, 1.25× and 1.5× scale, real scrollbars, direct load, search, Back, browser back/forward, quarter and year steps): the boxes moved every time; the snapping text was the one change to the motion. Not reproduced otherwise: owner asked what exactly they see | `web/src/fund/treemapView.ts`, `web/tests/fund-treemap-view.test.ts` |
+
 ## 2026-11-23 — Run 38 (`sectors_only`): the CUSIP guard stopped the sector files; dollars now keep their decimals
 
 | What changed | Why | Files |
 |---|---|---|
 | Run 38 (`main` 4b9a157, started by Claude at the owner's request): indices and scores in the main step (27 min, saved). "Sector files" computed every chunk (29 min, peak 7.1 GB of 16 GB) and then the CUSIP guard refused 80 staged `skill.json` files, so nothing was uploaded: the site and its manifest are unchanged | Dollar amounts were rounded to whole dollars, and a bare 9-digit number can equal an all-digit CUSIP (Microsoft's is 594918104); the other files keep decimals, which the guard skips | — |
 | Dollars in the sector files are rounded to the cent and always written as decimals; a regression test runs the guard on such a value. Contract notes it. Demo data rebuilt | So the next run publishes | `pipeline/orca/run/sectors_step.py` (`_dollars`), `pipeline/tests/test_skill_detail.py`, `pipeline/contract.md`, `web/public/demo-data/` |
+
 
 ## 2026-11-23 — UI trims from the owner's marked-up screenshots
 

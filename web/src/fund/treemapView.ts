@@ -41,8 +41,10 @@ type Node = {
   t0: number;
   leaving: boolean;
   d: TileDatum;
-  /** The labels' scale (labelScale of the tile's final box). */
+  /** The labels' scale: k0 at t0, gliding to k (labelScale of the tile's final box) with the box; kShown as drawn. */
+  k0: number;
   k: number;
+  kShown: number;
 };
 
 /** The same motion as the Analysis charts' bars (--d-grow 600 ms on --ease-out, cubic-bezier(.2,.7,.2,1)): the
@@ -155,7 +157,18 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     n.clipRect.setAttribute("width", w);
     n.clipRect.setAttribute("height", h);
     // the value on the ticker's row hugs the tile's right edge as the edge moves
-    n.labels.v.el.setAttribute("x", String(Math.max(PADX * n.k, geo.w - PADX * n.k)));
+    // the labels' size glides with the box (a big tile's text grows or shrinks with it, never jumps)
+    const k = lerp(n.k0, n.k, progress(n, t));
+    if (k !== n.kShown) {
+      n.kShown = k;
+      for (const key of KEYS) {
+        const el = n.labels[key].el;
+        el.style.fontSize = k === 1 ? "" : FONT_PX[key] * k + "px";
+        if (key !== "v") el.setAttribute("x", String(PADX * k));
+        el.setAttribute("y", String((key === "v" ? BASE.tk : BASE[key]) * k));
+      }
+    }
+    n.labels.v.el.setAttribute("x", String(Math.max(PADX * k, geo.w - PADX * k)));
     const moves = n.from.x !== n.to.x || n.from.y !== n.to.y || n.from.w !== n.to.w || n.from.h !== n.to.h;
     let busy = moves && t < n.t0 + DUR;
     for (const k of KEYS) {
@@ -227,7 +240,9 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       t0: 0,
       leaving: false,
       d,
+      k0: 1,
       k: 1,
+      kShown: 1,
     };
     const show = (e: PointerEvent) => opts.tip.show(n.d.tip(), e.clientX, e.clientY);
     g.addEventListener("pointerenter", show);
@@ -248,15 +263,9 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     // a big tile draws its labels larger: they are fitted at base size into the box shrunk by k, then scaled up
     const k = labelScale(nb.w, nb.h);
     const fin = labelSet(n.d.label, nb.w / k, nb.h / k, opts.measure);
-    if (k !== n.k) {
-      n.k = k;
-      for (const key of KEYS) {
-        const el = n.labels[key].el;
-        el.style.fontSize = k === 1 ? "" : FONT_PX[key] * k + "px";
-        if (key !== "v") el.setAttribute("x", String(PADX * k));
-        el.setAttribute("y", String((key === "v" ? BASE.tk : BASE[key]) * k));
-      }
-    }
+    // from the size drawn now (a tile with no text yet starts at its final size: it fades in), to k; apply() draws it
+    n.k0 = anim && Object.values(n.labels).some((l) => l.text !== "") ? n.kShown : k;
+    n.k = k;
     for (const k of KEYS) {
       const l = n.labels[k];
       settleTexts(l, t);

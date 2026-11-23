@@ -271,7 +271,7 @@ describe("Home", () => {
 
     // moving focus within the box (the button, then a result) keeps it open; tabbing out closes it
     await user.tab();
-    expect(screen.getByRole("button", { name: "Open fund" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Search" })).toHaveFocus();
     expect(results()).not.toBeNull();
     await user.tab();
     const link = within(results()!).getByRole("link", {
@@ -294,7 +294,7 @@ describe("Home", () => {
     const box = screen.getByRole("searchbox", { name: /search a fund/i });
     await user.type(box, "Tern");
     await screen.findByRole("list", { name: "Matching funds" });
-    await user.tab(); // Open fund
+    await user.tab(); // Search
     await user.tab(); // the first result
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("list", { name: "Matching funds" })).toBeNull();
