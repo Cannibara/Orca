@@ -14,6 +14,15 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Cap report in every indices run's log ("caps market/sector/jumps"): the 15 biggest shares of the market in any quarter, stocks that are half or more of a sector of 10+, and caps that jumped 5x in a quarter with the close under 2x. Tickers and caps only | Names the next bad count instead of hiding it | `engine/sectors.cap_report`, `run/sectors_step._log_caps` |
 | Checks: pipeline 1,091 tests green (two new); demo unchanged (24 stocks, the guard does not apply). Next: merge, run `sectors_only`, read the "caps" lines, check Berkshire's market replay, then lift the Specialization hold | | |
 
+## 2026-11-23 — Famous funds and Top funds: the table on the chart's grid
+
+| What changed | Why | Files |
+|---|---|---|
+| The ranked lists' Table view is its own component, `RankTable`, laid out on the chart's grid so Chart ↔ Table moves nothing: the same 42px header strip with one hairline (labels on its foot, "Fund" over the names), 46px rows (48px on a phone), photo 32px / 14px gap / 252px name column, the chart's hover band 8px past each side, no row or column lines. Measured in Chromium: header strip, first rows, names and photos at identical pixels in both views at 1440px and on an iPhone 13. Columns: Fund (photo or initials, short name with the legal name as its title, person · filed until), Return / yr (where the chart's plot starts; one decimal; the S&P 500 figure over its heading, as on the chart's axis), AUM ("$3.6B"), Positions, Max drawdown (one decimal), Sharpe. A click anywhere on a row opens the fund. Sorting (incl. Famous funds' most-popular cycle) and paging unchanged; the foot is the chart's (caption left, page buttons right, no rule) | Owner: the table should match the chart's axis, border lines, alignment and spacing and "look seamless when users switch"; no return bars in the table (the chart has them) (chat) | `web/src/home/RankTable.tsx`, `web/src/home/rankTable.css`, `web/src/pages/Home.tsx`, `web/src/lib/sort.ts` (`setSort`), `web/src/home/FamousChart.tsx` (exports `Photo`) |
+| Phone (< 560px): each fund is the chart's phone row (photo, name, and under it "$3.6B • 56 pos • Max DD −12.4% • Sharpe 2.31" where the chart has AUM • person), the return on the right; a Sort by menu sits in the header strip in place of the headings (kept for screen readers) | Owner chose two-line rows earlier (chat) | same |
+| Removed the old Famous/Top table pieces (`TOP_COLUMNS`, `PersonFund`, `personColumns`, `famousColumns`, `components/Face.tsx`, `.home .face`/`.fund-row` CSS) | Unused after the change | `web/src/pages/Home.tsx`, `web/src/pages/home.css`, `web/src/home/famousChart.css` |
+| Checks: web 1,203 vitest (new: the grid's cells and row click; phone Sort by) and 102 Playwright green; typecheck clean | | `web/tests/home.test.tsx`, `web/tests/home-famous-chart.test.tsx` |
+
 ## 2026-11-23 — Run 39 published the sector files; the market index is wrong, so the tab is held
 
 | What changed | Why | Files |
@@ -22,6 +31,7 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | The numbers are wrong. Orca's whole-market index swings absurdly (Berkshire's market replay: 2008 −84%, 2011 −84%, 2013 +157%, 2022 −83%; IRR −17% a year) while SPY is sane. `labels.json` at Q3 2026: one stock is 96.6% of Industrials > Transportation & Logistics (91 stocks) and 76.7% of Industrials (544 stocks); Business Services > Other Commercial Services has one at 84%. A bad market cap (likely an ADR counted in ordinary shares, or a share-count unit error) dominates the cap-weighted indices | Found when checking Berkshire after the run; the sector indices were never sanity-checked quarter by quarter (plan phase 4) | — |
 | Proposed hold: the production build sets `VITE_SPECIALIZATION=hold`, and the Specialization tab says "Being checked" and loads nothing, until the indices are fixed. Dev, tests and the demo are unchanged | Wrong numbers should not stay on the site | `web/src/fund/SkillPanels.tsx`, `web/src/pages/Fund.tsx`, `.github/workflows/web.yml`, `web/tests/fund-skill-ui.test.tsx` |
 | Next: find the stock (a diagnostic in the sectors step: per quarter, the biggest weights in Market and each sector, and caps that jump ×5 or more), fix its cap (ADR ratio in `share_overrides.csv`, or a guard that sets such caps aside), re-run, check Berkshire and a few funds, then lift the hold | | |
+
 
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 

@@ -53,5 +53,5 @@ export function useSortedRows<R>(
         : { key, dir: col?.align === "l" ? 1 : -1 };
     });
   };
-  return { sorted, sort, onSort };
+  return { sorted, sort, onSort, setSort };
 }

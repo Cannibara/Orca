@@ -364,12 +364,12 @@ describe("Famous funds chart", () => {
     await user.click(within(view()).getByRole("button", { name: "Table" }));
     const table = screen.getByRole("table", { name: "Most searched" });
     expect(screen.queryByRole("region", { name: WINDOW })).toBeNull();
-    // the table keeps the popularity order and the funds' full names
+    // the table keeps the popularity order, with the chart's short names (owner, 2026-11-23)
     const names = within(table)
       .getAllByRole("row")
       .slice(1)
       .map((r) => within(r).getByRole("link").textContent);
-    expect(names).toEqual(mostSearched(famous).slice(0, 10).map((r) => r.name));
+    expect(names).toEqual(mostSearched(famous).slice(0, 10).map((r) => shortNameOf(r.fund_id, r.name)));
     expect(screen.getByText("Showing 1–10 of 50 funds")).toBeInTheDocument();
     // the source stays in both views
     expect(screen.getByText(/^Source: SEC 13F filings/)).toBeInTheDocument();
