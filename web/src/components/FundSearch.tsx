@@ -8,7 +8,7 @@ import { fBook } from "../pages/homeFmt";
 import "./search.css";
 
 // The fund search: in the top bar on every page (owner, 2026-11-23; it was in the home page's tab row).
-// Type a name, pick a match or press Enter (or Open fund) for the best one. "/" focuses it from anywhere.
+// Type a name, pick a match or press Enter (or Search) for the best one. "/" focuses it from anywhere.
 
 const MAX_MATCHES = 8;
 type Match = { id: number; name: string; book: number; n: number };
@@ -135,7 +135,7 @@ export function FundSearch() {
           type="submit"
           disabled={matches.length === 0}
         >
-          Open fund
+          Search
         </button>
       </form>
       {funds.status === "error" && (

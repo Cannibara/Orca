@@ -5,6 +5,15 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-23 — Home: tighter top, no group names, "Search" button
+
+| What changed | Why | Files |
+|---|---|---|
+| The top bar's button reads "Search" (was "Open fund"; it still opens the best match, as Enter does) | Owner struck "Open fund" and wrote "Search"; chose a button named Search (chat) | `web/src/components/FundSearch.tsx`, `web/tests/home.test.tsx` |
+| Famous funds' group names (Popular, Investing style, Type of investor) and the lines under them are gone; the names stay for screen readers. Their grid rows collapse, so the lists sit straight under the tabs; on mid-width pages a later group keeps a 12px gap | Struck out; owner chose to drop the lines too (chat) | `web/src/home/famousChart.css` |
+| Gaps tightened: top bar → page 32 → 20px on every page (`main`), home title → tabs 24 → 12px, a list's name → its chart 38 → 22px (the axis header 46 → 42px) | Owner's ↕ marks, "tighten them all" (chat) | `web/src/styles.css`, `web/src/pages/home.css`, `web/src/home/famousChart.css` |
+| Checks: web 1,201 vitest and 102 Playwright green; typecheck clean | | |
+
 ## 2026-11-23 — Tree map: wheel and swipe change the period
 
 | What changed | Why | Files |

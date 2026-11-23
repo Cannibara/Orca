@@ -75,7 +75,8 @@ p{margin:0}
 .top .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ---------- page frame ---------- */
-main{padding-block:32px 40px}
+/* 20px under the top bar (owner, 2026-11-23: was 32px; the page starts higher) */
+main{padding-block:20px 40px}
 /* site-foot: one quiet line on every page, outside <main> so no page layout moves */
 .site-foot{border-top:1px solid var(--line);padding-block:16px 32px}
 .foot-row{display:flex;align-items:center;gap:8px}
