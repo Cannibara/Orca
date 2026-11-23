@@ -13,8 +13,12 @@
    Groups under a small heading and a hairline, on equal tracks. A list is a line of text; the pressed one is
    the segmented control's pressed chip, bled 10px into the gap so every name keeps its column's left edge. */
 .fp .ranked .ix{--cell:34px;--bleed:10px;display:grid;column-gap:24px;min-width:0}
-.fp .ranked .ix-h{align-self:end;margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line2);font:600 11px/14px var(--f-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp .ranked .ix-h.later{padding-top:16px}
+/* the group names (Popular, Investing style, Type of investor) are for screen readers only (owner, 2026-11-23):
+   out of the grid's flow, so their rows collapse and the lists sit straight under the tabs */
+.fp .ranked .ix{position:relative}
+.fp .ranked .ix-h{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* on a mid-width page the groups stack: a later group's (invisible) name keeps a 12px gap above it */
+.fp .ranked .ix-h.later{position:static;width:auto;height:12px;clip:auto;color:transparent;font-size:1px;line-height:1px}
 .fp .ranked .ix-c{position:relative;display:flex;align-items:center;min-width:0;height:var(--cell);margin:0 calc(-1 * var(--bleed));padding:0 var(--bleed);border:0;border-radius:var(--r-2);background:none;color:var(--ink2);font:500 13.5px/18px var(--f-sans);text-align:left;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fp .ranked .ix-c .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .fp .ranked .ix-c:hover{color:var(--ink);background:var(--hover)}
@@ -57,7 +61,7 @@
 
 /* ---------- the module: rule, list name and count, lead line, chart or table, source ---------- */
 .fp .ranked .fam-mod{display:flex;flex-direction:column;min-width:0;margin-top:10px}
-.fp .ranked .fam-rule{display:flex;flex-direction:column;gap:4px;padding-bottom:12px}
+.fp .ranked .fam-rule{display:flex;flex-direction:column;gap:4px}
 .fp .ranked .fam-rule::before{content:"";display:block;width:40px;height:4px;background:var(--ink);margin-bottom:12px}
 .fp .ranked .fam-h3{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
 .fp .ranked h3{font:700 20px/26px var(--f-sans);letter-spacing:-.015em}
@@ -72,7 +76,8 @@
 
 /* axis header: the S&P label over a notch on top, tick labels below. Ticks fading out are parked up to 8%
    past the plot's ends; clipping the header keeps them from widening the page (shown labels sit well inside) */
-.fp .fc-axis{height:46px;box-shadow:0 1px 0 var(--line2);overflow-x:clip}
+/* 42px: the S&P label just clears the tick labels; the list's name sits close above (owner, 2026-11-23) */
+.fp .fc-axis{height:42px;box-shadow:0 1px 0 var(--line2);overflow-x:clip}
 .fp .fc-axis .plot{height:100%}
 .fp .fc .fc-axl{align-self:end;padding-bottom:7px;font-size:10.5px;line-height:13px;color:var(--ink3)}
 .fp .fc .tick{position:absolute;bottom:9px;transform:translateX(-50%);font:400 11px/14px var(--f-sans);color:var(--ink3);white-space:nowrap}

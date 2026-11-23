@@ -32,3 +32,7 @@
 .fp .tm-load span{display:inline-block;padding:5px 10px;border-radius:var(--r-2);background:var(--inv);color:var(--invfg);font-size:12px;line-height:16px;font-weight:500;box-shadow:var(--shadow-1)}
 .fp .tm-msg{position:absolute;left:0;top:0;padding:24px 0;font-size:13px;color:var(--ink3)}
 
+
+/* A sideways swipe on the tree map or the period tools steps the period (PeriodPicker); up and down, and a pinch,
+   stay the page's */
+.fp .tm-box,.fp .ptools,.fp #holdPanel>.ph{touch-action:pan-y pinch-zoom}

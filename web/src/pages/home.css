@@ -4,7 +4,8 @@
    and styles.css (tabs, the DataTable look: .tbl-wrap .stk .lc, .pager). Tokens come from tokens.css. */
 
 /* ---------- hero: eyebrow and heading (the search and theme switch are in the top bar) ---------- */
-.home .hero{padding:8px 0}
+/* tight to the top bar and to the tabs (owner, 2026-11-23): the frame's 16px gap, less 4px, to the tabs */
+.home .hero{padding:0;margin-bottom:-4px}
 .home .hero-t{display:flex;flex-direction:column;gap:14px;min-width:0}
 /* the fund page's heading size, so the two pages open alike */
 .home .hero h1{font:600 clamp(24px,3.6cqi,34px)/1.08 var(--f-sans);letter-spacing:-.03em;overflow-wrap:anywhere}

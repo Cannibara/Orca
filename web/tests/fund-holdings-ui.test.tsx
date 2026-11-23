@@ -328,6 +328,56 @@ describe("Holdings panel: periods", () => {
   });
 });
 
+describe("Holdings panel: the wheel and swipes on the tree map", () => {
+  // jsdom has no PointerEvent: a MouseEvent with the pointer fields stands in, so clientX and pointerType arrive
+  beforeEach(() => {
+    if (typeof PointerEvent !== "undefined") return;
+    class PE extends MouseEvent {
+      pointerId: number;
+      pointerType: string;
+      isPrimary: boolean;
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 0;
+        this.pointerType = init.pointerType ?? "mouse";
+        this.isPrimary = init.isPrimary ?? true;
+      }
+    }
+    vi.stubGlobal("PointerEvent", PE);
+  });
+  const selected = () => document.querySelector("#holdPanel .pi.on > span")?.textContent;
+  test("the mouse wheel over the tree map steps through periods too", async () => {
+    mount();
+    await settle();
+    await new Promise((r) => setTimeout(r, 70));
+    fireEvent.wheel(document.querySelector(".tm-box")!, { deltaY: 120 });
+    expect(selected()).toBe("Q1 ’26");
+    await settle();
+  });
+
+  test("a sideways swipe on the tree map or the period bar steps one period: left is later, right is earlier", async () => {
+    mount();
+    await settle();
+    const swipe = (el: Element, dx: number, dy = 0, pointerType = "touch") => {
+      fireEvent.pointerDown(el, { pointerId: 1, pointerType, isPrimary: true, clientX: 200, clientY: 200 });
+      fireEvent.pointerMove(el, { pointerId: 1, pointerType, isPrimary: true, clientX: 200 + dx / 2, clientY: 200 + dy / 2 });
+      fireEvent.pointerMove(el, { pointerId: 1, pointerType, isPrimary: true, clientX: 200 + dx, clientY: 200 + dy });
+      fireEvent.pointerUp(el, { pointerId: 1, pointerType, isPrimary: true, clientX: 200 + dx, clientY: 200 + dy });
+    };
+    const map = document.querySelector(".tm-box")!;
+    swipe(map, 120); // finger to the right: back in time, one step only
+    expect(selected()).toBe("Q1 ’26");
+    swipe(document.querySelector(".ptools")!, -120); // to the left: later
+    expect(selected()).toBe("Q2 ’26");
+    swipe(map, 30); // too short
+    swipe(map, 60, 80); // more up-and-down than sideways: the page's scroll
+    swipe(map, 120, 0, "mouse"); // a mouse drag is not a swipe
+    expect(selected()).toBe("Q2 ’26");
+    await settle();
+  });
+
+});
+
 describe("Holdings panel: motion", () => {
   const width = (g: SVGGElement) => Number(g.querySelector("rect")!.getAttribute("width"));
   /** The largest tile's width before a step back, just after the new layout lands, and once it has settled. */
