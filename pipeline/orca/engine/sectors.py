@@ -83,14 +83,33 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
 # The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,
 # West Pharmaceutical 33 trillion; BioNTech's first two 20-Fs 1,000x), and later ones slip now and then. Run 42 used
 # a company's earliest count for the years before it, so one slip set a stock at 5–15% of the market back to 1999.
-# A count MAX_SHARE_JUMP-fold or more off the median of the COUNT_WINDOW counts around it (on today's basis) is
-# dropped, and the counts either side stand in.
+# Such slips are 1,000^k exactly, and can be most of a stretch (Chesapeake Utilities' 10-Qs of 2024–25 in thousands
+# between right 10-Ks; Methode's first four counts), where a median keeps the slip. So, walking back from a company's
+# latest count, a count within UNIT_TOLERANCE of 1,000^k times the next later one is divided by 1,000^k (no real
+# count moves 400x in a quarter). Then a count MAX_SHARE_JUMP-fold or more off the median of the COUNT_WINDOW counts
+# around it (on today's basis) is dropped, and the counts either side stand in.
+UNIT_TOLERANCE = 2.5
 COUNT_WINDOW = 9
+
+
+def _unit_slips(stock_ids: list[int], shares: list[float]) -> list[float]:
+    """`shares` (sorted by stock, then date) with the 1,000^k slips divided out, against each company's latest count."""
+    out = list(shares)
+    tol = math.log10(UNIT_TOLERANCE)
+    for i in range(len(out) - 1, -1, -1):
+        if i == len(out) - 1 or stock_ids[i + 1] != stock_ids[i]:
+            continue  # a company's latest count: the anchor
+        e = math.log10(out[i] / out[i + 1])
+        k = round(e / 3)
+        if k and abs(e - 3 * k) < tol:
+            out[i] /= 1000.0**k
+    return out
 
 
 def todays_counts(hist: pl.DataFrame, splits: pl.DataFrame | None = None) -> pl.DataFrame:
     """`hist` (SHARES_SCHEMA) with each count on today's share basis, times the `splits` (stock_id, date,
-    split_factor) dated after its `end` (the day it is as of), less the slips (COUNT_WINDOW)."""
+    split_factor) dated after its `end` (the day it is as of), the 1,000^k slips divided out and the other slips
+    dropped (UNIT_TOLERANCE, COUNT_WINDOW)."""
     h = hist.filter(pl.col("shares").is_not_null() & (pl.col("shares") > 0))
     if splits is not None and not splits.is_empty():
         later = (
@@ -99,7 +118,9 @@ def todays_counts(hist: pl.DataFrame, splits: pl.DataFrame | None = None) -> pl.
             .filter(pl.col("_d") > pl.col("end")).group_by("stock_id", "end").agg(pl.col("split_factor").product().alias("_f"))
         )  # fmt: skip
         h = h.join(later, on=["stock_id", "end"], how="left").with_columns(shares=pl.col("shares") * pl.col("_f").fill_null(1.0)).drop("_f")
-    h = h.sort("stock_id", "end", "filed").with_columns(_l=pl.col("shares").log())
+    h = h.sort("stock_id", "end", "filed")
+    h = h.with_columns(shares=pl.Series(_unit_slips(h["stock_id"].to_list(), h["shares"].to_list()), dtype=pl.Float64))
+    h = h.with_columns(_l=pl.col("shares").log())
     h = h.with_columns(_m=pl.col("_l").rolling_median(COUNT_WINDOW, min_samples=1, center=True).over("stock_id"))
     return h.filter((pl.col("_l") - pl.col("_m")).abs() < math.log(MAX_SHARE_JUMP)).drop("_l", "_m").select(*SHARES_SCHEMA.names())
 

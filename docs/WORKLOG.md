@@ -5,6 +5,16 @@ Last verified: 2026-11-24
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — Run 43: within 10 points of SPY in all years but 2019; thousands slips and five ADR ratios left
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 43 (`sectors_only`, `main` 4768bb8): all steps green, files published, tab still on hold. Berkshire's market vs SPY: every year within 10 points but 2019 (+19.8% vs +31.2%); 2003 +34.3% vs +28.2% (run 42: +48.8%), 2013 +27.1% vs +32.3% (+20.4%), 2020 +12.8% vs +18.3% (+29.6%). Pershing, Tiger Global and 1649339 the same. Only Apple, Microsoft and Nvidia among real companies reach 4% ("caps heavy"); 1 stock set aside as outsized (run 42: 19) | PR #71 | — |
+| Left, from "caps heavy": ADRs without a ratio (Banco Santander-Chile at 4–14% of the market in 89 quarters; HSBC, Vodafone, America Movil, Barclays) and 1,000x slips that are most of a stretch, where the median keeps the slip: Chesapeake Utilities' 10-Qs of 2024–25 report the count in thousands between right 10-Ks (60% of Utilities in 2025 Q1), Methode's first four counts. Now, walking back from a company's latest count, a count within 2.5x of 1,000^k times the next later one is divided by 1,000^k, before the median check | Repair the slips the median cannot see | `pipeline/orca/engine/sectors.py` (`_unit_slips`, `todays_counts`) |
+| ADR ratios from each 2026 20-F: Banco Santander-Chile 400, HSBC 5, Vodafone 10, America Movil 20, Barclays 4 | Counted in ordinary shares | `pipeline/orca/hierarchy/data/share_overrides.csv` |
+| Known limit: before 2009 (no SEC count yet) a company's earliest count stands in, so one that issued many shares in 2008–10 reads too big before then (Citigroup 4–7% in 1999–2007, Lloyds). Years before 2013 are within 7 points of SPY all the same | No count to use | — |
+| Checks: one new test (thousands slips in most of a stretch; a doubling diluter left alone), two updated (slips now divided out, not dropped); pipeline suite green; demo data unchanged | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-24 — Positions table: the mouse wheel steps the period again (desktop only)
 
 | What changed | Why | Files |
