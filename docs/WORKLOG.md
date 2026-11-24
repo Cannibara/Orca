@@ -14,6 +14,16 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | A sideways wheel (shift + wheel, a trackpad swipe: \|deltaX\| > \|deltaY\|) is now left to the browser everywhere the picker listens, so a narrow desktop window can still scroll the table's columns | Without it the table's columns could not be scrolled with a trackpad | `fund/PeriodPicker.tsx` |
 | Checks: 3 new tests (wheel on the table, sideways wheel, swipe on the table vs the tools); typecheck and all 1,207 web tests green; checked in Chromium on the demo fund (wheel steps Q2 ’26 ↔ Q1 ’26, page does not move, sideways wheel does nothing). Side effect to know: with the pointer over the table and the page at rest, a wheel turn changes the quarter instead of scrolling the page | | `tests/fund-positions-ui.test.tsx`, `tests/holdings-harness.tsx` |
 
+## 2026-11-24 — Run 42: splits fixed; bad early SEC counts and three ADR ratios are what is left
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 42 (`sectors_only`, `main` d15b8dc): all steps green, files published, tab still on hold. Market vs SPY per year (Berkshire): 2021 +19.8% vs +28.7% (run 41: +1.4%), 2022 −15.1% vs −18.2% (−31.9%), 2025 +23.4% vs +17.7%. Still off by 10+ points: 2000, 2003, 2004, 2013, 2014, 2019, 2020. Big names no longer set aside, except Chipotle, Netflix and Qualcomm in 2 to 4 quarters | The split-basis fix (PR #69) | — |
+| What is left, from the movers log and the SEC's own data: the first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist 648 trillion shares, West Pharmaceutical 33 trillion, EOG and Sanmina 1,000x; BioNTech's first two 20-Fs 1,000x). PR #69's earliest-count fallback carried such a slip back to 1999 (EOG, Sanmina, Truist at 5–15% of the market for 40+ quarters). New `todays_counts`: each count goes to today's share basis, then any count 5x or more off the median of the 9 around it is dropped and its neighbours stand in | Bad counts, not prices | `pipeline/orca/engine/sectors.py`, `pipeline/orca/shares_hist.py` |
+| ADR ratios added from each company's 2026 20-F: Banco de Chile 200, Ecopetrol 20, Lloyds 4 (each 8–28% of the market in some quarters) | Counted in ordinary shares | `pipeline/orca/hierarchy/data/share_overrides.csv` |
+| The movers log also names every stock at 4%+ of the market ("caps heavy", quarters and top weight), so an overweight stock shows even when its price stood still | Find what is left without another blind run | `engine/sectors.index_returns`, `run/sectors_step._log_caps` |
+| Checks: three new tests (slips dropped, the earliest clean count used, heavy stocks listed); pipeline suite green; demo data unchanged. Unexplained: WW International's 9.6% in 2018 Q2 (its SEC counts look right; maybe its price history) | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-24 — Run 41: the filters dropped big names at their splits; share counts now follow the splits
 
 | What changed | Why | Files |
