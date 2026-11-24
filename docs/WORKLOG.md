@@ -5,6 +5,15 @@ Last verified: 2026-11-24
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — Run 44: the top of the market is now real companies; one slip repair misfired
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 44 (`sectors_only`, `main` 653c9ad): all steps green, files published, tab still on hold. Berkshire's market vs SPY: 2019 +26.0% vs +31.2% (run 43: +19.8%), 2020 +18.1% vs +18.3%, 2017 +16.8% vs +21.7%; every year within 8 points but 2021 (+16.0% vs +28.7%). The 15 biggest market shares are now real (Nvidia, Apple, Microsoft, Amazon, Cisco, Bank of America, AT&T, Pfizer, TSMC, Intel, GE) apart from Citigroup and Lloyds before 2009 (the known limit) and two below | PR #72 | — |
+| The slip repair misfired on RedHill Biopharma (4–12% of the market in 31 quarters, 2013–21): its ADS went from 10 to 400 to 10,000 ordinary shares (Tiingo records splits) while it issued ~10x more, which on today's basis read as a 1,000x slip, so every earlier count was multiplied by 1,000. The repair now works on the counts as reported and skips a pair with a split between them | A split explains a jump | `pipeline/orca/engine/sectors.py` (`_unit_slips`, `todays_counts`) |
+| Also seen: VCI Global at 3.4% in 2025 Q4 (−92%), likely the same; the next run's "caps heavy" shows | | — |
+| Checks: a RedHill-shaped test (fails on the old code); pipeline suite green; demo data unchanged | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-24 — Run 43: within 10 points of SPY in all years but 2019; thousands slips and five ADR ratios left
 
 | What changed | Why | Files |

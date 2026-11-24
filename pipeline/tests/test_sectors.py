@@ -166,6 +166,18 @@ def test_todays_counts_divide_out_thousands_slips_even_where_they_are_most_of_a_
     assert kept[3] == [1e6 * 2**i for i in range(12)]  # real growth is left alone
 
 
+def test_todays_counts_leave_a_jump_alone_when_a_split_explains_it():
+    # RedHill (run 44): its ADS went from 10 to 400 ordinary shares in 2023 and to 10,000 in 2025 (Tiingo: splits of
+    # 1-for-40 and 1-for-25) while it issued about 10x more. On today's basis 2022 to 2023 jumps ~430x, which read as
+    # a 1,000x slip and multiplied every earlier count by 1,000; as reported it is ~10x, with a split between.
+    ends = [date(2017 + i, 12, 31) for i in range(9)]
+    counts = [2.13e8, 2.84e8, 3.53e8, 3.84e8, 5.27e8, 1.18e9, 1.27e10, 1.29e10, 5.09e10]
+    hist = pl.DataFrame([(7, e, e + timedelta(days=60), c) for e, c in zip(ends, counts)], schema=sectors.SHARES_SCHEMA, orient="row")
+    splits = pl.DataFrame({"stock_id": [7, 7], "date": [date(2023, 6, 1), date(2025, 6, 1)], "split_factor": [0.025, 0.04]})
+    got = sectors.todays_counts(hist, splits).filter(pl.col("end") < date(2023, 1, 1))["shares"].to_list()
+    assert got == pytest.approx([c * 0.001 for c in counts[:6]])  # on today's basis, not 1,000x that
+
+
 def test_market_caps_before_the_first_count_use_it_with_its_slip_divided_out():
     sq = pl.DataFrame({"stock_id": [1, 1], "q": [-20, 0], "close": [20.0, 30.0], "raw_close": [20.0, 30.0]})  # 2008 Q1, 2013 Q1
     hist = pl.DataFrame({"stock_id": [1, 1, 1], "end": [date(2009, 7, 31), date(2009, 10, 31), date(2010, 1, 31)],
