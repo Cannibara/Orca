@@ -22,6 +22,7 @@ import polars as pl
 
 from orca.engine import skill, skill_detail
 from orca.engine.sectors import (
+    HEAVY_WEIGHT,
     OUT_SCHEMA,
     QUARTER_SCHEMA,
     cap_report,
@@ -198,9 +199,15 @@ def _log_caps(
             log.info("caps %s: %s (%s, id %s) q%s %s cap $%sbn %s", kind, r["ticker"], r["name"], r["stock_id"], r["q"],
                      r["sector"], f"{r['cap'] / 1e9:,.1f}", r["weight"])  # fmt: skip
     if movers:
-        for r in pl.concat(movers).join(names, on="stock_id", how="left").iter_rows(named=True):
+        moved = pl.concat(movers).join(names, on="stock_id", how="left")
+        for r in moved.filter(pl.col("pts").abs() >= 0.03).iter_rows(named=True):
             log.info("caps movers: q%s %s (%s, id %s) weight %.1f%% return %+.0f%% moved the market %+.1f pts", r["q"], r["ticker"],
                      r["name"], r["stock_id"], 100 * r["weight"], 100 * r["r"], 100 * r["pts"])  # fmt: skip
+        heavy = moved.filter(pl.col("weight") >= HEAVY_WEIGHT).sort("weight", descending=True).group_by("stock_id", "ticker", "name", maintain_order=True)
+        for r in heavy.agg(pl.len().alias("n"), pl.col("weight").first().alias("top"), pl.col("q").first(), pl.col("q").min().alias("q0"),
+                           pl.col("q").max().alias("q1")).iter_rows(named=True):  # fmt: skip
+            log.info("caps heavy: %s (%s, id %s) %.0f%%+ of the market in %d quarters (q%s to q%s), top %.1f%% in q%s", r["ticker"],
+                     r["name"], r["stock_id"], 100 * HEAVY_WEIGHT, r["n"], r["q0"], r["q1"], 100 * r["top"], r["q"])  # fmt: skip
     if set_aside:
         gone = pl.concat(set_aside).join(names, on="stock_id", how="left")
         per = gone.group_by("why", "stock_id", "ticker", "name").agg(pl.len().alias("quarters"), pl.col("weight").max().alias("worst"))

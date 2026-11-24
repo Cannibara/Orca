@@ -14,6 +14,7 @@ unless the stock never trades again: then it is a delisting and earns its return
 
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 
 import polars as pl
@@ -32,7 +33,7 @@ OUT_SCHEMA = pl.Schema(
     {"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "ret": pl.Float64, "level_end": pl.Float64, "level_avg": pl.Float64,
      "n": pl.Int32, "cap": pl.Float64, "top_weight": pl.Float64}
 )  # fmt: skip
-__all__ = ["MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_returns", "market_caps", "stock_quarters"]
+__all__ = ["HEAVY_WEIGHT", "MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_returns", "market_caps", "stock_quarters", "todays_counts"]
 # No real stock has come near 15% of the US market (the biggest are ~7%), so a cap above it is a data error: an ADR
 # counted in ordinary shares (LATAM: 604bn shares, 2,000 to an ADR, read as $21tn in run 39) or a unit slip. Such a
 # stock sits out of every index that quarter, and the sectors step logs it. Only where the market has enough stocks
@@ -46,6 +47,10 @@ MIN_MARKET_STOCKS = 100
 # barely moves a cap-weighted index, so little is lost.
 MAX_SHARE_JUMP = 5.0
 MAX_RETURN = 3.0
+# The movers log also lists every stock-quarter at this share of the market or more (Apple, Microsoft and Nvidia
+# reach 5–7%), so an overweight stock is named even in a quarter its price stood still; only in a quarter of
+# MIN_MARKET_STOCKS or more, where the share means that.
+HEAVY_WEIGHT = 0.04
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
@@ -75,47 +80,56 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
     return out.join(ends, on="q").with_columns(stale=pl.col("last") < pl.col("_cut")).drop("_cut").sort("stock_id", "q")
 
 
+# The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,
+# West Pharmaceutical 33 trillion; BioNTech's first two 20-Fs 1,000x), and later ones slip now and then. Run 42 used
+# a company's earliest count for the years before it, so one slip set a stock at 5–15% of the market back to 1999.
+# A count MAX_SHARE_JUMP-fold or more off the median of the COUNT_WINDOW counts around it (on today's basis) is
+# dropped, and the counts either side stand in.
+COUNT_WINDOW = 9
+
+
+def todays_counts(hist: pl.DataFrame, splits: pl.DataFrame | None = None) -> pl.DataFrame:
+    """`hist` (SHARES_SCHEMA) with each count on today's share basis, times the `splits` (stock_id, date,
+    split_factor) dated after its `end` (the day it is as of), less the slips (COUNT_WINDOW)."""
+    h = hist.filter(pl.col("shares").is_not_null() & (pl.col("shares") > 0))
+    if splits is not None and not splits.is_empty():
+        later = (
+            h.select("stock_id", "end").unique()
+            .join(splits.select(pl.col("stock_id").cast(pl.Int32), pl.col("date").alias("_d"), pl.col("split_factor").cast(pl.Float64)), on="stock_id")
+            .filter(pl.col("_d") > pl.col("end")).group_by("stock_id", "end").agg(pl.col("split_factor").product().alias("_f"))
+        )  # fmt: skip
+        h = h.join(later, on=["stock_id", "end"], how="left").with_columns(shares=pl.col("shares") * pl.col("_f").fill_null(1.0)).drop("_f")
+    h = h.sort("stock_id", "end", "filed").with_columns(_l=pl.col("shares").log())
+    h = h.with_columns(_m=pl.col("_l").rolling_median(COUNT_WINDOW, min_samples=1, center=True).over("stock_id"))
+    return h.filter((pl.col("_l") - pl.col("_m")).abs() < math.log(MAX_SHARE_JUMP)).drop("_l", "_m").select(*SHARES_SCHEMA.names())
+
+
 def market_caps(
     sq: pl.DataFrame, hist: pl.DataFrame, securities: pl.DataFrame, adr: dict[str, float], splits: pl.DataFrame | None = None
 ) -> tuple[pl.DataFrame, set[int]]:
     """(stock_id, q, cap) at each quarter end, and the stock ids whose count in some quarter was not filed by then.
 
-    cap = split-adjusted close × a share count turned to today's share basis by the `splits` (stock_id, date,
-    split_factor) dated after the day the count is as of. So price and count stand on the same basis whenever a
-    split fell: run 41 paired a price after a split with a count from before it (Nvidia's 10-for-1; reverse splits
-    read 50x too big). The count is the latest filed by the quarter end; before a company's first filed count, its
-    earliest one (today's count put penny stocks that later issued 1000s of times the shares at 10% of the 2013
-    market). With no count on record, today's `shares_out`. All per ADR for an ADR. A company with several share
-    classes reports one total, so it is counted once, on its lowest stock id."""
+    cap = split-adjusted close × a share count on today's share basis (`todays_counts`). So price and count stand on
+    the same basis whenever a split fell: run 41 paired a price after a split with a count from before it (Nvidia's
+    10-for-1; reverse splits read 50x too big). The count is the latest filed by the quarter end; before a company's
+    first filed count, its earliest one (today's count put penny stocks that later issued 1000s of times the shares
+    at 10% of the 2013 market). With no count on record, today's `shares_out`. All per ADR for an ADR. A company with
+    several share classes reports one total, so it is counted once, on its lowest stock id."""
     securities = securities.filter(pl.col("stock_id").is_in(sq["stock_id"].unique().to_list()))  # a bond sharing the CIK never wins
     first = securities.filter(pl.col("cik").is_null() | (pl.col("stock_id") == pl.col("stock_id").min().over("cik")))
     sq = sq.join(first.select("stock_id", "ticker", "shares_out"), on="stock_id")
+    counts = todays_counts(hist, splits)
     dates = {q: q_end(q) for q in sorted(set(sq["q"].to_list()))}
-    asof = shares_asof(hist, list(dates.values()))
+    asof = shares_asof(counts, list(dates.values()))
     asof = asof.join(pl.DataFrame({"q": list(dates), "asof": list(dates.values())}, schema={"q": pl.Int32, "asof": pl.Date}), on="asof")
-    earliest = (
-        hist.filter(pl.col("shares").is_not_null()).sort("end", "filed").group_by("stock_id").first()
-        .select("stock_id", pl.col("shares").alias("_s0"), pl.col("end").alias("_e0"))
-    )  # fmt: skip
+    earliest = counts.sort("end", "filed").group_by("stock_id").first().select("stock_id", pl.col("shares").alias("_s0"))
     out = (
-        sq.join(asof.select("stock_id", "q", "shares", "end"), on=["stock_id", "q"], how="left").join(earliest, on="stock_id", how="left")
+        sq.join(asof.select("stock_id", "q", "shares"), on=["stock_id", "q"], how="left").join(earliest, on="stock_id", how="left")
         .with_columns(fallback=pl.col("shares").is_null() & (pl.col("_s0").is_not_null() | pl.col("shares_out").is_not_null()),
-                      shares=pl.coalesce("shares", "_s0"), end=pl.coalesce("end", "_e0"))
+                      shares=pl.coalesce("shares", "_s0"))
     )  # fmt: skip
-    if splits is not None and not splits.is_empty():
-        pairs = out.filter(pl.col("end").is_not_null()).select("stock_id", "end").unique()
-        later = (
-            pairs.join(splits.select(pl.col("stock_id").cast(pl.Int32), pl.col("date").alias("_d"), pl.col("split_factor").cast(pl.Float64)), on="stock_id")
-            .filter(pl.col("_d") > pl.col("end")).group_by("stock_id", "end").agg(pl.col("split_factor").product().alias("_f"))
-        )  # fmt: skip
-        out = out.join(later, on=["stock_id", "end"], how="left")
-    else:
-        out = out.with_columns(_f=pl.lit(None, pl.Float64))
     ratio = pl.col("ticker").replace_strict(adr, default=1.0, return_dtype=pl.Float64)
-    out = out.with_columns(
-        cap=pl.when(pl.col("shares").is_not_null()).then(pl.col("close") * pl.col("shares") * pl.col("_f").fill_null(1.0))
-        .otherwise(pl.col("close") * pl.col("shares_out")) / ratio
-    )  # fmt: skip
+    out = out.with_columns(cap=pl.coalesce(pl.col("close") * pl.col("shares"), pl.col("close") * pl.col("shares_out")) / ratio)
     out = out.filter(pl.col("cap").is_not_null() & (pl.col("cap") > 0))
     return out.select("stock_id", pl.col("q").cast(pl.Int32), "cap"), set(out.filter("fallback")["stock_id"].to_list())
 
@@ -163,7 +177,7 @@ def index_returns(
     vertical path. Stocks without a label are left out, and so are data slips: share-count jumps
     (`_drop_count_slips`), returns over MAX_RETURN and outsized caps (`_set_aside_outsized`). The rows set aside go
     to `set_aside` (stock_id, q, cap, weight, why) and, per quarter, the stocks that moved the market 3 points or more
-    to `movers` (stock_id, q, weight, r, pts), when lists are given."""
+    or weighed HEAVY_WEIGHT of it to `movers` (stock_id, q, weight, r, pts), when lists are given."""
     lab = pl.DataFrame({"stock_id": list(labels), "path": list(labels.values())}, schema={"stock_id": pl.Int32, "path": pl.String})
     s = sq.filter(pl.col("q") <= last_q).join(lab, on="stock_id").sort("stock_id", "q")
     s = _drop_count_slips(s, set_aside)
@@ -192,7 +206,8 @@ def index_returns(
     if movers is not None:
         m = r.with_columns(w=pl.col("cap_p") / pl.col("cap_p").sum().over("q")).with_columns(pts=pl.col("w") * pl.col("r"))
         movers.append(
-            m.filter(pl.col("pts").abs() >= 0.03).sort("q", "pts", descending=[False, True])
+            m.filter((pl.col("pts").abs() >= 0.03) | ((pl.col("w") >= HEAVY_WEIGHT) & (pl.len().over("q") >= MIN_MARKET_STOCKS)))
+            .sort("q", "pts", descending=[False, True])
             .select("stock_id", "q", pl.col("w").alias("weight"), "r", "pts")
         )  # fmt: skip
     parts = []
