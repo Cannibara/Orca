@@ -23,6 +23,7 @@ import polars as pl
 from orca.engine import skill, skill_detail
 from orca.engine.sectors import (
     HEAVY_WEIGHT,
+    MAX_PRICE_GAP,
     OUT_SCHEMA,
     QUARTER_SCHEMA,
     REPORTED_SCHEMA,
@@ -175,19 +176,26 @@ def adr_ratios(lake: Lake, securities: pl.DataFrame, overrides: dict[str, float]
 
 def reported_prices(lake: Lake, cusip_map: pl.DataFrame) -> pl.DataFrame:
     """REPORTED_SCHEMA: per stock and quarter, the median price per share its 13F holders report (value over shares,
-    share rows only) and how many funds report it. One quarter's holdings at a time, four columns of it."""
+    share rows only), and the funds and shares of the rows priced within MAX_PRICE_GAP of that median (a share count
+    misread from a text filing has a price far off, and would swamp the sum). One quarter's holdings at a time, four
+    columns of it."""
     mapped = cusip_map.filter(pl.col("stock_id").is_not_null()).select("cusip", pl.col("stock_id").cast(pl.Int32)).lazy()
     parts = []
     for part in lake.parts("holdings"):
-        parts.append(
+        rows = (
             pl.scan_parquet(lake.root / "holdings" / f"{part}.parquet")
             .filter((pl.col("kind") == "SH") & (pl.col("shares") > 0) & (pl.col("value_usd") > 0))
-            .select("cik", "q", "cusip", (pl.col("value_usd") / pl.col("shares")).alias("price"))
+            .select("cik", "q", "cusip", "shares", (pl.col("value_usd") / pl.col("shares")).alias("_p"))
             .join(mapped, on="cusip")
-            .group_by("stock_id", "q")
-            .agg(pl.col("price").median(), pl.col("cik").n_unique().alias("holders"))
-            .collect()
+            .with_columns(price=pl.col("_p").median().over("stock_id", "q"))
         )  # fmt: skip
+        near = (pl.col("_p") <= pl.col("price") * MAX_PRICE_GAP) & (pl.col("_p") >= pl.col("price") / MAX_PRICE_GAP)
+        parts.append(
+            rows.filter(near)
+            .group_by("stock_id", "q")
+            .agg(pl.col("price").first(), pl.col("cik").n_unique().alias("holders"), pl.col("shares").sum().alias("held"))
+            .collect()
+        )
     if not parts:
         return pl.DataFrame(schema=REPORTED_SCHEMA)
     return pl.concat(parts).select(*REPORTED_SCHEMA.names()).cast(REPORTED_SCHEMA)
@@ -209,6 +217,25 @@ def _log_mispriced(off: pl.DataFrame, securities: pl.DataFrame, flags: list, top
         log.warning("prices set aside (13F price): %s (%s, id %s) in %d quarters (q%s to q%s), worst q%s ours %.4g, theirs %.4g",
                     r["ticker"], r["name"], r["stock_id"], r["quarters"], r["q0"], r["q1"], r["q"], r["ours"], r["theirs"])  # fmt: skip
     flags.append({"type": "prices_set_aside", "stocks": per.height, "quarters": off.height})
+
+
+def _log_scaled(scaled: pl.DataFrame, caps: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 25) -> None:
+    """Log the stocks whose stand-in count `held_scales` scaled down, biggest share of the market first (in the
+    quarter it was biggest), with that quarter's scale."""
+    if scaled.is_empty():
+        return
+    names = securities.select(pl.col("stock_id").cast(pl.Int32), "ticker", "name")
+    total = caps.group_by("q").agg(pl.col("cap").sum().alias("_t"))
+    s = scaled.join(total, on="q").with_columns(w=pl.col("cap") / pl.col("_t")).sort("w", descending=True)
+    per = (
+        s.group_by("stock_id", maintain_order=True)
+        .agg(pl.len().alias("quarters"), pl.col("q").first(), pl.col("w").first(), pl.col("scale").first(), pl.col("scale").min().alias("low"))
+        .join(names, on="stock_id", how="left")
+    )  # fmt: skip
+    for r in per.head(top).iter_rows(named=True):
+        log.info("caps scaled by 13F holdings: %s (%s, id %s) in %d quarters, top %.2f%% of the market in q%s at x%.3f (lowest x%.3f)",
+                 r["ticker"], r["name"], r["stock_id"], r["quarters"], 100 * r["w"], r["q"], r["scale"], r["low"])  # fmt: skip
+    flags.append({"type": "caps_scaled", "stocks": per.height, "quarters": scaled.height})
 
 
 def stock_paths(stocks: pl.DataFrame, labels: dict, sic: SicTable) -> tuple[dict[int, str], dict[int, str], int]:
@@ -273,7 +300,8 @@ def build_sector_returns(
     sq = pl.concat(parts)
     # A close that is some other security's (`mispriced`) sits out: of the indices, and of the fund scores' stock
     # series, which read `stock_quarters`
-    off = mispriced(sq, reported_prices(lake, read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)))
+    reported = reported_prices(lake, read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
+    off = mispriced(sq, reported)
     if not off.is_empty():
         bad = pl.col("_off").fill_null(False)
         sq = (
@@ -287,7 +315,9 @@ def build_sector_returns(
     sq = sq.filter(pl.col("stock_id").is_in(stocks["stock_id"].to_list()))
     hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
     splits = pl.concat(split_parts)
-    caps, fallback = market_caps(sq, hist, securities, adr, splits)
+    scaled: list = []
+    caps, fallback = market_caps(sq, hist, securities, adr, splits, reported, scaled)
+    _log_scaled(pl.concat(scaled), caps, securities, flags)
     _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr, splits)  # the health figure: today only
     sq = sq.join(caps, on=["stock_id", "q"], how="left").select(*QUARTER_SCHEMA.names()).cast(QUARTER_SCHEMA)
     set_aside: list = []

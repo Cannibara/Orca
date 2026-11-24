@@ -5,6 +5,14 @@ Last verified: 2026-11-24
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — Run 46 (ADR lookup); stand-in counts before 2009 scaled by 13F holdings
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 46 (`sectors_only`, `main` 6fa2d0c, PR #74): all steps green, files published, tab still on hold. `adr_ratios`: 2,500 companies asked (3,413 owed to later runs), 343 file a 20-F, 216 ratios read; no ratio disagreed with `share_overrides.csv`. Berkshire's market vs SPY moved closer in most years (2021 +22.4% vs +28.7%, 2014 +9.9% vs +13.5%, 2008 −40.6% vs −36.8%); worst gap 8.3 points (2000, −1.4% vs −9.7%); the other three funds within 6.3 points every year. "caps heavy": Citigroup (to 9.9% in 2001) and Lloyds (6.3%) before 2009, then only Nvidia, Apple, Microsoft, Amazon, GE | PR #74 | — |
+| Citigroup's first SEC count is Sept 2009 (22.9bn shares; 2007: ~5.0bn), Lloyds' is 2017 (72bn; 2007: ~5.7bn), and before a company's first count its earliest stands in. Now, there, the earliest count is scaled by the stock's 13F-held shares in that quarter over those at the count (rows priced within 5x of the median only, so a misread count cannot swamp the sum), against the median stock's same ratio, where 10+ funds hold it at both ends; only scales of 0.5 or less are used, so a stock is only ever read smaller (a higher scale is more often institutions leaving, like AIG's in 2009, than a buyback). The run logs "caps scaled by 13F holdings" (biggest first) and a `caps_scaled` flag | The known pre-2009 limit, from data already in the lake | `pipeline/orca/engine/sectors.py` (`held_scales`, `market_caps`), `pipeline/orca/run/sectors_step.py` (`reported_prices`, `_log_scaled`) |
+| Checks: 2 new tests (Citigroup- and AIG-shaped; a misread count left out); pipeline suite green (1,112); demo data unchanged | | `pipeline/tests/test_sectors.py`, `pipeline/tests/test_sectors_step.py` |
+
 ## 2026-11-24 — Run 45: every year within 8 points of SPY; a price history that is another bank's
 
 | What changed | Why | Files |
