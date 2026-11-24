@@ -5,6 +5,14 @@ Last verified: 2026-11-24
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — ADR ratios read from each filer's 20-F, not typed by hand
+
+| What changed | Why | Files |
+|---|---|---|
+| New lake table `adr_ratios` and step `update_adr_ratios` in the sectors command: per company, its latest 20-F (submissions), the ratio from the SEC's rendered cover page `R1.htm`, else from the 20-F (tagged `dei:Security12bTitle` titles, then the text, the ratio stated most often). Asked again after a year, biggest first by count x close (so an ADR counted in ordinary shares ranks high), at most 2,500 companies a run. `share_overrides.csv` stays on top for hand corrections; a disagreement is logged | Missing ADR ratios were the most common error left (Banco Santander-Chile, HSBC, Vodafone, America Movil, Barclays, Banco de Chile, Ecopetrol, Lloyds, LATAM in runs 39–43) | `pipeline/orca/sec/adr.py`, `run/sectors_step.py`, `run/sources.py`, `run/cli.py`, `shares_hist.py` |
+| Checked against the SEC: 34 of the CSV's 35 ratios read right, AstraZeneca none (it states none; the CSV keeps it), none wrong; 29 of 29 other ADRs with known ratios right (Novo, SAP, Petrobras 2, SMFG 3/5 ...), three 1:1 ones state none. RedHill reads 10,000 | Precision before trusting it | `pipeline/tests/test_sec_adr.py` |
+| Checks: 10 new tests; pipeline suite green (1,108); demo data unchanged | | |
+
 ## 2026-11-24 — Run 44: the top of the market is now real companies; one slip repair misfired
 
 | What changed | Why | Files |
