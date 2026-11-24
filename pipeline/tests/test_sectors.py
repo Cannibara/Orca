@@ -191,6 +191,32 @@ def test_market_caps_before_the_first_count_use_it_with_its_slip_divided_out():
     assert fallback == {1}  # 2008 had no count filed by then
 
 
+def test_before_the_first_count_a_stock_whose_13f_holdings_grew_far_faster_than_the_median_is_scaled_down():
+    # Stock 1 (Citigroup): first count 22.9bn in 2009 Q3 (q-14), funds held a fifth as many shares in 2007 Q4
+    # (q-21) while the median stock's 13F holdings halved going back: x0.4. Stock 2 (AIG in 2009): its holders left,
+    # so its ratio is 5x the median's; not scaled up. Stock 3: 4 holders, too few. Stocks 10-20 are the median. Stock
+    # 1 split 1-for-10 after both quarters, which moves its held shares and its count alike.
+    ids = [1, 2, 3] + list(range(10, 21))
+    sq = pl.DataFrame({"stock_id": ids * 2, "q": [-21] * 14 + [-14] * 14, "close": [100.0] * 28,
+                       "raw_close": [10.0, 100.0, 100.0] + [100.0] * 11 + [10.0, 100.0, 100.0] + [100.0] * 11})  # fmt: skip
+    held = [2e9, 5e8, 1e6] + [5e7] * 11 + [10e9, 1e8, 1e7] + [1e8] * 11
+    reported = pl.DataFrame({"stock_id": ids * 2, "q": [-21] * 14 + [-14] * 14, "price": [100.0] * 28,
+                             "holders": [400, 300, 4] + [50] * 11 + [500, 100, 4] + [50] * 11, "held": held}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+    hist = pl.DataFrame({"stock_id": ids, "end": [date(2009, 9, 30)] * 14, "filed": [date(2009, 11, 6)] * 14,
+                         "shares": [22.9e9, 2.7e9, 1e8] + [1e9] * 11}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
+    splits = pl.DataFrame({"stock_id": [1], "date": [date(2011, 5, 9)], "split_factor": [0.1]})
+    securities = pl.DataFrame({"stock_id": ids, "ticker": [f"T{i}" for i in ids], "cik": ids, "shares_out": [1e9] * 14})
+    scaled: list = []
+    caps, _ = sectors.market_caps(sq, hist, securities, {}, splits, reported, scaled)
+    got = {(r["stock_id"], r["q"]): r["cap"] for r in caps.iter_rows(named=True)}
+    assert got[(1, -21)] == pytest.approx(100.0 * 2.29e9 * 0.4)  # the 2009 count on today's basis, x0.4
+    assert got[(2, -21)] == pytest.approx(100.0 * 2.7e9) and got[(3, -21)] == pytest.approx(100.0 * 1e8)
+    assert got[(1, -14)] == pytest.approx(100.0 * 2.29e9)  # the count's own quarter, not filed yet: as it is
+    assert pl.concat(scaled).select("stock_id", "q").rows() == [(1, -21)]
+    plain, _ = sectors.market_caps(sq, hist, securities, {}, splits)  # no holdings given: the earliest count as it is
+    assert plain.filter((pl.col("stock_id") == 1) & (pl.col("q") == -21))["cap"].item() == pytest.approx(100.0 * 2.29e9)
+
+
 def test_an_outsized_cap_sits_out_and_is_reported_but_a_small_universe_is_left_alone():
     # 120 stocks of $10bn each and one read as $21tn (LATAM in run 39: ordinary shares, not ADRs)
     rows = []
@@ -252,7 +278,7 @@ def test_a_close_far_off_the_price_its_13f_holders_report_is_mispriced():
     qs = [17, 50, 17, 17, 17] + [18] * 115
     sq = pl.DataFrame({"stock_id": ids, "q": qs, "raw_close": [30150.0, 13.3, 26.0, 2.0, 100.0] + [10.0] * 115})
     reported = pl.DataFrame({"stock_id": ids, "q": qs, "price": [27.0, 13.5, 27.0, 11.0, 1.0] + [1000.0] * 15 + [10.0] * 100,
-                             "holders": [40, 60, 40, 3, 2] + [5] * 115}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+                             "holders": [40, 60, 40, 3, 2] + [5] * 115, "held": [1.0] * 120}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
     off = sectors.mispriced(sq, reported)
     # Mechanics Bank's $30,150 for HomeStreet; a close 5.5x below theirs; not stock 4: two holders are too few
     assert off.select("stock_id", "q").rows() == [(1, 17), (3, 17)]

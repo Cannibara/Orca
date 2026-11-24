@@ -7,7 +7,7 @@ import polars as pl
 from orca.hierarchy import parse
 from orca.hierarchy.assign import SicTable, StockLabel
 from orca.prices import PRICES_SCHEMA
-from orca.run.sectors_step import build_sector_returns
+from orca.run.sectors_step import build_sector_returns, reported_prices
 from orca.run.state import CUSIP_MAP_SCHEMA, SECURITIES_TABLE_SCHEMA
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
@@ -72,3 +72,16 @@ def test_a_close_the_13f_holders_disagree_with_sits_out(tmp_path):
     closes = {(r["stock_id"], r["q"]): r["close"] for r in lake.read("stock_quarters").iter_rows(named=True)}
     assert closes[(2, 10)] is None and closes[(2, 11)] == 30.0 and closes[(1, 10)] == 10.0  # the fund scores skip it too
     assert {"type": "prices_set_aside", "stocks": 1, "quarters": 1} in flags
+
+
+def test_the_13f_prices_and_held_shares_leave_out_a_misread_share_count(tmp_path):
+    lake = Lake(tmp_path / "lake")
+    cusips = pl.DataFrame({"cusip": ["CC0000000", "XX0000000"], "stock_id": [7, None], "method": ["openfigi", "unmapped"], "tried": [None, None]},
+                          schema=CUSIP_MAP_SCHEMA)  # fmt: skip
+    # four funds hold stock 7 at ~$10 a share; a fifth's count was misread 10,000x (its price reads $0.001)
+    rows = [(1, 100.0, 1000.0), (2, 200.0, 2100.0), (3, 300.0, 2900.0), (4, 50.0, 500.0), (5, 1e6, 1000.0)]
+    lake.write("holdings", pl.DataFrame({"cik": [r[0] for r in rows] + [6], "q": [-21] * 6, "cusip": ["CC0000000"] * 5 + ["XX0000000"],
+                                         "kind": ["SH"] * 6, "shares": [r[1] for r in rows] + [5.0], "value_usd": [r[2] for r in rows] + [50.0]})
+               .cast({"cik": pl.Int64, "q": pl.Int16}), part="q-21")  # fmt: skip
+    got = reported_prices(lake, cusips)
+    assert got.rows() == [(7, -21, 10.0, 4, 650.0)]  # median $10 (of 5); the four near it hold 650 shares
