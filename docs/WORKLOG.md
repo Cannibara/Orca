@@ -5,6 +5,16 @@ Last verified: 2026-11-24
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — Run 45: every year within 8 points of SPY; a price history that is another bank's
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 45 (`sectors_only`, `main` 5f9722c): all steps green, files published, tab still on hold. For Berkshire, Pershing, Tiger Global and 1649339, Orca's market is within 8 points of SPY in every year 1999–2026: 2021 +21.6% vs +28.7% (run 44: +16.0%), 2017 +22.1% vs +21.7%, 2025 +17.9% vs +17.7%; worst 2008, −41.3% vs −36.8% (Citigroup and Lloyds too big before 2009, the known limit). "caps heavy" lists only Nvidia, Apple, Microsoft, GE and those two; no stock moved the market 3 points in a quarter | PR #73 | — |
+| Left in "caps market": Mechanics Bancorp (once HomeStreet, 19M shares, ~$27) at $875bn and 2.8% of the market in 2017. Its ticker MCHB was Mechanics Bank's on the OTC market, and the vendor's history under it is that bank's ($10,800–36,500 a share) to the 2025 merger; the published `stock/3881/weekly.json` shows it. Now each stock-quarter's as-traded close is checked against the median price per share its 13F holders report (value over shares, share rows, one quarter's `holdings` at a time); 5x or more off with 3+ funds reporting, close and VWAP are set aside in `stock_quarters` (not in a quarter where over a tenth of 100+ stocks checked disagree: that points at the filings' units), so the stock sits out of the indices and the fund scores' stock series there. The run logs "prices set aside (13F price)" and a `prices_set_aside` flag | Catches any ticker whose history is another security's, not just this one | `pipeline/orca/engine/sectors.py` (`mispriced`), `pipeline/orca/run/sectors_step.py` (`reported_prices`, `_log_mispriced`) |
+| Not changed: fund returns on the other pages still value HomeStreet at the vendor's close (the engine's `price_mismatch` flags report it); a fix there changes production returns, so it is the owner's call | | — |
+| The monthly run's "Save the sector tables" step now also saves `adr_ratios` (PR #74 left it out, so monthly runs would have looked every ratio up again; `sectors_only` runs save the whole lake) | | `.github/workflows/pipeline.yml` |
+| Checks: 2 new tests; pipeline suite green (1,110); demo data unchanged | | `pipeline/tests/test_sectors.py`, `pipeline/tests/test_sectors_step.py` |
+
 ## 2026-11-24 — ADR ratios read from each filer's 20-F, not typed by hand
 
 | What changed | Why | Files |

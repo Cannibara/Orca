@@ -33,7 +33,8 @@ OUT_SCHEMA = pl.Schema(
     {"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "ret": pl.Float64, "level_end": pl.Float64, "level_avg": pl.Float64,
      "n": pl.Int32, "cap": pl.Float64, "top_weight": pl.Float64}
 )  # fmt: skip
-__all__ = ["HEAVY_WEIGHT", "MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_returns", "market_caps", "stock_quarters", "todays_counts"]
+__all__ = ["HEAVY_WEIGHT", "MARKET", "QUARTER_SCHEMA", "REPORTED_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_returns", "market_caps",
+           "mispriced", "stock_quarters", "todays_counts"]  # fmt: skip
 # No real stock has come near 15% of the US market (the biggest are ~7%), so a cap above it is a data error: an ADR
 # counted in ordinary shares (LATAM: 604bn shares, 2,000 to an ADR, read as $21tn in run 39) or a unit slip. Such a
 # stock sits out of every index that quarter, and the sectors step logs it. Only where the market has enough stocks
@@ -51,6 +52,16 @@ MAX_RETURN = 3.0
 # reach 5–7%), so an overweight stock is named even in a quarter its price stood still; only in a quarter of
 # MIN_MARKET_STOCKS or more, where the share means that.
 HEAVY_WEIGHT = 0.04
+# Run 45 put Mechanics Bancorp, once HomeStreet, at $875bn in 2017: its ticker, MCHB, was Mechanics Bank's on the OTC
+# market, and the price vendor's history under it is that bank's ($10,800–36,500 a share) up to their 2025 merger. A
+# stock's 13F holders report its price too (value over shares), so an as-traded close MAX_PRICE_GAP-fold or more off
+# the median they report, MIN_PRICE_HOLDERS funds or more, is some other security's price (`mispriced`).
+MAX_PRICE_GAP = 5.0
+MIN_PRICE_HOLDERS = 3
+# A quarter where more than this share of the stocks checked disagree (MIN_MARKET_STOCKS or more checked) points at
+# the filings (values in thousands read as dollars), not at the prices: it is left alone, not emptied out of the indices.
+MAX_MISPRICED_SHARE = 0.1
+REPORTED_SCHEMA = pl.Schema({"stock_id": pl.Int32, "q": pl.Int32, "price": pl.Float64, "holders": pl.Int32})
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
@@ -78,6 +89,25 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
     ends = pl.DataFrame({"q": sorted(set(out["q"].to_list()))}, schema={"q": pl.Int32})
     ends = ends.with_columns(pl.col("q").map_elements(lambda q: q_end(q) - timedelta(days=STALE_DAYS), return_dtype=pl.Date).alias("_cut"))
     return out.join(ends, on="q").with_columns(stale=pl.col("last") < pl.col("_cut")).drop("_cut").sort("stock_id", "q")
+
+
+def mispriced(sq: pl.DataFrame, reported: pl.DataFrame) -> pl.DataFrame:
+    """(stock_id, q, gap = ours / theirs, ours, theirs) of the quarters whose as-traded close (`sq`, `stock_quarters`
+    output) is MAX_PRICE_GAP-fold or more off the median price per share the stock's 13F holders report
+    (`reported`, REPORTED_SCHEMA), where MIN_PRICE_HOLDERS funds or more report it, in quarters where no more than
+    MAX_MISPRICED_SHARE of the stocks checked are (if MIN_MARKET_STOCKS or more are checked). Both are on the quarter's own share basis, so a split needs no
+    adjusting."""
+    theirs = reported.filter((pl.col("holders") >= MIN_PRICE_HOLDERS) & (pl.col("price") > 0))
+    gap = pl.col("raw_close") / pl.col("price")
+    off = (pl.col("gap") >= MAX_PRICE_GAP) | (pl.col("gap") <= 1 / MAX_PRICE_GAP)
+    return (
+        sq.filter(pl.col("raw_close") > 0).select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "raw_close")
+        .join(theirs.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "price"), on=["stock_id", "q"])
+        .with_columns(gap=gap)
+        .filter(off & ((off.mean().over("q") <= MAX_MISPRICED_SHARE) | (pl.len().over("q") < MIN_MARKET_STOCKS)))
+        .select("stock_id", "q", "gap", pl.col("raw_close").alias("ours"), pl.col("price").alias("theirs"))
+        .sort("stock_id", "q")
+    )  # fmt: skip
 
 
 # The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,

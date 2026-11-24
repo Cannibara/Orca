@@ -25,9 +25,11 @@ from orca.engine.sectors import (
     HEAVY_WEIGHT,
     OUT_SCHEMA,
     QUARTER_SCHEMA,
+    REPORTED_SCHEMA,
     cap_report,
     index_returns,
     market_caps,
+    mispriced,
     stock_quarters,
 )
 from orca.hierarchy import assign, load
@@ -171,6 +173,44 @@ def adr_ratios(lake: Lake, securities: pl.DataFrame, overrides: dict[str, float]
     return out
 
 
+def reported_prices(lake: Lake, cusip_map: pl.DataFrame) -> pl.DataFrame:
+    """REPORTED_SCHEMA: per stock and quarter, the median price per share its 13F holders report (value over shares,
+    share rows only) and how many funds report it. One quarter's holdings at a time, four columns of it."""
+    mapped = cusip_map.filter(pl.col("stock_id").is_not_null()).select("cusip", pl.col("stock_id").cast(pl.Int32)).lazy()
+    parts = []
+    for part in lake.parts("holdings"):
+        parts.append(
+            pl.scan_parquet(lake.root / "holdings" / f"{part}.parquet")
+            .filter((pl.col("kind") == "SH") & (pl.col("shares") > 0) & (pl.col("value_usd") > 0))
+            .select("cik", "q", "cusip", (pl.col("value_usd") / pl.col("shares")).alias("price"))
+            .join(mapped, on="cusip")
+            .group_by("stock_id", "q")
+            .agg(pl.col("price").median(), pl.col("cik").n_unique().alias("holders"))
+            .collect()
+        )  # fmt: skip
+    if not parts:
+        return pl.DataFrame(schema=REPORTED_SCHEMA)
+    return pl.concat(parts).select(*REPORTED_SCHEMA.names()).cast(REPORTED_SCHEMA)
+
+
+def _log_mispriced(off: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 40) -> None:
+    """Log the stocks whose closes `mispriced` set aside, most quarters first, with the worst quarter's two prices."""
+    if off.is_empty():
+        return
+    names = securities.select(pl.col("stock_id").cast(pl.Int32), "ticker", "name")
+    worst = off.with_columns(_x=pl.col("gap").log().abs()).sort("_x", descending=True)
+    per = (
+        worst.group_by("stock_id", maintain_order=True)
+        .agg(pl.len().alias("quarters"), pl.col("q").min().alias("q0"), pl.col("q").max().alias("q1"), pl.col("q").first(),
+             pl.col("ours").first(), pl.col("theirs").first())
+        .join(names, on="stock_id", how="left").sort("quarters", "stock_id", descending=[True, False])
+    )  # fmt: skip
+    for r in per.head(top).iter_rows(named=True):
+        log.warning("prices set aside (13F price): %s (%s, id %s) in %d quarters (q%s to q%s), worst q%s ours %.4g, theirs %.4g",
+                    r["ticker"], r["name"], r["stock_id"], r["quarters"], r["q0"], r["q1"], r["q"], r["ours"], r["theirs"])  # fmt: skip
+    flags.append({"type": "prices_set_aside", "stocks": per.height, "quarters": off.height})
+
+
 def stock_paths(stocks: pl.DataFrame, labels: dict, sic: SicTable) -> tuple[dict[int, str], dict[int, str], int]:
     """(stock_id -> vertical path, stock_id -> how, ids skipped by the ticker guard) for `stocks` (stock_id,
     ticker, sic). A CSV row whose ticker no longer matches the lake's is not trusted (the lake's ids moved, or
@@ -231,6 +271,18 @@ def build_sector_returns(
     if not parts:
         return {"stocks": 0}
     sq = pl.concat(parts)
+    # A close that is some other security's (`mispriced`) sits out: of the indices, and of the fund scores' stock
+    # series, which read `stock_quarters`
+    off = mispriced(sq, reported_prices(lake, read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)))
+    if not off.is_empty():
+        bad = pl.col("_off").fill_null(False)
+        sq = (
+            sq.join(off.select(pl.col("stock_id").cast(sq.schema["stock_id"]), pl.col("q").cast(sq.schema["q"]), _off=pl.lit(True)),
+                    on=["stock_id", "q"], how="left", maintain_order="left")
+            .with_columns(close=pl.when(bad).then(None).otherwise(pl.col("close")), vwap=pl.when(bad).then(None).otherwise(pl.col("vwap")))
+            .drop("_off")
+        )  # fmt: skip
+    _log_mispriced(off, securities, flags)
     lake.write("stock_quarters", sq.select("stock_id", "q", "close", "div", "vwap"))
     sq = sq.filter(pl.col("stock_id").is_in(stocks["stock_id"].to_list()))
     hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
