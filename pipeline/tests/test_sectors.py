@@ -1,6 +1,6 @@
 """Sector, industry and industry-vertical indices (`orca/engine/sectors.py`), checked by hand."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 import pytest
@@ -135,6 +135,35 @@ def test_market_caps_put_the_filed_count_on_the_prices_split_basis():
     assert got[(3, 11)] == pytest.approx(2.0 * 30 * 4)  # = raw close 8 x 30: the later split cancels out
 
 
+def test_todays_counts_drop_the_slips_of_the_first_cover_pages():
+    ends = [date(2009 + i // 4, 3 * (i % 4) + 1, 28) for i in range(12)]
+    # stock 1 (Truist): its first count read 648 trillion; stock 2 (BioNTech): its first two 1,000x; stock 3: a
+    # 10-for-1 split in 2011, its counts as reported (they are not slips); stock 4: a slip in the middle
+    def rows(sid, counts):
+        return [(sid, e, e + timedelta(days=10), c) for e, c in zip(ends, counts)]
+    data = rows(1, [6.48e14] + [6.9e8] * 11) + rows(2, [2.3e11, 2.4e11] + [2.4e8] * 10)
+    data += rows(3, [1e8] * 8 + [1e9] * 4) + rows(4, [5e7] * 5 + [5e13] + [5e7] * 6)
+    hist = pl.DataFrame(data, schema=sectors.SHARES_SCHEMA, orient="row")
+    splits = pl.DataFrame({"stock_id": [3], "date": [date(2011, 1, 3)], "split_factor": [10.0]})
+    got = sectors.todays_counts(hist, splits)
+    kept = {sid: got.filter(pl.col("stock_id") == sid)["shares"].to_list() for sid in (1, 2, 3, 4)}
+    assert kept[1] == [6.9e8] * 11 and kept[2] == [2.4e8] * 10 and kept[4] == [5e7] * 11
+    assert kept[3] == [1e9] * 12  # the 2009–10 counts on today's basis
+
+
+def test_market_caps_before_the_first_clean_count_use_it_not_the_slip():
+    sq = pl.DataFrame({"stock_id": [1, 1], "q": [-20, 0], "close": [20.0, 30.0], "raw_close": [20.0, 30.0]})  # 2008 Q1, 2013 Q1
+    hist = pl.DataFrame({"stock_id": [1, 1, 1], "end": [date(2009, 7, 31), date(2009, 10, 31), date(2010, 1, 31)],
+                         "filed": [date(2009, 8, 13), date(2009, 11, 9), date(2010, 2, 26)], "shares": [6.48e14, 6.88e8, 6.91e8]},
+                        schema=sectors.SHARES_SCHEMA)  # fmt: skip
+    securities = pl.DataFrame({"stock_id": [1], "ticker": ["TFC"], "cik": [92230], "shares_out": [1.3e9]})
+    caps, fallback = sectors.market_caps(sq, hist, securities, {})
+    got = {r["q"]: r["cap"] for r in caps.iter_rows(named=True)}
+    assert got[-20] == pytest.approx(20.0 * 6.88e8)  # before any filing: the first clean count, not 648 trillion
+    assert got[0] == pytest.approx(30.0 * 6.91e8)
+    assert fallback == {1}  # 2008 had no count filed by then
+
+
 def test_an_outsized_cap_sits_out_and_is_reported_but_a_small_universe_is_left_alone():
     # 120 stocks of $10bn each and one read as $21tn (LATAM in run 39: ordinary shares, not ADRs)
     rows = []
@@ -153,6 +182,15 @@ def test_an_outsized_cap_sits_out_and_is_reported_but_a_small_universe_is_left_a
     few = [r for r in rows if r[0] in (1, 999)]
     out = sectors.index_returns(quarters(few), {1: A, 999: C}, last_q=11, set_aside=(none := []))
     assert none == [] and series(out, sectors.MARKET)[11]["ret"] == pytest.approx((1e10 * 0.10 + 2.1e13 * -0.8) / (1e10 + 2.1e13))
+
+
+def test_the_movers_list_names_a_heavy_stock_whose_price_stood_still():
+    rows = [(sid, q, 10.0, 0, 10.0, 1e9, False) for sid in range(1, 121) for q in (10, 11)]
+    rows += [(500, 10, 10.0, 0, 10.0, 1e10, False), (500, 11, 10.0, 0, 10.0, 1e10, False)]  # 7.7% of the market, flat
+    moved: list = []
+    sectors.index_returns(quarters(rows), {sid: A for sid in range(1, 121)} | {500: A}, last_q=11, movers=moved)
+    m = pl.concat(moved)
+    assert m["stock_id"].to_list() == [500] and m["pts"].to_list() == [0.0]
 
 
 def test_the_cap_report_names_a_share_count_slip():
