@@ -44,6 +44,9 @@ from orca.run.state import (
     SECURITIES_TABLE_SCHEMA,
     read_table,
 )
+from orca.sec.adr import SCHEMA as ADR_SCHEMA
+from orca.sec.adr import TABLE as ADR_TABLE
+from orca.sec.adr import Adr
 from orca.shares_hist import SCHEMA, frame, load_overrides
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
@@ -98,6 +101,76 @@ def update_share_history(
     return stats
 
 
+ADR_FRESH_DAYS = 365  # a 20-F comes once a year
+ADR_MAX_CALLS = 2_500  # ~5 minutes at 8 calls a second; the rest wait for later runs, biggest first
+
+
+def update_adr_ratios(
+    lake: Lake,
+    fetch: Callable[[int], Adr],
+    securities: pl.DataFrame,
+    flags: list,
+    budget: Budget,
+    today: date,
+    max_calls: int = ADR_MAX_CALLS,
+) -> dict:
+    """Keep `adr_ratios` (`sec/adr.py`) up to date: one row per company, asked again after ADR_FRESH_DAYS.
+    Companies never asked come first, biggest first by today's count times the last close. That count is in
+    ordinary shares for an ADR, so a missing ratio makes it look bigger and it is asked sooner. A lookup costs
+    one SEC call, or up to three for a 20-F filer."""
+    table = read_table(lake, ADR_TABLE, ADR_SCHEMA)
+    stocks = securities.filter(pl.col("cik").is_not_null() & (pl.col("sector") != "ETF/Fund"))
+    sq = lake.read("stock_quarters")  # the last indices run's closes; empty on a new lake
+    if sq.is_empty():
+        last = pl.DataFrame(schema={"stock_id": pl.Int32, "close": pl.Float64})
+    else:
+        last = sq.sort("q").group_by("stock_id").last().select(pl.col("stock_id").cast(pl.Int32), pl.col("close").cast(pl.Float64))
+    size = (
+        stocks.join(last, on="stock_id", how="left").group_by("cik")
+        .agg((pl.col("shares_out") * pl.col("close")).max().fill_null(0.0).alias("size"))
+    )  # fmt: skip
+    todo = (
+        size.join(table.select("cik", "checked"), on="cik", how="left")
+        .filter(pl.col("checked").is_null() | (pl.col("checked") < today - timedelta(days=ADR_FRESH_DAYS)))
+        .sort(pl.col("checked").is_not_null(), pl.col("size"), descending=[False, True])
+    )  # fmt: skip
+    rows, failed, asked = [], 0, 0
+    for cik in todo["cik"].to_list():
+        if asked >= max_calls or budget.spent():
+            break
+        asked += 1
+        try:
+            a = fetch(cik)
+        except FetchError:
+            failed += 1
+            continue
+        rows.append({"cik": cik, "form": a.form, "filed": a.filed, "ratio": a.ratio, "source": a.source, "checked": today})
+    if rows:
+        done = pl.DataFrame(rows, schema=ADR_SCHEMA)
+        table = pl.concat([table.filter(~pl.col("cik").is_in(done["cik"].to_list())), done])
+        lake.write(ADR_TABLE, table.sort("cik"))
+    if failed:
+        flags.append({"type": "adr_lookup_failed", "count": failed})
+    filers = table.filter(pl.col("form") == "20-F")
+    stats = {"companies": asked - failed, "owed": todo.height - asked, "filers": filers.height,
+             "ratios": filers.filter(pl.col("ratio").is_not_null()).height}  # fmt: skip
+    log.info("adr_ratios: %s", stats)
+    return stats
+
+
+def adr_ratios(lake: Lake, securities: pl.DataFrame, overrides: dict[str, float]) -> dict[str, float]:
+    """ticker -> ordinary shares per ADS: the 20-F lookups (`adr_ratios`), then `share_overrides.csv` on top
+    (a hand correction wins). Each lookup the CSV contradicts is logged, to fix one or the other."""
+    table = read_table(lake, ADR_TABLE, ADR_SCHEMA).filter(pl.col("ratio").is_not_null() & (pl.col("ratio") > 0))
+    found = securities.filter(pl.col("ticker").is_not_null()).join(table.select("cik", "ratio"), on="cik").select("ticker", "ratio")
+    out = dict(found.iter_rows())
+    for ticker, r in overrides.items():
+        if ticker in out and abs(out[ticker] - r) > 0.01 * r:
+            log.warning("adr ratio: %s is %s in share_overrides.csv but %s in its 20-F", ticker, r, out[ticker])
+    out.update(overrides)
+    return out
+
+
 def stock_paths(stocks: pl.DataFrame, labels: dict, sic: SicTable) -> tuple[dict[int, str], dict[int, str], int]:
     """(stock_id -> vertical path, stock_id -> how, ids skipped by the ticker guard) for `stocks` (stock_id,
     ticker, sic). A CSV row whose ticker no longer matches the lake's is not trusted (the lake's ids moved, or
@@ -135,8 +208,8 @@ def build_sector_returns(
     h = load()
     labels = assign.load_stock_labels(h=h) if labels is None else labels
     sic = SicTable.load(h=h) if sic is None else sic
-    adr = load_overrides() if adr is None else adr
     securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
+    adr = adr_ratios(lake, securities, load_overrides()) if adr is None else adr
     stocks = securities.filter(
         pl.struct("ticker", "sector").map_elements(lambda r: kind(r["ticker"] or "", r["sector"] or "") == "stock", return_dtype=pl.Boolean)
     )
@@ -482,9 +555,14 @@ def peak_mb() -> int:
 
 
 def recompute(
-    lake: Lake, fetch_shares: Callable[[int], list] | None = None, minutes: float = 90, part: str = "all", out_root: Path | None = None
+    lake: Lake,
+    fetch_shares: Callable[[int], list] | None = None,
+    minutes: float = 90,
+    part: str = "all",
+    out_root: Path | None = None,
+    fetch_adr: Callable[[int], Adr] | None = None,
 ) -> dict:
-    """`orca.run sectors`: share-count history (when `fetch_shares` is given), the indices and the scores, from
+    """`orca.run sectors`: share-count history (when `fetch_shares` is given), ADS ratios (`fetch_adr`), the indices and the scores, from
     the lake. Its own workflow step after the monthly run's lake is saved (so it can never cost that run), and
     the whole job after a relabel (`sectors_only`). `part` = "indices" (share counts and indices) or "scores"
     (fund scores) runs one half, so the workflow saves the indices before scoring starts. No fund compute,
@@ -510,6 +588,8 @@ def recompute(
     if fetch_shares is not None:
         securities = read_table(lake, "securities", SECURITIES_TABLE_SCHEMA)
         out["shares"] = update_share_history(lake, fetch_shares, securities, flags, budget, date.today())
+        if fetch_adr is not None:
+            out["adr"] = update_adr_ratios(lake, fetch_adr, securities, flags, budget, date.today())
         del securities
         log.info("shares: peak %d MB", peak_mb())
     out["sectors"] = build_sector_returns(lake, last_q, flags)

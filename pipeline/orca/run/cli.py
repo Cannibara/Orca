@@ -69,10 +69,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sectors":
         from orca.run.sectors_step import recompute
 
-        fetch = production_sources().shares_history if args.part in ("all", "indices") else None
-        stats = recompute(Lake(config.LAKE_DIR), fetch, part=args.part, out_root=config.OUT_DIR)
-        if "shares" in stats:
-            print(f"shares: {json.dumps(stats['shares'], sort_keys=True)}")
+        sources = production_sources() if args.part in ("all", "indices") else None
+        stats = recompute(
+            Lake(config.LAKE_DIR),
+            sources.shares_history if sources else None,
+            part=args.part,
+            out_root=config.OUT_DIR,
+            fetch_adr=sources.adr_ratio if sources else None,
+        )
+        for key in ("shares", "adr"):
+            if key in stats:
+                print(f"{key}: {json.dumps(stats[key], sort_keys=True)}")
         for key in ("sectors", "skill", "files"):
             if key in stats:
                 print(f"{key}: {json.dumps(stats[key], sort_keys=True)}")

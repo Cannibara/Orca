@@ -1,10 +1,16 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-23
+Last verified: 2026-11-24
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-24 — Sector indices: market caps from SEC counts made consistent, ADR ratios read from 20-Fs (owner: "keep iterating")
+- Decision (chat): fix the indices by patterns, not stock by stock. The owner approved each fix and run (PRs #63–#73) and then asked to "keep iterating by discovering patterns of issues and plugging them with scalable solutions".
+- What the runs showed (WORKLOG runs 39–45): a market cap is a price times an SEC cover-page count, and four kinds of error put single stocks at 5–99% of the market: (1) the price and the count on different sides of a split; (2) counts scaled 1,000x or 1,000,000x, most in the first XBRL filings of 2009–11; (3) ADRs counted in ordinary shares; (4) before a company's first count, today's count, or a slipped first count, standing in.
+- Now (code `engine/sectors.todays_counts`, `market_caps`): every count goes to today's share basis with the splits after its date. 1,000^k jumps between counts as reported with no split between them are divided out. Counts 5x off the 9 around them are dropped. Before a company's first count, its earliest clean count stands in. ADR ratios are read from each filer's latest 20-F (`sec/adr.py`, lake table `adr_ratios`: 63 of 64 known ratios read right, none wrong), with `share_overrides.csv` on top for hand corrections. The guards (15% of the market, count jumps, +300% quarters) stay as a last net, and every run logs the stocks at 4%+ of the market.
+- Known limit: no SEC count exists before 2009, so a company that issued many shares in 2008–10 (Citigroup, Lloyds) reads too big before then.
 
 ## 2026-11-23 — Licensing for the sector panels: approved (owner)
 - Decision (chat): the owner is "Ok with licensing" for showing figures built from Tiingo prices (L1) and Damodaran's industry lists (R10) on the site, the gate DECISIONS 2026-11-16 deferred "until something is shown on the site" and 2026-11-21 left open. PR #61 (the Specialization tab and the sector files) may merge.

@@ -7,8 +7,9 @@ table `shares_hist`. Counts are as reported, on the share basis of their `end` d
 sector step turns them to today's basis with the splits after that date, to pair with split-adjusted closes, and
 drops the slips (`engine/sectors.todays_counts`).
 
-ADRs: a 20-F filer reports ordinary shares, but the price is per ADR, so `data/share_overrides.csv` gives the
-ordinary shares per ADR for the big ones (TSM: 5).
+ADRs: a 20-F filer reports ordinary shares, but the price is per ADR, so the count is divided by the ordinary
+shares per ADR: read from each filer's 20-F (lake table `adr_ratios`, `sec/adr.py`), with
+`data/share_overrides.csv` on top for hand corrections (TSM: 5).
 """
 
 from __future__ import annotations

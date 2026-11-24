@@ -11,6 +11,7 @@ from orca.famous import Famous, SearchScores, load_ranked_famous, load_search
 from orca.http import FigiClient
 from orca.prices import PriceSource
 from orca.sec.about import About
+from orca.sec.adr import Adr
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-201
         Callable[[str, set[str], dict], tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]] | None
     ) = None
     shares_history: Callable[[int], list] | None = None  # None: the share-count history is not kept
+    adr_ratio: Callable[[int], Adr] | None = None  # a company's ADS ratio from its 20-F (`sec.adr`); None: not looked up
     # A fund's SEC facts for the About tab (`sec.about.fetch_about`); None: not looked up.
     fund_about: Callable[[int], About | None] | None = None
 
@@ -54,6 +56,7 @@ def production_sources() -> Sources:
     from orca.prices import TiingoSource
     from orca.rf import fetch_tbill
     from orca.sec.about import fetch_about
+    from orca.sec.adr import fetch_adr
     from orca.sec.bulk import list_bulk_zips
     from orca.sec.legacy import fetch_quarter
     from orca.sec.live import fetch_new_filings
@@ -79,6 +82,7 @@ def production_sources() -> Sources:
         sic=lambda cik: fetch_sic(sec, cik),
         shares_outstanding=lambda cik: fetch_shares_outstanding(sec, cik),
         shares_history=lambda cik: fetch_shares_history(sec, cik),
+        adr_ratio=lambda cik: fetch_adr(sec, cik),
         fund_about=lambda cik: fetch_about(sec, cik),
         prices=TiingoSource(tiingo_client()),
         tbill=lambda: fetch_tbill(fred),
