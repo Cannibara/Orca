@@ -137,3 +137,20 @@ def test_the_cap_report_names_a_share_count_slip():
     r = sectors.cap_report(quarters(rows), labels, last_q=11)
     assert r["jumps"]["stock_id"].to_list() == [50]
     assert r["sector"]["stock_id"].to_list() == [50]  # half or more of a sector of 12
+
+
+def test_a_share_count_slip_and_a_price_jump_sit_out_and_are_reported():
+    # stock 2's count reads a million times too big in q11 only (Oracle in run 40); stock 3 "returns" +900% in q11
+    rows = [(1, q, 10.0, 0, 10.0, 1e10, False) for q in (10, 11, 12)]
+    rows += [(2, 10, 10.0, 0, 10.0, 1e10, False), (2, 11, 10.0, 0, 10.0, 1e16, False), (2, 12, 11.0, 0, 10.5, 1.1e10, False)]
+    rows += [(3, 10, 1.0, 0, 1.0, 1e9, False), (3, 11, 10.0, 0, 5.0, 1e10, False), (3, 12, 10.0, 0, 10.0, 1e10, False)]
+    labels = {1: A, 2: A, 3: A}
+    gone: list = []
+    movers: list = []
+    out = sectors.index_returns(quarters(rows), labels, last_q=12, set_aside=gone, movers=movers)
+    m = series(out, sectors.MARKET)
+    assert m[11]["ret"] == pytest.approx(0.0)  # stock 3's +900% is left out
+    assert m[12]["n"] == 2 and m[12]["ret"] == pytest.approx(0.0)  # stock 2 sits out q12: its q11 weight was a slip
+    why = {(r["stock_id"], r["why"]) for r in pl.concat(gone).iter_rows(named=True)}
+    assert (2, "count jump") in why and (3, "price jump") in why
+    assert pl.concat(movers).is_empty()  # nothing left that moved the market 3 points

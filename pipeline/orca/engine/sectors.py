@@ -39,6 +39,13 @@ __all__ = ["MARKET", "QUARTER_SCHEMA", "SHARES_SCHEMA", "cap_report", "index_ret
 # for the share to mean that (a tiny universe, as in the demo, is left alone).
 MAX_MARKET_WEIGHT = 0.15
 MIN_MARKET_STOCKS = 100
+# Run 40's cap report showed single-quarter share counts a million times too big (Oracle, Clorox, Exelon...) and
+# prices that jump by multiples: data slips, not markets. A quarter whose implied share count (cap over close) moves
+# 5x or more against the quarter before keeps its price but not its cap, so the stock sits out of the next quarter's
+# weights; a quarterly return over +300% (MAX_RETURN) sits out of that quarter. A small cap that really quadruples
+# barely moves a cap-weighted index, so little is lost.
+MAX_SHARE_JUMP = 5.0
+MAX_RETURN = 3.0
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
@@ -89,6 +96,19 @@ def market_caps(sq: pl.DataFrame, hist: pl.DataFrame, securities: pl.DataFrame, 
     return out.select("stock_id", pl.col("q").cast(pl.Int32), "cap"), set(out.filter("fallback")["stock_id"].to_list())
 
 
+def _drop_count_slips(s: pl.DataFrame, report: list | None) -> pl.DataFrame:
+    """`s` (one row per stock and quarter, sorted) with the cap set to null where the implied share count moved
+    MAX_SHARE_JUMP-fold or more against the quarter before; those rows go to `report`."""
+    sh = (pl.col("cap") / pl.col("cap").shift(1).over("stock_id")) / (pl.col("close") / pl.col("close").shift(1).over("stock_id"))
+    s = s.with_columns(_sh=sh)
+    slip = (pl.col("_sh") >= MAX_SHARE_JUMP) | (pl.col("_sh") <= 1 / MAX_SHARE_JUMP)
+    if report is not None:
+        bad = s.filter(slip)
+        if not bad.is_empty():
+            report.append(bad.select("stock_id", "q", "cap", pl.col("_sh").alias("weight"), pl.lit("count jump").alias("why")))
+    return s.with_columns(cap=pl.when(slip).then(None).otherwise(pl.col("cap"))).drop("_sh")
+
+
 def _set_aside_outsized(r: pl.DataFrame, report: list | None) -> pl.DataFrame:
     """`r` without the stock-quarters whose start-of-quarter cap is over MAX_MARKET_WEIGHT of the quarter's total,
     in quarters with MIN_MARKET_STOCKS or more; repeated, as setting one aside raises the others' shares. The rows
@@ -103,21 +123,26 @@ def _set_aside_outsized(r: pl.DataFrame, report: list | None) -> pl.DataFrame:
         out = w.filter(big)
         if out.is_empty():
             break
-        gone.append(out.select("stock_id", "q", pl.col("cap_p").alias("cap"), pl.col("_w").alias("weight")))
+        gone.append(out.select("stock_id", "q", pl.col("cap_p").alias("cap"), pl.col("_w").alias("weight"), pl.lit("outsized").alias("why")))
         r = w.filter(~big).drop("_w", "_n")
     if report is not None and gone:
         report.append(pl.concat(gone))
     return r.drop("_w", "_n", strict=False)
 
 
-def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int, set_aside: list | None = None) -> pl.DataFrame:
+def index_returns(
+    sq: pl.DataFrame, labels: dict[int, str], last_q: int, set_aside: list | None = None, movers: list | None = None
+) -> pl.DataFrame:
     """One row per hierarchy label (every tier, and MARKET) and quarter with a return, up to `last_q`.
 
     `sq` has QUARTER_SCHEMA columns (cap = market cap at that quarter's end); `labels` maps stock_id to its
-    vertical path. Stocks without a label are left out, and so are outsized caps (`_set_aside_outsized`; the rows
-    go to `set_aside` when a list is given)."""
+    vertical path. Stocks without a label are left out, and so are data slips: share-count jumps
+    (`_drop_count_slips`), returns over MAX_RETURN and outsized caps (`_set_aside_outsized`). The rows set aside go
+    to `set_aside` (stock_id, q, cap, weight, why) and, per quarter, the stocks that moved the market 3 points or more
+    to `movers` (stock_id, q, weight, r, pts), when lists are given."""
     lab = pl.DataFrame({"stock_id": list(labels), "path": list(labels.values())}, schema={"stock_id": pl.Int32, "path": pl.String})
     s = sq.filter(pl.col("q") <= last_q).join(lab, on="stock_id").sort("stock_id", "q")
+    s = _drop_count_slips(s, set_aside)
     prev = s.select("stock_id", (pl.col("q") + 1).alias("q"), pl.col("close").alias("close_p"), pl.col("cap").alias("cap_p"), pl.col("stale").alias("stale_p"))
     last = s.group_by("stock_id").agg(pl.col("q").max().alias("q_last"))
     r = (
@@ -133,7 +158,19 @@ def index_returns(sq: pl.DataFrame, labels: dict[int, str], last_q: int, set_asi
             market=pl.lit(MARKET),
         )
     )  # fmt: skip
+    jump = pl.col("r") > MAX_RETURN
+    if set_aside is not None:
+        bad = r.filter(jump)
+        if not bad.is_empty():
+            set_aside.append(bad.select("stock_id", "q", pl.col("cap_p").alias("cap"), pl.col("r").alias("weight"), pl.lit("price jump").alias("why")))
+    r = r.filter(~jump)
     r = _set_aside_outsized(r, set_aside)
+    if movers is not None:
+        m = r.with_columns(w=pl.col("cap_p") / pl.col("cap_p").sum().over("q")).with_columns(pts=pl.col("w") * pl.col("r"))
+        movers.append(
+            m.filter(pl.col("pts").abs() >= 0.03).sort("q", "pts", descending=[False, True])
+            .select("stock_id", "q", pl.col("w").alias("weight"), "r", "pts")
+        )  # fmt: skip
     parts = []
     for tier, key in enumerate(("market", "sector", "industry", "vertical")):
         g = r.group_by(key, "q").agg(

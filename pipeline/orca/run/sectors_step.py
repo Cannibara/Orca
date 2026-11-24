@@ -159,9 +159,10 @@ def build_sector_returns(
     _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr)  # the health figure: today only
     sq = sq.join(caps, on=["stock_id", "q"], how="left").select(*QUARTER_SCHEMA.names()).cast(QUARTER_SCHEMA)
     set_aside: list = []
-    out = index_returns(sq, paths, last_q, set_aside)
+    movers: list = []
+    out = index_returns(sq, paths, last_q, set_aside, movers)
     lake.write("sector_returns", out)
-    _log_caps(sq, paths, last_q, set_aside, securities, flags)
+    _log_caps(sq, paths, last_q, set_aside, movers, securities, flags)
     latest = caps.filter(pl.col("q") == last_q)
     total = latest["cap"].sum() or 1.0
     unlabelled = latest.filter(~pl.col("stock_id").is_in(list(paths)))["cap"].sum()
@@ -179,7 +180,9 @@ def build_sector_returns(
     return stats
 
 
-def _log_caps(sq: pl.DataFrame, paths: dict[int, str], last_q: int, set_aside: list, securities: pl.DataFrame, flags: list) -> None:
+def _log_caps(
+    sq: pl.DataFrame, paths: dict[int, str], last_q: int, set_aside: list, movers: list, securities: pl.DataFrame, flags: list
+) -> None:
     """Log the caps worth a look (engine/sectors.cap_report) and the stock-quarters the indices set aside, with
     ticker and name, so a bad share count (an ADR without its ratio in share_overrides.csv) is named in the run's
     log. Tickers and caps only; the lake's CUSIPs never appear."""
@@ -188,13 +191,18 @@ def _log_caps(sq: pl.DataFrame, paths: dict[int, str], last_q: int, set_aside: l
         for r in rows.join(names, on="stock_id", how="left").iter_rows(named=True):
             log.info("caps %s: %s (%s, id %s) q%s %s cap $%sbn %s", kind, r["ticker"], r["name"], r["stock_id"], r["q"],
                      r["sector"], f"{r['cap'] / 1e9:,.1f}", r["weight"])  # fmt: skip
+    if movers:
+        for r in pl.concat(movers).join(names, on="stock_id", how="left").iter_rows(named=True):
+            log.info("caps movers: q%s %s (%s, id %s) weight %.1f%% return %+.0f%% moved the market %+.1f pts", r["q"], r["ticker"],
+                     r["name"], r["stock_id"], 100 * r["weight"], 100 * r["r"], 100 * r["pts"])  # fmt: skip
     if set_aside:
         gone = pl.concat(set_aside).join(names, on="stock_id", how="left")
-        per = gone.group_by("stock_id", "ticker", "name").agg(pl.len().alias("quarters"), pl.col("weight").max().round(3).alias("max_weight"))
-        for r in per.sort("max_weight", descending=True).iter_rows(named=True):
-            log.warning("caps set aside: %s (%s, id %s) in %d quarters, up to %.1f%% of the market", r["ticker"], r["name"],
-                        r["stock_id"], r["quarters"], 100 * r["max_weight"])  # fmt: skip
-        flags.append({"type": "caps_set_aside", "stocks": per.height, "stock_ids": sorted(per["stock_id"].to_list())[:20]})
+        per = gone.group_by("why", "stock_id", "ticker", "name").agg(pl.len().alias("quarters"), pl.col("weight").max().alias("worst"))
+        for r in per.sort("why", "worst", descending=[False, True]).iter_rows(named=True):
+            log.warning("caps set aside (%s): %s (%s, id %s) in %d quarters, worst %.3g", r["why"], r["ticker"], r["name"],
+                        r["stock_id"], r["quarters"], r["worst"])  # fmt: skip
+        counts = dict(per.group_by("why").len().iter_rows())
+        flags.append({"type": "caps_set_aside", **counts})
 
 
 SKILL_TRADES = 300_000  # trades per replay chunk: a few giant funds hold millions, so chunk by trades, not funds

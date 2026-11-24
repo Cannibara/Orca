@@ -5,6 +5,14 @@ Last verified: 2026-11-23
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-24 — Run 40: the guard caught 64 bad caps; years still off, so two more filters and a movers report
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 40 (`sectors_only`, `main` d8aae32): all steps green; 15,489 funds' files published (175.6 MB, largest 44.8 KB); the Specialization tab stays on hold. The cap report found far more than LATAM: single-quarter share counts ~10^6 too big for large US companies (Oracle q−2, Clorox q0, Exelon q−11, Yum q15, Chubb, Truist, AEP...) and reverse-split penny stocks read as quadrillions (Top Ships for 31 quarters, Biodexa, Aditxt, Euronet q32). The 15% guard set aside 64 stocks | First run with the cap report | — |
+| After it: no sector has one stock over 38% (Communication), and Berkshire's market IRR is +8.5% a year (SPY +11.6%). But years still differ from SPY: 2013 +66% vs +32%, 2018 +37% vs −5%, 2021 +2% vs +29%, 2022 −32% vs −18% (Berkshire, Pershing, Tiger Global alike) | Errors too small for the 15% guard | — |
+| Two more filters in `index_returns`: a quarter whose implied share count (cap ÷ close) moves 5x or more against the quarter before loses its cap (the stock sits out the next quarter's weights), and a quarterly return over +300% sits out. Each indices run now also logs, per quarter, the stocks that moved the market 3 points or more ("caps movers"), with weight and return. The set-aside log says why ("count jump", "price jump", "outsized"). Demo unchanged | Name the remaining culprits by year, and drop the slips the report showed | `pipeline/orca/engine/sectors.py`, `run/sectors_step.py`, `tests/test_sectors.py` |
+
 ## 2026-11-23 — The culprit: LATAM Airlines' ADR ratio; a guard and a cap report for the indices
 
 | What changed | Why | Files |
