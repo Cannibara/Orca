@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-11-22 (the sector files and their publish part from the code; `spx_window` in the `home.py` row from the code; `famous_rank.csv` from the code; `fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
+Last verified: 2026-11-24 (market caps from the code; the sector files and their publish part from the code; `spx_window` in the `home.py` row from the code; `famous_rank.csv` from the code; `fund_about` and the About step, `weekly.json` quarter-end closes, from the code; pre-2013 history from text filings; vendor-ticker repair; the `hierarchy/` row from the code on 2026-11-16; `shares_hist`, `sector_returns`, `fund_flows`, `fund_skill` from the code on 2026-11-17; workbook section from code and the 2026-11-10 spec; pipeline facts from a full read of `pipeline/orca`; web and hosting checked in code and with curl against the live site)
 
 ## Overview
 
@@ -152,7 +152,7 @@ Run size (chat, 2026-11-02): 13,314 funds, 74,358 files on a full publish, ~80 m
 | `vendor_tickers` | stock_id, ticker, end |
 | `rf` | year i32, rate f64 (decimal); from 1999 (`rf.START`), fetched again when the stored table starts later |
 | `fund_about` | cik i64, name, street, city, state, incorporated, sic, tickers list[str], exchanges list[str], former_names list[{name, from date, to date}], signer, signer_title, signed date, other_managers list[str], accession, filed date (the 13F the row was read from; the lake's newest when the record lists none), fetched date. One row per fund, as the SEC gives it; `run/about_step.update_fund_about` (two SEC calls a fund) |
-| `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history` |
+| `shares_hist` | stock_id i32, end date, filed date, shares f64 (as reported, on the share basis of `end`; null = the company reports no count). One SEC call per company, `run/sectors_step.update_share_history`. The sector indices' market cap = split-adjusted close × the count filed by the quarter end (before the first one, the earliest), times the splits after its `end` (`engine/sectors.market_caps`) |
 | `sector_returns` | label (hierarchy path, or `Market`), tier i8 (0 market, 1 sector, 2 industry, 3 vertical), q, ret, level_end, level_avg, n, cap, top_weight (`engine/sectors.py`; not published as such: the sector files below are built from it) |
 | `stock_quarters` | stock_id, q, close, div, vwap (split-adjusted; stocks and ETFs), written with `sector_returns` |
 | `fund_flows`, `fund_flows_run/bNNNNN` | cik, stock_id, q, delta, px, shares_after: each fund's trades over its tracking segment, merged like `fund_state` but streamed (each part sorted, a sorted merge on cik, `Lake.sink`): ~85M rows with the history from 1999 |

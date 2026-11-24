@@ -1,9 +1,18 @@
 # Worklog
 
-Last verified: 2026-11-23
+Last verified: 2026-11-24
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-24 — Run 41: the filters dropped big names at their splits; share counts now follow the splits
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 41 (`sectors_only`, `main` 28da3bd): all steps green, files published, tab still on hold. The new count-jump filter set aside big names at their split quarters (Nvidia, Amazon, Apple, Netflix, Mastercard, Tesla, Chipotle), and reverse-split penny stocks (BioLineRx, Ridgetech, Meiwu, Greenlane, MSP Recovery) still weighed 4–14% of the market in single quarters. Berkshire's market IRR fell to +4.8% a year (SPY +11.6%); years still off (2003, 2005, 2009, 2013, 2021, 2022, 2024) | The "caps movers" and "caps set aside" lines | — |
+| Root cause: a quarter-end price after a split was paired with a share count dated before it (the count filed by the quarter end is often months old), so caps read 10x too small after a split and 50x too big after a reverse split. Now cap = split-adjusted close × the filed count turned to today's share basis by the splits dated after the count's own date. Price and count always stand on the same basis | Proper fix instead of more filters | `pipeline/orca/engine/sectors.py` (`market_caps(..., splits)`), `pipeline/orca/shares_hist.py` (`shares_asof` returns `end`), `run/sectors_step.py` (collects the splits from the daily bars) |
+| Before a company's first filed count, the cap now uses that earliest count (on today's basis), not today's count: companies that later issued 1000s of times their shares (most of the penny stocks above; foreign filers whose SEC counts start in 2017+) read as giants in 2013 | Second source of the penny-stock weights | same |
+| Checks: two tests rewritten/new (a 10-for-1 split and a 1-for-50 reverse split between count and quarter end; the earliest-count fallback); pipeline suite green. Next: merge, run `sectors_only`, compare years with SPY for Berkshire, Pershing, Tiger Global, then ask to lift the hold | | `pipeline/tests/test_sectors.py` |
 
 ## 2026-11-24 — Run 40: the guard caught 64 bad caps; years still off, so two more filters and a movers report
 

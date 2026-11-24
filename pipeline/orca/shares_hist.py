@@ -3,7 +3,8 @@
 `securities.shares_out` holds only the latest cover-page count, so today's count times a past price misweights
 the past (Apple's count fell about 40% since 2013). The SEC companyconcept JSON that lookup downloads holds the
 whole history of `dei:EntityCommonStockSharesOutstanding`; this keeps it, one row per period end, in the lake
-table `shares_hist`. Counts are as reported, so they pair with raw (not split-adjusted) closes.
+table `shares_hist`. Counts are as reported, on the share basis of their `end` date (the cover-page date); the
+sector step turns them to today's basis with the splits after that date, to pair with split-adjusted closes.
 
 ADRs: a 20-F filer reports ordinary shares, but the price is per ADR, so `data/share_overrides.csv` gives the
 ordinary shares per ADR for the big ones (TSM: 5).
@@ -50,14 +51,15 @@ def frame(stock_id: int, rows: list[tuple[date, date, float]]) -> pl.DataFrame:
 
 
 def shares_asof(table: pl.DataFrame, dates: list[date]) -> pl.DataFrame:
-    """stock_id, asof, shares: on each date, the count of the latest period end filed by then."""
+    """stock_id, asof, shares, end: on each date, the count of the latest period end filed by then, and that
+    period end (the day the count is as of, which a split after it changes the basis of)."""
     parts = []
     for d in dates:
         known = table.filter((pl.col("filed") <= d) & pl.col("shares").is_not_null())
         if known.height:
-            parts.append(known.sort("end", "filed").group_by("stock_id").last().select("stock_id", pl.lit(d).alias("asof"), "shares"))
+            parts.append(known.sort("end", "filed").group_by("stock_id").last().select("stock_id", pl.lit(d).alias("asof"), "shares", "end"))
     if not parts:
-        return pl.DataFrame(schema={"stock_id": pl.Int32, "asof": pl.Date, "shares": pl.Float64})
+        return pl.DataFrame(schema={"stock_id": pl.Int32, "asof": pl.Date, "shares": pl.Float64, "end": pl.Date})
     return pl.concat(parts)
 
 
