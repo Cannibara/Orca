@@ -138,20 +138,35 @@ def test_market_caps_put_the_filed_count_on_the_prices_split_basis():
 def test_todays_counts_drop_the_slips_of_the_first_cover_pages():
     ends = [date(2009 + i // 4, 3 * (i % 4) + 1, 28) for i in range(12)]
     # stock 1 (Truist): its first count read 648 trillion; stock 2 (BioNTech): its first two 1,000x; stock 3: a
-    # 10-for-1 split in 2011, its counts as reported (they are not slips); stock 4: a slip in the middle
+    # 10-for-1 split in 2011, its counts as reported (they are not slips); stock 4: a slip in the middle; stock 5: a
+    # 40x slip, not a power of 1,000, which the median drops
     def rows(sid, counts):
         return [(sid, e, e + timedelta(days=10), c) for e, c in zip(ends, counts)]
     data = rows(1, [6.48e14] + [6.9e8] * 11) + rows(2, [2.3e11, 2.4e11] + [2.4e8] * 10)
-    data += rows(3, [1e8] * 8 + [1e9] * 4) + rows(4, [5e7] * 5 + [5e13] + [5e7] * 6)
+    data += rows(3, [1e8] * 8 + [1e9] * 4) + rows(4, [5e7] * 5 + [5e13] + [5e7] * 6) + rows(5, [2e8] * 3 + [8e9] + [2e8] * 8)
     hist = pl.DataFrame(data, schema=sectors.SHARES_SCHEMA, orient="row")
     splits = pl.DataFrame({"stock_id": [3], "date": [date(2011, 1, 3)], "split_factor": [10.0]})
     got = sectors.todays_counts(hist, splits)
-    kept = {sid: got.filter(pl.col("stock_id") == sid)["shares"].to_list() for sid in (1, 2, 3, 4)}
-    assert kept[1] == [6.9e8] * 11 and kept[2] == [2.4e8] * 10 and kept[4] == [5e7] * 11
+    kept = {sid: got.filter(pl.col("stock_id") == sid)["shares"].to_list() for sid in (1, 2, 3, 4, 5)}
+    assert kept[1] == pytest.approx([6.48e8] + [6.9e8] * 11) and kept[2] == pytest.approx([2.3e8] + [2.4e8] * 11)
+    assert kept[4] == pytest.approx([5e7] * 12) and kept[5] == [2e8] * 11
     assert kept[3] == [1e9] * 12  # the 2009–10 counts on today's basis
 
 
-def test_market_caps_before_the_first_clean_count_use_it_not_the_slip():
+def test_todays_counts_divide_out_thousands_slips_even_where_they_are_most_of_a_stretch():
+    ends = [date(2011 + i // 4, 3 * (i % 4) + 2, 1) for i in range(12)]
+    cpk = [2.22e7, 2.227e10, 2.245e10, 2.278e10, 2.298e7, 2.333e10, 2.354e10, 2.365e10, 2.394e7, 2.40e7, 2.41e7, 2.445e7]
+    mei = [3.702e10] * 4 + [3.706e7] * 8
+    data = [(1, e, e + timedelta(days=5), c) for e, c in zip(ends, cpk)] + [(2, e, e + timedelta(days=5), c) for e, c in zip(ends, mei)]
+    data += [(3, e, e + timedelta(days=5), c) for e, c in zip(ends, [1e6 * 2**i for i in range(12)])]  # a diluter, doubling
+    got = sectors.todays_counts(pl.DataFrame(data, schema=sectors.SHARES_SCHEMA, orient="row"))
+    kept = {sid: got.filter(pl.col("stock_id") == sid)["shares"].to_list() for sid in (1, 2, 3)}
+    assert len(kept[1]) == 12 and max(kept[1]) < 2.5e7 and min(kept[1]) > 2.2e7
+    assert kept[2] == pytest.approx([3.702e7] * 4 + [3.706e7] * 8)
+    assert kept[3] == [1e6 * 2**i for i in range(12)]  # real growth is left alone
+
+
+def test_market_caps_before_the_first_count_use_it_with_its_slip_divided_out():
     sq = pl.DataFrame({"stock_id": [1, 1], "q": [-20, 0], "close": [20.0, 30.0], "raw_close": [20.0, 30.0]})  # 2008 Q1, 2013 Q1
     hist = pl.DataFrame({"stock_id": [1, 1, 1], "end": [date(2009, 7, 31), date(2009, 10, 31), date(2010, 1, 31)],
                          "filed": [date(2009, 8, 13), date(2009, 11, 9), date(2010, 2, 26)], "shares": [6.48e14, 6.88e8, 6.91e8]},
@@ -159,7 +174,7 @@ def test_market_caps_before_the_first_clean_count_use_it_not_the_slip():
     securities = pl.DataFrame({"stock_id": [1], "ticker": ["TFC"], "cik": [92230], "shares_out": [1.3e9]})
     caps, fallback = sectors.market_caps(sq, hist, securities, {})
     got = {r["q"]: r["cap"] for r in caps.iter_rows(named=True)}
-    assert got[-20] == pytest.approx(20.0 * 6.88e8)  # before any filing: the first clean count, not 648 trillion
+    assert got[-20] == pytest.approx(20.0 * 6.48e8)  # before any filing: the first count, 648 trillion divided out
     assert got[0] == pytest.approx(30.0 * 6.91e8)
     assert fallback == {1}  # 2008 had no count filed by then
 
