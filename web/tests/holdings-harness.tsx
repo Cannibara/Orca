@@ -1,6 +1,7 @@
 // The Holdings tab as tests mount it, with the state the fund page keeps (useHoldingsState). TableOnly leaves
 // the tree map out: its colours ask for weekly files of their own, which the tests of the table's loading and
 // of the background prefetch must not see. Holdings is the whole tab, as Fund.tsx mounts it.
+import { useRef } from "react";
 import type { Stock } from "../src/data/api";
 import type { PositionRow, Summary } from "../src/data/types";
 import { fmtLong } from "../src/fund/fmt";
@@ -23,12 +24,27 @@ function TableOnlyInner({ fundId, summary, positions, prices, stocks, asof }: Ha
   const h = useHoldingsState(summary, positions, prices, asof);
   const { qs, qe } = periodOf(h.period);
   const data = usePositionData({ positions: h.positions, tl: h.tl, prices, stocks, qs, qe, store: h.store });
+  const tableRef = useRef<HTMLDivElement>(null); // as HoldingsTab does: the table's wheel steps the picker
   return (
     <WeeklyStoreContext.Provider value={h.store}>
       <section className="panel" id="holdPanel" aria-labelledby="holdTitle">
-        <PeriodPicker state={h.period} onChange={h.setPeriod} tl={h.tl} title="Holdings" titleId="holdTitle" asOf={periodAsOf(h.period, h.tl)} />
+        <PeriodPicker
+          state={h.period}
+          onChange={h.setPeriod}
+          tl={h.tl}
+          title="Holdings"
+          titleId="holdTitle"
+          asOf={periodAsOf(h.period, h.tl)}
+          wheelOn={tableRef}
+        />
       </section>
-      <PositionsPanel fundId={fundId} data={data} asOf={"Positions and prices as of " + fmtLong(endDate(h.tl, qe))} latest={prices} />
+      <PositionsPanel
+        fundId={fundId}
+        data={data}
+        asOf={"Positions and prices as of " + fmtLong(endDate(h.tl, qe))}
+        latest={prices}
+        tableRef={tableRef}
+      />
     </WeeklyStoreContext.Provider>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useTooltip, type TipContent } from "../charts/Tooltip";
 import type { Weekly } from "../data/types";
 import { money, pct } from "../lib/format";
@@ -123,9 +123,11 @@ type Props = {
   data: PositionData;
   /** Latest close of every stock that has one: the newest quarter's prices. */
   prices: Map<number, number>;
+  /** The Positions table's box: its mouse wheel steps the picker's periods too (see PeriodPicker `wheelOn`). */
+  tableRef?: RefObject<HTMLElement | null>;
 };
 
-export function HoldingsPanel({ h, data, prices }: Props) {
+export function HoldingsPanel({ h, data, prices, tableRef }: Props) {
   const { tl, period, setPeriod, store } = h;
   const tip = useTooltip();
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -329,7 +331,7 @@ export function HoldingsPanel({ h, data, prices }: Props) {
 
   return (
     <section className="panel" id="holdPanel" aria-labelledby="holdTitle" ref={panelRef}>
-      <PeriodPicker state={period} onChange={setPeriod} tl={tl} title="Holdings" titleId="holdTitle" asOf={asOf} alsoOn={boxRef} />
+      <PeriodPicker state={period} onChange={setPeriod} tl={tl} title="Holdings" titleId="holdTitle" asOf={asOf} alsoOn={boxRef} wheelOn={tableRef} />
       <div className="tm-pb">
         <div className={"tm-box" + (loading ? " is-loading" : "")} ref={boxRef} style={{ height: H }}>
           <svg
