@@ -15,6 +15,15 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Known limit: before 2009 (no SEC count yet) a company's earliest count stands in, so one that issued many shares in 2008–10 reads too big before then (Citigroup 4–7% in 1999–2007, Lloyds). Years before 2013 are within 7 points of SPY all the same | No count to use | — |
 | Checks: one new test (thousands slips in most of a stretch; a doubling diluter left alone), two updated (slips now divided out, not dropped); pipeline suite green; demo data unchanged | | `pipeline/tests/test_sectors.py` |
 
+## 2026-11-24 — Positions table: the mouse wheel steps the period again (desktop only)
+
+| What changed | Why | Files |
+|---|---|---|
+| The mouse wheel over the Positions table steps the period picker, same rules as over the tree map: down = earlier, only from rest (a page scroll in the last 300 ms keeps scrolling the page), the selected pill springs back at the ends. The picker lost this when it moved into the Holdings panel (PR #46) and the table had no wheel of its own | Owner: "reinstate as identical as the treemap" (chat) | `fund/PeriodPicker.tsx` (new `wheelOn` prop), `fund/HoldingsTab.tsx` (owns the table ref), `fund/HoldingsPanel.tsx`, `fund/PositionsPanel.tsx`, `fund/PositionsTable.tsx` (`wrapRef`) |
+| Wheel only, no swipe: a phone is too narrow for the 12 columns, so a sideways finger swipe on the table must keep scrolling them. Touch scrolling fires no wheel events, so nothing else was needed for phones | Owner: "do not put this for mobile" (chat) | same |
+| A sideways wheel (shift + wheel, a trackpad swipe: \|deltaX\| > \|deltaY\|) is now left to the browser everywhere the picker listens, so a narrow desktop window can still scroll the table's columns | Without it the table's columns could not be scrolled with a trackpad | `fund/PeriodPicker.tsx` |
+| Checks: 3 new tests (wheel on the table, sideways wheel, swipe on the table vs the tools); typecheck and all 1,207 web tests green; checked in Chromium on the demo fund (wheel steps Q2 ’26 ↔ Q1 ’26, page does not move, sideways wheel does nothing). Side effect to know: with the pointer over the table and the page at rest, a wheel turn changes the quarter instead of scrolling the page | | `tests/fund-positions-ui.test.tsx`, `tests/holdings-harness.tsx` |
+
 ## 2026-11-24 — Run 42: splits fixed; bad early SEC counts and three ADR ratios are what is left
 
 | What changed | Why | Files |

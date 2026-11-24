@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { Stock } from "../data/api";
 import { fmtLong } from "./fmt";
 import { HoldingsPanel } from "./HoldingsPanel";
@@ -30,12 +30,20 @@ type Props = {
 export function HoldingsTab({ fundId, h, prices, stocks, tiles, returns }: Props) {
   const { qs, qe } = periodOf(h.period);
   const data = usePositionData({ positions: h.positions, tl: h.tl, prices, stocks, qs, qe, store: h.store });
+  // The table's box, so the mouse wheel over it steps the picker's periods like it does over the tree map.
+  const tableRef = useRef<HTMLDivElement>(null);
   return (
     <>
       {tiles}
-      <HoldingsPanel h={h} data={data} prices={prices} />
+      <HoldingsPanel h={h} data={data} prices={prices} tableRef={tableRef} />
       {returns}
-      <PositionsPanel fundId={fundId} data={data} asOf={"Positions and prices as of " + fmtLong(endDate(h.tl, qe))} latest={prices} />
+      <PositionsPanel
+        fundId={fundId}
+        data={data}
+        asOf={"Positions and prices as of " + fmtLong(endDate(h.tl, qe))}
+        latest={prices}
+        tableRef={tableRef}
+      />
     </>
   );
 }
