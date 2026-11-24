@@ -144,19 +144,25 @@ def build_sector_returns(
         flags.append({"type": "label_ticker_changed", "count": moved})
     etf_ids = securities.filter(pl.col("sector") == "ETF/Fund")["stock_id"].to_list()  # their own series, for ETF picks
     ids = stocks["stock_id"].to_list() + etf_ids
-    parts = []
+    parts, split_parts = [], []
     for i in range(0, len(ids), SECTOR_CHUNK):
         daily = load_daily(lake, ids[i : i + SECTOR_CHUNK])
         if not daily.is_empty():
             parts.append(stock_quarters(daily))
+            # the splits on record, to put each filed share count on the price's share basis
+            split_parts.append(
+                daily.filter(pl.col("split_factor").is_not_null() & (pl.col("split_factor") != 1.0))
+                .select(pl.col("stock_id").cast(pl.Int32), "date", pl.col("split_factor").cast(pl.Float64))
+            )
     if not parts:
         return {"stocks": 0}
     sq = pl.concat(parts)
     lake.write("stock_quarters", sq.select("stock_id", "q", "close", "div", "vwap"))
     sq = sq.filter(pl.col("stock_id").is_in(stocks["stock_id"].to_list()))
     hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
-    caps, fallback = market_caps(sq, hist, securities, adr)
-    _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr)  # the health figure: today only
+    splits = pl.concat(split_parts)
+    caps, fallback = market_caps(sq, hist, securities, adr, splits)
+    _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr, splits)  # the health figure: today only
     sq = sq.join(caps, on=["stock_id", "q"], how="left").select(*QUARTER_SCHEMA.names()).cast(QUARTER_SCHEMA)
     set_aside: list = []
     movers: list = []

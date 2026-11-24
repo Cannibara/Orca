@@ -95,19 +95,44 @@ def test_stock_quarters_take_the_last_close_its_date_raw_close_and_dividends():
     assert q9["vwap"] == pytest.approx(((6 + 5 + 5.5) / 3 + (7 + 5 + 6) / 3) / 2)
 
 
-def test_market_caps_use_the_count_filed_by_then_and_fall_back_to_todays_count():
-    sq = pl.DataFrame({"stock_id": [1, 1, 2, 3], "q": [10, 11, 11, 11], "close": [5.0, 6.0, 20.0, 7.0], "raw_close": [10.0, 12.0, 20.0, 7.0]})
-    hist = pl.DataFrame({"stock_id": [1, 1], "end": [date(2015, 6, 30), date(2015, 9, 30)],
-                         "filed": [date(2015, 8, 1), date(2015, 11, 1)], "shares": [100.0, 90.0]}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
-    securities = pl.DataFrame({"stock_id": [1, 2, 3], "ticker": ["AAA", "TSM", "CCC"], "cik": [9, 8, 9], "shares_out": [50.0, 500.0, 7.0]})
-    caps, fallback = sectors.market_caps(sq, hist, securities, {"TSM": 5.0})
+def test_market_caps_use_the_count_filed_by_then_and_fall_back_to_the_earliest_then_todays_count():
+    # stock 1 split 2-for-1 in 2016 (its split-adjusted close is half the raw one); stock 4's first count is filed
+    # after q10; stock 2 has no count on record
+    sq = pl.DataFrame({"stock_id": [1, 1, 2, 3, 4, 4], "q": [10, 11, 11, 11, 10, 11], "close": [5.0, 6.0, 20.0, 7.0, 3.0, 4.0],
+                       "raw_close": [10.0, 12.0, 20.0, 7.0, 3.0, 4.0]})  # fmt: skip
+    hist = pl.DataFrame({"stock_id": [1, 1, 4], "end": [date(2015, 6, 30), date(2015, 9, 30), date(2015, 10, 20)],
+                         "filed": [date(2015, 8, 1), date(2015, 11, 1), date(2015, 11, 1)], "shares": [100.0, 90.0, 40.0]},
+                        schema=sectors.SHARES_SCHEMA)  # fmt: skip
+    splits = pl.DataFrame({"stock_id": [1], "date": [date(2016, 5, 2)], "split_factor": [2.0]})
+    securities = pl.DataFrame({"stock_id": [1, 2, 3, 4], "ticker": ["AAA", "TSM", "CCC", "DDD"], "cik": [9, 8, 9, 7], "shares_out": [50.0, 500.0, 7.0, 4000.0]})
+    caps, fallback = sectors.market_caps(sq, hist, securities, {"TSM": 5.0}, splits)
     got = {(r["stock_id"], r["q"]): r["cap"] for r in caps.iter_rows(named=True)}
-    assert got[(1, 10)] == 10.0 * 100  # filed 2015-08-01, before q10's end (2015-09-30)
+    assert got[(1, 10)] == 10.0 * 100  # filed 2015-08-01, before q10's end (2015-09-30): $5 x 200 post-split shares
     assert got[(1, 11)] == 12.0 * 90  # the 2015-11-01 filing is known by 2015-12-31
-    assert got[(2, 11)] == 20.0 * 500 / 5  # no history: today's count, per ADR
+    assert got[(4, 10)] == 3.0 * 40  # before its first filing: that first count, not today's 4,000
+    assert got[(4, 11)] == 4.0 * 40
+    assert got[(2, 11)] == 20.0 * 500 / 5  # no count on record: today's count, per ADR
     assert (3, 11) not in got  # company 9's other share class: counted once, on its lowest stock id
-    assert fallback == {2}
+    assert fallback == {2, 4}
     assert q_end(10) == date(2015, 9, 30)
+
+
+def test_market_caps_put_the_filed_count_on_the_prices_split_basis():
+    # Stock 1 (Nvidia, run 41): the count is as of 2015-06-30, a 10-for-1 split follows on 2015-08-15, and its
+    # q10 price is after it. Stock 2 (a penny stock): a 1-for-50 reverse split after its count. Stock 3: a split
+    # after the quarter only rescales both sides alike. Prices are split-adjusted to today's shares.
+    sq = pl.DataFrame({"stock_id": [1, 1, 2, 3], "q": [10, 11, 11, 11], "close": [5.0, 6.0, 50.0, 2.0], "raw_close": [5.0, 6.0, 50.0, 8.0]})
+    hist = pl.DataFrame({"stock_id": [1, 1, 2, 3], "end": [date(2015, 6, 30), date(2015, 9, 30), date(2015, 9, 30), date(2015, 9, 30)],
+                         "filed": [date(2015, 8, 1), date(2015, 11, 1), date(2015, 11, 1), date(2015, 11, 1)],
+                         "shares": [100.0, 1000.0, 5000.0, 30.0]}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
+    splits = pl.DataFrame({"stock_id": [1, 2, 3], "date": [date(2015, 8, 15), date(2015, 10, 15), date(2016, 3, 1)], "split_factor": [10.0, 0.02, 4.0]})
+    securities = pl.DataFrame({"stock_id": [1, 2, 3], "ticker": ["NVDA", "PNY", "CCC"], "cik": [1, 2, 3], "shares_out": [1e9, 1e9, 1e9]})
+    caps, _ = sectors.market_caps(sq, hist, securities, {}, splits)
+    got = {(r["stock_id"], r["q"]): r["cap"] for r in caps.iter_rows(named=True)}
+    assert got[(1, 10)] == pytest.approx(5.0 * 100 * 10)  # the June count, made post-split: $5,000, not $500
+    assert got[(1, 11)] == pytest.approx(6.0 * 1000)  # the September count is already post-split
+    assert got[(2, 11)] == pytest.approx(50.0 * 5000 * 0.02)  # $5,000, not 50x that
+    assert got[(3, 11)] == pytest.approx(2.0 * 30 * 4)  # = raw close 8 x 30: the later split cancels out
 
 
 def test_an_outsized_cap_sits_out_and_is_reported_but_a_small_universe_is_left_alone():

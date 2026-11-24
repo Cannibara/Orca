@@ -75,22 +75,46 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
     return out.join(ends, on="q").with_columns(stale=pl.col("last") < pl.col("_cut")).drop("_cut").sort("stock_id", "q")
 
 
-def market_caps(sq: pl.DataFrame, hist: pl.DataFrame, securities: pl.DataFrame, adr: dict[str, float]) -> tuple[pl.DataFrame, set[int]]:
-    """(stock_id, q, cap) at each quarter end, and the stock ids that fell back to today's count.
+def market_caps(
+    sq: pl.DataFrame, hist: pl.DataFrame, securities: pl.DataFrame, adr: dict[str, float], splits: pl.DataFrame | None = None
+) -> tuple[pl.DataFrame, set[int]]:
+    """(stock_id, q, cap) at each quarter end, and the stock ids whose count in some quarter was not filed by then.
 
-    cap = raw close × the latest count filed by the quarter end; without a history, split-adjusted close ×
-    today's `shares_out`. Both are per ADR for an ADR. A company with several share classes reports one
-    total, so it is counted once, on its lowest stock id."""
+    cap = split-adjusted close × a share count turned to today's share basis by the `splits` (stock_id, date,
+    split_factor) dated after the day the count is as of. So price and count stand on the same basis whenever a
+    split fell: run 41 paired a price after a split with a count from before it (Nvidia's 10-for-1; reverse splits
+    read 50x too big). The count is the latest filed by the quarter end; before a company's first filed count, its
+    earliest one (today's count put penny stocks that later issued 1000s of times the shares at 10% of the 2013
+    market). With no count on record, today's `shares_out`. All per ADR for an ADR. A company with several share
+    classes reports one total, so it is counted once, on its lowest stock id."""
     securities = securities.filter(pl.col("stock_id").is_in(sq["stock_id"].unique().to_list()))  # a bond sharing the CIK never wins
     first = securities.filter(pl.col("cik").is_null() | (pl.col("stock_id") == pl.col("stock_id").min().over("cik")))
     sq = sq.join(first.select("stock_id", "ticker", "shares_out"), on="stock_id")
     dates = {q: q_end(q) for q in sorted(set(sq["q"].to_list()))}
     asof = shares_asof(hist, list(dates.values()))
     asof = asof.join(pl.DataFrame({"q": list(dates), "asof": list(dates.values())}, schema={"q": pl.Int32, "asof": pl.Date}), on="asof")
+    earliest = (
+        hist.filter(pl.col("shares").is_not_null()).sort("end", "filed").group_by("stock_id").first()
+        .select("stock_id", pl.col("shares").alias("_s0"), pl.col("end").alias("_e0"))
+    )  # fmt: skip
+    out = (
+        sq.join(asof.select("stock_id", "q", "shares", "end"), on=["stock_id", "q"], how="left").join(earliest, on="stock_id", how="left")
+        .with_columns(fallback=pl.col("shares").is_null() & (pl.col("_s0").is_not_null() | pl.col("shares_out").is_not_null()),
+                      shares=pl.coalesce("shares", "_s0"), end=pl.coalesce("end", "_e0"))
+    )  # fmt: skip
+    if splits is not None and not splits.is_empty():
+        pairs = out.filter(pl.col("end").is_not_null()).select("stock_id", "end").unique()
+        later = (
+            pairs.join(splits.select(pl.col("stock_id").cast(pl.Int32), pl.col("date").alias("_d"), pl.col("split_factor").cast(pl.Float64)), on="stock_id")
+            .filter(pl.col("_d") > pl.col("end")).group_by("stock_id", "end").agg(pl.col("split_factor").product().alias("_f"))
+        )  # fmt: skip
+        out = out.join(later, on=["stock_id", "end"], how="left")
+    else:
+        out = out.with_columns(_f=pl.lit(None, pl.Float64))
     ratio = pl.col("ticker").replace_strict(adr, default=1.0, return_dtype=pl.Float64)
-    out = sq.join(asof.select("stock_id", "q", "shares"), on=["stock_id", "q"], how="left").with_columns(
-        cap=pl.when(pl.col("shares").is_not_null()).then(pl.col("raw_close") * pl.col("shares")).otherwise(pl.col("close") * pl.col("shares_out")) / ratio,
-        fallback=pl.col("shares").is_null() & pl.col("shares_out").is_not_null(),
+    out = out.with_columns(
+        cap=pl.when(pl.col("shares").is_not_null()).then(pl.col("close") * pl.col("shares") * pl.col("_f").fill_null(1.0))
+        .otherwise(pl.col("close") * pl.col("shares_out")) / ratio
     )  # fmt: skip
     out = out.filter(pl.col("cap").is_not_null() & (pl.col("cap") > 0))
     return out.select("stock_id", pl.col("q").cast(pl.Int32), "cap"), set(out.filter("fallback")["stock_id"].to_list())
