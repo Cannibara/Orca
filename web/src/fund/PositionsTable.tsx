@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { money } from "../lib/format";
 import { fP0, fPx, fW0, qShort } from "./fmt";
 import { useWidth } from "./hooks";
@@ -120,6 +120,8 @@ type Props = {
   progress?: { done: number; total: number };
   /** Latest close per stock, for the price chart's last point. */
   latest: Map<number, number>;
+  /** Hands the scrolling box to the page, which lets the mouse wheel over it step the period (see PeriodPicker). */
+  wrapRef?: RefObject<HTMLDivElement>;
 };
 
 type RowProps = {
@@ -173,10 +175,11 @@ const Row = memo(function Row({ r, maxW, isOpen, tw, fundId, latest, onToggle, o
  * AUTO_FILL_MAX, in the sorted order, and "Show more" adds the rest MORE_STEP at a time (see ./loading). A new
  * sort or period starts again from the first rows.
  */
-export function PositionsTable({ fundId, rows, pending, failed, progress, latest }: Props) {
+export function PositionsTable({ fundId, rows, pending, failed, progress, latest, wrapRef }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "w", dir: -1 });
   const [open, setOpen] = useState<number | null>(null);
-  const wrap = useRef<HTMLDivElement>(null);
+  const own = useRef<HTMLDivElement>(null);
+  const wrap = wrapRef ?? own;
   const tw = useWidth(wrap, 300, 900);
 
   const all = useMemo(() => rows ?? [], [rows]);

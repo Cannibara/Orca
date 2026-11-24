@@ -12,6 +12,9 @@ import "./positions.css";
 // page is at rest, and trying to go past the newest or oldest one makes the selected pill nudge and spring back.
 // The same goes for the element passed as `alsoOn` (the tree map, owner 2026-11-23). On a touch screen a sideways
 // swipe on any of them steps one period: left for a later one, right for an earlier one (the pills run old → new).
+// `wheelOn` (the Positions table, owner 2026-11-24) takes the wheel only: a phone is too narrow for the whole table,
+// so a sideways swipe there must keep scrolling the columns. A sideways wheel (shift, or a trackpad) is left alone
+// for the same reason.
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "quarter", label: "Quarter" },
@@ -37,9 +40,11 @@ type Props = {
   asOf: string;
   /** Another element whose wheel and swipes step the periods too: the tree map. */
   alsoOn?: RefObject<HTMLElement | null>;
+  /** Another element whose wheel (not its swipes) steps the periods: the Positions table. */
+  wheelOn?: RefObject<HTMLElement | null>;
 };
 
-export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn }: Props) {
+export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn, wheelOn }: Props) {
   const { mode } = state;
   const ys = mode === "year";
   const vals = periodValues(state, tl);
@@ -100,6 +105,8 @@ export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn
     const onWheel = (e: WheelEvent) => {
       const now = Date.now();
       if (now - paged < WHEEL_REST) return;
+      // a sideways wheel scrolls the table's columns (shift + wheel, a trackpad swipe): not ours
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       e.preventDefault();
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1); // lines and pages (Firefox, some mice) to pixels
       if (now - seen > 250 || dy > 0 !== acc > 0) acc = 0;
@@ -149,6 +156,8 @@ export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn
 
     window.addEventListener("scroll", onScroll, { passive: true });
     const els = [phRef.current, toolsRef.current, alsoOn?.current ?? null].filter((el): el is HTMLElement => el != null);
+    const wheelOnly = wheelOn?.current ?? null;
+    wheelOnly?.addEventListener("wheel", onWheel, { passive: false });
     els.forEach((el) => {
       el.addEventListener("wheel", onWheel, { passive: false });
       el.addEventListener("pointerdown", onDown);
@@ -159,6 +168,7 @@ export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn
     });
     return () => {
       window.removeEventListener("scroll", onScroll);
+      wheelOnly?.removeEventListener("wheel", onWheel);
       els.forEach((el) => {
         el.removeEventListener("wheel", onWheel);
         el.removeEventListener("pointerdown", onDown);
@@ -168,7 +178,8 @@ export function PeriodPicker({ state, onChange, tl, title, titleId, asOf, alsoOn
         el.removeEventListener("click", onClick, true);
       });
     };
-    // `alsoOn` is a ref: its element is in place when this runs (rendered with the picker), and never swapped
+    // `alsoOn` and `wheelOn` are refs: their elements are in place when this runs (all rendered in the same pass as
+    // the picker), and never swapped
   }, []);
 
   // A pick from the list keeps the focus on the list: the selected pill is a different element afterwards.

@@ -257,6 +257,57 @@ describe("the period picker", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
+  test("the mouse wheel over the Positions table steps through periods the same way", async () => {
+    panel();
+    const table = screen.getByRole("region", { name: "Positions table, scrollable" });
+    const down = new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    act(() => void table.dispatchEvent(down));
+    expect(down.defaultPrevented).toBe(true); // the page does not scroll under it
+    expect(selected()).toBe("Q1 ’26");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    await new Promise((r) => setTimeout(r, 70));
+    fireEvent.wheel(table, { deltaY: -120 });
+    expect(selected()).toBe("Q2 ’26");
+    // up at the newest: no change, the pill springs back
+    (Element.prototype.animate as unknown as ReturnType<typeof vi.fn>).mockClear();
+    await new Promise((r) => setTimeout(r, 70));
+    fireEvent.wheel(table, { deltaY: -120 });
+    expect(selected()).toBe("Q2 ’26");
+    expect(Element.prototype.animate).toHaveBeenCalledTimes(1);
+  });
+
+  test("a sideways wheel over the table scrolls its columns: it does not step periods", async () => {
+    panel();
+    await new Promise((r) => setTimeout(r, 70));
+    const table = screen.getByRole("region", { name: "Positions table, scrollable" });
+    const ev = new WheelEvent("wheel", { deltaX: 120, deltaY: 4, bubbles: true, cancelable: true });
+    act(() => void table.dispatchEvent(ev));
+    expect(ev.defaultPrevented).toBe(false);
+    expect(selected()).toBe("Q2 ’26");
+  });
+
+  test("a sideways swipe on the table does not step periods: it scrolls the columns (the tools' swipe still steps)", async () => {
+    panel();
+    const table = screen.getByRole("region", { name: "Positions table, scrollable" });
+    // jsdom has no PointerEvent: a MouseEvent carrying the pointer fields the picker reads
+    const touch = (el: Element, type: string, x: number, y: number) => {
+      const e = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y });
+      Object.defineProperties(e, { pointerId: { value: 7 }, pointerType: { value: "touch" }, isPrimary: { value: true } });
+      act(() => void el.dispatchEvent(e));
+    };
+    // a finger moving right = an earlier period, where a swipe is wired
+    const swipe = (el: Element) => {
+      touch(el, "pointerdown", 100, 100);
+      touch(el, "pointermove", 200, 102);
+      touch(el, "pointerup", 200, 102);
+    };
+    swipe(table);
+    expect(selected()).toBe("Q2 ’26");
+    swipe(document.querySelector(".ptools")!); // the control: the same swipe on the tools steps back a quarter
+    expect(selected()).toBe("Q1 ’26");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
   test("the wheel right after a page scroll keeps scrolling the page: it steps periods only from rest", async () => {
     panel();
     await new Promise((r) => setTimeout(r, 70));
