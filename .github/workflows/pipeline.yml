@@ -378,7 +378,7 @@ jobs:
           done
           # Only the tables these steps write: copy, never sync, so nothing else in the bucket changes.
           rclone copy data/lake "r2:${R2_LAKE_BUCKET}" --include "shares_hist.parquet" --include "sector_returns.parquet" \
-            --include "stock_quarters.parquet"
+            --include "stock_quarters.parquet" --include "adr_ratios.parquet"
       - id: scores
         name: Fund scores (draft, lake only)
         if: steps.sectors.outcome == 'success'

@@ -244,3 +244,16 @@ def test_a_share_count_slip_and_a_price_jump_sit_out_and_are_reported():
     why = {(r["stock_id"], r["why"]) for r in pl.concat(gone).iter_rows(named=True)}
     assert (2, "count jump") in why and (3, "price jump") in why
     assert pl.concat(movers).is_empty()  # nothing left that moved the market 3 points
+
+
+def test_a_close_far_off_the_price_its_13f_holders_report_is_mispriced():
+    # q18: 15 of 115 stocks disagree, more than a tenth, which points at the filings
+    ids = [1, 1, 2, 3, 4] + list(range(100, 215))
+    qs = [17, 50, 17, 17, 17] + [18] * 115
+    sq = pl.DataFrame({"stock_id": ids, "q": qs, "raw_close": [30150.0, 13.3, 26.0, 2.0, 100.0] + [10.0] * 115})
+    reported = pl.DataFrame({"stock_id": ids, "q": qs, "price": [27.0, 13.5, 27.0, 11.0, 1.0] + [1000.0] * 15 + [10.0] * 100,
+                             "holders": [40, 60, 40, 3, 2] + [5] * 115}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+    off = sectors.mispriced(sq, reported)
+    # Mechanics Bank's $30,150 for HomeStreet; a close 5.5x below theirs; not stock 4: two holders are too few
+    assert off.select("stock_id", "q").rows() == [(1, 17), (3, 17)]
+    assert off["gap"].to_list() == pytest.approx([30150 / 27, 2 / 11])

@@ -8,7 +8,7 @@ from orca.hierarchy import parse
 from orca.hierarchy.assign import SicTable, StockLabel
 from orca.prices import PRICES_SCHEMA
 from orca.run.sectors_step import build_sector_returns
-from orca.run.state import SECURITIES_TABLE_SCHEMA
+from orca.run.state import CUSIP_MAP_SCHEMA, SECURITIES_TABLE_SCHEMA
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
 
@@ -43,3 +43,32 @@ def test_funds_are_scored_in_chunks_of_about_the_same_number_of_trades():
 
     counts = {1: 5, 2: 5, 3: 12, 4: 3, 5: 3, 6: 3}
     assert trade_chunks(counts, max_trades=10) == [[1, 2], [3], [4, 5, 6]]  # a fund bigger than a chunk gets its own
+
+
+def test_a_close_the_13f_holders_disagree_with_sits_out(tmp_path):
+    # Mechanics Bancorp in run 45: the vendor's history under its ticker was another bank's, at ~1,000x the price
+    lake = Lake(tmp_path / "lake")
+    sec = {"stock_id": [1, 2], "ticker": ["MU", "INTC"], "cik": [10, 20], "sic": [3674, 3674], "sector": ["Tech", "Tech"],
+           "shares_out": [100.0, 100.0]}  # fmt: skip
+    lake.write("securities", pl.DataFrame(sec).cast({k: v for k, v in SECURITIES_TABLE_SCHEMA.items() if k in sec}), part=None)
+    days = [date(2015, 9, 30), date(2015, 12, 31)]
+    bars = [(sid, d, close) for sid, c0, c1 in ((1, 10.0, 11.0), (2, 10.0, 30.0)) for d, close in zip(days, (c0, c1))]
+    prices = pl.DataFrame({"stock_id": [b[0] for b in bars], "date": [b[1] for b in bars], "open": [b[2] for b in bars], "high": [b[2] for b in bars],
+                           "low": [b[2] for b in bars], "close": [b[2] for b in bars], "volume": [1.0] * len(bars),
+                           "split_factor": [1.0] * len(bars), "dividend": [0.0] * len(bars)}, schema=PRICES_SCHEMA)  # fmt: skip
+    lake.write("prices_daily", prices, part="000")
+    lake.write("shares_hist", pl.DataFrame(schema=SHARES_SCHEMA))
+    lake.write("cusip_map", pl.DataFrame({"cusip": ["MU0000000", "IN0000000"], "stock_id": [1, 2], "method": ["openfigi"] * 2, "tried": [None, None]},
+                                         schema=CUSIP_MAP_SCHEMA))  # fmt: skip
+    # three funds value INTC at $1,000 a share in q10 (ours: $10); only two say so of MU: too few to overrule ours
+    rows = [(c, "IN0000000", 5.0, 5000.0) for c in (1, 2, 3)] + [(c, "MU0000000", 5.0, 5000.0) for c in (1, 2)]
+    lake.write("holdings", pl.DataFrame({"cik": [r[0] for r in rows], "q": [10] * len(rows), "cusip": [r[1] for r in rows], "kind": ["SH"] * len(rows),
+                                         "shares": [r[2] for r in rows], "value_usd": [r[3] for r in rows]}).cast({"cik": pl.Int64, "q": pl.Int16}), part="q010")  # fmt: skip
+    flags: list = []
+    labels = {1: StockLabel("MU", "stock", MEMORY, "placed"), 2: StockLabel("INTC", "stock", LOGIC, "placed")}
+    build_sector_returns(lake, last_q=11, flags=flags, labels=labels, sic=SicTable({}), adr={})
+    ret = {(r["label"], r["q"]): r["ret"] for r in lake.read("sector_returns").iter_rows(named=True)}
+    assert abs(ret[("Market", 11)] - 0.1) < 1e-12 and (LOGIC.path, 11) not in ret  # INTC's tripling is left out
+    closes = {(r["stock_id"], r["q"]): r["close"] for r in lake.read("stock_quarters").iter_rows(named=True)}
+    assert closes[(2, 10)] is None and closes[(2, 11)] == 30.0 and closes[(1, 10)] == 10.0  # the fund scores skip it too
+    assert {"type": "prices_set_aside", "stocks": 1, "quarters": 1} in flags
