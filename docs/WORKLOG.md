@@ -1,9 +1,18 @@
 # Worklog
 
-Last verified: 2026-11-24
+Last verified: 2026-11-25
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-25 — Run 47: the 13F price check finds other companies' prices, and set aside some right ones
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 47 (`sectors_only`, `main` 40e6b6b, PR #75): all steps green, files published, tab still on hold. The four funds' market vs SPY barely moved (Berkshire 2019 +28.9% vs +31.2%, 2025 +18.2% vs +17.7%; worst 2000, 8.4 points). "prices set aside (13F price)" named Mechanics Bancorp (52 quarters) and other prices that are another company's: Juniper Networks under JNP (Juniper Pharmaceuticals; Networks is JNPR) 1999–2017, Exact Sciences under EXK (Endeavour Silver), BP Prudhoe Bay under BMI (Badger Meter), Oncolytics under ONC (now BeiGene's), TotalEnergies at $0.03 | The check works where our price is wrong | — |
+| It also set aside right prices: BlackRock in 73 quarters (ours $834, theirs $10.18), Accenture, Eaton before 2013, Honeywell. The CUSIP map gives such a stock other securities too (dozens of BlackRock funds at ~$10; Eaton Vance funds under Eaton), and the median over all their rows is theirs. Now the price, holders and held shares come from the one CUSIP per stock and quarter that the funds hold the most dollars of | The company's own shares always dwarf funds named after it | `pipeline/orca/run/sectors_step.py` (`reported_prices`) |
+| Not changed: those wrong tickers also price the fund pages (Juniper Networks 1999–2017 at Juniper Pharmaceuticals' prices); fixing the tickers themselves is the owner's call | | — |
+| Checks: 1 new test (BlackRock-shaped, fails on the old code); pipeline suite green; demo data unchanged | | `pipeline/tests/test_sectors_step.py` |
 
 ## 2026-11-24 — Run 46 (ADR lookup); stand-in counts before 2009 scaled by 13F holdings
 

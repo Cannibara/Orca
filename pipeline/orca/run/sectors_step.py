@@ -175,27 +175,32 @@ def adr_ratios(lake: Lake, securities: pl.DataFrame, overrides: dict[str, float]
 
 
 def reported_prices(lake: Lake, cusip_map: pl.DataFrame) -> pl.DataFrame:
-    """REPORTED_SCHEMA: per stock and quarter, the median price per share its 13F holders report (value over shares,
-    share rows only), and the funds and shares of the rows priced within MAX_PRICE_GAP of that median (a share count
-    misread from a text filing has a price far off, and would swamp the sum). One quarter's holdings at a time, four
-    columns of it."""
+    """REPORTED_SCHEMA: per stock and quarter, from its 13F holdings of the one CUSIP the funds hold the most dollars
+    of: the median price per share reported (value over shares, share rows only), and the funds and shares of the rows
+    priced within MAX_PRICE_GAP of that median (a share count misread from a text filing has a price far off, and would
+    swamp the sum). Other CUSIPs mapped to the stock are left out: run 47 read BlackRock at $10 a share, the median of
+    the dozens of BlackRock funds the CUSIP map also gives its id. One quarter's holdings at a time, five columns of it."""
     mapped = cusip_map.filter(pl.col("stock_id").is_not_null()).select("cusip", pl.col("stock_id").cast(pl.Int32)).lazy()
     parts = []
     for part in lake.parts("holdings"):
         rows = (
             pl.scan_parquet(lake.root / "holdings" / f"{part}.parquet")
             .filter((pl.col("kind") == "SH") & (pl.col("shares") > 0) & (pl.col("value_usd") > 0))
-            .select("cik", "q", "cusip", "shares", (pl.col("value_usd") / pl.col("shares")).alias("_p"))
+            .select("cik", "q", "cusip", "shares", "value_usd", (pl.col("value_usd") / pl.col("shares")).alias("_p"))
             .join(mapped, on="cusip")
-            .with_columns(price=pl.col("_p").median().over("stock_id", "q"))
+            .with_columns(price=pl.col("_p").median().over("stock_id", "q", "cusip"))
         )  # fmt: skip
         near = (pl.col("_p") <= pl.col("price") * MAX_PRICE_GAP) & (pl.col("_p") >= pl.col("price") / MAX_PRICE_GAP)
         parts.append(
             rows.filter(near)
-            .group_by("stock_id", "q")
-            .agg(pl.col("price").first(), pl.col("cik").n_unique().alias("holders"), pl.col("shares").sum().alias("held"))
+            .group_by("stock_id", "q", "cusip")
+            .agg(pl.col("price").first(), pl.col("cik").n_unique().alias("holders"), pl.col("shares").sum().alias("held"),
+                 pl.col("value_usd").sum().alias("_v"))
+            .sort("stock_id", "q", "_v", "cusip", descending=[False, False, True, False])
+            .group_by("stock_id", "q", maintain_order=True)
+            .first()
             .collect()
-        )
+        )  # fmt: skip
     if not parts:
         return pl.DataFrame(schema=REPORTED_SCHEMA)
     return pl.concat(parts).select(*REPORTED_SCHEMA.names()).cast(REPORTED_SCHEMA)
