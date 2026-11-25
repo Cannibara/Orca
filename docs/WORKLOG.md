@@ -5,6 +5,14 @@ Last verified: 2026-11-25
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-25 — Run 48: Lloyds scaled, Citigroup not; the scale now reads 8 counts
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 48 (`sectors_only`, `main` 183210c, PR #76): all steps green, files published, tab still on hold. Berkshire's market vs SPY: 2008 −39.2% vs −36.8% (run 47: −40.6%), 2007 +5.2% vs +5.1%, 2006 +18.1% vs +15.8%, 2004 +12.3% vs +10.7%; 2000 −0.4% vs −9.7% (worse: Citigroup, up in 2000, weighs more once Lloyds is right). "caps scaled by 13F holdings": Lloyds in 50 quarters (x0.22 in 2003, to x0.007), now off the heavy list; Bank of America (x0.47), HSBC, Santander, Barclays, BBVA, Novartis, TSMC, Ecopetrol and others, mostly banks that issued shares in 2008–10. Citigroup was not scaled and stays at 10.5% of the market in 2001 | PR #76 | — |
+| Why Citigroup was not: at its first count (Sept 2009) the government held a third of it, which no 13F reports, so its 13F-held shares were low against its count and the ratio stayed above 0.5. Also seen: JPMorgan x0.001 in 2000 (its CUSIP then, Chase's, mostly maps elsewhere: 12 holders against 500 at the count), Bank of America x0.05 in one quarter (one quarter's big holder missing). Now: the scale is the median over the company's first 8 filed counts (by 2011 institutions held Citigroup as before); the market's move is a chained index of the median stock's quarter-on-quarter change; held shares are a centred median of 5 quarters; a quarter counts only with at least a quarter as many holders as at the count | Each failure has a guard | `pipeline/orca/engine/sectors.py` (`held_scales`) |
+| Checks: the scaling test now has all four cases (Citigroup scaled x0.4; AIG, JPMorgan's CUSIP and a one-quarter dip not scaled; fails on the old code at JPMorgan); pipeline suite green; demo data unchanged | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-25 — Run 47: the 13F price check finds other companies' prices, and set aside some right ones
 
 | What changed | Why | Files |
