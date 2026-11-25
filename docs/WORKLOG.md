@@ -5,6 +5,13 @@ Last verified: 2026-11-25
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-25 — Run 51: the 13F price check now spares the big names it misread
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 51 (`sectors_only`, `main` b37e073, PR #79): all steps green, files published, tab still on hold; the four funds' market vs SPY unchanged (Berkshire's worst gap 8.2 points, 2000; the others within 6.5). "prices set aside (13F price)": Mechanics Bancorp (funds hold 66% of HomeStreet's shares), Exact Sciences under EXK (88%), Octave Specialty (79%), Dawson Geophysical, Argan before 2002, a few small ones. "prices kept": BlackRock's 2024 id (8% outside 2006–07), Accenture (17%), Juniper Networks under JNP (no count on record, so no cap either), BP Prudhoe Bay under BMI (0%), Oncolytics; Honeywell and Eaton no longer listed | PR #79 | — |
+| Left among those set aside, likely wrong but small: Check Point 2023–26 (40% at $2.61, a CUSIP that is not its stock), Jazz 2021–22, Freeport-McMoRan in 2000 (one quarter) | | — |
+
 ## 2026-11-25 — Run 50: Citigroup still unscaled; the holder guard undid Lloyds before 2006
 
 | What changed | Why | Files |
