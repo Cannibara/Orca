@@ -5,6 +5,14 @@ Last verified: 2026-11-25
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-25 — Run 52: Lloyds scaled again; the indices are where the data allows
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 52 (`sectors_only`, `main` 14d30cf, PR #80): all steps green, files published, tab still on hold. Lloyds is scaled in 47 quarters and at 4%+ of the market in 3 (2002 Q1–Q3, to 6.6%; run 50: 13). "caps heavy" otherwise lists only Citigroup before 2009 (to 10.4%) and real giants (Nvidia, Apple, Microsoft, GE, Amazon); no stock moved the market 3 points in a quarter | PR #80 | — |
+| Market vs SPY, every year 1999–2026: Berkshire within 8.7 points (worst 2000, −1.0% vs −9.7%: Citigroup), Pershing, Tiger Global and 1649339 within 6.5 (worst 2021, +22.2% vs +28.7%: the whole market has small and foreign companies, which lagged that year). No new error pattern: index fixes stop here | | — |
+| Left, the known limits: Citigroup before 2009 (no SEC count before Sept 2009 and the 13F proxy does not reach it); wrong tickers for some delisted companies (Juniper Networks under JNP, Exact Sciences under EXK, ...) that also price the fund pages, the owner's call | | — |
+
 ## 2026-11-25 — Run 51: the 13F price check now spares the big names it misread
 
 | What changed | Why | Files |
