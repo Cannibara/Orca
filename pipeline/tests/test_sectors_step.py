@@ -85,3 +85,16 @@ def test_the_13f_prices_and_held_shares_leave_out_a_misread_share_count(tmp_path
                .cast({"cik": pl.Int64, "q": pl.Int16}), part="q-21")  # fmt: skip
     got = reported_prices(lake, cusips)
     assert got.rows() == [(7, -21, 10.0, 4, 650.0)]  # median $10 (of 5); the four near it hold 650 shares
+
+
+def test_the_13f_price_is_the_most_held_cusips_not_that_of_funds_mapped_to_the_same_stock(tmp_path):
+    # BlackRock in run 47: its own shares ($800) and dozens of BlackRock funds ($10) under one stock id
+    lake = Lake(tmp_path / "lake")
+    funds = [f"BF{i:07d}" for i in range(8)]
+    cusips = pl.DataFrame({"cusip": ["BLK000000", *funds], "stock_id": [632] * 9, "method": ["openfigi"] + ["name"] * 8, "tried": [None] * 9},
+                          schema=CUSIP_MAP_SCHEMA)  # fmt: skip
+    rows = [(c, "BLK000000", 1000.0, 800_000.0) for c in (1, 2, 3)] + [(c, f, 100.0, 1000.0) for c in (4, 5, 6) for f in funds]
+    lake.write("holdings", pl.DataFrame({"cik": [r[0] for r in rows], "q": [44] * len(rows), "cusip": [r[1] for r in rows], "kind": ["SH"] * len(rows),
+                                         "shares": [r[2] for r in rows], "value_usd": [r[3] for r in rows]})
+               .cast({"cik": pl.Int64, "q": pl.Int16}), part="q044")  # fmt: skip
+    assert reported_prices(lake, cusips).rows() == [(632, 44, 800.0, 3, 3000.0)]
