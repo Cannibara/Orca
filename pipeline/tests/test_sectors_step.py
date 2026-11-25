@@ -60,8 +60,9 @@ def test_a_close_the_13f_holders_disagree_with_sits_out(tmp_path):
     lake.write("shares_hist", pl.DataFrame(schema=SHARES_SCHEMA))
     lake.write("cusip_map", pl.DataFrame({"cusip": ["MU0000000", "IN0000000"], "stock_id": [1, 2], "method": ["openfigi"] * 2, "tried": [None, None]},
                                          schema=CUSIP_MAP_SCHEMA))  # fmt: skip
-    # three funds value INTC at $1,000 a share in q10 (ours: $10); only two say so of MU: too few to overrule ours
-    rows = [(c, "IN0000000", 5.0, 5000.0) for c in (1, 2, 3)] + [(c, "MU0000000", 5.0, 5000.0) for c in (1, 2)]
+    # three funds value INTC at $1,000 a share in q10 (ours: $10), holding 90 of its 100 shares; only two say so of
+    # MU: too few to overrule ours
+    rows = [(c, "IN0000000", 30.0, 30000.0) for c in (1, 2, 3)] + [(c, "MU0000000", 30.0, 30000.0) for c in (1, 2)]
     lake.write("holdings", pl.DataFrame({"cik": [r[0] for r in rows], "q": [10] * len(rows), "cusip": [r[1] for r in rows], "kind": ["SH"] * len(rows),
                                          "shares": [r[2] for r in rows], "value_usd": [r[3] for r in rows]}).cast({"cik": pl.Int64, "q": pl.Int16}), part="q010")  # fmt: skip
     flags: list = []

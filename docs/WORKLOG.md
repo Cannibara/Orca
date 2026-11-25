@@ -5,6 +5,14 @@ Last verified: 2026-11-25
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-25 — Run 49: the most-held CUSIP did not spare Honeywell or Accenture; a held-share guard does
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 49 (`sectors_only`, `main` fce731c, PR #77): all steps green, files published, tab still on hold. "prices set aside (13F price)" still listed BlackRock (61 quarters), Accenture (33), Eaton before 2013, Honeywell 2016–19, Check Point, an AstraZeneca id and Eversource 2005–09 next to the right catches (Mechanics Bancorp, Juniper Networks under JNP, Exact Sciences under EXK, ...). Their published prices are right (`stock/8758/weekly.json`: Honeywell $172.58 in 2019 Q2), so the most-held CUSIP under their stock ids in those quarters is not their stock: some other security mapped to them. BlackRock has two ids, 196 (BLACKROCK INC) and 632 (BlackRock, Inc., the 2024 holding company, priced back to 2006 under the same ticker) | PR #77 assumed the company's own CUSIP is always among those mapped to its id | — |
+| Now the check acts only where the funds hold 25–150% of the company's shares in that CUSIP (held shares on today's basis over the count the index uses, per ADR): what a fund holds of a company is its stock; a security mapped to it by mistake is not. Mechanics Bancorp's holders held 79% of HomeStreet's 19M shares. The run logs the spared ones as "prices kept (13F holdings not its stock)", with the share held, to tune the range | Spares the stock whose 13F data is someone else's, keeps the catches | `pipeline/orca/engine/sectors.py` (`mispriced`, `market_caps` `units`), `pipeline/orca/run/sectors_step.py` (order: caps before the check; `_log_mispriced`) |
+| Checks: the mispriced test now has the guard (HomeStreet set aside at 79%, a Honeywell-shaped 15% kept); pipeline suite green (1,113); demo data unchanged | | `pipeline/tests/test_sectors.py`, `pipeline/tests/test_sectors_step.py` |
+
 ## 2026-11-25 — Run 48: Lloyds scaled, Citigroup not; the scale now reads 8 counts
 
 | What changed | Why | Files |

@@ -284,12 +284,21 @@ def test_a_share_count_slip_and_a_price_jump_sit_out_and_are_reported():
 
 def test_a_close_far_off_the_price_its_13f_holders_report_is_mispriced():
     # q18: 15 of 115 stocks disagree, more than a tenth, which points at the filings
-    ids = [1, 1, 2, 3, 4] + list(range(100, 215))
-    qs = [17, 50, 17, 17, 17] + [18] * 115
-    sq = pl.DataFrame({"stock_id": ids, "q": qs, "raw_close": [30150.0, 13.3, 26.0, 2.0, 100.0] + [10.0] * 115})
-    reported = pl.DataFrame({"stock_id": ids, "q": qs, "price": [27.0, 13.5, 27.0, 11.0, 1.0] + [1000.0] * 15 + [10.0] * 100,
-                             "holders": [40, 60, 40, 3, 2] + [5] * 115, "held": [1.0] * 120}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
-    off = sectors.mispriced(sq, reported)
+    ids = [1, 1, 2, 3, 4, 5] + list(range(100, 215))
+    qs = [17, 50, 17, 17, 17, 17] + [18] * 115
+    raw = [30150.0, 13.3, 26.0, 2.0, 100.0, 175.0] + [10.0] * 115
+    sq = pl.DataFrame({"stock_id": ids, "q": qs, "raw_close": raw, "close": raw})
+    reported = pl.DataFrame({"stock_id": ids, "q": qs, "price": [27.0, 13.5, 27.0, 11.0, 1.0, 19.0] + [1000.0] * 15 + [10.0] * 100,
+                             "holders": [40, 60, 40, 3, 2, 900] + [5] * 115, "held": [15e6, 1.0, 1.0, 8e5, 1.0, 1.1e8] + [1.0] * 115},
+                            schema=sectors.REPORTED_SCHEMA)  # fmt: skip
     # Mechanics Bank's $30,150 for HomeStreet; a close 5.5x below theirs; not stock 4: two holders are too few
-    assert off.select("stock_id", "q").rows() == [(1, 17), (3, 17)]
-    assert off["gap"].to_list() == pytest.approx([30150 / 27, 2 / 11])
+    off = sectors.mispriced(sq, reported)
+    assert off.select("stock_id", "q").rows() == [(1, 17), (3, 17), (5, 17)]
+    assert off["gap"].to_list() == pytest.approx([30150 / 27, 2 / 11, 175 / 19])
+    # with the companies' counts: HomeStreet's holders hold 79% of its 19M shares; stock 3's 8%, and stock 5's 15%
+    # (Honeywell in run 49: the funds' CUSIP was some other security mapped to it), so their prices are kept
+    units = pl.DataFrame({"stock_id": [1, 3, 5], "q": [17, 17, 17], "units": [19e6, 1e7, 7.45e8]})
+    spared: list = []
+    off = sectors.mispriced(sq, reported, units, spared)
+    assert off.select("stock_id", "q").rows() == [(1, 17)] and off["held_share"].to_list() == pytest.approx([15 / 19])
+    assert pl.concat(spared).select("stock_id", "q").rows() == [(3, 17), (5, 17)]

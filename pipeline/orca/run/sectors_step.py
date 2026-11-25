@@ -206,22 +206,26 @@ def reported_prices(lake: Lake, cusip_map: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(parts).select(*REPORTED_SCHEMA.names()).cast(REPORTED_SCHEMA)
 
 
-def _log_mispriced(off: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 40) -> None:
-    """Log the stocks whose closes `mispriced` set aside, most quarters first, with the worst quarter's two prices."""
-    if off.is_empty():
-        return
+def _log_mispriced(off: pl.DataFrame, spared: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 40) -> None:
+    """Log the stocks whose closes `mispriced` set aside, most quarters first, with the worst quarter's two prices and
+    the share of the company the funds hold then; and those it spared (the funds' CUSIP is not the company's stock)."""
     names = securities.select(pl.col("stock_id").cast(pl.Int32), "ticker", "name")
-    worst = off.with_columns(_x=pl.col("gap").log().abs()).sort("_x", descending=True)
-    per = (
-        worst.group_by("stock_id", maintain_order=True)
-        .agg(pl.len().alias("quarters"), pl.col("q").min().alias("q0"), pl.col("q").max().alias("q1"), pl.col("q").first(),
-             pl.col("ours").first(), pl.col("theirs").first())
-        .join(names, on="stock_id", how="left").sort("quarters", "stock_id", descending=[True, False])
-    )  # fmt: skip
-    for r in per.head(top).iter_rows(named=True):
-        log.warning("prices set aside (13F price): %s (%s, id %s) in %d quarters (q%s to q%s), worst q%s ours %.4g, theirs %.4g",
-                    r["ticker"], r["name"], r["stock_id"], r["quarters"], r["q0"], r["q1"], r["q"], r["ours"], r["theirs"])  # fmt: skip
-    flags.append({"type": "prices_set_aside", "stocks": per.height, "quarters": off.height})
+    for rows, what, limit in ((off, "prices set aside (13F price)", top), (spared, "prices kept (13F holdings not its stock)", 15)):
+        if rows.is_empty():
+            continue
+        per = (
+            rows.with_columns(_x=pl.col("gap").log().abs()).sort("_x", descending=True)
+            .group_by("stock_id", maintain_order=True)
+            .agg(pl.len().alias("quarters"), pl.col("q").min().alias("q0"), pl.col("q").max().alias("q1"), pl.col("q").first(),
+                 pl.col("ours").first(), pl.col("theirs").first(), pl.col("held_share").first())
+            .join(names, on="stock_id", how="left").sort("quarters", "stock_id", descending=[True, False])
+        )  # fmt: skip
+        for r in per.head(limit).iter_rows(named=True):
+            held = "–" if r["held_share"] is None else f"{100 * r['held_share']:.0f}%"
+            log.warning("%s: %s (%s, id %s) in %d quarters (q%s to q%s), worst q%s ours %.4g, theirs %.4g, funds hold %s",
+                        what, r["ticker"], r["name"], r["stock_id"], r["quarters"], r["q0"], r["q1"], r["q"], r["ours"], r["theirs"], held)  # fmt: skip
+    if not off.is_empty():
+        flags.append({"type": "prices_set_aside", "stocks": off["stock_id"].n_unique(), "quarters": off.height})
 
 
 def _log_scaled(scaled: pl.DataFrame, caps: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 25) -> None:
@@ -303,26 +307,30 @@ def build_sector_returns(
     if not parts:
         return {"stocks": 0}
     sq = pl.concat(parts)
+    reported = reported_prices(lake, read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
+    hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
+    splits = pl.concat(split_parts)
+    stock_ids = stocks["stock_id"].to_list()
+    scaled: list = []
+    units: list = []
+    caps, fallback = market_caps(sq.filter(pl.col("stock_id").is_in(stock_ids)), hist, securities, adr, splits, reported, scaled, units)
     # A close that is some other security's (`mispriced`) sits out: of the indices, and of the fund scores' stock
     # series, which read `stock_quarters`
-    reported = reported_prices(lake, read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA))
-    off = mispriced(sq, reported)
+    spared: list = []
+    off = mispriced(sq, reported, pl.concat(units), spared)
     if not off.is_empty():
         bad = pl.col("_off").fill_null(False)
+        gone = off.select(pl.col("stock_id").cast(sq.schema["stock_id"]), pl.col("q").cast(sq.schema["q"]), _off=pl.lit(True))
         sq = (
-            sq.join(off.select(pl.col("stock_id").cast(sq.schema["stock_id"]), pl.col("q").cast(sq.schema["q"]), _off=pl.lit(True)),
-                    on=["stock_id", "q"], how="left", maintain_order="left")
+            sq.join(gone, on=["stock_id", "q"], how="left", maintain_order="left")
             .with_columns(close=pl.when(bad).then(None).otherwise(pl.col("close")), vwap=pl.when(bad).then(None).otherwise(pl.col("vwap")))
             .drop("_off")
         )  # fmt: skip
-    _log_mispriced(off, securities, flags)
-    lake.write("stock_quarters", sq.select("stock_id", "q", "close", "div", "vwap"))
-    sq = sq.filter(pl.col("stock_id").is_in(stocks["stock_id"].to_list()))
-    hist = read_table(lake, "shares_hist", SHARES_SCHEMA)
-    splits = pl.concat(split_parts)
-    scaled: list = []
-    caps, fallback = market_caps(sq, hist, securities, adr, splits, reported, scaled)
+        caps = caps.join(gone.select(pl.col("stock_id").cast(caps.schema["stock_id"]), pl.col("q").cast(pl.Int32)), on=["stock_id", "q"], how="anti")
+    _log_mispriced(off, pl.concat(spared), securities, flags)
     _log_scaled(pl.concat(scaled), caps, securities, flags)
+    lake.write("stock_quarters", sq.select("stock_id", "q", "close", "div", "vwap"))
+    sq = sq.filter(pl.col("stock_id").is_in(stock_ids))
     _, fallback_now = market_caps(sq.filter(pl.col("q") == last_q), hist, securities, adr, splits)  # the health figure: today only
     sq = sq.join(caps, on=["stock_id", "q"], how="left").select(*QUARTER_SCHEMA.names()).cast(QUARTER_SCHEMA)
     set_aside: list = []

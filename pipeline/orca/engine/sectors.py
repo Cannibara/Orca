@@ -58,6 +58,11 @@ HEAVY_WEIGHT = 0.04
 # the median they report, MIN_PRICE_HOLDERS funds or more, is some other security's price (`mispriced`).
 MAX_PRICE_GAP = 5.0
 MIN_PRICE_HOLDERS = 3
+# The funds' price says something about ours only if what they hold is this company's stock: shares held of
+# HELD_SHARE_RANGE of its count (on the same basis). Run 49 set aside right prices for Honeywell, Accenture and Eaton,
+# whose most-held CUSIP in the 13F data was some other security mapped to them; Mechanics Bancorp's holders held 80%
+# of HomeStreet's shares.
+HELD_SHARE_RANGE = (0.25, 1.5)
 # A quarter where more than this share of the stocks checked disagree (MIN_MARKET_STOCKS or more checked) points at
 # the filings (values in thousands read as dollars), not at the prices: it is left alone, not emptied out of the indices.
 MAX_MISPRICED_SHARE = 0.1
@@ -111,23 +116,36 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
     return out.join(ends, on="q").with_columns(stale=pl.col("last") < pl.col("_cut")).drop("_cut").sort("stock_id", "q")
 
 
-def mispriced(sq: pl.DataFrame, reported: pl.DataFrame) -> pl.DataFrame:
-    """(stock_id, q, gap = ours / theirs, ours, theirs) of the quarters whose as-traded close (`sq`, `stock_quarters`
-    output) is MAX_PRICE_GAP-fold or more off the median price per share the stock's 13F holders report
-    (`reported`, REPORTED_SCHEMA), where MIN_PRICE_HOLDERS funds or more report it, in quarters where no more than
-    MAX_MISPRICED_SHARE of the stocks checked are (if MIN_MARKET_STOCKS or more are checked). Both are on the quarter's own share basis, so a split needs no
-    adjusting."""
+def mispriced(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame | None = None, spared: list | None = None) -> pl.DataFrame:
+    """(stock_id, q, gap = ours / theirs, ours, theirs, held_share) of the quarters whose as-traded close (`sq`,
+    `stock_quarters` output) is MAX_PRICE_GAP-fold or more off the median price per share the stock's 13F holders
+    report (`reported`, REPORTED_SCHEMA), where MIN_PRICE_HOLDERS funds or more report it, in quarters where no more
+    than MAX_MISPRICED_SHARE of the stocks checked are (if MIN_MARKET_STOCKS or more are checked). Both are on the
+    quarter's own share basis, so a split needs no adjusting. With `units` (stock_id, q, units: the company's count on
+    today's basis, in the unit its price is quoted in), only where the funds hold HELD_SHARE_RANGE of it; the others
+    go to `spared`."""
     theirs = reported.filter((pl.col("holders") >= MIN_PRICE_HOLDERS) & (pl.col("price") > 0))
     gap = pl.col("raw_close") / pl.col("price")
     off = (pl.col("gap") >= MAX_PRICE_GAP) | (pl.col("gap") <= 1 / MAX_PRICE_GAP)
-    return (
-        sq.filter(pl.col("raw_close") > 0).select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "raw_close")
-        .join(theirs.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "price"), on=["stock_id", "q"])
+    rows = (
+        sq.filter(pl.col("raw_close") > 0)
+        .select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "raw_close", (pl.col("raw_close") / pl.col("close")).alias("_f"))
+        .join(theirs.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "price", "held"), on=["stock_id", "q"])
         .with_columns(gap=gap)
         .filter(off & ((off.mean().over("q") <= MAX_MISPRICED_SHARE) | (pl.len().over("q") < MIN_MARKET_STOCKS)))
-        .select("stock_id", "q", "gap", pl.col("raw_close").alias("ours"), pl.col("price").alias("theirs"))
-        .sort("stock_id", "q")
     )  # fmt: skip
+    if units is None:
+        rows = rows.with_columns(held_share=pl.lit(None, pl.Float64))
+    else:
+        u = units.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "units")
+        rows = rows.join(u, on=["stock_id", "q"], how="left").with_columns(held_share=pl.col("held") * pl.col("_f") / pl.col("units"))
+        lo, hi = HELD_SHARE_RANGE
+        own = pl.col("held_share").is_between(lo, hi)
+        if spared is not None:
+            spared.append(rows.filter(~own.fill_null(False)).select("stock_id", "q", "gap", pl.col("raw_close").alias("ours"),
+                                                                   pl.col("price").alias("theirs"), "held_share"))  # fmt: skip
+        rows = rows.filter(own.fill_null(False))
+    return rows.select("stock_id", "q", "gap", pl.col("raw_close").alias("ours"), pl.col("price").alias("theirs"), "held_share").sort("stock_id", "q")
 
 
 # The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,
@@ -239,6 +257,7 @@ def market_caps(
     splits: pl.DataFrame | None = None,
     reported: pl.DataFrame | None = None,
     scaled: list | None = None,
+    units: list | None = None,
 ) -> tuple[pl.DataFrame, set[int]]:
     """(stock_id, q, cap) at each quarter end, and the stock ids whose count in some quarter was not filed by then.
 
@@ -249,7 +268,7 @@ def market_caps(
     at 10% of the 2013 market), scaled by its 13F holdings (`held_scales`) when `reported` (REPORTED_SCHEMA) is given;
     the rows scaled (stock_id, q, scale, cap) go to `scaled`. With no count on record, today's `shares_out`. All per
     ADR for an ADR. A company with several share classes reports one total, so it is counted once, on its lowest
-    stock id."""
+    stock id. The counts used (stock_id, q, units: per ADR for an ADR) go to `units`."""
     securities = securities.filter(pl.col("stock_id").is_in(sq["stock_id"].unique().to_list()))  # a bond sharing the CIK never wins
     first = securities.filter(pl.col("cik").is_null() | (pl.col("stock_id") == pl.col("stock_id").min().over("cik")))
     sq = sq.join(first.select("stock_id", "ticker", "shares_out"), on="stock_id")
@@ -274,6 +293,8 @@ def market_caps(
     out = out.filter(pl.col("cap").is_not_null() & (pl.col("cap") > 0))
     if scaled is not None:
         scaled.append(out.filter(pl.col("scale").is_not_null()).select("stock_id", pl.col("q").cast(pl.Int32), "scale", "cap"))
+    if units is not None:
+        units.append(out.select("stock_id", pl.col("q").cast(pl.Int32), (pl.coalesce("shares", "shares_out") / ratio).alias("units")))
     return out.select("stock_id", pl.col("q").cast(pl.Int32), "cap"), set(out.filter("fallback")["stock_id"].to_list())
 
 
