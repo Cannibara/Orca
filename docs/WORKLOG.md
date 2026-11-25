@@ -5,6 +5,15 @@ Last verified: 2026-11-25
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-25 — Run 50: Citigroup still unscaled; the holder guard undid Lloyds before 2006
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 50 (`sectors_only`, `main` cc5d14e, PR #78): all steps green, files published, tab still on hold. Berkshire's market vs SPY: 2000 −1.5% vs −9.7% (run 49: −0.3%), 2004 +13.1% vs +10.7% (+12.3%), 2005 +8.3% vs +4.8% (+7.7%); worst gap 8.3 points (2000); the other three within 6.5 every year. JPMorgan and Bank of America's one-quarter dip are no longer scaled. Citigroup is still not scaled (10.0% of the market in 2001): against its first 8 counts too, its 13F-held shares in 2001, over the market's growth, stay above half of its 2009 count. Lloyds is scaled in 37 quarters but back at 4–6.4% of the market in 2002–05 | PR #78 | — |
+| Why Lloyds: in 2002–05 far fewer US funds held its ADRs than at its first counts (2017–18), so the guard (a quarter as many holders as at the count) dropped those quarters. Now a tenth: JPMorgan's 2000 CUSIP (12 holders against 500) still fails it | | `pipeline/orca/engine/sectors.py` (`HOLDER_DROP`) |
+| Left: Citigroup before 2009, the known limit; the 13F proxy does not reach it | | — |
+| Checks: a Lloyds-shaped case in the scaling test (fails at a quarter); sector tests green; demo data unchanged | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-25 — Run 49: the most-held CUSIP did not spare Honeywell or Accenture; a held-share guard does
 
 | What changed | Why | Files |
