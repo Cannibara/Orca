@@ -192,27 +192,37 @@ def test_market_caps_before_the_first_count_use_it_with_its_slip_divided_out():
 
 
 def test_before_the_first_count_a_stock_whose_13f_holdings_grew_far_faster_than_the_median_is_scaled_down():
-    # Stock 1 (Citigroup): first count 22.9bn in 2009 Q3 (q-14), funds held a fifth as many shares in 2007 Q4
-    # (q-21) while the median stock's 13F holdings halved going back: x0.4. Stock 2 (AIG in 2009): its holders left,
-    # so its ratio is 5x the median's; not scaled up. Stock 3: 4 holders, too few. Stocks 10-20 are the median. Stock
-    # 1 split 1-for-10 after both quarters, which moves its held shares and its count alike.
-    ids = [1, 2, 3] + list(range(10, 21))
-    sq = pl.DataFrame({"stock_id": ids * 2, "q": [-21] * 14 + [-14] * 14, "close": [100.0] * 28,
-                       "raw_close": [10.0, 100.0, 100.0] + [100.0] * 11 + [10.0, 100.0, 100.0] + [100.0] * 11})  # fmt: skip
-    held = [2e9, 5e8, 1e6] + [5e7] * 11 + [10e9, 1e8, 1e7] + [1e8] * 11
-    reported = pl.DataFrame({"stock_id": ids * 2, "q": [-21] * 14 + [-14] * 14, "price": [100.0] * 28,
-                             "holders": [400, 300, 4] + [50] * 11 + [500, 100, 4] + [50] * 11, "held": held}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
-    hist = pl.DataFrame({"stock_id": ids, "end": [date(2009, 9, 30)] * 14, "filed": [date(2009, 11, 6)] * 14,
-                         "shares": [22.9e9, 2.7e9, 1e8] + [1e9] * 11}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
+    # q-21 (2007 Q4) to q-12 (2010 Q1); every company's first count is as of 2009-09-30 (q-14), filed in q-13. From
+    # q-14 the median stock's 13F holdings double. Stock 1 (Citigroup): its holdings grow 5x, so before its first
+    # count it held 2/5 of the shares (x0.4); it split 1-for-10 in 2011, which moves its held shares and its count
+    # alike. Stock 2 (AIG in 2009): its holders left, a 5x fall; not scaled up. Stock 3: 4 holders, too few. Stock 4
+    # (JPMorgan's 2000 CUSIP, mostly mapped elsewhere): 12 holders then, 500 at the count. Stock 5 (Bank of America):
+    # one quarter's holdings 10x low. Stocks 10-20 are the median.
+    ids = [1, 2, 3, 4, 5] + list(range(10, 21))
+    qs = list(range(-21, -11))
+    before = {1: 2e9, 2: 5e8, 3: 1e6, 4: 1e6, 5: 5e7}  # held shares as reported, before q-14 (typical: 5e7)
+    after = {1: 10e9, 2: 1e8, 3: 1e7, 4: 1e8, 5: 1e8}  # from q-14 (typical: 1e8)
+    rows = [(i, q) for i in ids for q in qs]
+    held = [(before if q < -14 else after).get(i, 5e7 if q < -14 else 1e8) * (0.1 if (i, q) == (5, -18) else 1.0) for i, q in rows]
+    holders = [4 if i == 3 else (12 if i == 4 and q < -14 else 500 if i == 4 else 50) for i, q in rows]
+    sq = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "close": [100.0] * len(rows),
+                       "raw_close": [10.0 if r[0] == 1 else 100.0 for r in rows]})  # fmt: skip
+    reported = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "price": [100.0] * len(rows), "holders": holders,
+                             "held": held}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+    hist = pl.DataFrame({"stock_id": ids, "end": [date(2009, 9, 30)] * len(ids), "filed": [date(2009, 11, 6)] * len(ids),
+                         "shares": [22.9e9, 2.7e9, 1e8, 3.9e9, 8.6e9] + [1e9] * 11}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
     splits = pl.DataFrame({"stock_id": [1], "date": [date(2011, 5, 9)], "split_factor": [0.1]})
-    securities = pl.DataFrame({"stock_id": ids, "ticker": [f"T{i}" for i in ids], "cik": ids, "shares_out": [1e9] * 14})
+    securities = pl.DataFrame({"stock_id": ids, "ticker": [f"T{i}" for i in ids], "cik": ids, "shares_out": [1e9] * len(ids)})
     scaled: list = []
     caps, _ = sectors.market_caps(sq, hist, securities, {}, splits, reported, scaled)
     got = {(r["stock_id"], r["q"]): r["cap"] for r in caps.iter_rows(named=True)}
     assert got[(1, -21)] == pytest.approx(100.0 * 2.29e9 * 0.4)  # the 2009 count on today's basis, x0.4
-    assert got[(2, -21)] == pytest.approx(100.0 * 2.7e9) and got[(3, -21)] == pytest.approx(100.0 * 1e8)
     assert got[(1, -14)] == pytest.approx(100.0 * 2.29e9)  # the count's own quarter, not filed yet: as it is
-    assert pl.concat(scaled).select("stock_id", "q").rows() == [(1, -21)]
+    assert got[(2, -21)] == pytest.approx(100.0 * 2.7e9) and got[(3, -21)] == pytest.approx(100.0 * 1e8)
+    assert got[(4, -21)] == pytest.approx(100.0 * 3.9e9) and got[(5, -18)] == pytest.approx(100.0 * 8.6e9)
+    done = pl.concat(scaled)
+    assert done.select("stock_id", "q").rows() == [(1, q) for q in range(-21, -14)]
+    assert done["scale"].to_list() == pytest.approx([0.4] * 7)
     plain, _ = sectors.market_caps(sq, hist, securities, {}, splits)  # no holdings given: the earliest count as it is
     assert plain.filter((pl.col("stock_id") == 1) & (pl.col("q") == -21))["cap"].item() == pytest.approx(100.0 * 2.29e9)
 

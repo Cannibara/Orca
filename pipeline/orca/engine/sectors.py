@@ -74,6 +74,14 @@ REPORTED_SCHEMA = pl.Schema({"stock_id": pl.Int32, "q": pl.Int32, "price": pl.Fl
 # government) than a company buying back half its shares, and a stock read too small does the index less harm.
 MIN_SCALE_HOLDERS = 10
 SCALE_BELOW = 0.5
+# Run 48 left Citigroup unscaled: in Sept 2009 the government held a third of it and no 13F reports that, so its
+# 13F-held shares were low against its count. Each scale is now the median of those against the company's first
+# ANCHOR_QUARTERS filed counts (by 2011 institutions held Citigroup as before). Held shares are a centred median of
+# 5 quarters (one quarter's missing big holder put Bank of America at x0.05), and a quarter counts only where at
+# least 1/HOLDER_DROP as many funds hold the stock as at the count (JPMorgan's 2000 CUSIP, Chase's, is mostly mapped
+# elsewhere: x0.001).
+ANCHOR_QUARTERS = 8
+HOLDER_DROP = 4
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
@@ -179,31 +187,48 @@ def todays_counts(hist: pl.DataFrame, splits: pl.DataFrame | None = None) -> pl.
     return h.filter((pl.col("_l") - pl.col("_m")).abs() < math.log(MAX_SHARE_JUMP)).drop("_l", "_m").select(*SHARES_SCHEMA.names())
 
 
-def held_scales(sq: pl.DataFrame, reported: pl.DataFrame, anchors: pl.DataFrame) -> pl.DataFrame:
-    """(stock_id, q, scale) for the `anchors` rows (stock_id, q, q0: a quarter before or at the quarter q0 of the
-    stock's earliest count) whose 13F-held shares in q over those in q0, against the median stock's, are SCALE_BELOW
-    or less (see SCALE_BELOW). Held shares go to today's share basis with the stock's splits (as-traded close over
-    the split-adjusted one in `sq`); only stocks MIN_SCALE_HOLDERS funds or more hold, in both quarters, count."""
+def held_scales(sq: pl.DataFrame, reported: pl.DataFrame, rows: pl.DataFrame) -> pl.DataFrame:
+    """(stock_id, q, scale) for the `rows` (stock_id, q, shares: the count filed by then, null before the first;
+    _s0: the earliest count, which stands in) before a company's first count, where its 13F-held shares say the
+    company had SCALE_BELOW or less of the earliest count. For each of its first ANCHOR_QUARTERS quarters with a
+    filed count: that count x the stock's held shares in q over those then, over the market's same move (a chained
+    index of the median stock's quarter-on-quarter change); the scale is the median of those, over the earliest
+    count. Held shares go to today's share basis with the stock's splits (as-traded close over the split-adjusted
+    one in `sq`) and are a centred median of 5 quarters; only quarters MIN_SCALE_HOLDERS funds or more hold the
+    stock, and at least 1/HOLDER_DROP as many as at the count, count."""
     factor = sq.filter((pl.col("close") > 0) & (pl.col("raw_close") > 0)).select(
         pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), (pl.col("raw_close") / pl.col("close")).alias("_f")
     )
     h = (
         reported.filter((pl.col("holders") >= MIN_SCALE_HOLDERS) & (pl.col("held") > 0))
-        .select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "held")
-        .join(factor, on=["stock_id", "q"]).select("stock_id", "q", (pl.col("held") * pl.col("_f")).alias("_h"))
+        .select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "holders", "held")
+        .join(factor, on=["stock_id", "q"])
+        .select("stock_id", "q", "holders", (pl.col("held") * pl.col("_f")).alias("_h"))
+        .sort("stock_id", "q")
+        .with_columns(_hs=pl.col("_h").rolling_median(5, min_samples=1, center=True).over("stock_id"))
     )  # fmt: skip
-    anchors = anchors.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), pl.col("q0").cast(pl.Int32))
-    pairs = anchors.select("q", "q0").unique()
-    moved = (
-        pairs.join(h, on="q").join(h.select("stock_id", pl.col("q").alias("q0"), pl.col("_h").alias("_h0")), on=["stock_id", "q0"])
-        .with_columns(_r=pl.col("_h") / pl.col("_h0"))
+    step = (
+        h.join(h.select("stock_id", (pl.col("q") + 1).alias("q"), pl.col("_h").alias("_hp")), on=["stock_id", "q"])
+        .group_by("q").agg((pl.col("_h") / pl.col("_hp")).median().alias("_g"))
     )  # fmt: skip
-    typical = moved.group_by("q", "q0").agg(pl.col("_r").median().alias("_m"))
-    return (
-        anchors.join(moved.select("stock_id", "q", "q0", "_r"), on=["stock_id", "q", "q0"]).join(typical, on=["q", "q0"])
-        .select("stock_id", "q", (pl.col("_r") / pl.col("_m")).alias("scale"))
-        .filter(pl.col("scale") <= SCALE_BELOW)
+    index = (
+        pl.DataFrame({"q": sorted(set(h["q"].to_list()))}, schema={"q": pl.Int32}).join(step, on="q", how="left")
+        .sort("q").select("q", pl.col("_g").fill_null(1.0).cum_prod().alias("_i"))
     )  # fmt: skip
+    h = h.join(index, on="q")
+    rows = rows.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "shares", "_s0")
+    anchors = (
+        rows.filter(pl.col("shares").is_not_null()).join(h, on=["stock_id", "q"]).sort("stock_id", "q")
+        .group_by("stock_id", maintain_order=True).head(ANCHOR_QUARTERS)
+        .select("stock_id", pl.col("shares").alias("_ca"), pl.col("_hs").alias("_ha"), pl.col("holders").alias("_na"), pl.col("_i").alias("_ia"))
+    )  # fmt: skip
+    est = (
+        rows.filter(pl.col("shares").is_null() & pl.col("_s0").is_not_null()).join(h, on=["stock_id", "q"]).join(anchors, on="stock_id")
+        .filter(pl.col("holders") * HOLDER_DROP >= pl.col("_na"))
+        .with_columns(_e=pl.col("_ca") * pl.col("_hs") / pl.col("_ha") * pl.col("_ia") / pl.col("_i"))
+        .group_by("stock_id", "q").agg(pl.col("_e").median(), pl.col("_s0").first())
+    )  # fmt: skip
+    return est.select("stock_id", "q", (pl.col("_e") / pl.col("_s0")).alias("scale")).filter(pl.col("scale") <= SCALE_BELOW).sort("stock_id", "q")
 
 
 def market_caps(
@@ -232,15 +257,13 @@ def market_caps(
     dates = {q: q_end(q) for q in sorted(set(sq["q"].to_list()))}
     asof = shares_asof(counts, list(dates.values()))
     asof = asof.join(pl.DataFrame({"q": list(dates), "asof": list(dates.values())}, schema={"q": pl.Int32, "asof": pl.Date}), on="asof")
-    quarter = ((pl.col("end").dt.year() - BASE_YEAR) * 4 + (pl.col("end").dt.month() - 1) // 3).cast(pl.Int32)
-    earliest = counts.sort("end", "filed").group_by("stock_id").first().select("stock_id", pl.col("shares").alias("_s0"), quarter.alias("_q0"))
+    earliest = counts.sort("end", "filed").group_by("stock_id").first().select("stock_id", pl.col("shares").alias("_s0"))
     out = (
         sq.join(asof.select("stock_id", "q", "shares"), on=["stock_id", "q"], how="left").join(earliest, on="stock_id", how="left")
         .with_columns(fallback=pl.col("shares").is_null() & (pl.col("_s0").is_not_null() | pl.col("shares_out").is_not_null()))
     )  # fmt: skip
     if reported is not None and not reported.is_empty():
-        anchors = out.filter(pl.col("shares").is_null() & pl.col("_s0").is_not_null() & (pl.col("q") <= pl.col("_q0")))
-        scales = held_scales(sq, reported, anchors.select("stock_id", "q", q0="_q0"))
+        scales = held_scales(sq, reported, out.select("stock_id", "q", "shares", "_s0"))
         out = out.join(scales.with_columns(pl.col("stock_id").cast(out.schema["stock_id"]), pl.col("q").cast(out.schema["q"])),
                        on=["stock_id", "q"], how="left")  # fmt: skip
     else:
