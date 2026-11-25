@@ -197,20 +197,22 @@ def test_before_the_first_count_a_stock_whose_13f_holdings_grew_far_faster_than_
     # count it held 2/5 of the shares (x0.4); it split 1-for-10 in 2011, which moves its held shares and its count
     # alike. Stock 2 (AIG in 2009): its holders left, a 5x fall; not scaled up. Stock 3: 4 holders, too few. Stock 4
     # (JPMorgan's 2000 CUSIP, mostly mapped elsewhere): 12 holders then, 500 at the count. Stock 5 (Bank of America):
-    # one quarter's holdings 10x low. Stocks 10-20 are the median.
-    ids = [1, 2, 3, 4, 5] + list(range(10, 21))
+    # one quarter's holdings 10x low. Stock 6 (Lloyds' ADR): 40 holders then, 300 at the count, and its holdings grew
+    # 10x (x0.2). Stocks 10-20 are the median.
+    ids = [1, 2, 3, 4, 5, 6] + list(range(10, 21))
     qs = list(range(-21, -11))
-    before = {1: 2e9, 2: 5e8, 3: 1e6, 4: 1e6, 5: 5e7}  # held shares as reported, before q-14 (typical: 5e7)
-    after = {1: 10e9, 2: 1e8, 3: 1e7, 4: 1e8, 5: 1e8}  # from q-14 (typical: 1e8)
+    before = {1: 2e9, 2: 5e8, 3: 1e6, 4: 1e6, 5: 5e7, 6: 1e7}  # held shares as reported, before q-14 (typical: 5e7)
+    after = {1: 10e9, 2: 1e8, 3: 1e7, 4: 1e8, 5: 1e8, 6: 1e8}  # from q-14 (typical: 1e8)
     rows = [(i, q) for i in ids for q in qs]
     held = [(before if q < -14 else after).get(i, 5e7 if q < -14 else 1e8) * (0.1 if (i, q) == (5, -18) else 1.0) for i, q in rows]
-    holders = [4 if i == 3 else (12 if i == 4 and q < -14 else 500 if i == 4 else 50) for i, q in rows]
+    few = {3: (4, 4), 4: (12, 500), 6: (40, 300)}  # holders before q-14, from q-14 (typical: 50)
+    holders = [few.get(i, (50, 50))[0 if q < -14 else 1] for i, q in rows]
     sq = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "close": [100.0] * len(rows),
                        "raw_close": [10.0 if r[0] == 1 else 100.0 for r in rows]})  # fmt: skip
     reported = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "price": [100.0] * len(rows), "holders": holders,
                              "held": held}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
     hist = pl.DataFrame({"stock_id": ids, "end": [date(2009, 9, 30)] * len(ids), "filed": [date(2009, 11, 6)] * len(ids),
-                         "shares": [22.9e9, 2.7e9, 1e8, 3.9e9, 8.6e9] + [1e9] * 11}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
+                         "shares": [22.9e9, 2.7e9, 1e8, 3.9e9, 8.6e9, 7.2e10] + [1e9] * 11}, schema=sectors.SHARES_SCHEMA)  # fmt: skip
     splits = pl.DataFrame({"stock_id": [1], "date": [date(2011, 5, 9)], "split_factor": [0.1]})
     securities = pl.DataFrame({"stock_id": ids, "ticker": [f"T{i}" for i in ids], "cik": ids, "shares_out": [1e9] * len(ids)})
     scaled: list = []
@@ -221,8 +223,8 @@ def test_before_the_first_count_a_stock_whose_13f_holdings_grew_far_faster_than_
     assert got[(2, -21)] == pytest.approx(100.0 * 2.7e9) and got[(3, -21)] == pytest.approx(100.0 * 1e8)
     assert got[(4, -21)] == pytest.approx(100.0 * 3.9e9) and got[(5, -18)] == pytest.approx(100.0 * 8.6e9)
     done = pl.concat(scaled)
-    assert done.select("stock_id", "q").rows() == [(1, q) for q in range(-21, -14)]
-    assert done["scale"].to_list() == pytest.approx([0.4] * 7)
+    assert done.select("stock_id", "q").rows() == [(i, q) for i in (1, 6) for q in range(-21, -14)]
+    assert done["scale"].to_list() == pytest.approx([0.4] * 7 + [0.2] * 7)
     plain, _ = sectors.market_caps(sq, hist, securities, {}, splits)  # no holdings given: the earliest count as it is
     assert plain.filter((pl.col("stock_id") == 1) & (pl.col("q") == -21))["cap"].item() == pytest.approx(100.0 * 2.29e9)
 

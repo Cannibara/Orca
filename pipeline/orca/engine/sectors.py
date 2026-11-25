@@ -84,9 +84,10 @@ SCALE_BELOW = 0.5
 # ANCHOR_QUARTERS filed counts (by 2011 institutions held Citigroup as before). Held shares are a centred median of
 # 5 quarters (one quarter's missing big holder put Bank of America at x0.05), and a quarter counts only where at
 # least 1/HOLDER_DROP as many funds hold the stock as at the count (JPMorgan's 2000 CUSIP, Chase's, is mostly mapped
-# elsewhere: x0.001).
+# elsewhere: 12 holders against 500, x0.001). Not 1/4 (run 50): far fewer US funds held Lloyds' ADRs in 2002–05 than
+# at its first counts (2017–18), and Lloyds went back to 6% of the market.
 ANCHOR_QUARTERS = 8
-HOLDER_DROP = 4
+HOLDER_DROP = 10
 
 
 def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
