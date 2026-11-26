@@ -86,16 +86,27 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
     </div>
   );
   if (!eligible) {
+    // Name the real reason: a fund with years of trades and many picks is not "too early" (owner 2026-11-26: Berkshire,
+    // 108 quarters and 128 picks, read "Too early to tell" when only its coverage fell short)
+    const young = span < 12 || (T.n ?? 0) < 20;
+    const covered = T.coverage != null ? Math.round(T.coverage * 100) : null;
     return (
       <section className="panel skp mapp" aria-labelledby="mapTitle">
         {header}
         <div className="pb">
           <div className="state">
-            <h4>Too early to tell</h4>
-            <p>
-              The map needs 3 years of trades and 20 picks, with most of the buying scored; this fund has {span} quarters and {T.n ?? 0} picks
-              {T.coverage != null && T.coverage < 0.8 ? `, and ${Math.round(T.coverage * 100)}% of its buying could be scored` : ""}.
-            </p>
+            <h4>{young ? "Too early to tell" : "Too little of its buying could be scored"}</h4>
+            {young ? (
+              <p>
+                The map needs 3 years of trades and 20 picks, with most of the buying scored; this fund has {span} quarters and {T.n ?? 0} picks
+                {covered != null && covered < 80 ? `, and ${covered}% of its buying could be scored` : ""}.
+              </p>
+            ) : (
+              <p>
+                The map needs at least 80% of a fund's buying matched to a sector with prices; for this fund {covered ?? "–"}% could be. The rest
+                went into funds, bonds or stocks without a sector or prices for those years.
+              </p>
+            )}
           </div>
         </div>
       </section>
