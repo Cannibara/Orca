@@ -20,6 +20,10 @@ VENDOR_TABLE = "vendor_tickers"  # lake table: each stock's ticker at the vendor
 UNIVERSE_URL = "https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip"
 UNIVERSE_SCHEMA = pl.Schema({"ticker": pl.String, "start": pl.Date, "end": pl.Date})
 VENDOR_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "end": pl.Date})
+# lake table: vendor tickers whose prices a stock's 13F holders showed are another company's (run/sectors_step), never
+# taken for that stock again; quarters / off: the quarters checked and those found mispriced, checked: the run's day
+REJECTS_TABLE = "vendor_rejects"
+REJECTS_SCHEMA = pl.Schema({"stock_id": pl.Int32, "ticker": pl.String, "quarters": pl.Int32, "off": pl.Int32, "checked": pl.Date})
 # A ticker from a non-US listing carries its currency: "XLNXEUR", "TWTRUSD", "PXGBX" (pence).
 CURRENCY_SUFFIXES = (
     "USD", "EUR", "GBP", "GBX", "CHF", "CAD", "JPY", "AUD", "HKD", "SEK", "NOK", "DKK",
@@ -98,6 +102,7 @@ def resolve(
     universe: pl.DataFrame,
     alternates: Mapping[int, Sequence[str]] | None = None,
     gone: Set[int] = frozenset(),
+    rejected: Mapping[int, Set[str]] | None = None,
 ) -> pl.DataFrame:
     """VENDOR_SCHEMA rows: for each stock of `tickers` (stock_id -> ticker), the first of its
     `candidates` (with its `alternates`, stock_id -> other tickers) whose current line at the
@@ -109,8 +114,11 @@ def resolve(
 an older line that ended over a month before it began (`_held_before_reuse`). A stock of
 `gone` (a company that no longer trades, found by OpenFIGI only among delisted securities) takes
 only a line that has ended: one still trading is someone else's (the vendor's "T" runs from 1984
-under today's AT&T, not old AT&T Corp). A stock with no such candidate is left out."""
+under today's AT&T, not old AT&T Corp). Nor does a ticker of `rejected` (stock_id -> tickers whose
+prices its 13F holders showed are another company's: lake table `vendor_rejects`). A stock with no
+such candidate is left out."""
     alternates = alternates or {}
+    rejected = rejected or {}
     lines: dict[str, list[tuple[date, date]]] = {}
     for ticker, start, end in universe.iter_rows():
         lines.setdefault(ticker, []).append((start, end))
@@ -122,6 +130,8 @@ under today's AT&T, not old AT&T Corp). A stock with no such candidate is left o
     for stock_id, ticker in tickers.items():
         first, last = held.get(stock_id, (date.min, date.max))
         for name in candidates(ticker, alternates.get(stock_id, ())):
+            if name in rejected.get(stock_id, ()):
+                continue
             line = current.get(name)
             if line is None or line[0] > last or line[1] < first:
                 continue

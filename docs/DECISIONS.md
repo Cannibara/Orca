@@ -1,10 +1,15 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-25
+Last verified: 2026-11-26
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-26 — Wrong-company prices on the fund pages: the vendor ticker is rejected (owner: "As long as its an efficient fix, then yes")
+- Decision (chat): the fund pages use the same check as the indices. Where 80%+ of a stock's quarters with a 13F price (4+ quarters) are 5x+ off the median price its holders report (`engine/sectors.mispriced`'s rules, the held-share guard; without a count on record, 20+ holders), the sectors step rejects its vendor ticker (lake table `vendor_rejects`). The next run's ticker lookup skips it and tries the next candidate (the SEC ticker of the same name, OpenFIGI's delisted US ticker); the existing path then drops the stored bars, refetches, recomputes the holders' funds and deletes the stock's chart. A stock with no other ticker is valued at the funds' reported prices (the engine's fallback).
+- Why this, not a per-quarter price override: it reuses the ticker machinery that already handles reused tickers, with no new path through the fund engine or the charts. A stock right for part of its history (Mechanics Bancorp after the 2025 merger) loses the right part too and falls back to reported prices there.
+- Guards: at most 300 new rejections a run (more is a broken input, flagged `vendor_rejects_held`); a rejection is kept for good (the prices it named are gone).
 
 ## 2026-11-24 — Sector indices: market caps from SEC counts made consistent, ADR ratios read from 20-Fs (owner: "keep iterating")
 - Decision (chat): fix the indices by patterns, not stock by stock. The owner approved each fix and run (PRs #63–#73) and then asked to "keep iterating by discovering patterns of issues and plugging them with scalable solutions".

@@ -34,7 +34,7 @@ OUT_SCHEMA = pl.Schema(
      "n": pl.Int32, "cap": pl.Float64, "top_weight": pl.Float64}
 )  # fmt: skip
 __all__ = ["HEAVY_WEIGHT", "MARKET", "QUARTER_SCHEMA", "REPORTED_SCHEMA", "SHARES_SCHEMA", "cap_report", "held_scales", "index_returns",
-           "market_caps", "mispriced", "stock_quarters", "todays_counts"]  # fmt: skip
+           "market_caps", "mispriced", "stock_quarters", "todays_counts", "vendor_rejects"]  # fmt: skip
 # No real stock has come near 15% of the US market (the biggest are ~7%), so a cap above it is a data error: an ADR
 # counted in ordinary shares (LATAM: 604bn shares, 2,000 to an ADR, read as $21tn in run 39) or a unit slip. Such a
 # stock sits out of every index that quarter, and the sectors step logs it. Only where the market has enough stocks
@@ -63,6 +63,14 @@ MIN_PRICE_HOLDERS = 3
 # whose most-held CUSIP in the 13F data was some other security mapped to them; Mechanics Bancorp's holders held 80%
 # of HomeStreet's shares.
 HELD_SHARE_RANGE = (0.25, 1.5)
+# A stock whose price history at the vendor is mostly another company's takes that company's prices on the fund pages
+# too (Juniper Networks under JNP, Juniper Pharmaceuticals', 1999-2017; Exact Sciences under EXK, Endeavour Silver's).
+# Where REJECT_SHARE or more of its quarters with a 13F price (REJECT_MIN_QUARTERS or more) are mispriced, its vendor
+# ticker is rejected (`vendor_rejects`; lake table `vendor_rejects`), and the next run looks for another
+# (`vendor.resolve`); with none, the fund engine values it at the funds' reported prices.
+REJECT_SHARE = 0.8
+REJECT_MIN_QUARTERS = 4
+REJECT_MIN_HOLDERS = 20
 # A quarter where more than this share of the stocks checked disagree (MIN_MARKET_STOCKS or more checked) points at
 # the filings (values in thousands read as dollars), not at the prices: it is left alone, not emptied out of the indices.
 MAX_MISPRICED_SHARE = 0.1
@@ -117,6 +125,26 @@ def stock_quarters(daily: pl.DataFrame) -> pl.DataFrame:
     return out.join(ends, on="q").with_columns(stale=pl.col("last") < pl.col("_cut")).drop("_cut").sort("stock_id", "q")
 
 
+def _compared(sq: pl.DataFrame, reported: pl.DataFrame) -> pl.DataFrame:
+    """The stock-quarters with a 13F price to check ours against (`mispriced`): stock_id, q, raw_close, _f (as-traded
+    close over the split-adjusted one), price, holders, held, gap; _off where MAX_PRICE_GAP-fold or more off, _ok in
+    quarters whose share of such rows points at the prices, not the filings (MAX_MISPRICED_SHARE)."""
+    theirs = reported.filter((pl.col("holders") >= MIN_PRICE_HOLDERS) & (pl.col("price") > 0))
+    off = (pl.col("gap") >= MAX_PRICE_GAP) | (pl.col("gap") <= 1 / MAX_PRICE_GAP)
+    return (
+        sq.filter(pl.col("raw_close") > 0)
+        .select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "raw_close", (pl.col("raw_close") / pl.col("close")).alias("_f"))
+        .join(theirs.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "price", "holders", "held"), on=["stock_id", "q"])
+        .with_columns(gap=pl.col("raw_close") / pl.col("price"))
+        .with_columns(_off=off, _ok=(off.mean().over("q") <= MAX_MISPRICED_SHARE) | (pl.len().over("q") < MIN_MARKET_STOCKS))
+    )  # fmt: skip
+
+
+def _held_share(rows: pl.DataFrame, units: pl.DataFrame) -> pl.DataFrame:
+    u = units.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "units")
+    return rows.join(u, on=["stock_id", "q"], how="left").with_columns(held_share=pl.col("held") * pl.col("_f") / pl.col("units"))
+
+
 def mispriced(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame | None = None, spared: list | None = None) -> pl.DataFrame:
     """(stock_id, q, gap = ours / theirs, ours, theirs, held_share) of the quarters whose as-traded close (`sq`,
     `stock_quarters` output) is MAX_PRICE_GAP-fold or more off the median price per share the stock's 13F holders
@@ -125,21 +153,11 @@ def mispriced(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame | No
     quarter's own share basis, so a split needs no adjusting. With `units` (stock_id, q, units: the company's count on
     today's basis, in the unit its price is quoted in), only where the funds hold HELD_SHARE_RANGE of it; the others
     go to `spared`."""
-    theirs = reported.filter((pl.col("holders") >= MIN_PRICE_HOLDERS) & (pl.col("price") > 0))
-    gap = pl.col("raw_close") / pl.col("price")
-    off = (pl.col("gap") >= MAX_PRICE_GAP) | (pl.col("gap") <= 1 / MAX_PRICE_GAP)
-    rows = (
-        sq.filter(pl.col("raw_close") > 0)
-        .select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "raw_close", (pl.col("raw_close") / pl.col("close")).alias("_f"))
-        .join(theirs.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "price", "held"), on=["stock_id", "q"])
-        .with_columns(gap=gap)
-        .filter(off & ((off.mean().over("q") <= MAX_MISPRICED_SHARE) | (pl.len().over("q") < MIN_MARKET_STOCKS)))
-    )  # fmt: skip
+    rows = _compared(sq, reported).filter(pl.col("_off") & pl.col("_ok"))
     if units is None:
         rows = rows.with_columns(held_share=pl.lit(None, pl.Float64))
     else:
-        u = units.select(pl.col("stock_id").cast(pl.Int32), pl.col("q").cast(pl.Int32), "units")
-        rows = rows.join(u, on=["stock_id", "q"], how="left").with_columns(held_share=pl.col("held") * pl.col("_f") / pl.col("units"))
+        rows = _held_share(rows, units)
         lo, hi = HELD_SHARE_RANGE
         own = pl.col("held_share").is_between(lo, hi)
         if spared is not None:
@@ -147,6 +165,18 @@ def mispriced(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame | No
                                                                    pl.col("price").alias("theirs"), "held_share"))  # fmt: skip
         rows = rows.filter(own.fill_null(False))
     return rows.select("stock_id", "q", "gap", pl.col("raw_close").alias("ours"), pl.col("price").alias("theirs"), "held_share").sort("stock_id", "q")
+
+
+def vendor_rejects(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame) -> pl.DataFrame:
+    """(stock_id, quarters, off) of the stocks whose price history at the vendor is mostly another company's: of the
+    `quarters` with a 13F price to check against (REJECT_MIN_QUARTERS or more), REJECT_SHARE or more are `off` as in
+    `mispriced`. Where the company has no count to check the funds' holding against, REJECT_MIN_HOLDERS funds or more
+    must report it instead."""
+    rows = _held_share(_compared(sq, reported), units)
+    lo, hi = HELD_SHARE_RANGE
+    own = pl.col("held_share").is_between(lo, hi) | (pl.col("held_share").is_null() & (pl.col("holders") >= REJECT_MIN_HOLDERS))
+    per = rows.group_by("stock_id").agg(pl.len().cast(pl.Int32).alias("quarters"), (pl.col("_off") & pl.col("_ok") & own).sum().cast(pl.Int32).alias("off"))
+    return per.filter((pl.col("quarters") >= REJECT_MIN_QUARTERS) & (pl.col("off") >= REJECT_SHARE * pl.col("quarters"))).sort("stock_id")
 
 
 # The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,

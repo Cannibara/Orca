@@ -54,7 +54,7 @@ from orca.securities import (
     us_tickers,
 )
 from orca.storage import Lake
-from orca.vendor import VENDOR_SCHEMA, VENDOR_TABLE, resolve
+from orca.vendor import REJECTS_SCHEMA, REJECTS_TABLE, VENDOR_SCHEMA, VENDOR_TABLE, resolve
 
 BENCHMARK_CUSIP = "78462F103"  # SPY, the benchmark of the what-if figures
 EMPTY_FETCH_WARN = 0.25  # share of tickers answering with no rows that is worth a flag
@@ -526,14 +526,17 @@ def resolve_vendor_tickers(
     tickers = dict(securities.select("stock_id", "ticker").iter_rows())
     spans = held_spans(lake, stocks)
     gone = set(cusip_map.filter(pl.col("method") == UNLISTED)["stock_id"].drop_nulls().to_list())
-    resolved = resolve(tickers, spans, universe, gone=gone)
+    rejected: dict[int, set[str]] = {}
+    for sid, ticker in read_table(lake, REJECTS_TABLE, REJECTS_SCHEMA).select("stock_id", "ticker").iter_rows():
+        rejected.setdefault(sid, set()).add(ticker)
+    resolved = resolve(tickers, spans, universe, gone=gone, rejected=rejected)
     missing = set(tickers) - set(resolved["stock_id"].to_list())
     old_only = {sid for sid, (_, last) in spans.items() if last < q_start(0)}
     alternates, counts = alternate_tickers(
         lake, sources, securities, cusip_map, missing, today, flags, budget, old_only
     )
     if alternates:
-        resolved = resolve(tickers, spans, universe, alternates, gone=gone)
+        resolved = resolve(tickers, spans, universe, alternates, gone=gone, rejected=rejected)
     # The ticker each stock's stored prices were fetched under: its vendor ticker of the last
     # run, else (a stock new to the table, or the first run with one) the security's own.
     stored = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA)

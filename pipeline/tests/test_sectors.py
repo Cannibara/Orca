@@ -304,3 +304,20 @@ def test_a_close_far_off_the_price_its_13f_holders_report_is_mispriced():
     off = sectors.mispriced(sq, reported, units, spared)
     assert off.select("stock_id", "q").rows() == [(1, 17)] and off["held_share"].to_list() == pytest.approx([15 / 19])
     assert pl.concat(spared).select("stock_id", "q").rows() == [(3, 17), (5, 17)]
+
+
+def test_a_stock_whose_vendor_prices_are_mostly_another_companys_is_rejected():
+    # Stock 1 (HomeStreet under MCHB): 9 of 10 quarters off, funds hold 79%. Stock 2 (Honeywell, run 49): 3 of 10 off.
+    # Stock 3 (Juniper Networks under JNP): no count on record, 9 of 10 off, 400 holders. Stock 4: the same with 12
+    # holders, too few without a count. Stock 5: 3 quarters checked, too few.
+    rows = [(1, q, 30000.0 if q < 9 else 13.0, 27.0 if q < 9 else 13.0, 40, 15e6) for q in range(10)]
+    rows += [(2, q, 175.0, 19.0 if q < 3 else 175.0, 900, 6e8) for q in range(10)]
+    rows += [(3, q, 7.5 if q < 9 else 30.0, 340.0 if q < 9 else 30.0, 400, 1e8) for q in range(10)]
+    rows += [(4, q, 7.5 if q < 9 else 30.0, 340.0 if q < 9 else 30.0, 12, 1e8) for q in range(10)]
+    rows += [(5, q, 1.0, 100.0, 50, 1e8) for q in range(3)]
+    sq = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "raw_close": [r[2] for r in rows], "close": [r[2] for r in rows]})
+    reported = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "price": [r[3] for r in rows], "holders": [r[4] for r in rows],
+                             "held": [r[5] for r in rows]}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+    units = pl.DataFrame({"stock_id": [1] * 10 + [2] * 10 + [5] * 3, "q": list(range(10)) * 2 + list(range(3)), "units": [19e6] * 10 + [7.45e8] * 10 + [1e8] * 3})
+    got = sectors.vendor_rejects(sq, reported, units)
+    assert got.rows() == [(1, 10, 9), (3, 10, 9)]

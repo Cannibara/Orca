@@ -32,6 +32,7 @@ from orca.engine.sectors import (
     market_caps,
     mispriced,
     stock_quarters,
+    vendor_rejects,
 )
 from orca.hierarchy import assign, load
 from orca.hierarchy.assign import SicTable
@@ -53,6 +54,7 @@ from orca.sec.adr import Adr
 from orca.shares_hist import SCHEMA, frame, load_overrides
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
+from orca.vendor import REJECTS_SCHEMA, REJECTS_TABLE, VENDOR_SCHEMA, VENDOR_TABLE
 
 log = logging.getLogger(__name__)
 FRESH_DAYS = 100  # a 10-Q comes every quarter
@@ -228,6 +230,37 @@ def _log_mispriced(off: pl.DataFrame, spared: pl.DataFrame, securities: pl.DataF
         flags.append({"type": "prices_set_aside", "stocks": off["stock_id"].n_unique(), "quarters": off.height})
 
 
+MAX_NEW_REJECTS = 300  # more in one run is a broken input (the 13F prices, the CUSIP map), not wrong tickers
+
+
+def update_vendor_rejects(lake: Lake, found: pl.DataFrame, securities: pl.DataFrame, flags: list, today: date | None = None) -> int:
+    """Add to lake table `vendor_rejects` the vendor ticker of each stock of `found` (`engine/sectors.vendor_rejects`:
+    stock_id, quarters, off) whose stored prices came under it (`vendor_tickers`), and log them; the next run's
+    `run/market.resolve_vendor_tickers` then drops those prices and looks for another ticker. A rejection is kept for
+    good: the prices it named are gone, so nothing could clear it. Over MAX_NEW_REJECTS new ones in a run are flagged,
+    not written. Returns the number added."""
+    table = read_table(lake, REJECTS_TABLE, REJECTS_SCHEMA)
+    vendor = read_table(lake, VENDOR_TABLE, VENDOR_SCHEMA).select("stock_id", "ticker")
+    new = (
+        found.join(vendor, on="stock_id").join(table.select("stock_id", "ticker"), on=["stock_id", "ticker"], how="anti")
+        .select("stock_id", "ticker", "quarters", "off", checked=pl.lit(today or date.today()))
+        .cast(REJECTS_SCHEMA).sort("stock_id")
+    )  # fmt: skip
+    if new.is_empty():
+        return 0
+    if new.height > MAX_NEW_REJECTS:
+        log.warning("vendor tickers: %d to reject in one run, more than %d: none rejected", new.height, MAX_NEW_REJECTS)
+        flags.append({"type": "vendor_rejects_held", "count": new.height})
+        return 0
+    names = securities.select(pl.col("stock_id").cast(pl.Int32), "name")
+    for r in new.join(names, on="stock_id", how="left").sort("off", descending=True).head(40).iter_rows(named=True):
+        log.warning("vendor ticker rejected: %s for %s (id %s): %d of %d quarters off the 13F prices",
+                    r["ticker"], r["name"], r["stock_id"], r["off"], r["quarters"])  # fmt: skip
+    lake.write(REJECTS_TABLE, pl.concat([table, new]).sort("stock_id", "ticker"))
+    flags.append({"type": "vendor_rejects", "new": new.height, "total": table.height + new.height})
+    return new.height
+
+
 def _log_scaled(scaled: pl.DataFrame, caps: pl.DataFrame, securities: pl.DataFrame, flags: list, top: int = 25) -> None:
     """Log the stocks whose stand-in count `held_scales` scaled down, biggest share of the market first (in the
     quarter it was biggest), with that quarter's scale."""
@@ -317,7 +350,9 @@ def build_sector_returns(
     # A close that is some other security's (`mispriced`) sits out: of the indices, and of the fund scores' stock
     # series, which read `stock_quarters`
     spared: list = []
-    off = mispriced(sq, reported, pl.concat(units), spared)
+    units_all = pl.concat(units)
+    off = mispriced(sq, reported, units_all, spared)
+    update_vendor_rejects(lake, vendor_rejects(sq.filter(pl.col("stock_id").is_in(stock_ids)), reported, units_all), securities, flags)
     if not off.is_empty():
         bad = pl.col("_off").fill_null(False)
         gone = off.select(pl.col("stock_id").cast(sq.schema["stock_id"]), pl.col("q").cast(sq.schema["q"]), _off=pl.lit(True))
