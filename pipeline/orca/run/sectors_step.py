@@ -253,9 +253,11 @@ def update_vendor_rejects(lake: Lake, found: pl.DataFrame, securities: pl.DataFr
         flags.append({"type": "vendor_rejects_held", "count": new.height})
         return 0
     names = securities.select(pl.col("stock_id").cast(pl.Int32), "name")
-    for r in new.join(names, on="stock_id", how="left").sort("off", descending=True).head(40).iter_rows(named=True):
-        log.warning("vendor ticker rejected: %s for %s (id %s): %d of %d quarters off the 13F prices",
-                    r["ticker"], r["name"], r["stock_id"], r["off"], r["quarters"])  # fmt: skip
+    drift = found.select("stock_id", *[c for c in ("moves", "drift") if c in found.columns])
+    for r in new.join(names, on="stock_id", how="left").join(drift, on="stock_id", how="left").sort("off", descending=True).head(40).iter_rows(named=True):
+        moved = f", price changes {r['drift']:.0%} apart (median of {r['moves']})" if r.get("drift") is not None else ""
+        log.warning("vendor ticker rejected: %s for %s (id %s): %d of %d quarters off the 13F prices%s",
+                    r["ticker"], r["name"], r["stock_id"], r["off"], r["quarters"], moved)  # fmt: skip
     lake.write(REJECTS_TABLE, pl.concat([table, new]).sort("stock_id", "ticker"))
     flags.append({"type": "vendor_rejects", "new": new.height, "total": table.height + new.height})
     return new.height

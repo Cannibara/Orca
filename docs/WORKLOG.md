@@ -5,6 +5,14 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — Run 53: 14 vendor tickers rejected; a price-move test for the rest
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 53 (`sectors_only`, `main` 1a4b1e9, PR #83): all steps green. 14 vendor tickers rejected, each another company's: MCHB for Mechanics Bancorp (52 of 57 quarters off), GPR for Great Panther, VAC (Marriott Vacations') for VBI Vaccines, ONC (BeiGene's) for Oncolytics, CRH (CRH plc's) for CRH Medical, TTEN for an old TotalEnergies ADR id (the main one, TTE, is another id), ENZB, AZN for id 7137 (an AstraZeneca id whose 13F CUSIP is not the ADR's: few holders, 2017–20), ABT (Abbott's) for Absolute Software, AI (C3.ai's) for Arlington Asset, AXON (Axon's) for Sio Gene Therapies, PD (PagerDuty's) for Precision Drilling's old id, HIVE for Aerohive, SPAQ for Fisker. None is a company's right ticker | PR #83 | — |
+| Missed: Exact Sciences under EXK (41 of ~70 quarters off) and Juniper Networks under JNP (47 of ~77): the other company's prices were within 5x in the rest. Now also rejected where the quarter-on-quarter price changes are a median 15%+ apart (8+ pairs of quarters, log terms); the same company's are a few percent apart | Prices in the same range, moves unlike | `pipeline/orca/engine/sectors.py` (`vendor_rejects`), `pipeline/orca/run/sectors_step.py` (log) |
+| Checks: a test with an Exact Sciences-shaped history (8 of 12 off, rejected on its moves), a right one 3% off and one with too few pairs (kept); sector tests green | | `pipeline/tests/test_sectors.py` |
+
 ## 2026-11-26 — Wrong-company prices: the vendor ticker is rejected, for the fund pages too
 
 | What changed | Why | Files |
