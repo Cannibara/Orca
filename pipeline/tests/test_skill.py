@@ -127,3 +127,22 @@ def test_an_etf_position_is_ranked_against_every_label_at_its_tier():
     ranks = skill.etf_ranks(trades([(1, 5, 10, 10.0, 10.0, 10.0)]), returns_table(rows), {5: skill.EtfPick("Tech > Chips", 2)}, last_q=13)
     r = ranks.row(0, named=True)
     assert (r["cik"], r["stock_id"], r["label"], r["rank"], r["of"], r["best"]) == (1, 5, "Tech > Chips", 2, 3, "Tech > Software")
+
+
+def test_a_position_held_from_the_start_of_the_data_is_scored_with_flat_series_before_them():
+    # Berkshire's Coca-Cola: first reported in 1998 Q4 (q-57), before any price (q-56) or index return (q-55). Both
+    # series are flat before they start, so the position is replayed from there instead of dropped. A stock listed
+    # later (first quarter q10) gets no flat stretch.
+    sq = pl.DataFrame({"stock_id": [25, 25, 25, 9, 9], "q": [-56, -55, -54, 10, 11], "close": [10.0, 11.0, 12.1, 5.0, 6.0],
+                       "div": [0.0] * 5, "vwap": [10.0, 10.5, 11.5, 5.0, 5.5]})  # fmt: skip
+    own = skill.own_series(sq)
+    levels = {(r["key"], r["q"]): r["level_end"] for r in own.iter_rows(named=True)}
+    assert levels[("s25", -57)] == 1.0 and levels[("s25", -56)] == 1.0 and levels[("s25", -54)] == pytest.approx(1.21)
+    assert ("s9", 9) not in levels and own.filter(pl.col("key") == "s9")["q"].min() == 10
+    rets = pl.DataFrame({"label": ["Market", "Market"], "tier": [0, 0], "q": [-55, -54], "ret": [0.1, 0.1], "level_end": [1.1, 1.21],
+                         "level_avg": [1.05, 1.15], "n": [1, 1], "cap": [1.0, 1.0], "top_weight": [1.0, 1.0]})  # fmt: skip
+    lab = {(r["key"], r["q"]): r["level_avg"] for r in skill.label_series(rets).iter_rows(named=True)}
+    assert lab[("Market", -57)] == 1.0 and lab[("Market", -56)] == 1.0
+    t = trades([(1, 25, -57, 100.0, 10.0, 100.0)]).with_columns(key=pl.lit("s25"))
+    out, dropped = skill.replay(t, own, last_q=-54)
+    assert dropped.is_empty() and flows_of(out)[-1][1] == pytest.approx(1000.0 * 1.21)
