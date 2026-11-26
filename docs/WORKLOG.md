@@ -5,6 +5,13 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — The map names low coverage instead of "Too early to tell" (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| A fund with 3+ years of trades and 20+ picks that misses the map only on coverage now reads "Too little of its buying could be scored": the map needs 80% of its buying matched to a sector with prices, and it says how much was. A young fund still reads "Too early to tell" | Berkshire (108 quarters, 128 picks, 77% scored) read "Too early to tell"; owner: build it | `web/src/fund/SkillMapPanel.tsx`, `web/tests/fund-skill-ui.test.tsx` |
+| Checks: 1 new test; web suite green (1,208), typecheck clean | | |
+
 ## 2026-11-26 — Positions held from the start of the data are scored, not dropped (owner)
 
 | What changed | Why | Files |
