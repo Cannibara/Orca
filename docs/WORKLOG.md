@@ -5,6 +5,13 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — Positions held from the start of the data are scored, not dropped (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| A stock's own series and every index series that begin with the data (first quarter 1999 Q2 or before) are flat from 1998 Q4: level 1.0 before their first quarter. A position first reported in 1998 Q4 or 1999 Q1 is then replayed from there instead of dropped whole | Berkshire's map read "Too early to tell": 77% of its buying could be scored, under the 80% the map needs, because Coca-Cola ($25bn first reported in 1998 Q4), Wells Fargo, American Express, Walmart, Freddie Mac and its 1999 Chubb stake had a first trade no series had a level for (13F data from 1998 Q4, prices from 1999 Q1, index returns from 1999 Q2). Owner: "assume it's the same" year to year before then. Fund and index side start alike, so neither gains; a series that begins later is left as it is | `pipeline/orca/engine/skill.py` (`_flat_start`, `own_series`, `label_series`) |
+| Checks: 1 new test (a 1998 Q4 position replayed, a later listing left alone; fails on the old code); pipeline suite green (1,119); demo data unchanged. Takes effect with the next sectors run | | `pipeline/tests/test_skill.py` |
+
 ## 2026-11-26 — Runs 54–55: 34 wrong-company tickers off the fund pages
 
 | What changed | Why | Files |

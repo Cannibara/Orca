@@ -45,9 +45,29 @@ def end_years(q: int) -> float:
     return (q_end(q) - EPOCH).days / 365
 
 
+# The 13F data starts in 1998 Q4 (FIRST_DATA_Q), prices in 1999 Q1 and the indices' returns in 1999 Q2, so a
+# position held from the start had a first trade no series had a level for and dropped out whole: Berkshire's
+# Coca-Cola, American Express, Wells Fargo and Walmart, 23% of its buying (owner 2026-11-26: "assume it's the same").
+# A series that begins with the data (its first quarter FLAT_UNTIL_Q or before) is flat before it: level 1.0 from
+# FIRST_DATA_Q, where both a stock's own series and every index start. Fund and index side start alike, so neither
+# gains; a series that begins later (a listing in 2005) is left as it is.
+FIRST_DATA_Q = -57
+FLAT_UNTIL_Q = -55
+
+
+def _flat_start(series: pl.DataFrame) -> pl.DataFrame:
+    """`series` (SERIES_SCHEMA) with level 1.0 in the quarters from FIRST_DATA_Q to the one before each key's first,
+    for the keys whose first quarter is FLAT_UNTIL_Q or before."""
+    first = series.group_by("key").agg(pl.col("q").min().alias("_q0")).filter(pl.col("_q0") <= FLAT_UNTIL_Q)
+    rows = [(key, q, 1.0, 1.0) for key, q0 in first.iter_rows() for q in range(FIRST_DATA_Q, q0)]
+    if not rows:
+        return series
+    return pl.concat([pl.DataFrame(rows, schema=SERIES_SCHEMA, orient="row"), series]).sort("key", "q")
+
+
 def own_series(sq: pl.DataFrame) -> pl.DataFrame:
     """Each stock's total-return series (key "s<stock_id>"): level_end chains (close + div) / previous close,
-    level_avg = previous level × VWAP / previous close; 1.0 at its first quarter."""
+    level_avg = previous level × VWAP / previous close; 1.0 at its first quarter (and flat before it, `_flat_start`)."""
     s = sq.sort("stock_id", "q").with_columns(
         close_p=pl.col("close").shift(1).over("stock_id"),
     )
@@ -56,11 +76,12 @@ def own_series(sq: pl.DataFrame) -> pl.DataFrame:
     s = s.with_columns(level_p=pl.col("level_end").shift(1).over("stock_id"))
     avg = pl.when(pl.col("close_p") > 0).then(pl.col("level_p") * pl.col("vwap").fill_null(pl.col("close")) / pl.col("close_p"))
     avg = avg.otherwise(pl.col("vwap").fill_null(pl.col("close")) / pl.col("close"))
-    return s.select(("s" + pl.col("stock_id").cast(pl.String)).alias("key"), "q", avg.alias("level_avg"), "level_end").cast(SERIES_SCHEMA)
+    return _flat_start(s.select(("s" + pl.col("stock_id").cast(pl.String)).alias("key"), "q", avg.alias("level_avg"), "level_end").cast(SERIES_SCHEMA))
 
 
 def label_series(sector_returns: pl.DataFrame) -> pl.DataFrame:
-    return sector_returns.select(pl.col("label").alias("key"), "q", "level_avg", "level_end").cast(SERIES_SCHEMA)
+    """Each hierarchy label's index series (key = the label), flat before it starts (`_flat_start`)."""
+    return _flat_start(sector_returns.select(pl.col("label").alias("key"), "q", "level_avg", "level_end").cast(SERIES_SCHEMA))
 
 
 def replay(trades: pl.DataFrame, series: pl.DataFrame, last_q: int, by: tuple[str, ...] = (), units: bool = False):
