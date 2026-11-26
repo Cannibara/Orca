@@ -5,6 +5,14 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — Runs 54–55: 34 wrong-company tickers off the fund pages
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 54 (`sectors_only`, `main` 01aad7b, PR #84): 20 more vendor tickers rejected, mostly on the price-move test: JNP for Juniper Networks (moves 26% apart over 77 pairs), EXK for Exact Sciences (24%), PGF and EPI (ETFs) for Pengrowth and ESSA Pharma, RYI (Ryerson's) for Viracta, TR (Tootsie Roll's) for Trillium, APH (Amphenol's) for Aphria, WTW (Willis Towers Watson's) for WW International, VTOL (Era's history) for the old Bristow, CZR for the old Caesars, and others. Borderline, possibly right tickers with patchy prices: SMSMY (Sims) and YZCAY (Yankuang), thin OTC ADRs at 17%, ECHO (16%), ARIS; if so their funds are valued at reported prices instead | PR #84 | — |
+| Run 55 (ordinary, `main` 01aad7b): 20 vendor tickers changed and 25 lost (155,001 bars dropped), 7,013 funds recomputed, 41,202 files changed, health 99.4% median priced; no time-budget cut, no `vendor_tickers_lost`. Live after the run: Juniper Networks (386) on JNPR ($37.96 in 2001 Q1, $36 in 2025), Exact Sciences (1684) on EXAS ($131.78 in 2021 Q1), Oncolytics on ONCY, CRH Medical on CRHM; Mechanics Bancorp (3881) has no other ticker: chart deleted, valued at its holders' reported prices | The fix reaches the fund pages | — |
+| Left: BP Prudhoe Bay Royalty Trust (1308) still under BMI (Badger Meter's prices): its 13F CUSIP shows 0% of its units held, so neither test counts its quarters; a hand override (`ticker_overrides.csv`) would fix it | | — |
+
 ## 2026-11-26 — Run 53: 14 vendor tickers rejected; a price-move test for the rest
 
 | What changed | Why | Files |
