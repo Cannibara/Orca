@@ -150,3 +150,13 @@ def test_a_company_gone_since_takes_only_a_line_that_has_ended():
     assert resolve(tickers, held, universe)["stock_id"].to_list() == [1, 2]
     gone = resolve(tickers, held, universe, gone={1, 2})
     assert gone["ticker"].to_list() == ["LEHMQ"]
+
+
+def test_resolve_skips_a_ticker_rejected_for_the_stock():
+    # Juniper Networks (stock 1) under JNP, Juniper Pharmaceuticals' line: rejected, so its alternate JNPR is taken;
+    # Juniper Pharmaceuticals itself (stock 2) keeps JNP
+    u = universe(("JNP", date(2003, 1, 2), date(2018, 7, 13)), ("JNPR", date(1999, 6, 25), date(2025, 7, 2)))
+    held = {1: (date(1999, 9, 30), date(2025, 6, 30)), 2: (date(2013, 1, 1), date(2018, 6, 30))}
+    out = resolve({1: "JNP", 2: "JNP"}, held, u, {1: ["JNPR"]}, rejected={1: {"JNP"}})
+    assert out.rows() == [(1, "JNPR", date(2025, 7, 2)), (2, "JNP", date(2018, 7, 13))]
+    assert resolve({1: "JNP"}, held, u, rejected={1: {"JNP"}}).is_empty()  # no other candidate: no vendor prices

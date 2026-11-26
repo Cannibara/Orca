@@ -7,10 +7,11 @@ import polars as pl
 from orca.hierarchy import parse
 from orca.hierarchy.assign import SicTable, StockLabel
 from orca.prices import PRICES_SCHEMA
-from orca.run.sectors_step import build_sector_returns, reported_prices
+from orca.run.sectors_step import build_sector_returns, reported_prices, update_vendor_rejects
 from orca.run.state import CUSIP_MAP_SCHEMA, SECURITIES_TABLE_SCHEMA
 from orca.shares_hist import SCHEMA as SHARES_SCHEMA
 from orca.storage import Lake
+from orca.vendor import VENDOR_SCHEMA
 
 H = parse("## Tech > Chips\nMemory: MU\nLogic: INTC\n@default Semis => Tech > Chips > Logic\n")
 MEMORY, LOGIC = H.nodes
@@ -99,3 +100,19 @@ def test_the_13f_price_is_the_most_held_cusips_not_that_of_funds_mapped_to_the_s
                                          "shares": [r[2] for r in rows], "value_usd": [r[3] for r in rows]})
                .cast({"cik": pl.Int64, "q": pl.Int16}), part="q044")  # fmt: skip
     assert reported_prices(lake, cusips).rows() == [(632, 44, 800.0, 3, 3000.0)]
+
+
+def test_a_rejected_vendor_ticker_is_recorded_once_and_a_flood_is_held_back(tmp_path, monkeypatch):
+    lake = Lake(tmp_path / "lake")
+    lake.write("vendor_tickers", pl.DataFrame({"stock_id": [386, 1684], "ticker": ["JNP", "EXK"], "end": [date(2018, 7, 13), date(2026, 11, 20)]},
+                                              schema=VENDOR_SCHEMA))  # fmt: skip
+    securities = pl.DataFrame({"stock_id": [386, 1684], "ticker": ["JNP", "EXK"], "name": ["JUNIPER NETWORKS INC", "EXACT SCIENCES CORP"]})
+    found = pl.DataFrame({"stock_id": [386, 999], "quarters": [47, 10], "off": [47, 9]}, schema={"stock_id": pl.Int32, "quarters": pl.Int32, "off": pl.Int32})
+    flags: list = []
+    assert update_vendor_rejects(lake, found, securities, flags, today=date(2026, 11, 26)) == 1  # 999 has no vendor ticker
+    assert lake.read("vendor_rejects").rows() == [(386, "JNP", 47, 47, date(2026, 11, 26))]
+    assert update_vendor_rejects(lake, found, securities, flags, today=date(2026, 12, 16)) == 0  # already rejected
+    monkeypatch.setattr("orca.run.sectors_step.MAX_NEW_REJECTS", 0)
+    more = pl.DataFrame({"stock_id": [1684], "quarters": [41], "off": [41]}, schema=found.schema)
+    assert update_vendor_rejects(lake, more, securities, flags) == 0 and lake.read("vendor_rejects").height == 1
+    assert {"type": "vendor_rejects_held", "count": 1} in flags

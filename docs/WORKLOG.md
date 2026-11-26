@@ -5,6 +5,14 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — Wrong-company prices: the vendor ticker is rejected, for the fund pages too
+
+| What changed | Why | Files |
+|---|---|---|
+| The sectors step now also rejects a stock's vendor ticker where 80%+ of its quarters with a 13F price (4+) are mispriced (held-share guard; 20+ holders without a count) and records it in lake table `vendor_rejects`; `resolve_vendor_tickers` skips rejected tickers, so the existing path drops the bars, looks for another ticker, recomputes the holders and deletes the chart. At most 300 new a run. The monthly run's sector-table save step saves the table | Juniper Networks under JNP (Juniper Pharmaceuticals' prices, 1999–2017), Exact Sciences under EXK (Endeavour Silver's) and Mechanics Bancorp under MCHB price the fund pages too; owner: fix, efficiently | `pipeline/orca/engine/sectors.py` (`vendor_rejects`), `pipeline/orca/run/sectors_step.py` (`update_vendor_rejects`), `pipeline/orca/vendor.py` (`resolve` `rejected`), `pipeline/orca/run/market.py`, `.github/workflows/pipeline.yml` |
+| To take effect now: a `sectors_only` run (writes the table), then an ordinary run (drops, refetches, recomputes, publishes) | The monthly run's sectors step runs after its fund step, so a rejection reaches the fund pages one run later | — |
+| Checks: 4 new tests (the rule; the table, once and with a flood held back; `resolve` skipping a rejected ticker for an alternate; a run where a rejected stock loses its prices and chart, fails on the old lookup) | | `pipeline/tests/test_sectors.py`, `test_sectors_step.py`, `test_vendor.py`, `test_run.py` |
+
 ## 2026-11-26 — Specialization tab back on (owner)
 
 | What changed | Why | Files |

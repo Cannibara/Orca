@@ -59,7 +59,7 @@ from orca.sec.about import COVER_URL
 from orca.sec.live import fetch_new_filings
 from orca.securities import FIGI_URL, SUBMISSIONS_URL
 from orca.storage import Lake
-from orca.vendor import UNIVERSE_SCHEMA
+from orca.vendor import REJECTS_SCHEMA, UNIVERSE_SCHEMA
 
 WEEK1, WEEK2, WEEK3 = date(2026, 10, 16), date(2026, 10, 23), date(2026, 10, 30)
 HALYARD, KELPWOOD = 9100002, 9100001  # Halyard restates Q2 2019 on 2026-10-20
@@ -1402,6 +1402,25 @@ def test_a_stock_on_an_older_line_of_a_reused_ticker_loses_its_prices_and_chart(
 
     run(tmp_path, replace(sources, price_universe=lambda: reused), WEEK3)
     assert (tmp_path / "out" / "deleted.txt").read_text() == ""  # deleted once
+
+
+def test_a_stock_whose_vendor_ticker_was_rejected_loses_its_prices_and_chart(fixtures, tmp_path):
+    # The sectors step found the stock's prices under its ticker to be another company's (vendor_rejects)
+    listed = universe_of(fixtures)
+    sources = replace(fixture_sources(fixtures), price_universe=lambda: listed)
+    run(tmp_path, sources, WEEK1)
+    lake = Lake(tmp_path / "lake")
+    vendor = dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    stock_id, ticker = sorted(vendor.items())[1]  # a held stock (the first is the benchmark)
+    path = f"stock/{stock_id}/weekly.json"
+    assert path in read_json(tmp_path / "out" / "manifest.json")["files"]
+    lake.write("vendor_rejects", pl.DataFrame([(stock_id, ticker, 40, 38, date(2026, 11, 26))], schema=REJECTS_SCHEMA, orient="row"))
+
+    run(tmp_path, sources, WEEK2)
+
+    assert stock_id not in dict(lake.read("vendor_tickers").select("stock_id", "ticker").iter_rows())
+    assert stock_id not in set(lake.read("prices_daily")["stock_id"].to_list())
+    assert path not in read_json(tmp_path / "out" / "manifest.json")["files"]
 
 
 def test_a_universe_that_loses_most_tickers_changes_nothing(fixtures, tmp_path, monkeypatch):
