@@ -1,9 +1,16 @@
 # Worklog
 
-Last verified: 2026-11-25
+Last verified: 2026-11-26
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-26 — Specialization tab back on (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| The production build no longer sets `VITE_SPECIALIZATION=hold`, so the fund page's Specialization tab shows the sector files again (held since 2026-11-23). The hold stays in the code for a next time | Owner: "Yes of course" after run 52 (market vs SPY within 8.7 points every year 1999–2026) | `.github/workflows/web.yml` |
+| Next, also approved: fix the wrong tickers of delisted companies (Juniper Networks under JNP, Exact Sciences under EXK, ...) that price the fund pages too | | — |
 
 ## 2026-11-25 — Run 52: Lloyds scaled again; the indices are where the data allows
 
