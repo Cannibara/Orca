@@ -5,6 +5,18 @@ Last verified: 2026-11-26
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-26 — Home Landscape tab: every 13F filer by type of investor; Perigee's $266T book removed
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner asked: how many 13F filers, and who must file. Checked: 8,907 managers filed 13F-HR holdings for Q2 2026 and 9,232 filings for Q3 2026 so far (SEC full index), plus ~1,950 13F-NT notices (holdings reported in another's filing); any manager with investment discretion over $100M+ of SEC-listed securities (US-listed stocks, ETFs, listed options, some convertibles; long only) on the last trading day of any month. Orca has 16,121 filers since 1999 | Owner question | — |
+| New home tab **Landscape**: a tree map of every current filer, grouped by type of investor under heading strips, area = 13F holdings, colour = estimated return a year over the shared period (the holdings map's ramp); headings zoom in, filers open their page, breadcrumb and Escape zoom out; the note says ETF money is counted twice and bounds it with the ETF providers' total ($24.4T of $72.7T at Q3 2026) | Owner's idea; owner chose to keep the index firms as Asset managers > ETF providers and call out the double counting | `web/src/home/LandscapeMap.tsx`, `landscape.ts`, `landscape.css`, `web/src/pages/Home.tsx`, `web/src/fund/treemapView.ts` (optional `fit`, `fixed`, `kind`, `onActivate`), `web/src/fund/treemapDom.ts` (moved from HoldingsPanel) |
+| Published file `home/landscape.json` (contract first): each leaf type's 150 largest filers and the rest as one row, returns for all six periods; ~45 KB brotli on real data | One file serves every period and zoom | `pipeline/contract.md`, `pipeline/orca/landscape.py`, `run/publish_step.py`, `publish.py` |
+| Types: hand labels for the ~300 largest (`investor_types.csv`), the famous lists, the SEC's monthly adviser register (7,877 filers typed by CIK or exact name: client mix and private funds; `scripts/investor_types.py`), SEC industry codes and name words. Unclassified: 2% of the money at Q3 2026 | 13Fs carry no type | `pipeline/orca/investors.py`, `investor_types.csv`, `investor_types_adv.csv`, `pipeline/scripts/investor_types.py` |
+| Perigee Private Management (1074020) showed $266T in Q2 1999: its text table ran two columns into 3.5 trillion-share rows. Rows over 50 billion shares are dropped at parse and build; the next ordinary run removes those in the lake and recomputes their funds | Owner: get rid of it | `pipeline/orca/holdings.py`, `sec/legacy.py`, `run/ingest.py` (`purge_misread_holdings`), `run/weekly.py` |
+| Checks: pipeline suite green (1,121 + new tests for types, landscape and the share guard); web suite green (1,220); Playwright smoke incl. a new Landscape test at 1280/400 px, light and dark; build and prerender green. Screenshots on real published data looked right | | `pipeline/tests/test_investors.py`, `test_landscape.py`, `web/tests/landscape.test.ts`, `web/tests/home.test.tsx`, `web/e2e/smoke.spec.ts` |
+| To go live: merge, then Actions > Pipeline > Run workflow with `home_only` (publishes `home/landscape.json`, ~5 min); the next ordinary run removes Perigee's rows. Until then the tab says the landscape arrives with the next data update | | — |
+
 ## 2026-11-26 — Runs 54–55: 34 wrong-company tickers off the fund pages
 
 | What changed | Why | Files |

@@ -13,6 +13,8 @@ import polars as pl
 
 from orca.config import PERIODS
 from orca.famous import Famous, SearchScores
+from orca.investors import Classifier
+from orca.landscape import landscape
 from orca.home import (
     FundSnapshot,
     calls,
@@ -33,6 +35,7 @@ from orca.publish import (
 from orca.run.compute import Context
 from orca.run.market import latest_closes
 from orca.run.state import MAX_FLAGS_PER_KIND, SECURITIES_TABLE_SCHEMA, read_table
+from orca.sec.about import SCHEMA as ABOUT_SCHEMA, TABLE as ABOUT_TABLE
 from orca.securities import ETF_SECTOR
 from orca.vendor import VENDOR_SCHEMA, VENDOR_TABLE
 
@@ -112,10 +115,12 @@ def publish_shared_files(
     compress: bool,
     famous: Sequence[Famous] = (),
     search: SearchScores | None = None,
+    investors: Classifier | None = None,
 ) -> dict[str, str]:
     """funds.json, securities.json, latest_prices.json, the home lists (`famous`: famous.csv's
     funds, for the Famous funds lists; `search`: their keywords' Google Trends scores, for Most
-    searched) and the weekly files of
+    searched; `investors`: each filer's type of investor, for the Landscape, which is left out
+    without it) and the weekly files of
     `weekly_ids` (every stock when None); the weekly files are built a chunk of stocks at a time
     (`Context.iter_closes`), so no more than a chunk's daily closes are ever held."""
     lake, last_q = ctx.lake, ctx.last_q
@@ -171,6 +176,7 @@ def publish_shared_files(
         calls_y=calls(snaps, mcap, q_close, px_on_filed, "y", latest_q=last_q),
         search_asof=search.asof if search else None,
         spx={period: spx_window(spy_px, last_q, period) for period in PERIODS},
+        landscape=None if investors is None else landscape(snaps, investors, last_q, _sic_of(lake)),
     )
 
     table = securities.with_columns(
@@ -190,6 +196,12 @@ def publish_shared_files(
         weekly = {sid: weekly_closes(frame) for sid, frame in closes.items()}
         files.update(publish_weekly(staging, weekly, compress))
     return files
+
+
+def _sic_of(lake) -> dict[int, str | None]:
+    """CIK -> the SEC industry description of lake table fund_about (the About tab's facts)."""
+    about = read_table(lake, ABOUT_TABLE, ABOUT_SCHEMA)
+    return dict(about.select("cik", "sic").iter_rows()) if about.height else {}
 
 
 def prune_staging(out_root: Path) -> None:

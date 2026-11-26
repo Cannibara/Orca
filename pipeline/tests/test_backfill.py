@@ -377,3 +377,19 @@ def test_an_unmarked_amendment_next_to_an_unreadable_original_is_not_the_book(tm
     )
     marked = dict(_mark_unmarked(filings, _originals(checks)).select("accession", "amendment_type").iter_rows())
     assert marked == {"B": "unmarked", "C": None}  # C: no original that quarter, it is the report
+
+
+def test_misread_holdings_already_in_the_lake_are_removed_and_their_funds_owed(tmp_path):
+    from orca.run.ingest import purge_misread_holdings
+
+    lake = Lake(tmp_path)
+    schema = {"cik": pl.Int64, "q": pl.Int16, "shares": pl.Float64}
+    lake.write("holdings", pl.DataFrame({"cik": [1, 2], "q": [-55, -55], "shares": [3.5e12, 10.0]}, schema=schema), part="a")
+    lake.write("holdings", pl.DataFrame({"cik": [3], "q": [1], "shares": [5.0]}, schema=schema), part="b")
+    state = State(pending_funds={9})
+
+    assert purge_misread_holdings(lake, state) == {"rows": 1, "funds": [1]}
+    assert lake.read("holdings", part="a").to_dicts() == [{"cik": 2, "q": -55, "shares": 10.0}]
+    assert lake.read("holdings", part="b").height == 1
+    assert state.pending_funds == {1, 9} and State.load(lake).pending_funds == {1, 9}
+    assert purge_misread_holdings(lake, state) == {}  # once they are gone, nothing to do

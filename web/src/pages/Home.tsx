@@ -16,6 +16,7 @@ import { State } from "../components/State";
 import { StockLabel } from "../components/StockLabel";
 import { Tabs, tabPanelProps, type TabItem } from "../components/Tabs";
 import {
+  NotFoundError,
   loadFunds,
   loadHome,
   loadLatestPrices,
@@ -46,6 +47,8 @@ import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
 import { sourceLine } from "../home/famousChart";
 import { ListIndex } from "../home/ListIndex";
+import { ROOT as LANDSCAPE_ROOT, aum } from "../home/landscape";
+import { LandscapeMap } from "../home/LandscapeMap";
 import { BEST_RETURN, MOST_POPULAR, RankTable } from "../home/RankTable";
 import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
 import { photoOf } from "../lib/people";
@@ -1206,12 +1209,83 @@ function Calls({
   );
 }
 
+// ---- landscape --------------------------------------------------------------------------
+
+/**
+ * Landscape: every current 13F filer as one tree map, grouped by type of investor (hedge funds by style, asset
+ * managers, banks, pensions, ...), sized by its 13F holdings and coloured by its return over the period that
+ * Famous funds and Top funds share. The ETF providers are kept: their total is the scale of the double counting
+ * the note under the map owns up to.
+ */
+function LandscapeSection({
+  period,
+  onPeriod,
+  zoom,
+  onZoom,
+}: {
+  period: Period;
+  onPeriod: (p: Period) => void;
+  zoom: string;
+  onZoom: (type: string) => void;
+}) {
+  const load = useLoad(() => loadHome("landscape"), []);
+  const section = useRef<HTMLElement>(null);
+  const width = useWidth(section, 280, FALLBACK_W);
+  const phone = width < PHONE_BELOW;
+  const h2 = useId();
+  const file = load.status === "ready" ? load.data : undefined;
+  const etf = useMemo(() => {
+    if (!file) return 0;
+    let v = 0;
+    file.funds.type.forEach((t, i) => t === "am.etf" && (v += file.funds.book[i]));
+    file.rest.type.forEach((t, i) => t === "am.etf" && (v += file.rest.book[i]));
+    return v;
+  }, [file]);
+  const periodLabel = PERIODS.find((p) => p.id === period)?.label.toLowerCase() ?? period;
+
+  let body: ReactNode;
+  if (load.status === "error" && load.error instanceof NotFoundError)
+    body = (
+      <div className="pb">
+        <State>The landscape arrives with the next data update.</State>
+      </div>
+    );
+  else if (load.status !== "ready") body = <Status state={load} />;
+  else
+    body = (
+      <div className="fam-mod">
+        <LandscapeMap file={load.data} period={period} periodLabel={periodLabel} zoom={zoom} onZoom={onZoom} />
+        <p className="ls-note">
+          {`${count(load.data.n_filers)} filers with ${aum(load.data.total)} of 13F holdings at ${qLabel(load.data.latest_q)}: long US-listed stocks, ETFs and options as filed, not their total assets. Holdings are counted as each filer reports them, so money in ETFs is counted twice: at the ETF provider, whose 13F holds its funds' stocks, and at any filer holding the ETF's shares. The ETF providers report ${aum(etf)} in all, the most that overlap can be. Types come from the SEC's adviser register, the firms' names and our own labels.`}
+        </p>
+        <SourceNote spx={null} />
+      </div>
+    );
+
+  return (
+    <section ref={section} className={"ranked landscape" + (phone ? " phone" : "")} aria-labelledby={h2}>
+      <h2 id={h2} className="vh">
+        Landscape of 13F filers
+      </h2>
+      <div className="fam-ctl">
+        <div className="fam-opts">
+          <div className="fo-per">
+            <Choice label="Period" options={phone ? PERIODS_SHORT : PERIODS} value={period} onChange={onPeriod} />
+          </div>
+        </div>
+      </div>
+      {body}
+    </section>
+  );
+}
+
 // ---- page ----------------------------------------------------------------------------
 
-type TabId = "top" | "famous" | "conviction" | "wins" | "crowded" | "calls";
+type TabId = "top" | "famous" | "landscape" | "conviction" | "wins" | "crowded" | "calls";
 const TABS: TabItem<TabId>[] = [
   { id: "famous", label: "Famous funds" },
   { id: "top", label: "Top funds" },
+  { id: "landscape", label: "Landscape" },
   { id: "conviction", label: "Conviction moves" },
   { id: "wins", label: "Big wins & losses" },
   { id: "crowded", label: "Crowded buys" },
@@ -1226,6 +1300,7 @@ export default function Home() {
   const [famousList, setFamousList] = useState(MOST_SEARCHED);
   const [famousView, setFamousView] = useState<RankView>("chart");
   const [topView, setTopView] = useState<RankView>("chart");
+  const [zoom, setZoom] = useState(LANDSCAPE_ROOT);
   const [mode, setMode] = useState<Mode>("best");
   const [win, setWin] = useState<CallWindow>("q");
   const [moveWin, setMoveWin] = useState<CallWindow>("q");
@@ -1234,6 +1309,8 @@ export default function Home() {
   let panel: ReactNode;
   if (tab === "top")
     panel = <TopFunds period={period} onPeriod={setPeriod} view={topView} onView={setTopView} />;
+  else if (tab === "landscape")
+    panel = <LandscapeSection period={period} onPeriod={setPeriod} zoom={zoom} onZoom={setZoom} />;
   else if (tab === "famous")
     panel = (
       <FamousFunds

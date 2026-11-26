@@ -1,0 +1,309 @@
+fund_id,type,name
+# Kept by hand: the type of a filer that the adviser register, famous.csv, its SEC industry code or its name
+# gets wrong or does not know (orca/investors.py). Holding companies, banks, pensions and sovereign funds are
+# not in the register, so the largest filers are listed here. type is a leaf of orca/investors.py TYPES.
+2012383,am.etf,BlackRock Inc
+2100119,am.etf,Vanguard Capital Management
+93751,am.etf,State Street Corp
+315066,am.mutual,FMR (Fidelity)
+2100121,am.etf,Vanguard Portfolio Management
+895421,bank,Morgan Stanley
+1214717,am.etf,Geode Capital Management
+19617,bank,JPMorgan Chase
+914208,am.etf,Invesco
+886982,bank,Goldman Sachs
+73124,am.etf,Northern Trust
+1422849,am.mutual,Capital World Investors
+884546,am.etf,Charles Schwab Investment Management
+1422848,am.mutual,Capital Research Global Investors
+861177,am.inst,UBS Asset Management
+1610520,bank,UBS Group
+72971,bank,Wells Fargo
+902219,am.inst,Wellington Management
+354204,am.etf,Dimensional Fund Advisors
+820027,am.mutual,Ameriprise Financial (Columbia Threadneedle)
+764068,am.etf,Legal & General (LGIM index funds)
+1562230,am.mutual,Capital International Investors
+933478,am.etf,Vanguard Fiduciary Trust
+38777,am.mutual,Franklin Templeton
+748054,am.mutual,American Century
+1871926,am.mutual,Nuveen
+1330387,am.mutual,Amundi
+720005,am.wealth,Raymond James Financial
+1067983,corp,Berkshire Hathaway
+312069,bank,Barclays
+815917,am.wealth,Edward Jones (Jones Financial)
+1274173,am.mutual,Janus Henderson
+1811242,am.etf,Vanguard Global Advisers
+1164508,am.inst,Arrowstreet Capital
+873630,bank,HSBC
+831001,bank,Citigroup
+713676,bank,PNC Financial
+1126328,ins,Principal Financial
+1466546,am.mutual,Mitsubishi UFJ Asset Management
+1166588,bank,BNP Paribas Financial Markets
+1475365,bank,Sumitomo Mitsui Trust
+1125816,am.etf,First Trust Advisors
+869178,am.etf,VanEck
+1680208,am.etf,Vanguard Asset Management Ltd
+1465109,am.mutual,Neuberger Berman
+1086619,am.inst,Schroders
+318989,am.mutual,FIL (Fidelity International)
+1115418,am.etf,RhumbLine Advisers (index)
+1218210,am.mutual,Nordea Investment Management
+720672,am.wealth,Stifel Financial
+946431,bank,Swedbank
+1056053,am.mutual,TD Asset Management
+1692234,am.inst,Russell Investments
+350894,am.mutual,SEI Investments
+1446194,bank,Susquehanna (market maker)
+1595888,bank,Jane Street (market maker)
+1535323,am.mutual,Allianz Asset Management
+1993888,am.mutual,Pictet Asset Management
+1088875,am.mutual,Baillie Gifford
+1546007,am.mutual,Assenagon Asset Management
+1520354,am.mutual,BNP Paribas Asset Management
+1137774,ins,Prudential Financial
+919859,am.mutual,Mackenzie Financial
+1456228,am.mutual,DekaBank (Deka funds)
+92230,bank,Truist Financial
+1677044,am.wealth,Osaic
+1705339,am.etf,Mirae Asset Global ETFs (Global X)
+1418773,am.mutual,Robeco
+916542,am.inst,Acadian Asset Management
+944388,am.mutual,1832 Asset Management
+1001085,pevc.pe,Brookfield Corp
+1648711,am.wealth,Baird Financial Group
+1054074,am.wealth,Bessemer Group
+67088,bank,Mitsubishi UFJ Financial Group
+1716774,am.mutual,Aberdeen Group
+1357955,am.etf,ProShare Advisors
+1056288,am.mutual,Federated Hermes
+1739439,am.wealth,Rockefeller Capital Management
+1140022,ins,Aviva
+898286,pension,Caisse de depot et placement du Quebec
+2057170,am.mutual,Universal-Investment
+1345929,am.wealth,Brown Advisory
+921739,am.mutual,Nomura Asset Management International
+1890906,am.mutual,Allspring Global Investments
+1454984,endow,Ensign Peak Advisors (church endowment)
+1284812,am.mutual,Cohen & Steers
+314984,ins,Thrivent Financial
+1017918,am.mutual,Baron Capital (BAMCO)
+1569395,am.mutual,Mirae Asset Global Investments
+1421224,bank,CIBC World Markets
+863748,am.mutual,Royal London Asset Management
+1368163,bank,Zurcher Kantonalbank
+1055964,am.mutual,Nomura Asset Management
+1411133,bank,KBC Group
+1481045,bank,Daiwa Securities
+1462160,bank,Mitsubishi UFJ Trust & Banking
+1434819,pension,APG Asset Management (Dutch pensions)
+1323255,pension,APG Asset Management US
+1600064,am.etf,Tidal Investments (ETFs)
+1550100,am.etf,Vanguard Investments Australia
+2062680,am.mutual,Rakuten Investment Management
+1685676,am.mutual,Storebrand Asset Management
+1462020,am.wealth,Chevy Chase Trust
+902367,am.mutual,William Blair
+1761054,pension,North Carolina Treasurer (retirement systems)
+1456670,am.mutual,DNB Asset Management
+1389426,am.etf,Rafferty Asset Management (Direxion)
+2107286,am.mutual,Eurizon Capital
+1628622,pevc.vc,VY Capital
+2011612,am.wealth,Pathstone
+1191672,bank,Credit Agricole
+1475597,bank,HRT Financial (market maker)
+1999606,bank,TD Waterhouse Canada
+1398318,am.mutual,Handelsbanken Fonder
+1837309,am.mutual,Polar Capital
+2022297,bank,Desjardins
+1587973,pension,Tennessee Treasury (retirement system)
+1393818,pevc.pe,Blackstone
+1717443,pension,KLP (Norwegian municipal pensions)
+1027796,am.inst,Pzena Investment Management
+1163648,am.mutual,CI Investments
+2001019,am.etf,NEOS Investment Management (ETFs)
+947529,am.etf,Vanguard Advisers
+1397960,family,Woodbridge (Thomson family)
+1166559,endow,Gates Foundation Trust
+2026053,hedge.moat,Pershing Square Inc
+1663865,am.mutual,Orbis Allan Gray
+1335644,bank,Scotia Capital
+1847328,bank,Nykredit
+1351991,am.wealth,Rathbones
+820478,pension,STRS Ohio
+2127509,am.mutual,SEB Asset Management
+1588340,am.mutual,Vontobel
+1351917,ins,Menora Mivtachim
+1587381,pension,USS Investment Management
+869589,am.mutual,Nissay Asset Management
+1694164,pension,AustralianSuper
+1484429,pension,Alecta
+1003518,am.mutual,AGF Management
+1274981,bank,Natixis
+1777271,am.wealth,Sanctuary Advisors
+1418333,bank,Macquarie Group
+1881567,bank,Clear Street
+1637689,am.mutual,Swiss Life Asset Management
+2059323,am.mutual,Lansforsakringar Fondforvaltning
+1163653,bank,Nomura Holdings
+1537014,am.mutual,Candriam
+1825259,bank,CaixaBank
+2094379,bank,Capitolis Liquid Global Markets
+1215838,am.mutual,Jupiter Asset Management
+1944142,am.mutual,Resona Asset Management
+1009016,am.inst,Fort Washington Investment Advisors
+1989400,pension,UniSuper
+1600177,pension,Employees Provident Fund (Malaysia)
+1575677,am.mutual,Flossbach von Storch
+1908923,swf,Czech National Bank
+1333986,ins,Equitable Holdings
+1619124,am.inst,Cardano Risk Management
+1589122,corp,Exor
+1360533,am.wealth,Orion Portfolio Solutions
+1039765,bank,ING Groep
+1553562,pension,AMF Tjanstepension
+1697748,am.etf,ARK Investment Management
+1281761,bank,Regions Financial
+1228242,pension,British Columbia Investment Management
+1802539,am.mutual,M&G
+1651424,hedge.quant,Quadrature Capital
+1053321,pension,OMERS
+1398346,am.mutual,Meitav Investment House
+1283072,am.mutual,Guggenheim Capital
+2082866,bank,Pinnacle Financial Partners
+1463559,pension,Alberta Investment Management (AIMCo)
+1411530,am.mutual,Sumitomo Mitsui DS Asset Management
+2024532,am.mutual,Erste Asset Management
+1087912,am.mutual,Vantagepoint (MissionSquare)
+1778131,am.mutual,BI Asset Management
+1666940,pension,Mn Services (Dutch pensions)
+895213,am.mutual,Capital International Inc
+1679543,ins,Phoenix Financial
+1774552,am.wealth,WealthNavi
+2080520,am.mutual,ABN AMRO Investment Solutions
+1096343,ins,Markel Group
+1481669,am.mutual,EdgePoint Investment Group
+898419,ins,Prudential plc
+1749768,am.mutual,Impax Asset Management
+850401,am.mutual,TCW Group
+1367401,am.mutual,Van Lanschot Kempen
+1697765,ins,Achmea Investment Management
+1165002,am.mutual,Westwood Holdings
+1812090,am.wealth,Vise Technologies
+2097005,am.mutual,OP Asset Management
+1767306,am.etf,Vanguard Personalized Indexing
+1847838,bank,B. Metzler seel. Sohn
+2022028,am.mutual,Mediolanum International Funds
+1831577,bank,Jump Financial (market maker)
+1977602,am.mutual,OFI Invest Asset Management
+1452861,bank,IMC-Chicago (market maker)
+1451623,am.wealth,Benjamin Edwards
+1535385,am.mutual,Artemis Investment Management
+1911278,bank,LGT Group
+1997464,bank,Marex Group
+1056581,hedge.other,Jeffrey L. Gendell (Tontine)
+39263,bank,Cullen/Frost Bankers
+1162170,am.wealth,Greenleaf Trust
+1916757,ins,ASR Vermogensbeheer (a.s.r.)
+1127508,ins,Allianz SE
+1856022,am.wealth,Blue Trust
+1615423,bank,Lombard Odier
+1370102,swf,State of Alaska Department of Revenue
+1140334,am.wealth,FL Putnam
+1597694,bank,MUFG Securities EMEA
+1026720,endow,Wellcome Trust
+1217541,am.mutual,Diamond Hill
+1510481,am.mutual,Sarasin & Partners
+889232,corp,Investor AB
+1708237,am.etf,Innovator Capital Management (ETFs)
+1846368,am.etf,Simplify Asset Management (ETFs)
+2027450,am.etf,Global X Japan
+1984256,am.etf,Vanguard National Trust
+217448,am.etf,Vanguard Marketing
+1839545,am.etf,GraniteShares (ETFs)
+1632494,am.etf,Amplify Investments (ETFs)
+1457320,am.etf,Exchange Traded Concepts
+1592828,am.etf,Empowered Funds (ETFs)
+1376113,am.etf,ALPS Advisors (ETFs)
+1744347,am.etf,Vident Advisory (ETFs)
+1709632,am.etf,Vest Financial (ETFs)
+812291,bank,Mizuho Securities USA
+1533421,bank,Tower Research Capital (market maker)
+899051,ins,Allstate
+759944,bank,Citizens Financial Group
+1050743,bank,Peapack-Gladstone Financial
+1969566,ins,iA Global Asset Management
+1055969,ins,Groupama Asset Management
+1162777,corp,Partners Value Investments
+1522877,ins,AIA Group
+1908219,am.mutual,Canoe Financial
+1923739,am.etf,Harvest Portfolios Group (ETFs)
+2056088,am.mutual,La Francaise
+1649647,bank,Edmond de Rothschild
+1970075,am.mutual,LBP AM
+1767471,am.etf,Ossiam (ETFs)
+2057060,am.mutual,GF Fund Management
+1569758,am.mutual,Carmignac
+1890222,bank,J. Safra Sarasin
+1716607,bank,Union Bancaire Privee
+1785342,endow,National Philanthropic Trust
+1770632,am.wealth,Quilter
+1065349,am.mutual,Capital International Sarl
+96223,bank,Jefferies Financial Group
+1775715,am.mutual,Milford Funds
+733986,am.inst,Cambridge Associates
+9634,bank,BOKF
+1828301,bank,XTX Markets (market maker)
+1544204,am.mutual,Liontrust
+2029723,ins,American Family Investments
+1324290,am.mutual,Altshuler Shaham
+1825516,bank,Mizuho Markets Americas
+1426748,am.mutual,Lazard Freres Gestion
+2017993,corp,Hancock Prospecting
+1647273,am.mutual,Perpetual
+1446179,hedge.other,Susquehanna Fundamental Investments
+2146944,am.wealth,Evelyn Partners
+1783464,bank,Japan Post Holdings
+1538846,pension,South Dakota Investment Council
+750577,bank,Hancock Whitney
+2109868,bank,EFG International
+1948391,endow,Japan Science & Technology Agency (university fund)
+1294571,hedge.quant,Millburn Ridgefield
+2046751,ins,Generali Asset Management
+1022837,bank,Sumitomo Mitsui Financial Group
+1418427,am.mutual,Robeco Schweiz
+852933,bank,Commerzbank
+20286,ins,Cincinnati Financial
+1859606,bank,Optiver (market maker)
+1838615,am.wealth,AlTi Global
+1269094,pension,Folketrygdfondet (Government Pension Fund Norway)
+2035325,am.mutual,Avanza Fonder
+1449434,pevc.pe,Apollo Management
+1521365,corp,Glencore
+1996449,bank,Susquehanna Portfolio Strategies
+1659196,am.mutual,DJE Kapital
+1024896,bank,Cantor Fitzgerald
+1674546,am.mutual,Bellevue Group
+1455915,bank,Old Mission Capital (market maker)
+1418226,pevc.pe,Silver Lake
+2009396,am.mutual,Ohman Asset Management
+1452765,bank,GTS Securities (market maker)
+1842296,am.mutual,E Fund Management
+1851815,bank,SBI Securities
+1103139,endow,Adventist Health System
+7789,bank,Associated Banc-Corp
+872786,bank,BNP Paribas
+1903793,pevc.pe,TPG
+1466697,bank,Flow Traders (market maker)
+1040508,pevc.pe,Bain Capital
+1082621,endow,Harvard Management Company
+1536925,pension,Vestcor (New Brunswick pensions)
+1132597,bank,Itau Unibanco
+59558,ins,Lincoln National
+805676,bank,Park National
+2126778,swf,Narodna banka Slovenska
+1504169,ins,Tokio Marine Asset Management
+1443077,ins,Intact Investment Management
+1389958,bank,PEAK6 (market maker)

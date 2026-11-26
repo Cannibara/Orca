@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 import polars as pl
 
-from orca.holdings import build_holdings, select_reports
+from orca.holdings import MAX_SHARES, build_holdings, select_reports
 from orca.http import FetchError
 from orca.run.budget import Budget
 from orca.run.sources import Sources
@@ -22,6 +22,7 @@ from orca.run.state import (
     REPORTS_SCHEMA,
     State,
     part_name,
+    part_paths,
     scan,
     scan_parts,
     strip_query,
@@ -51,6 +52,29 @@ def live_watermark(since: date, until: date, no_index_days: Iterable[date]) -> d
         day -= timedelta(days=1)
     missing = [d for d in no_index_days if d in recent]
     return min(missing) - timedelta(days=1) if missing else until
+
+
+def purge_misread_holdings(lake: Lake, state: State) -> dict:
+    """Holdings rows of more than MAX_SHARES read before that rule existed are taken out of the
+    lake, a part at a time, and their funds owed a recompute (`state.pending_funds`), so the next
+    compute values them without the misread rows. Nothing to do once they are gone. Returns
+    {"rows": n, "funds": [ciks]} when it removed any, else {}."""
+    funds: set[int] = set()
+    rows = 0
+    for path in part_paths(lake, "holdings"):
+        bad = pl.scan_parquet(path).filter(pl.col("shares") > MAX_SHARES).select("cik").collect()
+        if not bad.height:
+            continue
+        kept = pl.read_parquet(path).filter(pl.col("shares") <= MAX_SHARES)
+        lake.write("holdings", kept, part=path.stem)
+        funds |= {int(c) for c in bad["cik"].to_list()}
+        rows += bad.height
+    if not rows:
+        return {}
+    state.pending_funds |= funds
+    state.save(lake)
+    log.warning("removed %d misread holdings rows (over %.0e shares) of %d funds", rows, MAX_SHARES, len(funds))
+    return {"rows": rows, "funds": sorted(funds)}
 
 
 @dataclass

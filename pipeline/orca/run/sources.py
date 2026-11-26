@@ -8,6 +8,7 @@ from pathlib import Path
 import polars as pl
 
 from orca.famous import Famous, SearchScores, load_ranked_famous, load_search
+from orca.investors import Classifier, load_classifier
 from orca.http import FigiClient
 from orca.prices import PriceSource
 from orca.sec.about import About
@@ -40,6 +41,8 @@ stats)` is `sec.legacy.fetch_quarter` on the shared SEC client (None: no pre-201
     price_universe: Callable[[], pl.DataFrame] | None = None
     famous: Callable[[], tuple[Famous, ...]] = load_ranked_famous
     search: Callable[[], SearchScores] = load_search
+    # Each filer's type of investor (the home Landscape) from the famous list; the demo has its own.
+    investors: Callable[[tuple[Famous, ...]], Classifier] = load_classifier
     legacy_quarter: (
         Callable[[str, set[str], dict], tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]] | None
     ) = None

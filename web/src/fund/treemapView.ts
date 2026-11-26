@@ -7,7 +7,7 @@
 // come from ./treemap (pure).
 
 import type { TipContent, TooltipApi } from "../charts/Tooltip";
-import { BASE, FONT_PX, PADX, labelScale, labelSet, neighbour, rgbCss, type Direction, type LabelTile, type Measure, type Rect, type RGB } from "./treemap";
+import { BASE, FONT_PX, PADX, labelScale, labelSet, neighbour, rgbCss, type Direction, type LabelSet, type LabelTile, type Measure, type Rect, type RGB } from "./treemap";
 
 export type TileDatum = {
   key: string;
@@ -23,6 +23,14 @@ export type TileDatum = {
   label: LabelTile;
   aria: string;
   tip: () => TipContent;
+  /** Its own labels for a w × h box instead of labelSet's (the home Landscape's names and figures). */
+  fit?: (w: number, h: number, measure: Measure) => LabelSet;
+  /** Labels at their base size whatever the tile's (a group's heading strip). */
+  fixed?: boolean;
+  /** The tile's data-kind attribute, for CSS (the Landscape's "grp", "fund", "rest"). */
+  kind?: string;
+  /** What a click, Enter or Space on the tile does (open a fund, zoom into a group); none: nothing. */
+  onActivate?: () => void;
 };
 
 type Geo = { x: number; y: number; w: number; h: number };
@@ -245,6 +253,9 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
       kShown: 1,
     };
     const show = (e: PointerEvent) => opts.tip.show(n.d.tip(), e.clientX, e.clientY);
+    g.addEventListener("click", () => {
+      if (!n.leaving) n.d.onActivate?.();
+    });
     g.addEventListener("pointerenter", show);
     g.addEventListener("pointermove", show);
     g.addEventListener("pointerleave", () => opts.tip.hide());
@@ -261,8 +272,8 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
   /** Sets what the tile's labels say for its new box `nb`, and when each one shows (see LABEL_FULL). */
   const setLabels = (n: Node, nb: Rect, anim: boolean, t: number) => {
     // a big tile draws its labels larger: they are fitted at base size into the box shrunk by k, then scaled up
-    const k = labelScale(nb.w, nb.h);
-    const fin = labelSet(n.d.label, nb.w / k, nb.h / k, opts.measure);
+    const k = n.d.fixed ? 1 : labelScale(nb.w, nb.h);
+    const fin = n.d.fit ? n.d.fit(nb.w / k, nb.h / k, opts.measure) : labelSet(n.d.label, nb.w / k, nb.h / k, opts.measure);
     // from the size drawn now (a tile with no text yet starts at its final size: it fades in), to k; apply() draws it
     n.k0 = anim && Object.values(n.labels).some((l) => l.text !== "") ? n.kShown : k;
     n.k = k;
@@ -303,6 +314,11 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
     const i = order.findIndex((n) => n.g === document.activeElement);
     if (i < 0) return;
+    if ((e.key === "Enter" || e.key === " ") && order[i].d.onActivate) {
+      e.preventDefault();
+      order[i].d.onActivate!();
+      return;
+    }
     const dirs: Record<string, Direction> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
     let j: number | null = null;
     if (e.key === "Home") j = 0;
@@ -379,6 +395,9 @@ export function createTreemapView(svg: SVGSVGElement, layer: SVGGElement, opts: 
         setLabels(n, r, anim, t);
         n.g.classList.toggle("oth", d.other);
         n.g.classList.toggle("nul", d.hollow);
+        if (d.kind) n.g.setAttribute("data-kind", d.kind);
+        else n.g.removeAttribute("data-kind");
+        n.g.toggleAttribute("data-act", !!d.onActivate);
         n.g.classList.remove("out");
         n.g.removeAttribute("aria-hidden");
         n.g.setAttribute("aria-label", d.aria);

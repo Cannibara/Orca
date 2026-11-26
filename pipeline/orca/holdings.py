@@ -10,6 +10,11 @@ AMENDMENT_FORM = "13F-HR/A"
 ORIGINAL, RESTATEMENT, NEW_HOLDINGS = "original", "restatement", "new_holdings"
 BULK, LIVE, LEGACY = "bulk", "live", "legacy"
 SOURCE_RANK = {BULK: 0, LIVE: 1, LEGACY: 2}  # who wins when one accession comes from two
+# A row of more shares than this was misread: no listed company has 50 billion shares (Nvidia,
+# the most, about 24 billion), let alone one holder. A pre-2013 text table can run two columns
+# together (Perigee Private Management, Q2 1999: 3,476,803,476,800 shares at a few cents' value),
+# and valued at the market price such a row made a $266 trillion fund.
+MAX_SHARES = 5e10
 
 
 HOLDINGS_SCHEMA = pl.Schema(
@@ -111,8 +116,8 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     ValueError is raised if `filings` has a live row: untagged live holdings would be dropped.
 
     `kind` is PUT or CALL when the row has put_call set, else its share type (SH / PRN). Rows
-    with shares <= 0 are dropped (counted in stats["nonpositive_shares"] if `stats` is given),
-    then rows are summed by key. `filed` is the date the quarter's last chosen report was filed.
+    with shares <= 0 are dropped (counted in stats["nonpositive_shares"] if `stats` is given), as are
+    misread rows of more than MAX_SHARES (stats["misread_shares"]), then rows are summed by key. `filed` is the date the quarter's last chosen report was filed.
     """
     if "source" not in raw_holdings.columns:
         if "source" in filings.columns and (filings["source"] != BULK).any():
@@ -123,8 +128,11 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     keys = chosen.select("accession", "source", "cik", "period").join(quarter_filed, on=["cik", "period"])
     rows = raw_holdings.join(keys, on=["accession", "source"], how="inner")
     positive = rows.filter(pl.col("shares") > 0)
+    sane = positive.filter(pl.col("shares") <= MAX_SHARES)
     if stats is not None:
         stats["nonpositive_shares"] = rows.height - positive.height
+        stats["misread_shares"] = positive.height - sane.height
+    positive = sane
     return (
         positive.with_columns(
             q=pl.col("period"),

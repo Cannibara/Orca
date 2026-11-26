@@ -277,6 +277,23 @@ export type TopList = {
   spx?: SpxWindow | null;
 };
 
+/** A period's figure per row: the keys of the home periods (top_{period}.json). */
+export type ByPeriod<T> = Record<"1y" | "3y" | "5y" | "10y" | "15y" | "max", T[]>;
+
+/** landscape.json: every current 13F filer by type of investor (contract.md, Home). Columnar. */
+export type Landscape = {
+  latest_q: number;
+  /** All the filers counted and their books (the listed ones and the rest). */
+  n_filers: number;
+  total: number;
+  /** The hierarchy in display order; parent null = a top-level type. Only leaves are given to filers. */
+  types: { key: string[]; label: string[]; parent: (string | null)[] };
+  /** Each leaf type's largest filers: book in dollars, type a leaf key, ret the estimated annual return (null: none). */
+  funds: { fund_id: number[]; name: string[]; book: number[]; type: string[]; ret: ByPeriod<number | null> };
+  /** The rest of a leaf type, together: n filers, their book, their book-weighted mean return and the share of their book that has one. */
+  rest: { type: string[]; n: number[]; book: number[]; ret: ByPeriod<number | null>; covered: ByPeriod<number> };
+};
+
 /** conviction, just_filed, crowded, calls_q, calls_y */
 export type RowsFile<T> = {
   latest_q: number;
@@ -355,6 +372,8 @@ export type HomeFiles = {
   crowded: RowsFile<CrowdedRow>;
   calls_q: RowsFile<CallRow>;
   calls_y: RowsFile<CallRow>;
+  /** Missing until the pipeline publishes it (files built before 2026-11-26). */
+  landscape: Landscape;
 };
 
 export type HomeName = keyof HomeFiles;

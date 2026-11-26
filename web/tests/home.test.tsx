@@ -112,6 +112,7 @@ function renderHome() {
 const TAB_NAMES = [
   "Famous funds",
   "Top funds",
+  "Landscape",
   "Conviction moves",
   "Big wins & losses",
   "Crowded buys",
@@ -176,7 +177,7 @@ describe("Home", () => {
     expect(box).toHaveValue("a/b"); // inside the field a slash is just a character
   });
 
-  it("shows six tabs in order", async () => {
+  it("shows seven tabs in order", async () => {
     stubData();
     renderHome();
     await famousReady();
@@ -1383,7 +1384,7 @@ describe("Home", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /couldn.t load/i,
     );
-    expect(screen.getAllByRole("tab")).toHaveLength(6); // the page is still there
+    expect(screen.getAllByRole("tab")).toHaveLength(7); // the page is still there
     await user.click(screen.getByRole("tab", { name: "Top funds" })); // and the other lists still work
     expect(await screen.findByRole("heading", { level: 3, name: "Funds over $1B" })).toBeInTheDocument();
   });
@@ -1398,5 +1399,76 @@ describe("Home", () => {
       await screen.findByText(/search isn.t available/i),
     ).toBeInTheDocument();
     await famousReady(); // lists unaffected
+  });
+});
+
+describe("Landscape", () => {
+  const map = () => screen.findByRole("group", { name: /^All 13F filers: each tile/ });
+  const tiles = (el: Element, kind: string) => [...el.querySelectorAll(`g.tile[data-kind="${kind}"]`)];
+
+  it("draws every current filer under its type, zooms into a group and back out", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Landscape" }));
+    const svg = await map();
+    const file = demo<{ funds: { fund_id: number[] }; n_filers: number }>("home/landscape.json");
+    // the demo's filers are few enough for a tile each, or a group's tile where a group is too small to open
+    await waitFor(() => expect(tiles(svg, "fund").length + tiles(svg, "box").length).toBeGreaterThan(0));
+    expect(tiles(svg, "fund").length).toBeLessThanOrEqual(file.funds.fund_id.length);
+    expect(screen.getByText(new RegExp(`^${file.n_filers} filers with`))).toBeInTheDocument();
+    expect(screen.getByText(/counted twice/)).toBeInTheDocument();
+    const head = tiles(svg, "grp").find((t) => t.getAttribute("aria-label")?.startsWith("Asset managers"))!;
+    await user.click(head);
+    const crumbs = screen.getByRole("navigation", { name: "Zoom" });
+    expect(within(crumbs).getByRole("button", { name: "All 13F filers" })).toBeInTheDocument();
+    expect(within(crumbs).getByText("Asset managers")).toHaveAttribute("aria-current", "location");
+    const zoomed = screen.getByRole("group", { name: /^Asset managers: each tile/ });
+    expect(tiles(zoomed, "fund").map((t) => t.getAttribute("aria-label"))).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Seastack/)]),
+    );
+    await user.keyboard("{Escape}"); // the clicked heading has the focus: Escape zooms out
+    expect(await map()).toBeInTheDocument();
+    const again = tiles(await map(), "grp").find((t) => t.getAttribute("aria-label")?.startsWith("Asset managers"))!;
+    await user.click(again);
+    await user.click(within(screen.getByRole("navigation", { name: "Zoom" })).getByRole("button", { name: "All 13F filers" }));
+    expect(await map()).toBeInTheDocument();
+  });
+
+  it("opens a filer's fund page from its tile", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Landscape" }));
+    const svg = await map();
+    await waitFor(() => expect(tiles(svg, "fund").length).toBeGreaterThan(0));
+    const seastack = tiles(svg, "fund").find((t) => t.getAttribute("aria-label")?.startsWith("Seastack"))!;
+    await user.click(seastack);
+    expect(await screen.findByText("Fund page 9100009")).toBeInTheDocument();
+  });
+
+  it("keeps the period the other tabs use", async () => {
+    stubData();
+    const user = userEvent.setup();
+    renderHome();
+    await famousReady();
+    await user.click(within(screen.getByRole("group", { name: "Period" })).getByRole("button", { name: "5 years" }));
+    await user.click(screen.getByRole("tab", { name: "Landscape" }));
+    await map();
+    const period = within(screen.getByRole("group", { name: "Period" }));
+    expect(period.getByRole("button", { name: "5 years" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("group", { name: /return a year over 5 years/ })).toBeInTheDocument();
+  });
+
+  it("says it comes with the next data update before the pipeline has published it", async () => {
+    stubData();
+    const inner = globalThis.fetch as unknown as (url: string) => Promise<unknown>;
+    vi.stubGlobal("fetch", async (url: string) =>
+      url.endsWith("home/landscape.json") ? { ok: false, status: 404, json: async () => ({}) } : inner(url),
+    );
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(screen.getByRole("tab", { name: "Landscape" }));
+    expect(await screen.findByText(/arrives with the next data update/)).toBeInTheDocument();
   });
 });

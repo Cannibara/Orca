@@ -36,6 +36,7 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `fund/{id}/exits.json`: `{"rows": {"stock_id": [], "status": [], "sold_shares": [], "sold_usd": [], "avg_exit": [], "last_sale_q": [], "one_y": [], "spy_one_y": []}, "summary": {"buys_12m": number|null, "sells_12m": number|null, "beat_spy_pct": number|null}}`
 - `stock/{stock_id}/weekly.json`: `{"start": "YYYY-MM-DD", "close": [], "q0": int | null, "qclose": []}` (weekly Friday closes and quarter-end closes, split-adjusted; `close` and `qclose` are `(number | null)[]`)
 - `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction_q.json`, `home/conviction_y.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
+- `home/landscape.json`: `{"latest_q", "n_filers", "total", "types": {"key": [], "label": [], "parent": []}, "funds": {"fund_id": [], "name": [], "book": [], "type": [], "ret": {"1y": [], "3y": [], "5y": [], "10y": [], "15y": [], "max": []}}, "rest": {"type": [], "n": [], "book": [], "ret": {period: []}, "covered": {period: []}}}` (columnar; described under Home).
 - `sectors/labels.json`: `{"last_q", "label": [], "tier": [], "parent": [], "name": [], "n": [], "top_weight": []}`
 - `sectors/scores.json`: `{"last_q", "fund_id": [], "tier": [], "picking": [], "allocation": [], "n": [], "coverage": [], "span_q": []}`
 - `fund/{id}/skill.json`: `{"last_q", "first_q", "quarters": {"q": [], "bought": [], "fund": [], "mkt": [], "spy": [], "v_fund": [], "v_mkt": [], "v_spy": []}, "years": {"name": [], "fund": [], "mkt": [], "spy": []}, "tiers": {"1": TIER, "2": TIER, "3": TIER}, "mix": {"q": [], "label": [], "share": [[...], ...]}}`, where TIER is `{"irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation", "coverage", "n", "quarters": {"label": [], "v_label": [], "v_never": [] | null}, "years": {"label": []}, "picks": {"stock_id": [], "label": [], "bought": [], "irr_own": [], "irr_label": []}, "bets": {"label": [], "bought": [], "irr": [], "irr_mkt": [], "mkt_share": []}}`
@@ -206,6 +207,19 @@ fund's name.
 - The moves in the conviction lists, `crowded.json` and the calls lists leave out a fund's first report (the first
   quarter of its tracking) and a holding valued for the first time: those are positions entering the book, not
   buys of that quarter.
+- `landscape.json` (the Landscape tree map; columnar, unlike the other home files): every 13F filer that filed
+  `latest_q` or the quarter before, has a book and has not stopped filing, by type of investor
+  (`pipeline/orca/investors.py`). `types` is the hierarchy in display order: `key` (stable id such as `"hedge"`
+  or `"hedge.macro"`), `label`, and `parent` (`null` for a top-level type). Only leaves (types no other type
+  names as parent) are given to filers. `funds`: each leaf type's 150 largest filers, by type in `types` order
+  then by `book` (largest first, then `fund_id`); `book` is the priced long book in whole dollars, `type` its
+  leaf, `ret[period]` its estimated annual return over that period of `top_{period}.json` (rounded to 4 places;
+  `null` without a record that long or with under 80% of the book priced). `rest`: one row per leaf type with
+  more filers than that, for the others together: `n` filers, their `book`, `ret[period]` their book-weighted
+  mean annual return (of those with one; `null` with none) and `covered[period]` the share of their book that
+  has one (0 to 1, 3 places). `n_filers` and `total` are all the filers counted and their books. Books add up
+  what each filer reports, so money in ETFs is counted at the ETF firm (its funds' stocks) and again at any
+  filer holding the ETF's shares. Files built before 2026-11-26 do not exist.
 
 ### Sector files (`sectors/labels.json`, `sectors/scores.json`, `fund/{id}/skill.json`)
 

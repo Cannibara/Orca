@@ -33,6 +33,7 @@ import httpx
 import polars as pl
 
 from orca.famous import Famous, SearchScores, apply_rank
+from orca.investors import Classifier, famous_types
 from orca.http import Client, FetchError, FigiClient
 from orca.prices import DAILY_SCHEMA, FixtureSource
 from orca.publish import read_json
@@ -153,6 +154,16 @@ DEMO_SEARCH = SearchScores(
 # The owner's order (famous_rank.csv): Mara Cobble ahead of higher Google scores, and Saltglass,
 # which has no keyword, ranked by its CIK.
 DEMO_RANK = ("Mara Cobble", str(FUND_CIK0 + 4))
+# The demo's types of investor (the home Landscape): the famous ones by their lists, the rest by hand,
+# so the map has groups with one filer and with several.
+DEMO_TYPES = {
+    FUND_CIK0 + 2: "am.etf",  # Lanternfish
+    FUND_CIK0 + 8: "am.mutual",  # Seastack
+    FUND_CIK0 + 5: "am.wealth",  # Brinestone
+    FUND_CIK0 + 3: "bank",  # Tern Harbor
+    FUND_CIK0 + 7: "endow",  # Gullwing
+    FUND_CIK0 + 11: "pension",  # Undertow
+}
 LAST_Q = q_index(2026, 2)  # the deadline quarter as of DEMO_TODAY
 CROWDED = (
     "Kelpwood Capital LP",
@@ -448,6 +459,7 @@ def fixture_sources(fx: Fixtures) -> Sources:
         tbill=lambda: dict(fx.tbill),
         famous=lambda: apply_rank(DEMO_FAMOUS, DEMO_RANK),
         search=lambda: DEMO_SEARCH,
+        investors=lambda famous: Classifier(hand=DEMO_TYPES, famous=famous_types(famous, {}), adv={}),
         fund_about=partial(fetch_about, sec_stub(fx.about)),
     )
 
