@@ -71,6 +71,13 @@ HELD_SHARE_RANGE = (0.25, 1.5)
 REJECT_SHARE = 0.8
 REJECT_MIN_QUARTERS = 4
 REJECT_MIN_HOLDERS = 20
+# Run 53 missed Exact Sciences under EXK and Juniper Networks under JNP: the other company's prices were within 5x of
+# theirs in a third of the quarters. Their moves are not: a stock's quarter-on-quarter price change is the same in
+# our closes and in its holders' reported prices, give or take a few percent. Where the median gap between the two
+# changes (in log terms), over REJECT_MIN_MOVES or more pairs of quarters, is REJECT_DRIFT or more, the history is
+# another company's too.
+REJECT_MIN_MOVES = 8
+REJECT_DRIFT = 0.15
 # A quarter where more than this share of the stocks checked disagree (MIN_MARKET_STOCKS or more checked) points at
 # the filings (values in thousands read as dollars), not at the prices: it is left alone, not emptied out of the indices.
 MAX_MISPRICED_SHARE = 0.1
@@ -168,15 +175,29 @@ def mispriced(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame | No
 
 
 def vendor_rejects(sq: pl.DataFrame, reported: pl.DataFrame, units: pl.DataFrame) -> pl.DataFrame:
-    """(stock_id, quarters, off) of the stocks whose price history at the vendor is mostly another company's: of the
-    `quarters` with a 13F price to check against (REJECT_MIN_QUARTERS or more), REJECT_SHARE or more are `off` as in
-    `mispriced`. Where the company has no count to check the funds' holding against, REJECT_MIN_HOLDERS funds or more
-    must report it instead."""
+    """(stock_id, quarters, off, moves, drift) of the stocks whose price history at the vendor is mostly another
+    company's: of the `quarters` with a 13F price to check against (REJECT_MIN_QUARTERS or more), REJECT_SHARE or
+    more are `off` as in `mispriced`; or, over `moves` pairs of consecutive such quarters (REJECT_MIN_MOVES or more),
+    the median gap between our price change and the holders' (`drift`, in log terms) is REJECT_DRIFT or more. Only
+    quarters where the funds hold the company's stock count (HELD_SHARE_RANGE; without a count to check against,
+    REJECT_MIN_HOLDERS funds or more)."""
     rows = _held_share(_compared(sq, reported), units)
     lo, hi = HELD_SHARE_RANGE
     own = pl.col("held_share").is_between(lo, hi) | (pl.col("held_share").is_null() & (pl.col("holders") >= REJECT_MIN_HOLDERS))
-    per = rows.group_by("stock_id").agg(pl.len().cast(pl.Int32).alias("quarters"), (pl.col("_off") & pl.col("_ok") & own).sum().cast(pl.Int32).alias("off"))
-    return per.filter((pl.col("quarters") >= REJECT_MIN_QUARTERS) & (pl.col("off") >= REJECT_SHARE * pl.col("quarters"))).sort("stock_id")
+    rows = rows.with_columns(_own=own.fill_null(False)).sort("stock_id", "q")
+    prev = lambda c: pl.col(c).shift(1).over("stock_id")  # noqa: E731
+    step = (pl.col("q") - prev("q") == 1) & pl.col("_own") & prev("_own")
+    gap = ((pl.col("raw_close") / prev("raw_close")).log() - (pl.col("price") / prev("price")).log()).abs()
+    rows = rows.with_columns(_d=pl.when(step).then(gap))
+    per = rows.group_by("stock_id").agg(
+        pl.len().cast(pl.Int32).alias("quarters"),
+        (pl.col("_off") & pl.col("_ok") & pl.col("_own")).sum().cast(pl.Int32).alias("off"),
+        pl.col("_d").count().cast(pl.Int32).alias("moves"),
+        pl.col("_d").median().alias("drift"),
+    )
+    level = (pl.col("quarters") >= REJECT_MIN_QUARTERS) & (pl.col("off") >= REJECT_SHARE * pl.col("quarters"))
+    moves = (pl.col("moves") >= REJECT_MIN_MOVES) & (pl.col("drift") >= REJECT_DRIFT)
+    return per.filter(level | moves.fill_null(False)).sort("stock_id")
 
 
 # The first XBRL cover pages (2009–11) often scaled the count 1,000x or 1,000,000x (Truist: 648 trillion shares,

@@ -320,4 +320,22 @@ def test_a_stock_whose_vendor_prices_are_mostly_another_companys_is_rejected():
                              "held": [r[5] for r in rows]}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
     units = pl.DataFrame({"stock_id": [1] * 10 + [2] * 10 + [5] * 3, "q": list(range(10)) * 2 + list(range(3)), "units": [19e6] * 10 + [7.45e8] * 10 + [1e8] * 3})
     got = sectors.vendor_rejects(sq, reported, units)
-    assert got.rows() == [(1, 10, 9), (3, 10, 9)]
+    assert got.select("stock_id", "quarters", "off").rows() == [(1, 10, 9), (3, 10, 9)]
+
+
+def test_a_stock_whose_vendor_prices_move_unlike_its_holders_prices_is_rejected():
+    # Stock 1 (Exact Sciences under EXK: Endeavour Silver's prices): within 5x of theirs in most quarters, but the
+    # quarter-on-quarter changes have nothing to do with each other. Stock 2: the right prices, ours a little off
+    # theirs (closing auction vs the filers' marks). Stock 3: unlike moves, but only 5 pairs of quarters.
+    ours = [5.0, 7.0, 4.0, 6.0, 3.0, 5.5, 8.0, 4.5, 6.5, 3.5, 7.5, 5.0]
+    theirs = [20.0, 18.0, 30.0, 26.0, 45.0, 40.0, 33.0, 60.0, 52.0, 80.0, 70.0, 95.0]
+    right = [10.0 * 1.05**i for i in range(12)]
+    rows = [(1, q, ours[q], theirs[q]) for q in range(12)] + [(2, q, right[q], right[q] * (1.02 if q % 2 else 0.99)) for q in range(12)]
+    rows += [(3, q, ours[q], theirs[q]) for q in range(6)]
+    sq = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "raw_close": [r[2] for r in rows], "close": [r[2] for r in rows]})
+    reported = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "price": [r[3] for r in rows], "holders": [300] * len(rows),
+                             "held": [1e8] * len(rows)}, schema=sectors.REPORTED_SCHEMA)  # fmt: skip
+    units = pl.DataFrame({"stock_id": [r[0] for r in rows], "q": [r[1] for r in rows], "units": [2e8] * len(rows)})
+    got = sectors.vendor_rejects(sq, reported, units)
+    assert got["stock_id"].to_list() == [1]
+    assert got["off"].item() < 0.8 * got["quarters"].item() and got["drift"].item() >= sectors.REJECT_DRIFT
