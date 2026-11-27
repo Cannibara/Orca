@@ -17,6 +17,20 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Checks: pipeline suite green (1,121 + new tests for types, landscape and the share guard); web suite green (1,220); Playwright smoke incl. a new Landscape test at 1280/400 px, light and dark; build and prerender green. Screenshots on real published data looked right | | `pipeline/tests/test_investors.py`, `test_landscape.py`, `web/tests/landscape.test.ts`, `web/tests/home.test.tsx`, `web/e2e/smoke.spec.ts` |
 | To go live: merge, then Actions > Pipeline > Run workflow with `home_only` (publishes `home/landscape.json`, ~5 min); the next ordinary run removes Perigee's rows. Until then the tab says the landscape arrives with the next data update | | — |
 
+## 2026-11-26 — The map names low coverage instead of "Too early to tell" (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| A fund with 3+ years of trades and 20+ picks that misses the map only on coverage now reads "Too little of its buying could be scored": the map needs 80% of its buying matched to a sector with prices, and it says how much was. A young fund still reads "Too early to tell" | Berkshire (108 quarters, 128 picks, 77% scored) read "Too early to tell"; owner: build it | `web/src/fund/SkillMapPanel.tsx`, `web/tests/fund-skill-ui.test.tsx` |
+| Checks: 1 new test; web suite green (1,208), typecheck clean | | |
+
+## 2026-11-26 — Positions held from the start of the data are scored, not dropped (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| A stock's own series and every index series that begin with the data (first quarter 1999 Q2 or before) are flat from 1998 Q4: level 1.0 before their first quarter. A position first reported in 1998 Q4 or 1999 Q1 is then replayed from there instead of dropped whole | Berkshire's map read "Too early to tell": 77% of its buying could be scored, under the 80% the map needs, because Coca-Cola ($25bn first reported in 1998 Q4), Wells Fargo, American Express, Walmart, Freddie Mac and its 1999 Chubb stake had a first trade no series had a level for (13F data from 1998 Q4, prices from 1999 Q1, index returns from 1999 Q2). Owner: "assume it's the same" year to year before then. Fund and index side start alike, so neither gains; a series that begins later is left as it is | `pipeline/orca/engine/skill.py` (`_flat_start`, `own_series`, `label_series`) |
+| Checks: 1 new test (a 1998 Q4 position replayed, a later listing left alone; fails on the old code); pipeline suite green (1,119); demo data unchanged. Takes effect with the next sectors run | | `pipeline/tests/test_skill.py` |
+
 ## 2026-11-26 — Runs 54–55: 34 wrong-company tickers off the fund pages
 
 | What changed | Why | Files |
@@ -205,7 +219,6 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Proposed hold: the production build sets `VITE_SPECIALIZATION=hold`, and the Specialization tab says "Being checked" and loads nothing, until the indices are fixed. Dev, tests and the demo are unchanged | Wrong numbers should not stay on the site | `web/src/fund/SkillPanels.tsx`, `web/src/pages/Fund.tsx`, `.github/workflows/web.yml`, `web/tests/fund-skill-ui.test.tsx` |
 | Next: find the stock (a diagnostic in the sectors step: per quarter, the biggest weights in Market and each sector, and caps that jump ×5 or more), fix its cap (ADR ratio in `share_overrides.csv`, or a guard that sets such caps aside), re-run, check Berkshire and a few funds, then lift the hold | | |
 
-
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 
 | What changed | Why | Files |
@@ -234,7 +247,6 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | Run 38 (`main` 4b9a157, started by Claude at the owner's request): indices and scores in the main step (27 min, saved). "Sector files" computed every chunk (29 min, peak 7.1 GB of 16 GB) and then the CUSIP guard refused 80 staged `skill.json` files, so nothing was uploaded: the site and its manifest are unchanged | Dollar amounts were rounded to whole dollars, and a bare 9-digit number can equal an all-digit CUSIP (Microsoft's is 594918104); the other files keep decimals, which the guard skips | — |
 | Dollars in the sector files are rounded to the cent and always written as decimals; a regression test runs the guard on such a value. Contract notes it. Demo data rebuilt | So the next run publishes | `pipeline/orca/run/sectors_step.py` (`_dollars`), `pipeline/tests/test_skill_detail.py`, `pipeline/contract.md`, `web/public/demo-data/` |
-
 
 ## 2026-11-23 — UI trims from the owner's marked-up screenshots
 

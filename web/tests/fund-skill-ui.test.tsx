@@ -146,6 +146,19 @@ describe("the Specialization tab", () => {
     // the switch still drives the other panels
     expect(within(panel("What kind of investor?")).getByRole("button", { name: "Sector" })).toBeTruthy();
   });
+
+  it("the map names low coverage, not youth, for a fund with years of trades and many picks", async () => {
+    // Berkshire on 2026-11-26: 108 quarters, 128 picks, 77% of its buying scored
+    const s = demo<Skill>(`fund/${FUND}/skill.json`);
+    for (const t of ["1", "2", "3"] as const) Object.assign(s.tiers[t], { n: 128, coverage: 0.77 });
+    stubData({ [`fund/${FUND}/skill.json`]: s });
+    renderTab();
+    await ready();
+    const p = panel("What kind of investor?");
+    expect(within(p).getByText("Too little of its buying could be scored")).toBeTruthy();
+    expect(within(p).getByText(/for this fund 77% could be/)).toBeTruthy();
+    expect(within(p).queryByText("Too early to tell")).toBeNull();
+  });
 });
 
 describe("the Specialization hold (production build with VITE_SPECIALIZATION=hold)", () => {
