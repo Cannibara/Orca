@@ -90,6 +90,9 @@ FAMOUS_STYLE = {
 FAMOUS_TYPE = {"Venture capital": "pevc.vc", "Family offices": "family", "Big companies": "corp"}
 SOVEREIGN_AND_PENSION = "Sovereign & pension funds"
 _SOV_OR_PENSION = "swf|pension"  # decided by the filer's name in `type_of`
+# famous.csv's description of a Sovereign & pension funds row that names a pension ("Dutch healthcare workers'
+# pension" for PGGM, "Australia's largest super fund"): many such filers' names carry no pension word.
+_PENSION_NOTE = re.compile(r"pension|retirement|super fund|teachers", re.IGNORECASE)
 
 
 def load_types(path: Path) -> dict[int, str]:
@@ -222,7 +225,8 @@ def famous_types(famous: Sequence[Famous], adv: Mapping[int, str]) -> dict[int, 
     """fund_id -> type from the famous lists (step 2). A fund in two lists takes its first in famous.csv. A
     style list is a hedge fund style unless the adviser register calls the fund an asset manager (it says
     "mutual funds" for Dodge & Cox; a hedge fund's private equity sidecars do not count against it); Sovereign & pension funds is split by the
-    filer's name when it is classified (a pension word: a pension fund; else sovereign)."""
+    list's description (a pension word: a pension fund), else by the filer's name when it is classified (a
+    pension word: a pension fund; else sovereign)."""
     out: dict[int, str] = {}
     for f in famous:
         if f.fund_id in out:
@@ -235,7 +239,7 @@ def famous_types(famous: Sequence[Famous], adv: Mapping[int, str]) -> dict[int, 
         elif f.group in FAMOUS_TYPE:
             out[f.fund_id] = FAMOUS_TYPE[f.group]
         elif f.group == SOVEREIGN_AND_PENSION:
-            out[f.fund_id] = _SOV_OR_PENSION
+            out[f.fund_id] = "pension" if _PENSION_NOTE.search(f.manager) else _SOV_OR_PENSION
     return out
 
 

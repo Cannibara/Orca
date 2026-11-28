@@ -94,6 +94,8 @@ def test_the_steps_in_order():
         Famous(4, "FOUR", "", "Sovereign & pension funds"),
         Famous(5, "FIVE", "", "Sovereign & pension funds"),
         Famous(6, "SIX", "", "Big companies"),
+        Famous(10, "PGGM", "Dutch healthcare workers' pension", "Sovereign & pension funds"),
+        Famous(11, "TEMASEK", "Singapore's state investor", "Sovereign & pension funds"),
         Famous(1, "ONE", "", "Activists"),  # a second list: the first one counts
     )
     adv = {2: "am.mutual", 3: "pevc.pe", 7: "hedge.other", 8: "am.mutual"}
@@ -104,6 +106,8 @@ def test_the_steps_in_order():
     assert c.type_of(4, "Ohio Public Employees Retirement System") == ("pension", "famous")
     assert c.type_of(5, "Norges Bank") == ("swf", "famous")
     assert c.type_of(6, "SIX INC") == ("corp", "famous")
+    assert c.type_of(10, "PGGM Investments") == ("pension", "famous")  # the list says pension; the name does not
+    assert c.type_of(11, "Temasek Holdings (Private) Ltd") == ("swf", "famous")
     assert c.type_of(7, "SEVEN LP") == ("hedge.quant", "hand")
     assert c.type_of(8, "Defiance ETFs, LLC") == ("am.etf", "name")  # before the register
     assert c.type_of(9, "Nine Corp", "Semiconductors & Related Devices") == ("corp", "sic")

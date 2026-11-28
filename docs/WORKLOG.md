@@ -5,6 +5,17 @@ Last verified: 2026-11-28
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-28 — Filer type review page for the owner; pension funds no longer typed sovereign
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner asked how filer types are decided and how to make them accurate. Shares of current money (3,357 largest current filers, $71.9T): hand list 66.8%, SEC adviser register 17.8%, famous lists 6.0%, SEC industry code 4.9%, name words 3.1%, unclassified 1.4%. Top 1,000 filers ≈ 94% of the money, top 2,000 ≈ 97% | Owner question | — |
+| **Filer type review** artifact (owner-only, https://claude.ai/artifact/6BBzUNpHWiaicVtdKN4Wog): the 2,000 largest current filers, largest first, each with its label, the source that set it, evidence (signer, SEC industry, register client mix and CRD link, top holdings, other managers, former names) and flags (no type, name words only, register matched by name, sources that disagree: 744 rows). Every row keeps its label unless the owner clicks another; "Confirm the rest of this page" confirms the untouched rows. Picks are saved in the artifact's database (`pages/pNNN`, 50 rows by size rank each) | Owner: "set up an artifact so I can sort funds into the right categories myself" | `pipeline/scripts/investor_review.py` (builds its data from the published site), `pipeline/scripts/investor_review_apply.py` (writes picks into `investor_types.csv`; a confirmed pick is added too, so register refreshes cannot flip it) |
+| Famous "Sovereign & pension funds" rows were split by the filer's name, so pension funds without a pension word were typed sovereign (PGGM, ATP, AP2, AP3, Aware Super, IMCO in the top 2,000). The list's own description now decides first ("Dutch healthcare workers' pension") | Found building the review list | `pipeline/orca/investors.py` (`famous_types`), `pipeline/tests/test_investors.py` |
+| Outside sources tested for typing: Wikidata items carrying an SEC CIK (one query) cover 86 of the top 2,000 (27% of the money; mostly banks and listed companies, already right); Wikipedia's API rate-limits this cloud IP (429). The adviser register lists each adviser's website: 37 of 100 sampled filers have one, 32 serve readable text (TCI, Yacktman, Sofinnova ...). Paid or paywalled sources (WhaleWisdom, Preqin, PitchBook, FT, Bloomberg) bar automated use | Owner asked for better sources | — |
+| Norges Bank (1374170) filed Q3 2026 but shows 0 holdings and a $0 book, so it is missing from the Landscape and the review list. Not fixed here (suggested as its own task) | Found building the review list | — |
+| Checks: pipeline suite green (1,152); apply script tried on made-up picks against a copy of the hand list (changed, confirmed and noted rows), list restored | | |
+
 ## 2026-11-28 — Landscape follow-ups: firms as one tile, quant trading firms, hedge styles, short names, quarterly refresh
 
 | What changed | Why | Files |
