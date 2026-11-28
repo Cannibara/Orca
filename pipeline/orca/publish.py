@@ -125,6 +125,8 @@ class HomeLists:
     search_asof: str | None = None  # the Google Trends snapshot's date (Most searched)
     # period -> `home.spx_window(...)`: SPY total return over that period's window (None: no figure)
     spx: Mapping[str, dict | None] = field(default_factory=dict)
+    # `landscape.landscape(...)`: every current filer by type of investor (home/landscape.json); None: no file
+    landscape: dict | None = None
 
 
 # --- writing files ----------------------------------------------------------------------------
@@ -549,6 +551,8 @@ def publish_shared(
         ("calls_y", home.calls_y),
     ):
         docs[f"home/{name}.json"] = {"latest_q": latest_q, "rows": rows}
+    if home.landscape is not None:
+        docs["home/landscape.json"] = home.landscape
     files = _write_all(out, docs, compress)
     files.update(publish_weekly(out, weekly or {}, compress))
     return files

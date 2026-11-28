@@ -302,6 +302,27 @@ for (const width of widths) {
       expect(errors).toEqual([]);
     });
 
+    test("Landscape: a tree map of every filer by type that zooms into a group and back, no sideways scroll", async ({ page }) => {
+      const errors = await open(page, "/");
+      await page.getByRole("tab", { name: "Landscape" }).click();
+      const map = page.getByRole("group", { name: /^All 13F filers: each tile/ });
+      await expect(map.locator('g.tile[data-kind="grp"]').first()).toBeVisible();
+      await expect(page.getByText(/counted twice/)).toBeVisible();
+      // the tiles fill the box: none reaches past its right edge
+      const { box, right } = await page.evaluate(() => ({
+        box: document.querySelector(".ls-box")!.getBoundingClientRect().right,
+        right: Math.max(...[...document.querySelectorAll(".ls-box g.tile .tr")].map((r) => r.getBoundingClientRect().right)),
+      }));
+      expect(right).toBeLessThanOrEqual(box + 1);
+      await map.locator('g.tile[data-kind="grp"][aria-label^="Asset managers"]').click();
+      await expect(page.getByRole("navigation", { name: "Zoom" }).getByRole("button", { name: "All 13F filers" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("navigation", { name: "Zoom" }).getByRole("button")).toHaveCount(0);
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
     test("a long list scrolls in its own window: zero line at the left edge, the caption follows, no sideways scroll", async ({ page }) => {
       await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
       const errors = await open(page, "/");

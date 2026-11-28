@@ -20,6 +20,7 @@ from datetime import date
 
 import polars as pl
 
+from orca.holdings import MAX_SHARES
 from orca.http import Client, FetchError
 from orca.quarters import q_of_date
 from orca.sec.bulk import KEPT_FORMS, raw_holdings, value_to_usd
@@ -107,6 +108,9 @@ MIN_ROWS_FOR_UNITS = 3
 # "24528916596000"). Berkshire's A share was under $200,000 before 2013.
 MAX_PRICE = 2e6  # dollars a share
 MAX_VALUE = 1e12  # dollars
+# More shares in one row than any listed company has (Perigee Private Management's 1999 table
+# read as 3,476,803,476,800 shares: two columns run together, at a few cents' value). The live
+# rule lives in orca.holdings (MAX_SHARES), which also drops such rows already in the lake.
 
 _DOCUMENT = re.compile(r"<DOCUMENT>(.*?)</DOCUMENT>", re.DOTALL | re.IGNORECASE)
 _TYPE = re.compile(r"<TYPE>[ \t]*([^\r\n<]+)", re.IGNORECASE)
@@ -578,7 +582,7 @@ def read_holdings(texts: list[str]) -> tuple[Table, str, float | None, int | Non
 
 def _plausible(row: Row, unit: float) -> bool:
     value = row.value * unit
-    if value > MAX_VALUE:
+    if value > MAX_VALUE or row.shares > MAX_SHARES:
         return False
     return row.sh_type != "SH" or row.shares <= 0 or value / row.shares <= MAX_PRICE
 

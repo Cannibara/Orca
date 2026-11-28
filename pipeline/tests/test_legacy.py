@@ -439,3 +439,16 @@ def test_one_filing_that_cannot_be_read_does_not_stop_the_quarter(monkeypatch):
     filings, raw, checks = fetch_quarter(make_client(routes), "2005Q1", set())
     assert filings["accession"].to_list() == [good]
     assert dict(checks.select("accession", "status").iter_rows())[bad] == legacy.UNREADABLE
+
+
+def test_a_share_count_of_two_columns_run_together_is_not_stored():
+    # Perigee Private Management, Q2 1999: "3476803476800" shares (two columns run together) at a
+    # sane value made a $266 trillion fund once valued at market prices.
+    text = """
+APPLE INC         COM     037833100   1,000      10,000  SH
+AT&T CORP         COM     001957109   39,549   3476803476800  SH
+MICROSOFT CORP    COM     594918104     300       5,000  SH
+"""
+    _, rows, check = read_submission(submission(text), ENTRY)
+    assert [r["cusip"] for r in rows] == ["037833100", "594918104"]
+    assert check["invalid_rows"] == 1

@@ -1,0 +1,80 @@
+name: Investor types
+
+# Refreshes pipeline/orca/investor_types_adv.csv (the Landscape's types of investor for filers that are
+# SEC-registered advisers) from the SEC's monthly adviser register, with pipeline/scripts/investor_types.py.
+# Each quarter, after the 13F deadline month's register is out, and by hand. It commits the new file to the
+# branch `investor-types-refresh` (never to the default branch: a merge there is what publishes it) and
+# opens a pull request when the repository lets workflows do that; otherwise open one from that branch.
+# The next pipeline run after the merge (or a `home_only` run) puts the new types on the site. Hand
+# corrections stay in pipeline/orca/investor_types.csv, which this never touches.
+
+on:
+  schedule:
+    - cron: "41 5 20 1,4,7,10 *" # the 20th of Jan, Apr, Jul and Oct, 05:41 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: investor-types
+  cancel-in-progress: false
+
+permissions:
+  contents: write # to push the refresh branch
+  pull-requests: write # to open its pull request
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BRANCH: investor-types-refresh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: true # the push step uses it
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+      - name: Read the register
+        env:
+          ORCA_CONTACT: ${{ secrets.ORCA_CONTACT }} # SEC asks for a contact in the User-Agent
+        run: |
+          set -o pipefail
+          uv run --no-project python pipeline/scripts/investor_types.py 2>&1 | tee refresh.log
+      - name: Check the file loads
+        working-directory: pipeline
+        run: |
+          uv sync --locked
+          uv run pytest -q tests/test_investors.py
+      - name: Commit to the refresh branch and open a pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          git add pipeline/orca/investor_types_adv.csv
+          if git diff --cached --quiet; then
+            echo "The register gave the same types: nothing to commit." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          changed=$(git diff --cached --numstat pipeline/orca/investor_types_adv.csv | awk '{print $1 " added, " $2 " removed"}')
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git commit -m "pipeline: investor types from the SEC adviser register" \
+            -m "Refreshed by the Investor types workflow (pipeline/scripts/investor_types.py): $changed lines."
+          git push --force origin "HEAD:$BRANCH" # the branch only ever holds the latest refresh
+          {
+            echo "### Investor types"
+            echo
+            echo '```'
+            tail -3 refresh.log
+            echo '```'
+            echo "Changed lines: $changed. Branch: \`$BRANCH\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base "$BASE" --head "$BRANCH" \
+              --title "pipeline: investor types from the SEC adviser register" \
+              --body "The quarterly refresh of \`pipeline/orca/investor_types_adv.csv\` ($changed lines). Merge, then run the Pipeline with \`home_only\` (or wait for the monthly run) to put the new types on the Landscape. Hand corrections go in \`pipeline/orca/investor_types.csv\`." \
+              || echo "::warning::could not open the pull request (the repository may not let workflows open them): open one from the branch $BRANCH"
+          fi

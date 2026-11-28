@@ -5,6 +5,30 @@ Last verified: 2026-11-28
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-28 — Landscape follow-ups: firms as one tile, quant trading firms, hedge styles, short names, quarterly refresh
+
+| What changed | Why | Files |
+|---|---|---|
+| A firm filing under several names is one tile per type (Vanguard 10 filers, Capital Group 6, Susquehanna, MUFG, Mizuho, Sequoia 7, ...): books added, returns weighted by book, the largest filer's page on click; `funds.n` and `funds.members` in `home/landscape.json` (contract first) | Owner approved the 5 recommendations | `pipeline/orca/investor_parents.csv`, `investors.load_parents`, `landscape.py`, `pipeline/contract.md`, `web/src/home/landscape.ts`, `LandscapeMap.tsx`, `web/src/data/types.ts` |
+| Spot-check of the register-typed filers: 20 corrected (Los Angeles Capital, IFM, Axiom, Generation IM: institutional; Gotham: quant; Rothschild Wealth UK, W1M: wealth; Ares: credit; Cerberus: PE; ...); 29 market makers and trading firms moved to Quant & multi-strategy | Owner: label market makers as quant firms | `pipeline/orca/investor_types.csv` (490 rows) |
+| Hedge styles: ~180 of the largest "Other hedge funds" by hand; the rest from holdings at run time (60%+ health care or tech and communication: a specialist; 400+ priced positions: quant) | 928 hedge funds had no style | `investors.refine_hedge`, `investor_types.csv` |
+| Short names for ~90 of the largest filers (Fidelity, JPMorgan Chase, CalPERS, GMO, VanEck, ...) | Names like "Jpmorgan Chase & Co", "Deutsche Bank Ag" (the filing name ends in a backslash) | `web/src/lib/famousNames.ts` |
+| Workflow Investor types: quarterly (20th of Jan/Apr/Jul/Oct) and by hand, refreshes the adviser-register file, checks it loads, pushes `investor-types-refresh` and opens a PR | The register snapshot ages | `.github/workflows/investor-types.yml` |
+| Colours stay green/red (the holdings map's), noted as the exception in CLAUDE.md; custodian money in banks left as is (owner) | Owner | `CLAUDE.md` |
+| Checks: pipeline and web suites green; demo data rebuilt (one filer per row) | | `pipeline/tests/test_landscape.py`, `test_investors.py`, `web/tests/landscape.test.ts` |
+
+## 2026-11-26 — Home Landscape tab: every 13F filer by type of investor; Perigee's $266T book removed
+
+| What changed | Why | Files |
+|---|---|---|
+| Owner asked: how many 13F filers, and who must file. Checked: 8,907 managers filed 13F-HR holdings for Q2 2026 and 9,232 filings for Q3 2026 so far (SEC full index), plus ~1,950 13F-NT notices (holdings reported in another's filing); any manager with investment discretion over $100M+ of SEC-listed securities (US-listed stocks, ETFs, listed options, some convertibles; long only) on the last trading day of any month. Orca has 16,121 filers since 1999 | Owner question | — |
+| New home tab **Landscape**: a tree map of every current filer, grouped by type of investor under heading strips, area = 13F holdings, colour = estimated return a year over the shared period (the holdings map's ramp); headings zoom in, filers open their page, breadcrumb and Escape zoom out; the note says ETF money is counted twice and bounds it with the ETF providers' total ($24.4T of $72.7T at Q3 2026) | Owner's idea; owner chose to keep the index firms as Asset managers > ETF providers and call out the double counting | `web/src/home/LandscapeMap.tsx`, `landscape.ts`, `landscape.css`, `web/src/pages/Home.tsx`, `web/src/fund/treemapView.ts` (optional `fit`, `fixed`, `kind`, `onActivate`), `web/src/fund/treemapDom.ts` (moved from HoldingsPanel) |
+| Published file `home/landscape.json` (contract first): each leaf type's 150 largest filers and the rest as one row, returns for all six periods; ~45 KB brotli on real data | One file serves every period and zoom | `pipeline/contract.md`, `pipeline/orca/landscape.py`, `run/publish_step.py`, `publish.py` |
+| Types: hand labels for the ~300 largest (`investor_types.csv`), the famous lists, the SEC's monthly adviser register (7,877 filers typed by CIK or exact name: client mix and private funds; `scripts/investor_types.py`), SEC industry codes and name words. Unclassified: 2% of the money at Q3 2026 | 13Fs carry no type | `pipeline/orca/investors.py`, `investor_types.csv`, `investor_types_adv.csv`, `pipeline/scripts/investor_types.py` |
+| Perigee Private Management (1074020) showed $266T in Q2 1999: its text table ran two columns into 3.5 trillion-share rows. Rows over 50 billion shares are dropped at parse and build; the next ordinary run removes those in the lake and recomputes their funds | Owner: get rid of it | `pipeline/orca/holdings.py`, `sec/legacy.py`, `run/ingest.py` (`purge_misread_holdings`), `run/weekly.py` |
+| Checks: pipeline suite green (1,121 + new tests for types, landscape and the share guard); web suite green (1,220); Playwright smoke incl. a new Landscape test at 1280/400 px, light and dark; build and prerender green. Screenshots on real published data looked right | | `pipeline/tests/test_investors.py`, `test_landscape.py`, `web/tests/landscape.test.ts`, `web/tests/home.test.tsx`, `web/e2e/smoke.spec.ts` |
+| To go live: merge, then Actions > Pipeline > Run workflow with `home_only` (publishes `home/landscape.json`, ~5 min); the next ordinary run removes Perigee's rows. Until then the tab says the landscape arrives with the next data update | | — |
+
 ## 2026-11-28 — Run 57: opportunity-cost scores live; the map says "too close to call" and names every dot (owner)
 
 | What changed | Why | Files |
@@ -225,7 +249,6 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Proposed hold: the production build sets `VITE_SPECIALIZATION=hold`, and the Specialization tab says "Being checked" and loads nothing, until the indices are fixed. Dev, tests and the demo are unchanged | Wrong numbers should not stay on the site | `web/src/fund/SkillPanels.tsx`, `web/src/pages/Fund.tsx`, `.github/workflows/web.yml`, `web/tests/fund-skill-ui.test.tsx` |
 | Next: find the stock (a diagnostic in the sectors step: per quarter, the biggest weights in Market and each sector, and caps that jump ×5 or more), fix its cap (ADR ratio in `share_overrides.csv`, or a guard that sets such caps aside), re-run, check Berkshire and a few funds, then lift the hold | | |
 
-
 ## 2026-11-23 — Home: tighter top, no group names, "Search" button
 
 | What changed | Why | Files |
@@ -254,7 +277,6 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 |---|---|---|
 | Run 38 (`main` 4b9a157, started by Claude at the owner's request): indices and scores in the main step (27 min, saved). "Sector files" computed every chunk (29 min, peak 7.1 GB of 16 GB) and then the CUSIP guard refused 80 staged `skill.json` files, so nothing was uploaded: the site and its manifest are unchanged | Dollar amounts were rounded to whole dollars, and a bare 9-digit number can equal an all-digit CUSIP (Microsoft's is 594918104); the other files keep decimals, which the guard skips | — |
 | Dollars in the sector files are rounded to the cent and always written as decimals; a regression test runs the guard on such a value. Contract notes it. Demo data rebuilt | So the next run publishes | `pipeline/orca/run/sectors_step.py` (`_dollars`), `pipeline/tests/test_skill_detail.py`, `pipeline/contract.md`, `web/public/demo-data/` |
-
 
 ## 2026-11-23 — UI trims from the owner's marked-up screenshots
 

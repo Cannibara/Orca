@@ -15,6 +15,7 @@ from pathlib import Path
 import polars as pl
 
 from orca.famous import load_ranked_famous, load_search
+from orca.investors import load_classifier
 from orca.holdings import HOLDINGS_SCHEMA, build_holdings, select_reports
 from orca.home import FundSnapshot
 from orca.publish import (
@@ -32,7 +33,7 @@ from orca.run.about_step import update_fund_about
 from orca.run.budget import Budget
 from orca.run.compute import Context, compute_batch
 from orca.run.gates import check_health
-from orca.run.ingest import Counts, ingest_bulk, ingest_legacy, ingest_live
+from orca.run.ingest import Counts, ingest_bulk, ingest_legacy, ingest_live, purge_misread_holdings
 from orca.run.market import (
     backfill_price_heads,
     map_new_cusips,
@@ -401,6 +402,9 @@ def run_weekly(
     if full:  # owed until a publish succeeds, even if this run dies
         state.pending_all = True
         state.save(lake)
+    misread = purge_misread_holdings(lake, state)
+    if misread:
+        flags.append({"type": "misread_holdings", **misread})
 
     def securities() -> dict:
         return {
@@ -474,6 +478,7 @@ def run_weekly(
             compress,
             famous,
             sources.search(),
+            sources.investors(famous),
         )
     )
     about_owed = _update_about(lake, sources, metas, computed, staging, files, flags, budget, today, compress)
@@ -638,6 +643,7 @@ def run_home(
         compress,
         famous,
         load_search(),
+        load_classifier(famous),
     )
     previous = load_published(lake, out_root, compress)
     changed = changed_files(files, previous)

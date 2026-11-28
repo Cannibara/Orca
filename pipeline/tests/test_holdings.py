@@ -286,6 +286,18 @@ def test_nonpositive_shares_dropped():
     assert stats["nonpositive_shares"] == 2
 
 
+def test_misread_share_counts_are_dropped():
+    # more shares in one row than any listed company has: a text table's columns run together
+    filings = filings_frame(filing(A, date(2024, 2, 14)))
+    raws = raw_frame(raw(A, "AAA", 100), raw(A, "RUN", 3_476_803_476_800), raw(A, "BIG", 5e10))
+    stats: dict = {}
+
+    out = build_holdings(filings, raws, stats)
+
+    assert rows_of(out, "cusip") == [("AAA",), ("BIG",)]
+    assert stats["misread_shares"] == 1
+
+
 def test_nonpositive_shares_counts_only_rows_of_the_chosen_reports():
     filings = filings_frame(filing(A, date(2024, 2, 10)), filing(B, date(2024, 2, 20)))
     raws = raw_frame(raw(A, "OLD", 0), raw(B, "AAA", 7))
