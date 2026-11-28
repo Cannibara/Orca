@@ -138,6 +138,42 @@ for (const width of widths) {
       await expect(page.getByRole("heading", { name: "Annual return stacked graph", exact: true })).toHaveCount(0);
     });
 
+    // A peer's dot on the map opens that fund in place (owner 2026-11-28): same tab, the map's chart where it was
+    // on screen, no Loading frame; Back returns to the first fund the same way.
+    test("fund page, Specialization: a peer's dot opens that fund without moving the map", async ({ page }) => {
+      const errors = await open(page, `/fund/${fundId}#specialization`);
+      const chartTop = () => page.locator(".mapp svg.viz").evaluate((el) => el.getBoundingClientRect().top);
+      // the chart well down the screen, the tabs scrolled out of sight
+      await page.evaluate(() => {
+        const r = document.querySelector(".mapp svg.viz")!.getBoundingClientRect();
+        window.scrollTo({ top: window.scrollY + r.top - 140, behavior: "instant" });
+      });
+      const top0 = await chartTop();
+      expect(Math.abs(top0 - 140)).toBeLessThan(2);
+      await page.evaluate(() => {
+        const w = window as unknown as { sawLoading: boolean };
+        w.sawLoading = false;
+        new MutationObserver(() => {
+          if (document.body.textContent?.includes("Loading…") || document.querySelector(".tp [aria-busy='true'].panel")) w.sawLoading = true;
+        }).observe(document.body, { childList: true, subtree: true, characterData: true });
+      });
+      const dot = page.locator(".mapp a.pt-g").first();
+      const href = (await dot.getAttribute("href"))!;
+      const peerName = funds.name[funds.id.indexOf(Number(/\/fund\/(\d+)/.exec(href)![1]))];
+      await dot.locator("circle").click();
+      await expect(page.locator("h1")).toHaveText(peerName);
+      expect(page.url()).toMatch(new RegExp(`${href}$`));
+      await expect(page.getByRole("tab", { name: "Specialization" })).toHaveAttribute("aria-selected", "true");
+      expect(Math.abs((await chartTop()) - top0)).toBeLessThan(2);
+      expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false);
+
+      await page.goBack();
+      await expect(page.locator("h1")).toHaveText(fundName);
+      expect(Math.abs((await chartTop()) - top0)).toBeLessThan(2);
+      expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
     // jsdom has no layout, so only here can the landing be watched as a real page runs it (the first draw used to
     // be cut short by the width being measured a moment later, and the tiles began in a neutral colour).
     test("fund page: the tree map forms on landing, every tile in its final colour from its first frame", async ({ page }) => {

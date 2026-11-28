@@ -22,7 +22,14 @@ export type MapProps = {
   scores: SectorScores | null;
   famous: TopRow[] | undefined;
   funds: FundsIndex | null;
+  /** The comparison list and path to start with (kept from the fund this page was opened from). */
+  view?: MapView;
+  /** A click on a peer's dot: open that fund in this place (owner 2026-11-28). Without it the dots are plain links. */
+  onPeer?: (id: number, view: MapView) => void;
 };
+
+/** What the map shows besides the fund itself, carried to the fund a click on its dot opens. */
+export type MapView = { list: string | null; path: boolean };
 
 const cornerName = (c: Exclude<Corner, "close">, w: TierWords) => ({ both: "Both", stock: "Stock picker", sector: w.picker, neither: "Neither, so far" })[c];
 
@@ -49,7 +56,7 @@ function TierSwitch({ tier, onTier }: { tier: Tier; onTier: (t: Tier) => void })
 }
 
 /** "What kind of investor?": this fund and its peers, by stock choice (across) and sector choice (up). */
-export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famous, funds }: MapProps) {
+export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famous, funds, view, onPeer }: MapProps) {
   const w = tierWords(tier);
   const T = tierOf(skill, tier);
   const me = shortNameOf(fundId, name); // the home page's short names (lib/famousNames)
@@ -57,11 +64,19 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
   const firstYear = 2013 + Math.floor(skill.first_q / 4);
   const eligible = T.picking != null && T.allocation != null && isEligible({ span_q: span, n: T.n ?? 0, coverage: T.coverage ?? 0 });
   const peers = useMemo(() => (scores && funds ? peersFor(fundId, tier, famous, scores, funds) : { lists: [], similar: [] as Peer[] }), [fundId, tier, famous, scores, funds]);
-  const [listName, setListName] = useState<string | null>(null);
-  const [path, setPath] = useState(false);
+  const [listName, setListName] = useState<string | null>(view?.list ?? null);
+  const [path, setPath] = useState(view?.path ?? false);
   const [table, setTable] = useState(false);
+  // the dot clicked, while its fund loads (the page stays as it is until then)
+  const [busy, setBusy] = useState<number | null>(null);
   const list = peers.lists.find((l) => l.name === listName) ?? peers.lists[0];
   const shown: Peer[] = list ? list.peers : (peers.similar ?? []);
+  const peer = onPeer
+    ? (id: number) => {
+        setBusy(id);
+        onPeer(id, { list: list?.name ?? null, path });
+      }
+    : undefined;
   const header = (
     <div className="ph">
       <div className="ph-t">
@@ -144,7 +159,7 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
       </p>
       {tier === 3 && <p className="note">Some sub-industries have few stocks, so their index leans on one or two companies.</p>}
       <div className="pb">
-        <MapChart me={{ name: me, pick, alloc, n: T.n ?? 0 }} peers={shown} w={w} path={path ? rollingPath(skill, tier) : []} table={table} />
+        <MapChart me={{ name: me, pick, alloc, n: T.n ?? 0 }} peers={shown} w={w} path={path ? rollingPath(skill, tier) : []} table={table} busy={busy} onPeer={peer} />
       </div>
       <p className="pf">
         Units. "pts a year" means percentage points of yearly return: +2 pts = 2% a year more, e.g. 12% a year instead of 10%. Measured on their own
@@ -159,7 +174,23 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
 
 type Dot = { name: string; pick: number; alloc: number; n: number };
 
-function MapChart({ me, peers, w, path, table }: { me: Dot; peers: Peer[]; w: TierWords; path: { q: number; pick: number; alloc: number }[]; table: boolean }) {
+function MapChart({
+  me,
+  peers,
+  w,
+  path,
+  table,
+  busy,
+  onPeer,
+}: {
+  me: Dot;
+  peers: Peer[];
+  w: TierWords;
+  path: { q: number; pick: number; alloc: number }[];
+  table: boolean;
+  busy: number | null;
+  onPeer?: (id: number) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const W = useWidth(host, 280, 600);
   const tip = useTooltip();
@@ -246,15 +277,30 @@ function MapChart({ me, peers, w, path, table }: { me: Dot; peers: Peer[]; w: Ti
           {peers.map((p) => {
             const r = rOf(p.n);
             const lab = labels.peers.get(p.fund_id);
+            // a link to the fund's own Specialization tab: a plain click opens it in place (onPeer), a middle-click
+            // or Cmd-click in a new tab
             return (
-              <g key={p.fund_id} className="pt-g" tabIndex={0} role="img" aria-label={`${p.name}: stock choice ${pts(p.pick)} a year, ${w.choice.toLowerCase()} ${pts(p.alloc)} a year, ${p.n} picks`} {...tipHandlers(tip, () => dotTip(p, false))}>
+              <a
+                key={p.fund_id}
+                className={"pt-g" + (busy === p.fund_id ? " busy" : "")}
+                href={`/fund/${p.fund_id}#specialization`}
+                tabIndex={0}
+                aria-label={`${p.name}: stock choice ${pts(p.pick)} a year, ${w.choice.toLowerCase()} ${pts(p.alloc)} a year, ${p.n} picks. Open its page`}
+                aria-busy={busy === p.fund_id || undefined}
+                onClick={(e) => {
+                  if (!onPeer || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  e.preventDefault();
+                  onPeer(p.fund_id);
+                }}
+                {...tipHandlers(tip, () => dotTip(p, false))}
+              >
                 <circle className="peer" cx={x(p.pick)} cy={y(p.alloc)} r={r} />
                 {lab && (
                   <text className="pname" x={lab.x} y={lab.y} textAnchor={lab.anchor}>
                     {lab.key ?? p.name}
                   </text>
                 )}
-              </g>
+              </a>
             );
           })}
           {path.length > 1 && (

@@ -5,7 +5,7 @@ import type { Load } from "../lib/useLoad";
 import { DecisionsPanel } from "./DecisionsPanel";
 import { MixPanel } from "./MixPanel";
 import type { Tier } from "./skill";
-import { SkillMapPanel } from "./SkillMapPanel";
+import { SkillMapPanel, type MapView } from "./SkillMapPanel";
 import "./skill.css";
 import { StackedPanel } from "./StackedPanel";
 
@@ -20,7 +20,7 @@ export const SPECIALIZATION_HOLD = import.meta.env.VITE_SPECIALIZATION === "hold
 
 export type SkillData = { skill: Skill; scores: SectorScores | null; famous: TopRow[] | undefined; funds: FundsIndex | null };
 
-async function loadSkillData(id: number): Promise<SkillData | null> {
+export async function loadSkillData(id: number): Promise<SkillData | null> {
   const skill = await loadSkill(id);
   if (!skill) return null;
   // The map's peers; without them it still places this fund (and says so in its sentence).
@@ -34,9 +34,12 @@ async function loadSkillData(id: number): Promise<SkillData | null> {
   return { skill, scores, famous, funds };
 }
 
-/** The fund's sector data, loaded the first time the Specialization tab opens (and kept for later visits). */
-export function useSkillData(id: number, open: boolean): Load<SkillData | null> | null {
-  const [state, setState] = useState<Load<SkillData | null> | null>(null);
+/**
+ * The fund's sector data, loaded the first time the Specialization tab opens (and kept for later visits).
+ * `ready` is data already loaded (a fund opened from another's map), shown from the first frame.
+ */
+export function useSkillData(id: number, open: boolean, ready?: SkillData | null): Load<SkillData | null> | null {
+  const [state, setState] = useState<Load<SkillData | null> | null>(() => (ready !== undefined ? { status: "ready", data: ready } : null));
   const wanted = open || state !== null;
   useEffect(() => {
     if (!wanted || state !== null) return;
@@ -85,6 +88,8 @@ export function SpecializationTab({
   fundId,
   name,
   stocks,
+  view,
+  onPeer,
 }: {
   state: Load<SkillData | null> | null;
   tier: Tier;
@@ -92,6 +97,10 @@ export function SpecializationTab({
   fundId: number;
   name: string;
   stocks: Map<number, Stock>;
+  /** The map's comparison list and path to start with (kept from the fund this page was opened from). */
+  view?: MapView;
+  /** A click on a peer's dot: open that fund here. */
+  onPeer?: (id: number, view: MapView) => void;
 }) {
   if (SPECIALIZATION_HOLD) {
     return (
@@ -134,7 +143,18 @@ export function SpecializationTab({
   }
   return (
     <>
-      <SkillMapPanel fundId={fundId} name={name} skill={d.skill} tier={tier} onTier={onTier} scores={d.scores} famous={d.famous} funds={d.funds} />
+      <SkillMapPanel
+        fundId={fundId}
+        name={name}
+        skill={d.skill}
+        tier={tier}
+        onTier={onTier}
+        scores={d.scores}
+        famous={d.famous}
+        funds={d.funds}
+        view={view}
+        onPeer={onPeer}
+      />
       <StackedPanel skill={d.skill} tier={tier} />
       <MixPanel skill={d.skill} />
       <DecisionsPanel skill={d.skill} tier={tier} stocks={stocks} />

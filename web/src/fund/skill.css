@@ -63,6 +63,15 @@
 .fp .mapp .viz .tyear{fill:var(--up-text);font:500 11px/1 var(--f-mono)}
 .fp .mapp .viz g[tabindex]{outline:none;cursor:default}
 .fp .mapp .viz g[tabindex]:focus-visible circle{stroke:var(--focus);stroke-width:3}
+/* a peer's dot opens that fund's page in place; it pulses while the fund loads */
+.fp .mapp .viz a.pt-g{outline:none;cursor:pointer;text-decoration:none}
+.fp .mapp .viz a.pt-g:hover .peer{stroke:var(--ink2);stroke-width:1.5}
+.fp .mapp .viz a.pt-g:hover .pname{fill:var(--ink2)}
+.fp .mapp .viz a.pt-g:focus-visible .peer{stroke:var(--focus);stroke-width:3}
+.fp .mapp .viz a.pt-g.busy{cursor:progress}
+.fp .mapp .viz a.pt-g.busy .peer{animation:skbusy .7s ease-in-out infinite alternate}
+@keyframes skbusy{to{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.fp .mapp .viz a.pt-g.busy .peer{animation:none;opacity:.5}}
 @container app (max-width:559px){
   .fp .mapp .viz .corner{font-size:12px}
   .fp .mapp .viz .atitle{font-size:11.5px}

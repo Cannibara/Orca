@@ -5,6 +5,13 @@ Last verified: 2026-11-28
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-28 — Specialization map: a peer's dot opens that fund in place
+
+| What changed | Why | Files |
+|---|---|---|
+| A click on another fund's dot on "What kind of investor?" opens that fund's page with nothing else moving: same Specialization tab, same level (Sector / Industry / Sub-industry), same comparison list and path, the map's chart at the same height on screen. The page stays as it is while the fund and its sector file load (the dot pulses), then swaps in one frame; both history entries carry the view, and the last 4 funds stay loaded, so Back and Forward return the same way. The dots are real links (`/fund/{id}#specialization`): middle-click and Cmd-click open a new tab | Owner asked for a seamless fund switch from the map | `web/src/pages/Fund.tsx` (hop, warm funds, anchor), `web/src/fund/SkillPanels.tsx`, `SkillMapPanel.tsx`, `skill.css` |
+| Checks: web suite green (1,226, a new hop test); Playwright smoke green (110, a new test at 1280/400 px, light and dark: chart within 2 px after the click and after Back, no Loading frame); it fails when the preload is removed | | `web/tests/fund-skill-ui.test.tsx`, `web/e2e/smoke.spec.ts` |
+
 ## 2026-11-28 — Landscape follow-ups: firms as one tile, quant trading firms, hedge styles, short names, quarterly refresh
 
 | What changed | Why | Files |
