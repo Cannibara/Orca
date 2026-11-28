@@ -2195,3 +2195,29 @@ def test_a_failed_summary_rewrite_owes_the_fund_to_the_next_run(fixtures, tmp_pa
     monkeypatch.undo()
     run(tmp_path, fixture_sources(fixtures), WEEK1)
     assert all(s["about"] for cik, s in summaries(tmp_path).items() if cik != COBBLEREEF)
+
+
+def test_a_table_withheld_in_full_is_no_sale_of_the_book(tmp_path, no_health_gates):
+    # Norges Bank files its Q1 and Q3 tables under confidential treatment: one blank row ("NA", CUSIP
+    # 000000000, 0 shares, $0). Read as a report, it sold the whole book; the book is carried instead.
+    small = small_fixtures(
+        {
+            Q1_24: [Holding("WIDGET CORP", WIDGET, 4_000.0, 100)],
+            Q2_24: [Holding("NA", "000000000", 0.0, 0)],
+        }
+    )
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY)
+    summary = read_json(tmp_path / "bucket" / "fund" / str(SMALL_FUND) / "summary.json")
+    assert (summary["book"], summary["n_holdings"]) == (4_000.0, 1)
+    assert summary["period_q"] == Q1_24 and not summary["inactive"]
+    assert summary["quarters"]["net_buying"][-1] == 0.0  # no sale in Q2
+
+    # A lake from before this rule owes the fund a recompute once, with no new filing.
+    path = tmp_path / "lake" / "state.json"
+    state = json.loads(path.read_text())
+    del state["blank_seen"]
+    path.write_text(json.dumps(state))
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY + timedelta(days=1))
+    assert (stats.filings_parsed, stats.funds_recomputed) == (0, 1)
+    stats = run(tmp_path, fixture_sources(small), SMALL_TODAY + timedelta(days=2))
+    assert stats.funds_recomputed == 0

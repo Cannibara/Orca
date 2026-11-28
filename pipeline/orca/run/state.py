@@ -149,7 +149,9 @@ class State:
     whole price history is to be fetched again (their ticker changed, or their stored history
     starts at the old 2013 start); `price_backfilled` the stocks already put there for their
     pre-2013 history (never twice); `legacy_done` the pre-2013 full-index quarters read
-    ("1999Q1", ...) and `legacy_retry` those of them with downloads to try once more."""
+    ("1999Q1", ...) and `legacy_retry` those of them with downloads to try once more. `blank_seen` holds the
+    accessions of the tables withheld in full (`holdings.blank_tables`) whose funds have been owed a
+    recompute since such a table stopped reading as a sale."""
 
     live_watermark: date | None = None
     last_q: int | None = None
@@ -165,6 +167,7 @@ class State:
     price_backfilled: set[int] = field(default_factory=set)
     legacy_done: set[str] = field(default_factory=set)
     legacy_retry: set[str] = field(default_factory=set)
+    blank_seen: set[str] = field(default_factory=set)
 
     @staticmethod
     def path(lake: Lake) -> Path:
@@ -192,6 +195,7 @@ class State:
             price_backfilled=set(raw.get("price_backfilled", [])),
             legacy_done=set(raw.get("legacy_done", [])),
             legacy_retry=set(raw.get("legacy_retry", [])),
+            blank_seen=set(raw.get("blank_seen", [])),
         )
 
     def save(self, lake: Lake) -> None:
@@ -212,6 +216,7 @@ class State:
                 "price_backfilled": sorted(self.price_backfilled),
                 "legacy_done": sorted(self.legacy_done),
                 "legacy_retry": sorted(self.legacy_retry),
+                "blank_seen": sorted(self.blank_seen),
             },
         )
 

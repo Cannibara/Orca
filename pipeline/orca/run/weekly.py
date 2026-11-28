@@ -33,7 +33,15 @@ from orca.run.about_step import update_fund_about
 from orca.run.budget import Budget
 from orca.run.compute import Context, compute_batch
 from orca.run.gates import check_health
-from orca.run.ingest import Counts, ingest_bulk, ingest_legacy, ingest_live, purge_misread_holdings
+from orca.run.ingest import (
+    Counts,
+    blank_tables_in_lake,
+    ingest_bulk,
+    ingest_legacy,
+    ingest_live,
+    owe_withheld,
+    purge_misread_holdings,
+)
 from orca.run.market import (
     backfill_price_heads,
     map_new_cusips,
@@ -428,6 +436,8 @@ def run_weekly(
         lambda: backfill_price_heads(lake, sources, state, run_id, flags, budget),
     )
     _stage("rf", budget, lambda: update_rf(lake, sources, state, last_q, full, flags))
+    blank = blank_tables_in_lake(lake)
+    owe_withheld(lake, state, blank)
     state.save(lake)
     for source, drops in sorted(counts.drops.items()):
         flags.append({"type": "dropped_rows", "source": source, **dict(sorted(drops.items()))})
@@ -442,6 +452,7 @@ def run_weekly(
 
     started = time.monotonic()
     ctx = Context.build(lake, last_q)
+    ctx.blank = blank
     recompute = _recompute_set(lake, ctx, state, last_q)
     staging = new_version(out_root, run_id)
     funds = _publish_funds(ctx, recompute, staging, compress, budget)

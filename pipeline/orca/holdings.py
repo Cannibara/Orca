@@ -146,6 +146,48 @@ def build_holdings(filings: pl.DataFrame, raw_holdings: pl.DataFrame, stats: dic
     )
 
 
+# A placeholder row: a CUSIP of zeros (or none) and no shares. A manager filing its whole table under
+# confidential treatment sends one (Norges Bank's Q1 and Q3 reports since 2025: "NA", CUSIP 000000000, 0
+# shares, $0, while its cover page counts 1,490 holdings worth $1.01 trillion). The holdings come in a
+# new-holdings amendment once the treatment ends, about a year later.
+BLANK_ROW = pl.col("cusip").fill_null("").str.strip_chars().str.contains(r"^0*$") & ~(
+    pl.col("shares") > 0
+).fill_null(False)
+
+
+def blank_tables(raw: pl.DataFrame) -> pl.DataFrame:
+    """(accession, source) of the tables that name no holding: every row a placeholder (BLANK_ROW). Without
+    a `source` column every row counts as bulk."""
+    if "source" not in raw.columns:
+        raw = raw.with_columns(source=pl.lit(BULK))
+    return (
+        raw.group_by("accession", "source")
+        .agg(blank=BLANK_ROW.all())
+        .filter("blank")
+        .select("accession", "source")
+        .sort("accession", "source")
+    )
+
+
+def withheld_quarters(reports: pl.DataFrame, blank: pl.DataFrame) -> pl.DataFrame:
+    """(cik, q) of the fund-quarters whose chosen reports (`select_reports`) are all blank tables
+    (`blank_tables`): the fund filed but withheld its holdings. That is no sale of them, so `fill_gaps`
+    takes such a quarter as unreadable and carries the last one read. A new-holdings amendment that
+    releases the table makes the quarter readable again."""
+    if "source" not in reports.columns:
+        reports = reports.with_columns(source=pl.lit(BULK))
+    marked = reports.join(
+        blank.with_columns(_blank=pl.lit(True)), on=["accession", "source"], how="left"
+    )
+    return (
+        marked.group_by("cik", "period")
+        .agg(withheld=pl.col("_blank").fill_null(False).all())
+        .filter("withheld")
+        .select(pl.col("cik").cast(pl.Int64), q=pl.col("period").cast(pl.Int16))
+        .sort("cik", "q")
+    )
+
+
 MAX_BRIDGED = 2  # unreadable filings in a row carried over before a fund's history is cut
 
 
@@ -170,7 +212,8 @@ def fill_gaps(
     `unreadable` (cik, q) lists fund-quarters the fund did file but whose table could not be read
     (pre-2013 text filings, `sec.legacy`). Between two readable quarters, up to MAX_BRIDGED of
     them in a row are carried like a single gap (copied from the last readable quarter) instead
-    of ending the segment: the fund kept filing, so its history goes on.
+    of ending the segment: the fund kept filing, so its history goes on. The run passes its tables
+    withheld in full (`withheld_quarters`) the same way, and leaves them out of `filed_quarters`.
 
     fund_status has one row per cik: first_q, last_filed_q, inactive (last_filed_q < last_q - 1,
     i.e. nothing filed in the latest two quarters) and segments, the (start, end) of each run of

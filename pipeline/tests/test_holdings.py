@@ -4,7 +4,7 @@ from datetime import date
 import polars as pl
 import pytest
 
-from orca.holdings import build_holdings, fill_gaps, select_reports
+from orca.holdings import blank_tables, build_holdings, fill_gaps, select_reports, withheld_quarters
 from orca.sec.bulk import parse_bulk_zip
 from orca.sec.live import FILINGS_SCHEMA, parse_infotable_xml
 
@@ -623,3 +623,62 @@ def test_unreadable_filings_are_carried_two_at_most():
     before = pl.DataFrame({"cik": [CIK], "q": [9]}, schema={"cik": pl.Int64, "q": pl.Int16})
     filled, status = fill_gaps(holdings, last_q=14, unreadable=before)
     assert 9 not in filled["q"].to_list()
+
+
+# --- withheld tables: a whole table under confidential treatment -------------------------
+
+
+def test_a_table_of_blank_placeholders_names_no_holding():
+    # Norges Bank's Q1 and Q3 reports: one row "NA", CUSIP 000000000, 0 shares, $0.
+    a, b, c = "0001374170-26-000023", "0001374170-26-000069", "0001374170-26-000090"
+    raws = raw_frame(
+        raw(a, "000000000", 0, value_usd=0),
+        raw(b, "000000000", 0, value_usd=0),  # a stray placeholder next to real rows
+        raw(b, "AAA", 100),
+        raw(c, "AAA", 0),  # real CUSIP, no shares: an empty report, not a placeholder
+    ).with_columns(source=pl.lit("live"))
+
+    assert blank_tables(raws).rows() == [(a, "live")]
+
+
+def test_a_quarter_is_withheld_when_every_chosen_report_is_blank():
+    a, b, c = "0001374170-26-000023", "0001374170-26-000088", "0001374170-25-000012"
+    filings = filings_frame(
+        filing(a, date(2026, 5, 11), q=52),  # whole table confidential
+        filing(c, date(2025, 5, 12), q=48),  # the same a year earlier ...
+        filing(b, date(2026, 5, 11), form="13F-HR/A", amendment_type="new_holdings", q=48),  # ... released
+    )
+    raws = raw_frame(raw(a, "000000000", 0, value_usd=0), raw(c, "000000000", 0, value_usd=0), raw(b, "AAA", 100))
+    blank = blank_tables(raws.with_columns(source=pl.lit("bulk")))
+
+    withheld = withheld_quarters(select_reports(filings), blank)
+
+    assert withheld.rows() == [(CIK, 52)]  # q48's release fills it in
+    assert withheld.schema == pl.Schema({"cik": pl.Int64, "q": pl.Int16})
+
+
+def test_a_withheld_quarter_is_carried_not_sold():
+    a, b, c = (f"0001374170-26-00002{i}" for i in range(3))
+    filings = filings_frame(
+        filing(a, date(2026, 2, 10), q=51),
+        filing(b, date(2026, 5, 11), q=52),  # withheld
+        filing(c, date(2026, 8, 12), q=53),
+    )
+    raws = raw_frame(raw(a, "AAA", 100), raw(b, "000000000", 0, value_usd=0), raw(c, "AAA", 120))
+    reports = select_reports(filings)
+    withheld = withheld_quarters(reports, blank_tables(raws.with_columns(source=pl.lit("bulk"))))
+    filed = reports.select("cik", q="period").join(withheld, on=["cik", "q"], how="anti")
+
+    filled, status = fill_gaps(build_holdings(filings, raws), 53, filed, unreadable=withheld)
+
+    by_q = {q: (shares, carried) for q, shares, carried in filled.select("q", "shares", "carried").rows()}
+    assert by_q == {51: (100.0, False), 52: (100.0, True), 53: (120.0, False)}
+    assert segments_of(status) == [(51, 53)]
+
+    # The latest quarter withheld (q53 not filed yet): the last one read is carried to it, and the fund
+    # stays active.
+    filings, filed = filings.filter(pl.col("period") <= 52), filed.filter(pl.col("q") <= 52)
+    filled, status = fill_gaps(build_holdings(filings, raws), 52, filed, unreadable=withheld)
+    assert filled.filter(pl.col("q") == 52)["shares"].to_list() == [100.0]
+    row = status.row(0, named=True)
+    assert (row["last_filed_q"], row["inactive"]) == (51, False)

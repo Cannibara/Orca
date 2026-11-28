@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 import polars as pl
 
-from orca.holdings import MAX_SHARES, build_holdings, select_reports
+from orca.holdings import BLANK_ROW, MAX_SHARES, blank_tables, build_holdings, select_reports
 from orca.http import FetchError
 from orca.run.budget import Budget
 from orca.run.sources import Sources
@@ -75,6 +75,45 @@ def purge_misread_holdings(lake: Lake, state: State) -> dict:
     state.save(lake)
     log.warning("removed %d misread holdings rows (over %.0e shares) of %d funds", rows, MAX_SHARES, len(funds))
     return {"rows": rows, "funds": sorted(funds)}
+
+
+BLANK_SCHEMA = pl.Schema({"accession": pl.String, "source": pl.String})
+
+
+def blank_tables_in_lake(lake: Lake) -> pl.DataFrame:
+    """`holdings.blank_tables` of every stored table (tables withheld in full), a part at a time: only the
+    few tables with a placeholder row are read beyond the columns that find them."""
+    frames = []
+    for path in part_paths(lake, "raw_holdings"):
+        scan = pl.scan_parquet(path)
+        keys = scan.filter(BLANK_ROW).select("accession").unique().collect()["accession"].to_list()
+        if keys:
+            rows = scan.filter(pl.col("accession").is_in(keys)).select("accession", "source", "cusip", "shares")
+            frames.append(blank_tables(rows.collect()))
+    return pl.concat(frames).cast(BLANK_SCHEMA) if frames else pl.DataFrame(schema=BLANK_SCHEMA)
+
+
+def owe_withheld(lake: Lake, state: State, blank: pl.DataFrame) -> set[int]:
+    """The funds of blank tables (`blank`, from `blank_tables_in_lake`) no earlier run has seen are owed a
+    recompute (`state.pending_funds`). A new table is a new filing and owed anyway; this is for those read
+    before `holdings.withheld_quarters` existed, which were taken as sales of the whole book (Norges Bank).
+    Returns those funds."""
+    keys = set(blank["accession"].to_list())
+    new = keys - state.blank_seen
+    funds: set[int] = set()
+    if new:
+        accessions = sorted(new)
+        for frame in scan_parts(
+            lake, "filings", lambda f: f.filter(pl.col("accession").is_in(accessions)).select("cik")
+        ):
+            funds |= {int(c) for c in frame["cik"].to_list()}
+    if keys != state.blank_seen:
+        state.pending_funds |= funds
+        state.blank_seen = keys
+        state.save(lake)
+    if funds:
+        log.info("%d tables withheld in full, first seen: %d funds owed a recompute", len(new), len(funds))
+    return funds
 
 
 @dataclass

@@ -58,7 +58,8 @@ website builds its TypeScript types from it. Change this file first, then the wr
 ### `fund/{id}/summary.json`
 
 - `id` is the fund id (also the `{id}` of the path). `cik` is the SEC CIK (integer). `period_q` is the latest
-  quarter the fund filed and `filed` the date of that filing. `book` is the priced long book in dollars,
+  quarter the fund filed and `filed` the date of that filing; a report whose whole table is withheld under
+  confidential treatment (one placeholder row) does not count until its holdings are released. `book` is the priced long book in dollars,
   `n_holdings` the number of positions held now (the length of `holdings_now`), `priced_pct` the share of the reported book that is priced
   (0 to 1). `tracked_since_q` is the first quarter of the fund's current tracking segment. `inactive` is true
   when the fund filed nothing in the latest two quarters.

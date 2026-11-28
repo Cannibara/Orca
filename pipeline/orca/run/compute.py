@@ -31,7 +31,7 @@ from orca.engine.metrics import (
 )
 from orca.engine.position import PositionResult, compute_position
 from orca.engine.whatif import beat_spy_pct, buys_vs_sells, exit_rows
-from orca.holdings import fill_gaps
+from orca.holdings import fill_gaps, withheld_quarters
 from orca.home import ConvictionQuarter, FundSnapshot
 from orca.prices import (
     HISTORY_START,
@@ -42,7 +42,7 @@ from orca.prices import (
 from orca.publish import ExitsSummary, FundMeta, FundOutput, build_metrics
 from orca.quarter_px import QuarterPx, quarter_px
 from orca.quarters import q_end
-from orca.run.ingest import LEGACY_CHECKS
+from orca.run.ingest import LEGACY_CHECKS, blank_tables_in_lake
 from orca.run.market import BENCHMARK_CUSIP, load_daily, rf_table, stock_of
 from orca.run.state import CUSIP_MAP_SCHEMA, chunks, read_table
 from orca.sec.about import SCHEMA as ABOUT_SCHEMA
@@ -169,6 +169,8 @@ class Context:
     # Fund-quarters filed before 2013 whose table could not be read (lake table legacy_checks);
     # read on first use.
     unreadable: pl.DataFrame | None = None
+    # (accession, source) of the stored tables withheld in full (`holdings.blank_tables`); read on first use.
+    blank: pl.DataFrame | None = None
     # Lake table fund_about by CIK (the About tab's SEC facts); read on first use.
     about: dict[int, dict] | None = None
 
@@ -405,11 +407,15 @@ def prepare_batch(
     ctx: Context, holdings: pl.DataFrame, reports: pl.DataFrame
 ) -> Iterator[tuple[Prepared, FundResult]]:
     """`compute_batch`, also yielding each fund's inputs."""
-    filed_quarters = reports.select("cik", q="period").unique()
     if ctx.unreadable is None:
         ctx.unreadable = unreadable_quarters(ctx.lake)
+    if ctx.blank is None:
+        ctx.blank = blank_tables_in_lake(ctx.lake)
+    # A quarter whose table was withheld in full is no sale of the book: carried like an unreadable one.
+    withheld = withheld_quarters(reports, ctx.blank)
+    filed_quarters = reports.select("cik", q="period").unique().join(withheld, on=["cik", "q"], how="anti")
     ciks = reports["cik"].unique().to_list()
-    unreadable = ctx.unreadable.filter(pl.col("cik").is_in(ciks))
+    unreadable = pl.concat([ctx.unreadable.filter(pl.col("cik").is_in(ciks)), withheld]).unique()
     filled, status = fill_gaps(holdings, ctx.last_q, filed_quarters, unreadable)
     ctx.load(_stock_ids(ctx, filled).to_list() + ([ctx.spy_id] if ctx.spy_id is not None else []))
     rows_of = filled.partition_by("cik", as_dict=True) if filled.height else {}
