@@ -9,10 +9,10 @@ const near = (a: number, b: number) => expect(a).toBeCloseTo(b, 9);
 
 function tier(over: Partial<SkillTier> = {}): SkillTier {
   return {
-    irr_fund: 0.1, irr_label: 0.08, irr_mkt: 0.07, irr_spy: 0.075, picking: 0.02, allocation: 0.01, coverage: 1, n: 25,
-    quarters: { label: [], v_label: [], v_never: null }, years: { label: [] },
-    picks: { stock_id: [], label: [], bought: [], irr_own: [], irr_label: [] },
-    bets: { label: [], bought: [], irr: [], irr_mkt: [], mkt_share: [] },
+    ret_fund: 0.1, ret_label: 0.08, ret_mkt: 0.07, ret_spy: 0.075, picking: 0.02, allocation: 0.01, coverage: 1, n: 25,
+    quarters: { label: [] }, years: { label: [] },
+    picks: { stock_id: [], label: [], bought: [], ret_own: [], ret_label: [], adds: [] },
+    bets: { label: [], bought: [], ret: [], ret_mkt: [], adds: [], mkt_share: [] },
     ...over,
   };
 }
@@ -20,10 +20,10 @@ function tier(over: Partial<SkillTier> = {}): SkillTier {
 function skillOf(n: number, r: { f: number; l: number; m: number }): Skill {
   const q = Array.from({ length: n }, (_, i) => 4 + i); // from Q1 2014
   const arr = (v: number) => q.map(() => v);
-  const t = tier({ quarters: { label: arr(r.l), v_label: arr(100), v_never: null }, years: { label: [r.l] } });
+  const t = tier({ quarters: { label: arr(r.l) }, years: { label: [r.l] } });
   return {
     last_q: q[n - 1], first_q: 4,
-    quarters: { q, bought: arr(0), fund: arr(r.f), mkt: arr(r.m), spy: arr(r.m), v_fund: arr(100), v_mkt: arr(100), v_spy: arr(100) },
+    quarters: { q, bought: arr(0), cap: arr(100), fund: arr(r.f), mkt: arr(r.m), spy: arr(r.m) },
     years: { name: ["2014"], fund: [r.f], mkt: [r.m], spy: [null] },
     tiers: { "1": t, "2": t, "3": t },
     mix: { q: [], label: [], share: [] },
@@ -87,9 +87,11 @@ describe("years and the map", () => {
     const s = skillOf(14, { f: 0.03, l: 0.02, m: 0.01 }); // Q1 2014 .. Q2 2017
     const p = rollingPath(s, 1);
     expect(p.map((x) => x.q)).toEqual([15, 17]); // Q4 2016 and the latest, Q2 2017
-    const ann = (r: number) => Math.pow(1 + r, 4) - 1;
-    near(p[0].pick, ann(0.03) - ann(0.02));
-    near(p[0].alloc, ann(0.02) - ann(0.01));
+    // the same $100 every quarter: 1 pt a quarter better than its label is 4 pts a year, nothing compounded
+    near(p[0].pick, 0.04);
+    near(p[0].alloc, 0.04);
+    s.quarters.cap[10] = 0; // a quarter with nothing at work: the windows over it are skipped
+    expect(rollingPath(s, 1)).toEqual([]);
   });
   it("needs 3 years, 20 picks and 80% coverage", () => {
     expect(isEligible({ span_q: 12, n: 20, coverage: 0.8 })).toBe(true);
@@ -152,8 +154,11 @@ describe("mix", () => {
 
 describe("decisions", () => {
   const t = tier({
-    picks: { stock_id: [7, 8, null], label: ["Tech > Chips", "Energy > Oil", null], bought: [60, 30, 10], irr_own: [0.2, 0.05, 0.1], irr_label: [0.1, 0.1, 0.1] },
-    bets: { label: ["Tech", "Energy", "Utilities"], bought: [60, 40, 0], irr: [0.15, 0.05, null], irr_mkt: [0.1, 0.1, null], mkt_share: [0.3, 0.05, 0.03] },
+    picks: {
+      stock_id: [7, 8, null], label: ["Tech > Chips", "Energy > Oil", null], bought: [60, 30, 10],
+      ret_own: [0.2, 0.05, 0.1], ret_label: [0.1, 0.1, 0.1], adds: [0.07, -0.012, 0.001],
+    },
+    bets: { label: ["Tech", "Energy", "Utilities"], bought: [60, 40, 0], ret: [0.15, 0.05, null], ret_mkt: [0.1, 0.1, null], adds: [0.028, -0.02, null], mkt_share: [0.3, 0.05, 0.03] },
   });
   const stocks = new Map([
     [7, { ticker: "NVDA", name: "Nvidia" }],
@@ -162,17 +167,20 @@ describe("decisions", () => {
   it("ranks stocks by what they added, the rest last", () => {
     const d = stockRows(t, stocks);
     expect(d.rows.map((r) => r.lab)).toEqual(["NVDA", "XOM", "All other picks"]);
-    near(d.rows[0].adds!, 0.6 * 0.1);
-    near(d.rows[1].adds!, 0.3 * -0.05);
+    // adds come from the file (the dollars it beat its label by ÷ the fund's dollar-years): they sum to the score
+    near(d.rows[0].adds!, 0.07);
+    near(d.rows[1].adds!, -0.012);
+    near(d.rows[0].beat!, 0.1);
     expect(d.rows[0].sub).toBe("Nvidia · Chips");
-    near(d.adds, 0.06 - 0.015);
+    near(d.adds, 0.07 - 0.012 + 0.001);
     expect(d.bought).toBe(100);
   });
   it("lists every sector at tier 1, unbought ones last and faded", () => {
     const d = betRows(t, 1);
     expect(d.rows.map((r) => [r.lab, r.skipped])).toEqual([["Tech", false], ["Energy", false], ["Utilities", true]]);
-    near(d.rows[0].adds!, 0.6 * 0.05);
+    near(d.rows[0].adds!, 0.028);
     expect(d.rows[2].adds).toBe(0);
+    near(d.adds, 0.008);
     expect(d.rows[0].sub).toBe("market holds 30%");
     expect(betRows(t, 2).rows).toHaveLength(2);
   });
@@ -199,15 +207,22 @@ describe("stacked layout", () => {
     expect(L.hits[1].label).toBe("2015: whole market −20.0%, industry choice +5.0 pts, stock choice −1.0 pts, fund −16.0%");
     for (const l of L.labels) expect(l.y).toBeLessThan(L.H - 34);
   });
-  it("draws every line at once with its end value apart from the others", () => {
+  it("draws the dollars made so far each way, every line at once with its end value apart from the others", () => {
     const s = skillOf(9, { f: 0.03, l: 0.02, m: 0.01 });
-    s.quarters.v_fund = s.quarters.v_fund.map((_, i) => 100 + i);
-    s.quarters.v_spy = s.quarters.v_spy.map(() => null);
+    s.quarters.spy = s.quarters.spy.map(() => null);
     const L = linesLayout(s, 2, 880, w);
     expect(L.lines.map((l) => l.name)).toEqual(["Their stocks", "Their industries", "Whole market", "S&P 500"]);
-    expect(L.lines[3].d).toBe("");
+    near(L.values.fund[8]!, 9 * 100 * 0.03); // $100 at work nine quarters, 3% a quarter: $27
+    near(L.values.label[8]!, 9 * 100 * 0.02);
+    expect(L.values.spy.every((v) => v === 0)).toBe(true);
     const ys = L.ends.map((e) => e.y);
     for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(15);
     expect(roundMoney(2_438_100_000)).toBe(2_400_000_000);
+  });
+  it("goes below $0 when their money lost", () => {
+    const L = linesLayout(skillOf(4, { f: -0.1, l: 0.02, m: 0.01 }), 2, 880, w);
+    near(L.values.fund[3]!, -40);
+    expect(L.ticks[0].v).toBeLessThanOrEqual(-40);
+    expect(L.ticks.some((t) => t.v === 0)).toBe(true);
   });
 });

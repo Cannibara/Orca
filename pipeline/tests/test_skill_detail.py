@@ -1,4 +1,4 @@
-"""The fund-page detail of the replays (`orca/engine/skill_detail.py`), checked by hand."""
+"""The fund-page detail of the opportunity-cost attribution (`orca/engine/skill_detail.py`), checked by hand."""
 
 import polars as pl
 import pytest
@@ -17,52 +17,14 @@ def trades(rows):
     return pl.DataFrame([dict(zip(cols, r)) for r in rows], schema=skill.TRADES_SCHEMA)
 
 
-def series(rows):
-    """rows: (key, q, level_avg, level_end)."""
-    cols = ["key", "q", "level_avg", "level_end"]
-    return pl.DataFrame([dict(zip(cols, r)) for r in rows], schema=skill.SERIES_SCHEMA)
-
-
-def replayed(t, s, last_q):
-    t = t.with_columns(key=pl.lit("X"), tier=pl.lit(1, pl.Int8), variant=pl.lit("fund"))
-    _, _, units = skill.replay(t, s, last_q, by=("tier", "variant"), units=True)
-    v = sd.quarter_values(units, s, last_q)
-    first = pl.DataFrame({"cik": [1], "first_q": [t["q"].min()]}, schema={"cik": pl.Int64, "first_q": pl.Int32})
-    return {r["q"]: r for r in sd.quarter_returns(v, first, last_q).iter_rows(named=True)}
-
-
-def test_a_held_position_is_worth_its_units_at_each_quarter_end_and_earns_the_series_return():
-    s = series([("X", 10, 1.0, 1.1), ("X", 11, 1.2, 1.3), ("X", 12, 1.3, 1.2), ("X", 13, 1.4, 1.5)])
-    q = replayed(trades([(1, 7, 10, 10.0, 10.0, 10.0)]), s, last_q=13)  # $100 buys 100 units at 1.0
-    assert [round(q[i]["v"], 9) for i in (10, 11, 12, 13)] == [110.0, 130.0, 120.0, 150.0]
-    assert q[10]["r"] == pytest.approx(0.1)  # from the buy at 1.0 to the end at 1.1
-    assert q[11]["r"] == pytest.approx(1.3 / 1.1 - 1) and q[13]["r"] == pytest.approx(1.5 / 1.2 - 1)
-
-
-def test_money_in_or_out_never_moves_the_return_even_a_sell_out():
-    s = series([("X", 10, 1.0, 1.0), ("X", 11, 1.2, 1.5), ("X", 12, 2.0, 2.0), ("X", 13, 3.0, 3.0)])
-    t = trades([(1, 7, 10, 10.0, 10.0, 10.0), (1, 7, 11, 30.0, 10.0, 40.0), (1, 7, 12, -40.0, 10.0, 0.0)])
-    q = replayed(t, s, last_q=13)
-    assert q[11]["r"] == pytest.approx(0.5)  # the series' own quarter: 1.0 -> 1.5, whatever was added at 1.2
-    assert q[12]["r"] == pytest.approx(2.0 / 1.5 - 1)  # all sold at 2.0: the quarter up to the sale
-    assert q[13]["r"] is None and q[13]["v"] == 0.0
-
-
-def test_a_stock_without_a_price_keeps_its_last_level():
-    s = series([("X", 10, 1.0, 1.0), ("X", 11, 1.0, 2.0)])  # no row after q11 (halted)
-    q = replayed(trades([(1, 7, 10, 10.0, 10.0, 10.0)]), s, last_q=13)
-    assert q[13]["v"] == pytest.approx(200.0) and q[13]["r"] == pytest.approx(0.0)
-
-
-def test_years_chain_the_quarters_and_take_the_summary_labels():
-    rows = [{"cik": 1, "tier": 1, "variant": "fund", "q": q, "v": 1.0, "r": r} for q, r in ((5, 0.1), (6, 0.1), (7, None), (8, 0.5))]
-    y = sd.year_returns(pl.DataFrame(rows)).rows(named=True)
-    assert [(r["name"], r["ret"]) for r in y] == [("2014 Q2–Q4", pytest.approx(0.21)), ("2015 Q1", pytest.approx(0.5))]
-
-
 def label_rows(label, tier, levels, cap=1.0):
     return [{"label": label, "tier": tier, "q": q, "ret": 0.0, "level_avg": la, "level_end": le, "n": 1, "cap": cap, "top_weight": 1.0}
             for q, (la, le) in levels.items()]  # fmt: skip
+
+
+def every_tier(levels, cap=1.0):
+    """The same index for A at every tier."""
+    return label_rows(A, 3, levels, cap) + label_rows("Tech > Chips", 2, levels, cap) + label_rows("Tech", 1, levels, cap)
 
 
 def sq_of(rows):
@@ -76,64 +38,82 @@ def detail(t, sq, rows, paths, etfs=None, last_q=12):
     return sd.fund_detail(t, sector, paths, etfs or {}, set(), None, last_q, ser)
 
 
-def test_two_labels_split_exactly_into_market_label_and_stock_choice_every_year():
+FLAT = {q: (1.0, 1.0) for q in (10, 11, 12)}
+
+
+def test_a_quarter_is_what_the_money_made_over_the_money_at_work_even_with_a_buy_in_the_middle():
+    sq = sq_of([(7, 10, 10.0, 10.0), (7, 11, 11.0, 10.0), (7, 12, 12.1, 11.0)])  # levels: q11 avg 1.0, end 1.1
+    rows = every_tier(FLAT) + label_rows(MARKET, 0, FLAT)
+    t = trades([(1, 7, 10, 10.0, 10.0, 10.0), (1, 7, 11, 10.0, 10.0, 20.0)])  # $100, then $100 more mid q11
+    q = {r["q"]: r for r in detail(t, sq, rows, {7: A}).quarters.iter_rows(named=True)}
+    # q11: $100 to the average level (it made nothing), then $200 to the end (+10%: $20); $150 at work on average
+    assert q[11]["cap"] == pytest.approx(150.0) and q[11]["fund"] == pytest.approx(20 / 150)
+    assert q[11]["mkt"] == 0.0 and q[11]["l3"] == 0.0 and q[11]["spy"] == 0.0  # no SPY: the market stands in
+    assert q[10]["cap"] == pytest.approx(50.0) and q[10]["fund"] == 0.0  # bought mid q10 at 1.0, still 1.0 at its end
+
+
+def test_years_split_exactly_into_market_label_and_stock_choice_and_average_to_the_scores():
     sq = sq_of([(7, 10, 10.0, 10.0), (7, 11, 12.0, 11.0), (7, 12, 15.0, 14.0), (8, 10, 10.0, 10.0), (8, 11, 9.0, 9.5), (8, 12, 10.0, 9.0)])
-    rows = label_rows(A, 3, {11: (1.05, 1.1), 12: (1.2, 1.3)}) + label_rows("Tech > Chips", 2, {11: (1.05, 1.1), 12: (1.2, 1.3)})
-    rows += label_rows("Tech", 1, {11: (1.05, 1.1), 12: (1.2, 1.3)}) + label_rows(B, 3, {11: (1.0, 0.9), 12: (0.9, 1.0)})
-    rows += label_rows("Energy > Oil", 2, {11: (1.0, 0.9), 12: (0.9, 1.0)}) + label_rows("Energy", 1, {11: (1.0, 0.9), 12: (0.9, 1.0)})
-    rows += label_rows(MARKET, 0, {11: (1.0, 1.0), 12: (1.05, 1.1)}, cap=4.0)
+    up, down = {10: (1.0, 1.0), 11: (1.05, 1.1), 12: (1.2, 1.3)}, {10: (1.0, 1.0), 11: (1.0, 0.9), 12: (0.9, 1.0)}
+    rows = every_tier(up) + label_rows(B, 3, down) + label_rows("Energy > Oil", 2, down) + label_rows("Energy", 1, down)
+    rows += label_rows(MARKET, 0, {10: (1.0, 1.0), 11: (1.0, 1.0), 12: (1.05, 1.1)}, cap=4.0)
     t = trades([(1, 7, 11, 10.0, 11.0, 10.0), (1, 8, 11, 10.0, 9.5, 10.0), (1, 8, 12, 5.0, 9.0, 15.0)])
     d = detail(t, sq, rows, {7: A, 8: B})
-    y = {(r["tier"], r["variant"]): r["ret"] for r in d.years.iter_rows(named=True)}
-    for tier in (1, 2, 3):
-        mkt, label, fund = y[(1, "mkt")], y[(tier, "label")], y[(1, "fund")]
-        assert mkt + (label - mkt) + (fund - label) == pytest.approx(fund, abs=1e-15)
-    # the fund replays each stock in its own series: its quarters are the stocks' own value-weighted moves
-    q = {(r["variant"], r["q"]): r for r in d.quarters.filter(pl.col("tier") == 1).iter_rows(named=True)}
-    v11 = 110 / 11 * 12 + 95 / 9.5 * 9
-    assert q[("fund", 11)]["v"] == pytest.approx(v11)
+    years = d.years.rows(named=True)
+    assert [y["name"] for y in years] == ["2015 Q4", "2016 Q1"]
+    for y in years:
+        for tier in (1, 2, 3):
+            mkt, label, fund = y["mkt"], y[f"l{tier}"], y["fund"]
+            assert mkt + (label - mkt) + (fund - label) == pytest.approx(fund, abs=1e-15)
+    # each year's gap × its money at work, summed, is the score × the dollar-years: the years averaged by money
+    cap = {r["q"]: r["cap"] for r in d.quarters.iter_rows(named=True)}
+    sc = d.scores.filter(pl.col("tier") == 3).row(0, named=True)
+    dollar_years = (cap[11] + cap[12]) / 4
+    assert sum((y["fund"] - y["l3"]) * c for y, c in zip(years, (cap[11], cap[12]))) == pytest.approx(sc["picking"] * dollar_years)
+    assert sum((y["l3"] - y["mkt"]) * c for y, c in zip(years, (cap[11], cap[12]))) == pytest.approx(sc["allocation"] * dollar_years)
     assert d.first_q.rows() == [(1, 11)]
     assert {r["q"]: r["bought"] for r in d.bought.iter_rows(named=True)} == {11: pytest.approx(205.0), 12: pytest.approx(45.0)}
 
 
-def test_a_pick_that_is_its_labels_whole_index_scores_zero_and_the_rest_is_one_row():
+def test_a_pick_that_is_its_labels_whole_index_scores_zero_and_adds_nothing():
     sq = sq_of([(7, 10, 10.0, 10.0), (7, 11, 12.0, 11.0), (7, 12, 15.0, 14.0)])
-    own = {r["q"]: (r["level_avg"], r["level_end"]) for r in skill.own_series(sq).iter_rows(named=True) if r["q"] > 10}
-    rows = label_rows(A, 3, own) + label_rows("Tech > Chips", 2, own) + label_rows("Tech", 1, own) + label_rows(MARKET, 0, {11: (1.0, 1.0), 12: (1.0, 1.0)})
-    d = detail(trades([(1, 7, 11, 10.0, 11.0, 10.0)]), sq, rows, {7: A})
+    own = {r["q"]: (r["level_avg"], r["level_end"]) for r in skill.own_series(sq).iter_rows(named=True)}
+    d = detail(trades([(1, 7, 11, 10.0, 11.0, 10.0)]), sq, every_tier(own) + label_rows(MARKET, 0, FLAT), {7: A})
     p = d.picks.filter(pl.col("tier") == 3).row(0, named=True)
     assert (p["stock_id"], p["label"], p["bought"]) == (7, A, pytest.approx(110.0))
-    assert p["irr_own"] == pytest.approx(p["irr_label"], abs=1e-12)
+    assert p["ret_own"] == pytest.approx(p["ret_label"], abs=1e-12) and p["adds"] == pytest.approx(0.0, abs=1e-12)
 
 
-def test_only_the_30_biggest_picks_are_listed_one_by_one():
+def test_the_decisions_add_up_to_the_scores_and_only_the_30_biggest_picks_are_listed_one_by_one():
     n = 33
-    sq = sq_of([(s, q, 10.0, 10.0) for s in range(1, n + 1) for q in (10, 11, 12)])
-    rows = label_rows(A, 3, {11: (1.0, 1.0), 12: (1.0, 1.0)}) + label_rows("Tech > Chips", 2, {11: (1.0, 1.0), 12: (1.0, 1.0)})
-    rows += label_rows("Tech", 1, {11: (1.0, 1.0), 12: (1.0, 1.0)}) + label_rows(MARKET, 0, {11: (1.0, 1.0), 12: (1.0, 1.0)})
+    sq = sq_of([(s, q, 10.0 + s * (q - 10) / 10, 10.0) for s in range(1, n + 1) for q in (10, 11, 12)])
+    rows = every_tier({10: (1.0, 1.0), 11: (1.01, 1.02), 12: (1.03, 1.04)}) + label_rows(MARKET, 0, FLAT)
     t = trades([(1, s, 11, float(s), 10.0, float(s)) for s in range(1, n + 1)])
-    p = detail(t, sq, rows, {s: A for s in range(1, n + 1)}).picks.filter(pl.col("tier") == 1)
+    d = detail(t, sq, rows, {s: A for s in range(1, n + 1)})
+    p = d.picks.filter(pl.col("tier") == 1)
     assert p.height == sd.PICKS + 1 and p["stock_id"].to_list()[:2] == [33, 32]
     rest = p.row(-1, named=True)
     assert rest["stock_id"] == sd.OTHERS and rest["label"] is None and rest["bought"] == pytest.approx(10.0 * (1 + 2 + 3))
+    sc = d.scores.filter(pl.col("tier") == 1).row(0, named=True)
+    assert p["adds"].sum() == pytest.approx(sc["picking"]) and sc["picking"] > 0
+    assert d.bets.filter(pl.col("tier") == 1)["adds"].drop_nulls().sum() == pytest.approx(sc["allocation"])
 
 
-def test_a_bet_is_its_labels_index_against_the_market_with_the_market_share_when_bought():
+def test_a_bet_is_its_labels_index_against_the_market_on_its_own_money_with_the_market_share_when_bought():
     sq = sq_of([(7, 10, 10.0, 10.0), (7, 11, 12.0, 11.0), (7, 12, 15.0, 14.0)])
-    lv = {11: (1.0, 1.2), 12: (1.2, 1.44)}
-    rows = label_rows(A, 3, lv, cap=1.0) + label_rows("Tech > Chips", 2, lv, cap=1.0) + label_rows("Tech", 1, lv, cap=1.0)
-    rows += label_rows("Energy", 1, {11: (1.0, 1.0), 12: (1.0, 1.0)}, cap=3.0)
-    rows += label_rows(MARKET, 0, {11: (1.0, 1.1), 12: (1.1, 1.21)}, cap=4.0)
+    rows = every_tier({10: (1.0, 1.0), 11: (1.0, 1.2), 12: (1.2, 1.44)}) + label_rows("Energy", 1, FLAT, cap=3.0)
+    rows += label_rows(MARKET, 0, {10: (1.0, 1.0), 11: (1.0, 1.1), 12: (1.1, 1.21)}, cap=4.0)
     d = detail(trades([(1, 7, 11, 10.0, 11.0, 10.0)]), sq, rows, {7: A})
     b = {(r["tier"], r["label"]): r for r in d.bets.iter_rows(named=True)}
     tech = b[(1, "Tech")]
     assert tech["mkt_share"] == pytest.approx(0.25) and tech["bought"] == pytest.approx(110.0)
-    flows = pl.DataFrame({"g": [1, 1], "t": [skill.trade_years(11), skill.end_years(12)], "cf": [-110.0, 110 * 1.44 / 1.0]})
-    assert tech["irr"] == pytest.approx(skill.irr_by(flows, ["g"])["irr"][0])
-    flows = flows.with_columns(cf=pl.Series([-110.0, 110 * 1.21 / 1.0]))
-    assert tech["irr_mkt"] == pytest.approx(skill.irr_by(flows, ["g"])["irr"][0])
+    # the fund's money in the stock: $110 at the q11 average, $120 (110 × 12/11) by its end, $168 at the q12 average
+    money = [(110.0, 0.2, 0.1), (120.0, 0.0, 0.0), (120 * 14 / 12, 0.2, 0.1)]  # (dollars, Tech's half, the market's)
+    dollar_years = sum(m for m, _, _ in money) / 8
+    assert tech["ret"] == pytest.approx(sum(m * r for m, r, _ in money) / dollar_years)
+    assert tech["ret_mkt"] == pytest.approx(sum(m * r for m, _, r in money) / dollar_years)
     energy = b[(1, "Energy")]  # never bought: listed, with the market's share when the fund was buying
-    assert energy["bought"] == 0.0 and energy["irr"] is None and energy["mkt_share"] == pytest.approx(0.75)
+    assert energy["bought"] == 0.0 and energy["ret"] is None and energy["adds"] is None and energy["mkt_share"] == pytest.approx(0.75)
     assert (2, "Energy") not in b and b[(3, A)]["mkt_share"] == pytest.approx(0.25)
 
 

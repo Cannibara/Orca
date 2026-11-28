@@ -1,8 +1,9 @@
 // Pure model of "Which decisions made the gap" (spec §5.4): each big pick against its own label's index, and
 // each label they bought against the whole market, with the share of their money and what it added.
 //
-// Adds ≈ share of their money × beat by: roughly how many points a year one decision added to the whole fund
-// (≈ because money went in at different times, so the sum is close to, not exactly, the panel's total score).
+// Every figure is on the fund's own money (contract.md, Sector files): a pick's return a year is what its money
+// made ÷ the dollar-years it was held, against the same money in its label's index. Adds is the dollars that
+// decision gained over the benchmark ÷ the whole fund's dollar-years, so the rows sum exactly to the score.
 
 import type { SkillTier } from "../data/types";
 import type { Stock } from "../data/api";
@@ -25,7 +26,7 @@ export type DecRow = {
   choice: number | null;
   /** choice − bench (fractions a year); null when either is missing. */
   beat: number | null;
-  /** share × beat. */
+  /** Points a year this decision added to the whole fund (the rows sum to the score). */
   adds: number | null;
   /** A sector they never bought (bets view, tier 1): faded, Adds 0. */
   skipped: boolean;
@@ -50,8 +51,8 @@ export function stockRows(t: SkillTier, stocks: Map<number, Stock>): Decisions {
   const rows: DecRow[] = P.bought.map((bought, i) => {
     const id = P.stock_id[i];
     const s = id == null ? undefined : stocks.get(id);
-    const bench = P.irr_label[i];
-    const choice = P.irr_own[i];
+    const bench = P.ret_label[i];
+    const choice = P.ret_own[i];
     const beat = bench == null || choice == null ? null : choice - bench;
     const share = bought / total;
     const rest = id == null;
@@ -65,7 +66,7 @@ export function stockRows(t: SkillTier, stocks: Map<number, Stock>): Decisions {
       bench,
       choice,
       beat,
-      adds: beat == null ? null : share * beat,
+      adds: P.adds[i] ?? null,
       skipped: false,
       rest,
       label: P.label[i],
@@ -84,8 +85,8 @@ export function betRows(t: SkillTier, tier: Tier): Decisions {
     const bought = B.bought[i];
     const skipped = bought <= 0;
     if (skipped && tier !== 1) return;
-    const bench = B.irr_mkt[i];
-    const choice = B.irr[i];
+    const bench = B.ret_mkt[i];
+    const choice = B.ret[i];
     const beat = bench == null || choice == null ? null : choice - bench;
     const share = bought / total;
     const ms = B.mkt_share[i];
@@ -99,7 +100,7 @@ export function betRows(t: SkillTier, tier: Tier): Decisions {
       bench: skipped ? null : bench,
       choice: skipped ? null : choice,
       beat: skipped ? null : beat,
-      adds: skipped ? 0 : beat == null ? null : share * beat,
+      adds: skipped ? 0 : (B.adds[i] ?? null),
       skipped,
       rest: false,
       label,

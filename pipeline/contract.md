@@ -38,7 +38,7 @@ website builds its TypeScript types from it. Change this file first, then the wr
 - `home/top_{1y|3y|5y|10y|15y|max}.json`, `home/conviction_q.json`, `home/conviction_y.json`, `home/wins_losses.json`, `home/just_filed.json`, `home/crowded.json`, `home/calls_q.json`, `home/calls_y.json`: row lists described under Home.
 - `sectors/labels.json`: `{"last_q", "label": [], "tier": [], "parent": [], "name": [], "n": [], "top_weight": []}`
 - `sectors/scores.json`: `{"last_q", "fund_id": [], "tier": [], "picking": [], "allocation": [], "n": [], "coverage": [], "span_q": []}`
-- `fund/{id}/skill.json`: `{"last_q", "first_q", "quarters": {"q": [], "bought": [], "fund": [], "mkt": [], "spy": [], "v_fund": [], "v_mkt": [], "v_spy": []}, "years": {"name": [], "fund": [], "mkt": [], "spy": []}, "tiers": {"1": TIER, "2": TIER, "3": TIER}, "mix": {"q": [], "label": [], "share": [[...], ...]}}`, where TIER is `{"irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation", "coverage", "n", "quarters": {"label": [], "v_label": [], "v_never": [] | null}, "years": {"label": []}, "picks": {"stock_id": [], "label": [], "bought": [], "irr_own": [], "irr_label": []}, "bets": {"label": [], "bought": [], "irr": [], "irr_mkt": [], "mkt_share": []}}`
+- `fund/{id}/skill.json`: `{"last_q", "first_q", "quarters": {"q": [], "bought": [], "cap": [], "fund": [], "mkt": [], "spy": []}, "years": {"name": [], "fund": [], "mkt": [], "spy": []}, "tiers": {"1": TIER, "2": TIER, "3": TIER}, "mix": {"q": [], "label": [], "share": [[...], ...]}}`, where TIER is `{"ret_fund", "ret_label", "ret_mkt", "ret_spy", "picking", "allocation", "coverage", "n", "quarters": {"label": []}, "years": {"label": []}, "picks": {"stock_id": [], "label": [], "bought": [], "ret_own": [], "ret_label": [], "adds": []}, "bets": {"label": [], "bought": [], "ret": [], "ret_mkt": [], "adds": [], "mkt_share": []}}`
 - `manifest.json` at the bucket root: `{"version": "...", "built": "...", "files": {path: sha256}}`; `health.json`: `{"filings_parsed", "unmapped_cusips", "coverage_median", "funds_recomputed", "flags": [...]}`.
 
 ## Field notes
@@ -212,41 +212,49 @@ fund's name.
 Written by the sector step (`orca.run sectors --part publish`, `run/sectors_step.py`) after the monthly run is
 published, from the lake's `fund_flows`, `stock_quarters` and `sector_returns`. They exist only after a sector
 step has run, and only for funds it scored: a reader treats a 404 as "not scored". The method is
-`engine/skill.py`: a fund's real trades are replayed three times, through each stock's own total-return series
-(`fund`, the fund itself), through the index of each stock's hierarchy label (`label`) and through Orca's index of
-the whole market (`mkt`); a fourth replay through SPY's total-return series (`spy`) is for reference only.
-`picking` = IRR(fund) − IRR(label) and `allocation` = IRR(label) − IRR(mkt).
+`engine/skill.py`, an opportunity cost on the fund's own money, with no IRR (owner 2026-11-28). A fund's real trades
+are replayed through each stock's own total-return series to give the dollars it had in each stock at every point;
+a quarter is split at its average level, where its trades happen. Each half, the same dollars are put four ways:
+the stock (`fund`), the index of its hierarchy label (`label`), Orca's index of the whole market (`mkt`) and SPY's
+total-return series (`spy`, for reference only). A way's `ret` is the dollars it made ÷ the dollar-years at work (a
+dollar at work for a year; a half quarter is 1/8), so `picking` = ret(fund) − ret(label) = the dollars the stocks
+beat their labels by ÷ the dollar-years, and `allocation` = ret(label) − ret(mkt). Nothing is compounded or
+annualised beyond that division. A half counts only where the stock, its label at every tier, the market and SPY
+all have a return, so every figure is on the same money.
 
 - `label` everywhere is a full hierarchy path joined by `" > "` ("Technology > Semiconductors"); `"Market"` is the
   whole market. Tier 1 is the sector, 2 the industry, 3 the vertical (the site calls it a sub-industry).
 - Dollar amounts are rounded to the cent and always written with a decimal point ("594918104.0"): a bare
   whole number of nine digits can equal an all-digit CUSIP, which the publish step's CUSIP guard refuses.
-- All IRRs and scores are fractions a year, `null` where the IRR has no root in [−0.99, 10]. `fund_id` is the CIK,
-  as in every fund file. `last_q` is the quarter the replays are valued at.
+- `ret_*`, `picking`, `allocation` and `adds` are fractions a year (dollars made ÷ dollar-years); `null` where
+  there was no money at work. `fund_id` is the CIK, as in every fund file. `last_q` is the quarter scored up to.
 - `sectors/labels.json`: one entry per label of the indices at `last_q` (tiers 1–3), ordered by `label`.
   `parent` is the label one tier up (`null` for a sector), `name` its last part, `n` the stocks in its index in
   `last_q` and `top_weight` the largest stock's weight in it (0 to 1).
 - `sectors/scores.json`: one entry per scored fund and tier, ordered by `fund_id`, then `tier`. `n` is the number
-  of positions scored, `coverage` the share of the fund's buying (dollars) they hold, `span_q` = `last_q` − the
+  of positions scored (with money at work in at least one half that counts), `coverage` the share of the fund's
+  buying (dollars) they hold, `span_q` = `last_q` − the
   quarter of the fund's first trade + 1.
 - `fund/{id}/skill.json`:
   - `first_q` is the quarter of the fund's first scored trade. `quarters` has one entry per quarter from `first_q`
-    to `last_q`. `bought` is the dollars bought in the quarter; `v_fund`, `v_mkt`, `v_spy` the replay's value at
-    the quarter end in dollars; `fund`, `mkt`, `spy` its quarterly return, time-weighted: the replay trades at the quarter's
-    average level, so the return chains the move from the last quarter end to the trades with the move from the
-    trades to the quarter end, and money in or out never moves it; `null` where the replay held nothing in the
-    quarter. A quarter's figures are as of its end, even the quarter in progress (`last_q`).
+    to `last_q`. `bought` is the dollars bought in the quarter; `cap` the dollars at work over it (the average of
+    its two halves; 0 when none); `fund`, `mkt`, `spy` what that money made each way ÷ `cap`; `null` where `cap` is
+    0. `cap` × a return is dollars, so a reader can sum dollars made over any stretch (the Lines chart) or score a
+    window (Σ `cap` × gap ÷ Σ `cap` / 4). A quarter's figures are as of its end, even the quarter in progress.
   - `years`: one entry per calendar year from `first_q` to `last_q`, `name` labelled as `summary.json` years
-    (`"2025"`, `"2026 9M"`, `"2014 Q2–Q4"`); the returns chain the quarterly ones (`null` when none). Each year,
-    market + (label − market) + (fund − label) = fund, exactly.
-  - `tiers.t.quarters.label` / `v_label` and `tiers.t.years.label` are the same for the label replay at tier t,
-    aligned with `quarters.q` and `years.name`. `v_never` is reserved for a "never rotated" replay; `null` today.
+    (`"2025"`, `"2026 9M"`, `"2014 Q2–Q4"`); each way's return is what it made in the year ÷ the average `cap` of
+    the year's quarters with money at work (`null` when none): a part year is not annualised. Each year,
+    market + (label − market) + (fund − label) = fund, exactly, and the scores are the years averaged by their money.
+  - `tiers.t.quarters.label` and `tiers.t.years.label` are the same for the label at tier t, aligned with
+    `quarters.q` and `years.name`.
   - `tiers.t.picks`: the fund's 30 largest positions by dollars bought, largest first, then one entry with
     `stock_id` `null` for all its other scored positions. `label` is the position's label at tier t (`null` on the
-    last entry), `irr_own` the IRR of its trades replayed in the stock, `irr_label` in that label's index.
+    last entry); `ret_own` what the position's money made a year in the stock, `ret_label` the same money in that
+    label's index; `adds` the dollars it beat the index by ÷ the whole fund's dollar-years, so they sum to `picking`.
   - `tiers.t.bets`: one entry per label at tier t the fund bought, most money first; at tier 1 every sector is
-    listed, and the unbought ones have `bought` 0 and `null` IRRs. `irr` is the IRR of all its trades in that label
-    replayed in the label's index, `irr_mkt` the same trades replayed in the market. `mkt_share` is the market's
+    listed, and the unbought ones have `bought` 0 and `null` returns and `adds`. `ret` is what the money the fund
+    had in that label's stocks made a year in the label's index, `ret_mkt` the same money in the market; `adds` the
+    dollars the label beat the market by ÷ the fund's dollar-years, so they sum to `allocation`. `mkt_share` is the market's
     share of that label when they were buying: Σ over quarters of dollars bought × (the label's market value ÷ the
     market's) at the quarter's start, ÷ the dollars bought (for an unbought sector, weighted by all the fund's
     buying).

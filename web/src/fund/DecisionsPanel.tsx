@@ -33,7 +33,7 @@ function rowTip(r: DecRow, stock: boolean, w: TierWords): TipContent {
         { label: "Its return for them", value: pct(r.choice) + " a year" },
         { label: `${r.rest ? "Their " + w.plural : labelName(r.label)} index, same trades`, value: pct(r.bench) },
         { label: "Beat by", value: pts(r.beat) },
-        { label: "Adds to the fund", value: "≈ " + pts(r.adds) + " a year", sum: true },
+        { label: "Adds to the fund", value: pts(r.adds) + " a year", sum: true },
       ],
     };
   }
@@ -49,7 +49,7 @@ function rowTip(r: DecRow, stock: boolean, w: TierWords): TipContent {
           { label: "The market holds", value: r.mktShare == null ? "–" : share0(r.mktShare) },
           { label: `${w.Noun} index, their dates`, value: pct(r.choice) + " a year" },
           { label: "Whole market, same trades", value: pct(r.bench) },
-          { label: "Adds to the fund", value: "≈ " + pts(r.adds) + " a year", sum: true },
+          { label: "Adds to the fund", value: pts(r.adds) + " a year", sum: true },
         ],
     note: r.skipped ? "They bought nothing here: it counts only through the market." : undefined,
   };
@@ -116,8 +116,8 @@ export function DecisionsPanel({ skill, tier, stocks }: { skill: Skill; tier: Ti
       </div>
       <p className="pf">
         {stock
-          ? `Share of their money = dollars put into that stock ÷ all dollars they put in. ○ the ${w.noun} index with the same buys and sells, ● what the stock returned for them. Beat by = the gap in yearly return, in percentage points. Adds ≈ share × beat by: roughly how many points a year it added to the whole fund (≈ because money went in at different times).`
-          : `Bar = share of their money; black tick = the market's share of the same ${w.noun} when they were buying, so a bar past its tick is a bet on that ${w.noun}. ○ the whole market with the same trades, ● the ${w.noun}'s whole index bought and sold on their dates (their stock picks are left out). Adds ≈ share × beat by.`}
+          ? `Share of their money = dollars put into that stock ÷ all dollars they put in. ● what the stock made a year on the dollars they had in it each quarter, ○ what the same money would have made in the ${w.noun} index. Beat by = the gap in yearly return, in percentage points. Adds = the dollars it gained over the index ÷ all their money at work, in points a year: the rows add up to the fund's stock choice score.`
+          : `Bar = share of their money; black tick = the market's share of the same ${w.noun} when they were buying, so a bar past its tick is a bet on that ${w.noun}. ○ the same money in the whole market, ● the same money in the ${w.noun}'s whole index (their stock picks are left out). Adds = the dollars it gained over the market ÷ all their money at work: the rows add up to the fund's ${w.noun} choice score.`}
       </p>
     </section>
   );
@@ -221,7 +221,7 @@ function DecChart({ rows, total, stock, w, table }: { rows: DecRow[]; total: { b
               {money(total.bought)} put in
             </text>
             <text className={"add tot " + sgnCls(total.adds)} x={AX} y={top + n * rh + 24} textAnchor="end">
-              ≈ {pts(total.adds).replace(" pts", "")}
+              {pts(total.adds).replace(" pts", "")}
             </text>
           </svg>
         </div>
@@ -240,7 +240,7 @@ function DecChart({ rows, total, stock, w, table }: { rows: DecRow[]; total: { b
               r.skipped ? "–" : pts(r.beat),
               r.skipped ? "0" : pts(r.adds),
             ]),
-            [stock ? "All picks" : "All " + w.plural, money(total.bought) + " put in", ...(stock ? [] : [""]), "", "", "", "≈ " + pts(total.adds)],
+            [stock ? "All picks" : "All " + w.plural, money(total.bought) + " put in", ...(stock ? [] : [""]), "", "", "", pts(total.adds)],
           ]}
         />
       )}

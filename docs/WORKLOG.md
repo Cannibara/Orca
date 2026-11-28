@@ -1,9 +1,18 @@
 # Worklog
 
-Last verified: 2026-11-26
+Last verified: 2026-11-28
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-28 — Sector choice vs stock choice rebuilt as an opportunity cost, no IRR (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 56 (`sectors_only`, `main` 0a323d3, PR #86, flat start): Berkshire's coverage 77% → 94% (142 picks), its map shows; median coverage 61.5% → 64.7%, dropped positions 792,655 → 596,360 | The flat start scores positions held from 1998 Q4 | (run) |
+| Scores rebuilt: each half quarter, the fund's dollars in each stock are put in the stock, its label's index, the market and SPY; picking and allocation = dollars beaten ÷ dollar-years at work. Years = what the money made ÷ its average in the year; Lines = dollars made so far; the map's path, the decisions' Adds (now exact: they sum to the scores) all use the same sums | Owner: "ensure that we are not using IRR, but rather an opportunity cost framework … given the same bet size and timing" | `pipeline/orca/engine/skill.py`, `skill_detail.py`, `run/sectors_step.py`, `contract.md`, `web/src/fund/{skill,stacked,decisions}.ts`, `StackedPanel.tsx`, `DecisionsPanel.tsx`, `SkillMapPanel.tsx`, `data/{types,api}.ts` |
+| `skill.json`: `irr_*` → `ret_*`, `cap` and `adds` added, `v_*` dropped. The site treats an older file as not scored until the sector step rewrites it | One measure, named for what it is | `pipeline/contract.md`, `web/src/data/api.ts` |
+| Checks: pipeline suite green (1,117), web suite green (1,209), typecheck clean, Specialization e2e green (12); demo data regenerated. Takes effect with the next `sectors_only` run | | |
 
 ## 2026-11-26 — The map names low coverage instead of "Too early to tell" (owner)
 
