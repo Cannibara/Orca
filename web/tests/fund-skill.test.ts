@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FundsIndex, SectorScores, Skill, SkillTier, TopRow } from "../src/data/types";
 import { betRows, returnTicks, stockRows } from "../src/fund/decisions";
 import { mixSeries, rotations, sectorColor } from "../src/fund/mix";
-import { isEligible, peersFor, quadrant, rollingPath, stackParts, tierWords, yearRows } from "../src/fund/skill";
+import { isEligible, peersFor, placeMapLabels, quadrant, rollingPath, stackParts, tierWords, yearRows } from "../src/fund/skill";
 import { linesLayout, roundMoney, stackedLayout } from "../src/fund/stacked";
 
 const near = (a: number, b: number) => expect(a).toBeCloseTo(b, 9);
@@ -82,6 +82,30 @@ describe("years and the map", () => {
     expect(quadrant(0.02, 0.005)).toBe("stock");
     expect(quadrant(-0.01, 0.02)).toBe("sector");
     expect(quadrant(0.007, -0.03)).toBe("neither");
+    // Berkshire on 2026-11-28 at industry level: −0.13 and −0.33 pts, inside the band both ways
+    expect(quadrant(-0.0013, -0.0033)).toBe("close");
+    expect(quadrant(0.008, -0.008)).toBe("close");
+  });
+  it("names every dot on the map, never over another dot or name", () => {
+    const me = { id: 0, cx: 300, cy: 200, r: 10, name: "Berkshire Hathaway", n: 142 };
+    // a peer just left of this fund: its name would run over this fund's dot, so it goes on the left
+    const peers = [{ id: 1, cx: 260, cy: 205, r: 6, name: "Markel", n: 40 }, { id: 2, cx: 400, cy: 300, r: 5, name: "Semper Augustus", n: 25 }];
+    const L = placeMapLabels(me, peers, [], 600, 400);
+    expect(L.me).toEqual({ x: 300, y: 184, anchor: "middle" }); // above its own dot
+    expect(L.peers.get(1)!.anchor).toBe("end");
+    expect(L.peers.get(2)!.anchor).toBe("start");
+    expect([...L.peers.values()].every((l) => l.key == null)).toBe(true);
+  });
+  it("numbers a dot whose name fits nowhere, for the key under the map", () => {
+    const me = { id: 0, cx: 100, cy: 100, r: 10, name: "This fund", n: 50 };
+    // a ring of dots so close that no long name fits beside the one in the middle
+    const ring = [[-12, 0], [12, 0], [0, -12], [0, 12], [-12, -12], [12, 12], [-12, 12], [12, -12]].map(([dx, dy], i) => ({
+      id: 10 + i, cx: 300 + dx, cy: 200 + dy, r: 4, name: "R", n: 1,
+    }));
+    const mid = { id: 1, cx: 300, cy: 200, r: 4, name: "Ruane, Cunniff & Goldfarb", n: 30 };
+    const L = placeMapLabels(me, [mid, ...ring], [], 600, 400);
+    expect(L.peers.get(1)!.key).toBe(1);
+    expect(L.peers.size).toBe(9); // every dot has a name or a number
   });
   it("draws 3-year windows ending each Q4 and the latest quarter", () => {
     const s = skillOf(14, { f: 0.03, l: 0.02, m: 0.01 }); // Q1 2014 .. Q2 2017
