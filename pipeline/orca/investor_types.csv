@@ -56,8 +56,8 @@ fund_id,type,name
 1056053,am.mutual,TD Asset Management
 1692234,am.inst,Russell Investments
 350894,am.mutual,SEI Investments
-1446194,bank,Susquehanna (market maker)
-1595888,bank,Jane Street (market maker)
+1446194,hedge.quant,Susquehanna (market maker)
+1595888,hedge.quant,Jane Street (market maker)
 1535323,am.mutual,Allianz Asset Management
 1993888,am.mutual,Pictet Asset Management
 1088875,am.mutual,Baillie Gifford
@@ -113,7 +113,7 @@ fund_id,type,name
 1628622,pevc.vc,VY Capital
 2011612,am.wealth,Pathstone
 1191672,bank,Credit Agricole
-1475597,bank,HRT Financial (market maker)
+1475597,hedge.quant,HRT Financial (market maker)
 1999606,bank,TD Waterhouse Canada
 1398318,am.mutual,Handelsbanken Fonder
 1837309,am.mutual,Polar Capital
@@ -196,14 +196,14 @@ fund_id,type,name
 1767306,am.etf,Vanguard Personalized Indexing
 1847838,bank,B. Metzler seel. Sohn
 2022028,am.mutual,Mediolanum International Funds
-1831577,bank,Jump Financial (market maker)
+1831577,hedge.quant,Jump Financial (market maker)
 1977602,am.mutual,OFI Invest Asset Management
-1452861,bank,IMC-Chicago (market maker)
+1452861,hedge.quant,IMC-Chicago (market maker)
 1451623,am.wealth,Benjamin Edwards
 1535385,am.mutual,Artemis Investment Management
 1911278,bank,LGT Group
 1997464,bank,Marex Group
-1056581,hedge.other,Jeffrey L. Gendell (Tontine)
+1056581,hedge.value,Jeffrey L. Gendell (Tontine)
 39263,bank,Cullen/Frost Bankers
 1162170,am.wealth,Greenleaf Trust
 1916757,ins,ASR Vermogensbeheer (a.s.r.)
@@ -230,7 +230,7 @@ fund_id,type,name
 1744347,am.etf,Vident Advisory (ETFs)
 1709632,am.etf,Vest Financial (ETFs)
 812291,bank,Mizuho Securities USA
-1533421,bank,Tower Research Capital (market maker)
+1533421,hedge.quant,Tower Research Capital (market maker)
 899051,ins,Allstate
 759944,bank,Citizens Financial Group
 1050743,bank,Peapack-Gladstone Financial
@@ -255,7 +255,7 @@ fund_id,type,name
 1775715,am.mutual,Milford Funds
 733986,am.inst,Cambridge Associates
 9634,bank,BOKF
-1828301,bank,XTX Markets (market maker)
+1828301,hedge.quant,XTX Markets (market maker)
 1544204,am.mutual,Liontrust
 2029723,ins,American Family Investments
 1324290,am.mutual,Altshuler Shaham
@@ -263,7 +263,7 @@ fund_id,type,name
 1426748,am.mutual,Lazard Freres Gestion
 2017993,corp,Hancock Prospecting
 1647273,am.mutual,Perpetual
-1446179,hedge.other,Susquehanna Fundamental Investments
+1446179,hedge.ls,Susquehanna Fundamental Investments
 2146944,am.wealth,Evelyn Partners
 1783464,bank,Japan Post Holdings
 1538846,pension,South Dakota Investment Council
@@ -276,27 +276,27 @@ fund_id,type,name
 1418427,am.mutual,Robeco Schweiz
 852933,bank,Commerzbank
 20286,ins,Cincinnati Financial
-1859606,bank,Optiver (market maker)
+1859606,hedge.quant,Optiver (market maker)
 1838615,am.wealth,AlTi Global
 1269094,pension,Folketrygdfondet (Government Pension Fund Norway)
 2035325,am.mutual,Avanza Fonder
 1449434,pevc.pe,Apollo Management
 1521365,corp,Glencore
-1996449,bank,Susquehanna Portfolio Strategies
+1996449,hedge.quant,Susquehanna Portfolio Strategies
 1659196,am.mutual,DJE Kapital
 1024896,bank,Cantor Fitzgerald
 1674546,am.mutual,Bellevue Group
-1455915,bank,Old Mission Capital (market maker)
+1455915,hedge.quant,Old Mission Capital (market maker)
 1418226,pevc.pe,Silver Lake
 2009396,am.mutual,Ohman Asset Management
-1452765,bank,GTS Securities (market maker)
+1452765,hedge.quant,GTS Securities (market maker)
 1842296,am.mutual,E Fund Management
 1851815,bank,SBI Securities
 1103139,endow,Adventist Health System
 7789,bank,Associated Banc-Corp
 872786,bank,BNP Paribas
 1903793,pevc.pe,TPG
-1466697,bank,Flow Traders (market maker)
+1466697,hedge.quant,Flow Traders (market maker)
 1040508,pevc.pe,Bain Capital
 1082621,endow,Harvard Management Company
 1536925,pension,Vestcor (New Brunswick pensions)
@@ -306,4 +306,206 @@ fund_id,type,name
 2126778,swf,Narodna banka Slovenska
 1504169,ins,Tokio Marine Asset Management
 1443077,ins,Intact Investment Management
-1389958,bank,PEAK6 (market maker)
+1389958,hedge.quant,PEAK6 (market maker)
+932540,hedge.quant,Group One Trading (trading)
+1488542,hedge.quant,Simplex Trading (trading)
+1533964,hedge.quant,Virtu Financial (trading)
+1445893,hedge.quant,CTC (trading)
+1481986,hedge.quant,DRW Securities (trading)
+1444949,hedge.quant,Susquehanna Advisors Group (trading)
+1529090,hedge.quant,Akuna Securities (trading)
+1450144,hedge.quant,Two Sigma Securities (trading)
+1633046,hedge.quant,Maven Securities (trading)
+1721757,hedge.quant,DV Trading (trading)
+1632341,hedge.quant,Belvedere Trading (trading)
+1094429,hedge.quant,SIG Brokerage (trading)
+1868643,hedge.quant,SIG North Trading (trading)
+1879628,hedge.quant,Susquehanna Capital Management (trading)
+1569550,hedge.quant,CTC Alternative Strategies (trading)
+1279891,hedge.quant,Wolverine Asset Management (trading)
+1510387,hedge.quant,Gotham Asset Management
+1453072,hedge.quant,Alyeska Investment Group
+2024579,hedge.quant,Jain Global
+1549230,hedge.quant,Boothbay Fund Management
+1772875,hedge.quant,Y-Intercept
+1825214,hedge.quant,Ghisallo Capital
+1535061,hedge.quant,Edgestream Partners
+2052310,hedge.quant,SummitTX Capital
+1803916,hedge.quant,Aquatic Capital
+1706766,hedge.quant,Caption Management
+1976151,hedge.quant,Entropy Technologies
+1512991,hedge.quant,Quantbot Technologies
+1742435,hedge.quant,FORA Capital
+1326389,hedge.quant,Polar Asset Management Partners
+1521001,hedge.quant,Parallax Volatility Advisers
+1872738,hedge.quant,CenterBook Partners
+1787258,hedge.quant,Cinctive Capital
+1692507,hedge.quant,Centiva Capital
+1900923,hedge.quant,ReadyState Asset Management
+2130487,hedge.quant,Militia Capital
+1668527,hedge.quant,Numerai
+1177206,am.inst,Los Angeles Capital Management
+1698246,am.inst,IFM Investors
+1109147,am.inst,Axiom Investors
+1375534,am.inst,Generation Investment Management
+1368465,am.inst,Hillsdale Investment Management
+1453620,am.inst,Cohen Klingenstein
+1476993,am.inst,Investure (OCIO)
+1784260,am.wealth,Rothschild & Co Wealth Management UK
+2163893,am.wealth,W1M Wealth Management
+949615,am.mutual,Kayne Anderson Capital Advisors
+1520478,am.mutual,RWC Asset Management
+1599814,am.mutual,Kopernik Global Investors
+1525907,pevc.pe,Cerberus Capital Management
+1259313,hedge.credit,Ares Management
+1425851,hedge.credit,Pentwater Capital
+1357550,hedge.credit,Weiss Asset Management
+1167456,hedge.credit,AQR Arbitrage
+1565854,hedge.credit,Zimmer Partners
+1710951,hedge.credit,Prana Capital
+1835751,hedge.credit,CastleKnight Management
+1728201,hedge.credit,Aequim Alternative Investments
+1443689,hedge.credit,Senator Investment Group
+1076809,hedge.credit,Glazer Capital
+1358253,hedge.credit,TIG Advisors
+1851869,hedge.credit,Concentric Capital Strategies
+1317195,hedge.credit,Empyrean Capital Partners
+1741675,hedge.credit,Callodine Capital
+1080171,hedge.credit,Aristeia Capital
+1290162,hedge.credit,QVT Financial
+1396835,hedge.credit,Alpine Associates
+2051323,hedge.macro,Caxton Associates
+1509842,hedge.macro,PointState Capital
+1353395,hedge.macro,Fulcrum Asset Management
+1535630,hedge.macro,Element Capital
+1687509,hedge.activist,Rubric Capital
+1595849,hedge.activist,Sessa Capital
+1365341,hedge.activist,Cevian Capital
+1998597,hedge.activist,JANA Partners
+1278387,hedge.activist,Broadwood Capital
+1724246,hedge.activist,HoldCo Asset Management
+1825564,hedge.activist,Browning West
+1599383,hedge.value,Windacre Partnership
+1113000,hedge.value,Kensico Capital
+1489933,hedge.value,DME Capital (Greenlight)
+1312908,hedge.value,Gates Capital
+1484148,hedge.value,Turtle Creek Asset Management
+1317588,hedge.value,Abrams Bison
+1472322,hedge.value,Nantahala Capital
+1974915,hedge.health,Vestal Point Capital
+1601086,hedge.health,Armistice Capital
+1920938,hedge.health,Braidwell
+1940272,hedge.health,ADAR1 Capital
+1773206,hedge.health,Integral Health
+1631134,hedge.health,Sofinnova Investments
+1697013,hedge.health,Eversept Partners
+1600004,hedge.health,First Light Asset Management
+1907884,hedge.health,Kynam Capital
+1773195,hedge.health,Affinity Asset Advisors
+1727492,hedge.health,Caligan Partners
+1662906,hedge.health,Atalan Capital
+1816616,hedge.tech,NZS Capital
+1700272,hedge.tech,Azora Capital
+1753384,hedge.tech,Analog Century
+1104329,hedge.tech,Crosslink Capital
+1592643,hedge.ls,Select Equity Group
+1687241,hedge.ls,Castle Hook Partners
+2007591,hedge.ls,Freestone Grove Partners
+1539041,hedge.ls,Picton Mahoney
+1768375,hedge.ls,Aspex Management
+1985479,hedge.ls,Linonia Partnership
+1595880,hedge.ls,Junto Capital
+1805589,hedge.ls,59 North Capital
+1732768,hedge.ls,Lingotto Investment Management
+1901865,hedge.ls,Divisadero Street Capital
+1736852,hedge.ls,Merewether Investment Management
+1658363,hedge.ls,Maple Rock Capital
+1050464,hedge.ls,Peconic Partners
+1732811,hedge.ls,MFN Partners
+1789082,hedge.ls,Crake Asset Management
+1849753,hedge.ls,Voyager Global
+1817646,hedge.ls,L1 Capital
+2041209,hedge.ls,Kedalion Capital
+1505183,hedge.ls,Stockbridge Partners
+1839209,hedge.ls,Darwin Global
+1051359,hedge.ls,PAR Capital
+1590531,hedge.ls,Foxhaven Asset Management
+1590228,hedge.ls,Interval Partners
+1756558,hedge.ls,XN
+1543170,hedge.ls,Spruce House
+1960830,hedge.ls,SurgoCap Partners
+1638555,hedge.ls,Summit Partners Public Asset Management
+1412741,hedge.ls,J. Goldman & Co
+1817534,hedge.ls,Anomaly Capital
+1547007,hedge.ls,Dorsal Capital
+1948899,hedge.ls,Avala Global
+1837343,hedge.ls,Hill City Capital
+1427119,hedge.ls,Meritage Group
+1867831,hedge.ls,North Reef Capital
+1808928,hedge.ls,Cartenna Capital
+1511881,hedge.ls,Theleme Partners
+1839497,hedge.ls,Helikon Investments
+1317583,hedge.ls,Scopus Asset Management
+1609074,hedge.ls,Hawk Ridge Capital
+1823138,hedge.ls,Two Seas Capital
+1592579,hedge.ls,Trinity Street
+1909126,hedge.ls,Seven Grand Managers
+1512171,hedge.ls,Route One Investment
+1755028,hedge.ls,Yaupon Capital
+1854440,hedge.ls,Darlington Partners
+1665012,hedge.ls,Naya Capital
+1085393,hedge.ls,Basswood Capital
+1904549,hedge.ls,Burkehill Global
+1926253,hedge.ls,Keystone Investors
+1822531,hedge.ls,Sourcerock Group
+1835730,hedge.ls,Ardmore Road
+1539436,hedge.ls,Standard Investments
+1106191,hedge.ls,GMT Capital
+1602716,hedge.ls,Long Focus Capital
+1796409,hedge.ls,Heard Capital
+1512162,hedge.ls,Cooper Creek Partners
+1550660,hedge.ls,Oaktop Capital
+1743937,hedge.ls,TOMS Capital
+1596510,hedge.ls,Park Presidio
+1697591,hedge.ls,CAS Investment Partners
+1586986,hedge.ls,Electron Capital
+1827734,hedge.ls,Fernbridge Capital
+1538653,hedge.ls,Prescott General Partners
+1600136,hedge.ls,Clearline Capital
+2009023,hedge.ls,L1 Capital International
+1633969,hedge.ls,Cryder Capital
+1691982,hedge.ls,Bowie Capital
+1736465,hedge.ls,Rush Island
+1626220,hedge.ls,Greenhouse Funds
+1555254,hedge.ls,Carrhae Capital
+1866872,hedge.ls,Carronade Capital
+1765774,hedge.ls,No Street
+1782124,hedge.ls,Dendur Capital
+2033334,hedge.ls,North of South Capital
+1894571,hedge.ls,Pertento Partners
+1944889,hedge.ls,Forest Avenue Capital
+1733755,hedge.ls,Arnhold
+1420816,hedge.ls,Telemark Asset Management
+1693745,hedge.ls,Anatole Investment Management
+1676292,hedge.ls,Hill Path Capital
+1532262,hedge.ls,Greenbrier Partners
+1452689,hedge.ls,Valiant Capital
+2123957,hedge.ls,Kryger Capital
+1660531,hedge.ls,FengHe Fund Management
+1065350,am.mutual,Capital International Ltd
+1803149,bank,Mizuho Markets Cayman
+1335730,bank,Mizuho Financial Group
+1520309,bank,Mizuho Securities
+1656187,bank,MUFG Securities Canada
+867626,bank,MUFG Securities Americas
+1694895,am.mutual,Mitsubishi UFJ Asset Management (2)
+1535660,am.mutual,Lombard Odier Asset Management (Switzerland)
+1535784,am.mutual,Lombard Odier Asset Management (Europe)
+1491719,am.mutual,Lombard Odier Asset Management (USA)
+890203,bank,Mirae Asset Securities USA
+1053187,am.mutual,Natixis Investment Managers
+1703031,pevc.pe,Bain Capital Life Sciences
+1768111,pevc.pe,Bain Capital Public Equity Management
+1962552,pevc.pe,Bain Capital Public Equity
+1317947,pevc.pe,Bain Capital Credit
+1954961,hedge.quant,Point72 Private Investments

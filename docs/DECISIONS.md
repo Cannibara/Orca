@@ -1,10 +1,17 @@
 # Decisions (ADR log)
 
-Last verified: 2026-11-26
+Last verified: 2026-11-28
 
 Newest first. Tags: (chat) session conversation, (code) checked in code, (git) commit history.
 Earlier build rulings R1–R33 (pipeline and website, 2026-10-30/31) are in
 `docs/superpowers/2026-10-31-orca-rulings-and-backlog.md`; they are not repeated here.
+
+## 2026-11-28 — Landscape follow-ups (owner: "5 fix recommendations sound good")
+- A firm filing under several names is one tile per type of investor (`investor_parents.csv`, by hand: Vanguard's ten filers, Capital Group's six, Susquehanna, the Japanese and Canadian bank groups, Sequoia's seven, ...), its books added and its returns weighted by book; the tile opens its largest filer. A firm's filers of different types stay apart (UBS's bank and its asset manager).
+- Market makers and trading firms (Jane Street, Susquehanna, Optiver, Virtu, HRT, ...) are Hedge funds > Quant & multi-strategy, not Banks & brokers (owner: "label them as quant firms").
+- Hedge fund styles beyond the famous list: ~180 more by hand, and an "Other hedge funds" filer gets one from its holdings at run time (`investors.refine_hedge`): 60%+ of the book in health care, or in tech and communication, makes a specialist; 400+ priced positions a quant or multi-strategy fund.
+- Colours stay the holdings tree map's green/red (owner), the one exception to the blue/orange rule. Custodian money in banks' 13Fs is not separated (owner: few will analyse it).
+- The adviser-register snapshot is refreshed each quarter by a workflow (`investor-types.yml`) that opens a pull request; a merge and the next run publish it.
 
 ## 2026-11-26 — Home Landscape: every 13F filer by type of investor; index firms kept as ETF providers (owner)
 - Decision (chat): a tree map of all current 13F filers on the home page, grouped by type of investor, with the period switch Famous funds uses. Hierarchy (owner): top level Hedge funds, Asset managers, Banks & brokers, Insurers (no sub-types), Pension funds, Sovereign wealth & central banks, Endowments & foundations, Family offices, Private equity & VC, Companies; hedge funds split by the Famous funds styles; asset managers into ETF providers, Mutual funds and Wealth managers (owner), plus Institutional managers (build: Wellington, Arrowstreet, GMO run institutions' money, not funds). "Not yet classified" holds the rest (about 2% of the money).

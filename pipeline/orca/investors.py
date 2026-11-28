@@ -26,6 +26,7 @@ from orca.famous import Famous
 
 HAND_CSV = Path(__file__).with_name("investor_types.csv")
 ADV_CSV = Path(__file__).with_name("investor_types_adv.csv")
+PARENTS_CSV = Path(__file__).with_name("investor_parents.csv")
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +110,49 @@ def load_types(path: Path) -> dict[int, str]:
                 raise ValueError(f"{path.name} lists fund {fund_id} twice")
             out[fund_id] = kind
     return out
+
+
+def load_parents(path: Path = PARENTS_CSV) -> dict[int, str]:
+    """investor_parents.csv as fund_id -> the firm it files for (Vanguard's ten filers -> "Vanguard"); empty
+    when the file is missing. Raises ValueError on a fund listed twice or an empty firm name."""
+    if not path.exists():
+        return {}
+    out: dict[int, str] = {}
+    with open(path, newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            raw = (r.get("fund_id") or "").strip()
+            if not raw or raw.startswith("#"):
+                continue
+            fund_id, parent = int(raw), (r.get("parent") or "").strip()
+            if not parent:
+                raise ValueError(f"{path.name}: fund {fund_id} has no parent")
+            if fund_id in out:
+                raise ValueError(f"{path.name} lists fund {fund_id} twice")
+            out[fund_id] = parent
+    return out
+
+
+# After the type: a hedge fund the steps could not give a style gets one from what it holds (refine_hedge).
+SPECIALIST_SHARE = 0.6  # of the book in one sector: a healthcare or a tech & growth specialist
+QUANT_POSITIONS = 400  # priced positions: a fundamental stock picker holds far fewer (multi-manager pods, quants)
+_TECH_SECTORS = ("Tech", "Communication")
+
+
+def refine_hedge(kind: str, weights: Mapping[int, float], n_priced: int, sector: Mapping[int, str]) -> str:
+    """A style for an "Other hedge funds" filer from its holdings now: 60%+ of the book in health care, or in
+    tech and communication, makes a specialist; 400+ priced positions a quant or multi-strategy fund. Any
+    other type comes back as it is."""
+    if kind != "hedge.other":
+        return kind
+    health = sum(w for sid, w in weights.items() if sector.get(sid) == "Health care")
+    tech = sum(w for sid, w in weights.items() if sector.get(sid) in _TECH_SECTORS)
+    if health >= SPECIALIST_SHARE:
+        return "hedge.health"
+    if tech >= SPECIALIST_SHARE:
+        return "hedge.tech"
+    if n_priced >= QUANT_POSITIONS:
+        return "hedge.quant"
+    return kind
 
 
 # Step 5: a word of the name. Order matters: "Swiss National Bank" is a central bank before it is a bank,

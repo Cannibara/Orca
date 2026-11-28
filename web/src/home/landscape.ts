@@ -34,6 +34,8 @@ export type LNode = {
   children: LNode[];
   /** A merged rest tile's filers too small to draw, largest first (for its tooltip). */
   others?: LNode[];
+  /** A firm's filers (tidied names, largest first) when it files under several names. */
+  members?: string[];
 };
 
 const weighted = (nodes: LNode[]): { ret: number | null; covered: number } => {
@@ -63,18 +65,21 @@ export function buildTree(file: Landscape, period: Period): LNode {
   const f = file.funds;
   for (let i = 0; i < f.fund_id.length; i++) {
     const ret = f.ret[period]?.[i] ?? null;
+    const n = f.n?.[i] ?? 1;
+    // a firm's row is named by the pipeline (investor_parents.csv); a filer's by its short name
     const node: LNode = {
       key: `f:${f.fund_id[i]}`,
       kind: "fund",
       type: f.type[i],
-      label: shortNameOf(f.fund_id[i], f.name[i]),
-      name: tidyName(f.name[i]),
+      label: n > 1 ? f.name[i] : shortNameOf(f.fund_id[i], f.name[i]),
+      name: n > 1 ? f.name[i] : tidyName(f.name[i]),
       fundId: f.fund_id[i],
       value: f.book[i],
-      n: 1,
+      n,
       ret,
       covered: ret === null ? 0 : f.book[i],
       children: [],
+      ...(n > 1 ? { members: (f.members?.[i] ?? []).map(tidyName) } : {}),
     };
     leafKids.set(node.type, [...(leafKids.get(node.type) ?? []), node]);
   }

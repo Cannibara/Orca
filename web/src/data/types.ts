@@ -289,7 +289,18 @@ export type Landscape = {
   /** The hierarchy in display order; parent null = a top-level type. Only leaves are given to filers. */
   types: { key: string[]; label: string[]; parent: (string | null)[] };
   /** Each leaf type's largest filers: book in dollars, type a leaf key, ret the estimated annual return (null: none). */
-  funds: { fund_id: number[]; name: string[]; book: number[]; type: string[]; ret: ByPeriod<number | null> };
+  /** A row is one filer, or one firm filing under several names: n filers (1 for one), members their names
+   * largest first (null when n is 1), name the firm's, fund_id its largest filer's. n and members are missing
+   * from files built before 2026-11-28. */
+  funds: {
+    fund_id: number[];
+    name: string[];
+    book: number[];
+    type: string[];
+    n?: number[];
+    members?: (string[] | null)[];
+    ret: ByPeriod<number | null>;
+  };
   /** The rest of a leaf type, together: n filers, their book, their book-weighted mean return and the share of their book that has one. */
   rest: { type: string[]; n: number[]; book: number[]; ret: ByPeriod<number | null>; covered: ByPeriod<number> };
 };

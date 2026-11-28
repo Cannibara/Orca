@@ -13,7 +13,7 @@ import polars as pl
 
 from orca.config import PERIODS
 from orca.famous import Famous, SearchScores
-from orca.investors import Classifier
+from orca.investors import Classifier, load_parents
 from orca.landscape import landscape
 from orca.home import (
     FundSnapshot,
@@ -176,7 +176,16 @@ def publish_shared_files(
         calls_y=calls(snaps, mcap, q_close, px_on_filed, "y", latest_q=last_q),
         search_asof=search.asof if search else None,
         spx={period: spx_window(spy_px, last_q, period) for period in PERIODS},
-        landscape=None if investors is None else landscape(snaps, investors, last_q, _sic_of(lake)),
+        landscape=None
+        if investors is None
+        else landscape(
+            snaps,
+            investors,
+            last_q,
+            _sic_of(lake),
+            load_parents(),
+            dict(securities.select("stock_id", "sector").drop_nulls().iter_rows()),
+        ),
     )
 
     table = securities.with_columns(

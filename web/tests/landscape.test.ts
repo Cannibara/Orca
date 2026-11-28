@@ -121,3 +121,23 @@ describe("labels", () => {
     expect(fitHead("Hedge funds", 4.2e12, 100, charMeasure).v).toBeNull();
   });
 });
+
+describe("a firm filing under several names", () => {
+  it("is one tile named after the firm, listing its filers", () => {
+    const f = file();
+    f.funds = {
+      ...f.funds,
+      name: ["BRIDGEWATER ASSOCIATES, LP", "CITADEL ADVISORS LLC", "Vanguard", "TINY WEALTH LLC", "BIG WEALTH LLC", "JPMORGAN CHASE & CO"],
+      n: [1, 1, 3, 1, 1, 1],
+      members: [null, null, ["VANGUARD CAPITAL MANAGEMENT LLC", "VANGUARD PORTFOLIO MANAGEMENT LLC", "VANGUARD FIDUCIARY TRUST CO"], null, null, null],
+    };
+    const etf = pathTo(buildTree(f, "1y"), "am.etf").at(-1)!;
+    const firm = etf.children.find((c) => c.key === "f:3")!;
+    expect(firm.label).toBe("Vanguard");
+    expect(firm.n).toBe(3);
+    expect(firm.members?.[0]).toBe("Vanguard Capital Management");
+    expect(etf.n).toBe(3);
+    // files without the columns read every row as one filer
+    expect(pathTo(buildTree(file(), "1y"), "am.etf").at(-1)!.n).toBe(1);
+  });
+});

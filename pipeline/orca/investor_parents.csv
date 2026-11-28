@@ -1,0 +1,134 @@
+fund_id,parent
+# Kept by hand: filers that are one firm filing under several names, drawn as one tile on the Landscape (their
+# books added, their returns weighted by book) where they share a type of investor. parent is the firm's name.
+2100119,Vanguard
+2100121,Vanguard
+933478,Vanguard
+1811242,Vanguard
+1680208,Vanguard
+1550100,Vanguard
+947529,Vanguard
+1767306,Vanguard
+1984256,Vanguard
+217448,Vanguard
+1422849,Capital Group
+1422848,Capital Group
+1562230,Capital Group
+895213,Capital Group
+1065349,Capital Group
+1065350,Capital Group
+80255,T. Rowe Price
+1897612,T. Rowe Price
+1446194,Susquehanna
+1996449,Susquehanna
+1444949,Susquehanna
+1094429,Susquehanna
+1868643,Susquehanna
+1879628,Susquehanna
+1446179,Susquehanna
+1179392,Two Sigma
+1450144,Two Sigma
+1445893,CTC
+1569550,CTC
+1817646,L1 Capital
+2009023,L1 Capital
+1542153,Focus Financial Partners
+1868872,Focus Financial Partners
+2010942,Focus Financial Partners
+1830819,Kestra
+1649451,Kestra
+1962449,Kestra
+822581,Oppenheimer
+1269119,Oppenheimer
+1314440,Stephens
+757657,Stephens
+1711924,CIBC
+1421224,CIBC
+1021926,CIBC
+944388,Scotiabank
+9631,Scotiabank
+1335644,Scotiabank
+1335382,Scotiabank
+1056053,TD
+947263,TD
+1999606,TD
+1551017,TD
+812291,Mizuho
+1825516,Mizuho
+1803149,Mizuho
+1512734,Mizuho
+1335730,Mizuho
+1520309,Mizuho
+921739,Nomura
+1055964,Nomura
+1163653,Nomura
+1466546,Mitsubishi UFJ
+67088,Mitsubishi UFJ
+1462160,Mitsubishi UFJ
+1597694,Mitsubishi UFJ
+1656187,Mitsubishi UFJ
+852743,Mitsubishi UFJ
+867626,Mitsubishi UFJ
+1694895,Mitsubishi UFJ
+1475365,Sumitomo Mitsui
+1411530,Sumitomo Mitsui
+1022837,Sumitomo Mitsui
+1993888,Pictet
+1535602,Pictet
+1123274,Pictet
+1599576,Pictet
+1535631,Pictet
+1615423,Lombard Odier
+1535660,Lombard Odier
+1535784,Lombard Odier
+1491719,Lombard Odier
+1418773,Robeco
+1418427,Robeco
+1207017,Lazard
+1426748,Lazard
+1705339,Mirae Asset
+1569395,Mirae Asset
+2027450,Mirae Asset
+890203,Mirae Asset
+1434819,APG
+1323255,APG
+1166588,BNP Paribas
+1520354,BNP Paribas
+872786,BNP Paribas
+861177,UBS
+1610520,UBS
+1871926,TIAA
+882928,TIAA
+2124867,TIAA
+1997405,TIAA
+1535323,Allianz
+1127508,Allianz
+884546,Charles Schwab
+1789219,Charles Schwab
+1776551,Charles Schwab
+895421,Morgan Stanley
+2026079,Morgan Stanley
+1018331,Natixis
+1274981,Natixis
+1053187,Natixis
+1137774,Prudential Financial
+1845793,Prudential Financial
+1040508,Bain Capital
+1703031,Bain Capital
+1317947,Bain Capital
+1309469,Bain Capital
+1962552,Bain Capital
+1768111,Bain Capital
+1603466,Point72
+1954961,Point72
+1024896,Cantor Fitzgerald
+1710477,Cantor Fitzgerald
+1607841,Sequoia Capital
+1374246,Sequoia Capital
+1261135,Sequoia Capital
+1206787,Sequoia Capital
+1367787,Sequoia Capital
+1471126,Sequoia Capital
+1537530,Sequoia Capital
+1470766,HongShan
+1822015,HongShan

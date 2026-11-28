@@ -1,9 +1,21 @@
 # Worklog
 
-Last verified: 2026-11-26
+Last verified: 2026-11-28
 
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
+
+## 2026-11-28 — Landscape follow-ups: firms as one tile, quant trading firms, hedge styles, short names, quarterly refresh
+
+| What changed | Why | Files |
+|---|---|---|
+| A firm filing under several names is one tile per type (Vanguard 10 filers, Capital Group 6, Susquehanna, MUFG, Mizuho, Sequoia 7, ...): books added, returns weighted by book, the largest filer's page on click; `funds.n` and `funds.members` in `home/landscape.json` (contract first) | Owner approved the 5 recommendations | `pipeline/orca/investor_parents.csv`, `investors.load_parents`, `landscape.py`, `pipeline/contract.md`, `web/src/home/landscape.ts`, `LandscapeMap.tsx`, `web/src/data/types.ts` |
+| Spot-check of the register-typed filers: 20 corrected (Los Angeles Capital, IFM, Axiom, Generation IM: institutional; Gotham: quant; Rothschild Wealth UK, W1M: wealth; Ares: credit; Cerberus: PE; ...); 29 market makers and trading firms moved to Quant & multi-strategy | Owner: label market makers as quant firms | `pipeline/orca/investor_types.csv` (490 rows) |
+| Hedge styles: ~180 of the largest "Other hedge funds" by hand; the rest from holdings at run time (60%+ health care or tech and communication: a specialist; 400+ priced positions: quant) | 928 hedge funds had no style | `investors.refine_hedge`, `investor_types.csv` |
+| Short names for ~90 of the largest filers (Fidelity, JPMorgan Chase, CalPERS, GMO, VanEck, ...) | Names like "Jpmorgan Chase & Co", "Deutsche Bank Ag" (the filing name ends in a backslash) | `web/src/lib/famousNames.ts` |
+| Workflow Investor types: quarterly (20th of Jan/Apr/Jul/Oct) and by hand, refreshes the adviser-register file, checks it loads, pushes `investor-types-refresh` and opens a PR | The register snapshot ages | `.github/workflows/investor-types.yml` |
+| Colours stay green/red (the holdings map's), noted as the exception in CLAUDE.md; custodian money in banks left as is (owner) | Owner | `CLAUDE.md` |
+| Checks: pipeline and web suites green; demo data rebuilt (one filer per row) | | `pipeline/tests/test_landscape.py`, `test_investors.py`, `web/tests/landscape.test.ts` |
 
 ## 2026-11-26 — Home Landscape tab: every 13F filer by type of investor; Perigee's $266T book removed
 

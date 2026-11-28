@@ -1,6 +1,6 @@
 # Orca: context for coding agents
 
-Last verified: 2026-11-26
+Last verified: 2026-11-28
 
 Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L for amateur investors ("WhaleWisdom shows what funds own; Orca shows how well they did it"). A Python pipeline on GitHub Actions ingests the SEC 13F data, prices and T-bill rates. It keeps its state in a private Cloudflare R2 bucket and publishes brotli JSON files to a public R2 bucket. A static React site on Cloudflare Pages reads those files in the browser and computes live values. The site is live at https://www.orcaetf.com, with data at https://data.orcaetf.com. Claude Code project name: "Whale Wisdom 13F Analytics Platform".
 
@@ -22,7 +22,7 @@ Orca turns SEC 13F filings into estimated fund returns and stock-by-stock P&L fo
 | The logo, favicon or app icons | `docs/brand/README.md` (files, colours, rules; `brand-sheet.png` is the guide) |
 | The sector → industry → industry vertical hierarchy (labels, naming, review page) | `pipeline/orca/hierarchy/README.md`, `docs/DECISIONS.md` (2026-11-16) |
 | Planning a new feature (CSV export, saved views, popularity list, sector page, manager rankings) | `docs/ROADMAP.md` (audit, priorities; proposal until the owner approves) |
-| The home page's Landscape tab (tree map of every filer by type of investor; hand and SEC adviser-register labels) | `web/src/home/LandscapeMap.tsx`, `landscape.ts`, `pipeline/orca/landscape.py`, `pipeline/orca/investors.py` (+ `investor_types.csv` by hand, `investor_types_adv.csv` from `scripts/investor_types.py`), `docs/DECISIONS.md` (2026-11-26) |
+| The home page's Landscape tab (tree map of every filer by type of investor; hand and SEC adviser-register labels) | `web/src/home/LandscapeMap.tsx`, `landscape.ts`, `pipeline/orca/landscape.py`, `pipeline/orca/investors.py` (+ `investor_types.csv` by hand, `investor_parents.csv` firms filing under several names, `investor_types_adv.csv` from `scripts/investor_types.py`, refreshed quarterly by the Investor types workflow), `docs/DECISIONS.md` (2026-11-26) |
 | The home page's Famous funds and Top funds charts (ranked return bars, one scale per list or page, list index, Chart / Table switch) | `web/src/home/` (built: `FamousChart.tsx`, `famousChart.ts`, `ListIndex.tsx`, `listIndex.ts`), `web/src/lib/famousNames.ts` (short names), `docs/superpowers/specs/2026-11-20-home-famous-chart-design.md` (design; mock-ups beside it) |
 | The fund page's Specialization tab: sector choice vs stock choice panels (map, Annual return stacked graph, sector mix, decisions) and the sector files they read | `web/src/fund/SkillPanels.tsx` and its panels (built), `pipeline/orca/engine/skill_detail.py`, `run/sectors_step.publish_sectors`, `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md` (design; draft HTML beside it) |
 | Original design and build plans | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
@@ -52,7 +52,7 @@ web/scripts/         prerender.mjs (fund pages, _headers, sitemap/robots), dataO
 web/src/assets/people/ photos of the people behind famous funds (<slug>.jpg, people.json, credits.json, README.md; fetch script pipeline/scripts/fetch_people_images.py)
 web/tests/, web/e2e/ vitest suites; Playwright smoke (1280/400 px, light/dark)
 web/public/demo-data synthetic demo data (funds 9100001–9100012) used by dev, tests and CI
-.github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, people-photos.yml, site-cors.yml, purge-cache.yml
+.github/workflows/   ci.yml (pipeline tests), web.yml (web tests + deploy), pipeline.yml, people-photos.yml, investor-types.yml, site-cors.yml, purge-cache.yml
 docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, brand/ (logo kit), superpowers/ (spec, plans, rulings)
 ```
 
@@ -69,14 +69,14 @@ docs/                PRODUCT, ARCHITECTURE, DECISIONS, WORKLOG, domain runbook, 
 | Sector indices + fund scores (after a relabel) | Actions > Pipeline > Run workflow (input `sectors_only`: indices, scores, then the sector files are published); locally `cd pipeline && uv run python -m orca.run sectors` (needs a restored lake; lake only), `--part publish` stages the sector files in `data/out/sectors_staging`. Check an edit first: `uv run python orca/hierarchy/tools/relabel_check.py` |
 | Fund workbook | Actions > Workbook > Run workflow (input `fund_ids`, at most 20); locally `cd pipeline && uv run python -m orca.run workbook --fund ID [--fund ID …] [--out DIR]` (needs a restored lake; output stays private) |
 | People photos (famous funds) | Actions > People photos > Run workflow, **choosing a branch, not `main`** (it commits the photos to that branch; merge it after); locally `cd pipeline && uv run --with pillow --with opencv-python-headless==4.10.0.84 python scripts/fetch_people_images.py`; see `web/src/assets/people/README.md` |
-| Investor types from the SEC adviser register (Landscape) | `cd pipeline && ORCA_CONTACT=you@example.com uv run python scripts/investor_types.py` (rewrites `orca/investor_types_adv.csv`; commit it); hand corrections go in `orca/investor_types.csv` |
+| Investor types from the SEC adviser register (Landscape) | Actions > Investor types (runs itself on the 20th of Jan/Apr/Jul/Oct; pushes branch `investor-types-refresh` and opens a PR); locally `cd pipeline && ORCA_CONTACT=you@example.com uv run python scripts/investor_types.py` (rewrites `orca/investor_types_adv.csv`; commit it); hand corrections go in `orca/investor_types.csv`, firms filing under several names in `orca/investor_parents.csv` |
 | Demo data | `cd pipeline && uv run python -m orca.run demo --plain --out ../web/public/demo-data` (no network) |
 | Deploy site | merge to `main` (Web workflow deploys), or Actions > Web > Run workflow |
 | Clear data cache | Actions > Purge cache |
 
 ## Conventions
 - Published JSON shapes follow `pipeline/contract.md` exactly (snake_case, columnar arrays, `null` = missing, quarters `q = (year−2013)*4 + (quarter−1)`, money in dollars, returns as fractions).
-- UI: one gain colour (blue) and one loss colour (orange), always with a printed sign and real minus `−`. Tokens are in `web/src/tokens.css`. Fund-page CSS is scoped under `.fp`.
+- UI: one gain colour (blue) and one loss colour (orange), always with a printed sign and real minus `−`. The exception: the tree maps (fund Holdings, home Landscape) use the green/red `--tm-*` ramp (owner). Tokens are in `web/src/tokens.css`. Fund-page CSS is scoped under `.fp`.
 - Missing values show "–" or "—", never NaN. Every figure is labelled as an estimate.
 - Comments explain why, briefly. No new npm dependencies without need; versions pinned exactly.
 - Commits: `area: what changed` with a body explaining why. Branch work goes to the session's assigned branch; PRs are squash-merged.

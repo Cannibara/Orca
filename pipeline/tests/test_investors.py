@@ -116,3 +116,17 @@ def test_every_famous_list_maps_to_a_type():
     for f in load_famous():
         kind, how = c.type_of(f.fund_id, f.manager or "x")
         assert how == "famous" and kind in LEAVES
+
+
+def test_the_parent_firms_load_and_bad_lines_fail(tmp_path: Path):
+    from orca.investors import PARENTS_CSV, load_parents
+
+    parents = load_parents(PARENTS_CSV)
+    assert parents[2100119] == parents[933478] == "Vanguard"
+    bad = tmp_path / "p.csv"
+    bad.write_text("fund_id,parent\n1,\n")
+    with pytest.raises(ValueError, match="no parent"):
+        load_parents(bad)
+    bad.write_text("fund_id,parent\n1,A\n1,B\n")
+    with pytest.raises(ValueError, match="twice"):
+        load_parents(bad)

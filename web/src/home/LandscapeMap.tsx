@@ -77,16 +77,23 @@ export function LandscapeMap({ file, period, periodLabel, zoom, onZoom }: Props)
     });
     const tipFor = (t: LTile): TipContent => {
       const n = t.node;
-      if (n.kind === "fund")
+      if (n.kind === "fund") {
+        const firm = n.n > 1 && n.members?.length ? n.members : null;
         return {
           title: n.name,
           rows: [
             { label: "13F holdings", value: aum(n.value), big: true },
             { label: "Share of all filers", value: share(n.value / total) },
-            retRow(n, false),
+            ...(firm ? [{ label: "Filers", value: count(n.n) }] : []),
+            retRow(n, !!firm),
           ],
-          note: n.ret === null ? "No return for this period: the record is shorter, or too little of it is priced." : "Click to open the fund.",
+          note: firm
+            ? `Files as ${firm.slice(0, 4).join(", ")}${firm.length > 4 ? ` and ${firm.length - 4} more` : ""}. Click to open ${firm[0]}.`
+            : n.ret === null
+              ? "No return for this period: the record is shorter, or too little of it is priced."
+              : "Click to open the fund.",
         };
+      }
       if (n.kind === "rest") {
         const names = (n.others ?? []).slice(0, 6).map((o) => o.label).join(", ");
         return {
