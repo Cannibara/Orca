@@ -1,26 +1,44 @@
-/* The ranked lists' Table view (home/RankTable.tsx), on the chart's grid (famousChart.css .fc) so Chart | Table
-   switch without anything moving (owner, 2026-11-23): photo 32px, 14px gap, name column 252px, the return column
-   where the plot starts; a 42px header strip with one hairline; 46px rows, no row lines, the hover band 8px past
-   each side. The table reaches 8px past the module each side and pads that back, as the chart's window does. */
-.fp .rk{--row:46px;--c1:32px;--c2:252px;--cg:14px;--band-x:8px;min-width:0;font-variant-numeric:tabular-nums}
-.fp .rk table{width:calc(100% + 2 * var(--band-x));margin:0 calc(-1 * var(--band-x));border-collapse:separate;border-spacing:0;table-layout:fixed}
+/* The home page's tables (home/ScrollTable.tsx: the ranked lists' Table view, Conviction moves, Best & worst calls),
+   on the chart's grid and in its window (famousChart.css .fc) so Chart | Table switch without anything moving
+   (owner, 2026-11-23; 2026-11-28): photo 32px, 14px gap, name column 252px, the return column where the plot starts;
+   a 42px header strip with one hairline as wide as the chart's; 46px rows, no row lines, the hover band 8px past each
+   side; 20 rows in view, then the body scrolls under the header with the chart's fades and thin scrollbar. The table
+   reaches 8px past the module each side and pads that back, as the chart's window does. */
+.fp .rk{--row:46px;--c1:32px;--c2:252px;--cg:14px;--band-x:8px;--head:42px;min-width:0;font-variant-numeric:tabular-nums}
+.fp .rk-wrap{position:relative}
+.fp .rk table{display:block;width:calc(100% + 2 * var(--band-x));margin:0 calc(-1 * var(--band-x));border-collapse:separate;border-spacing:0}
+/* header and body are blocks (only the body scrolls); each row lays its cells out on the same fixed widths */
+.fp .rk :is(thead,tbody){display:block}
+.fp .rk tr{display:table;width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0}
 .fp .rk :is(th,td){padding:0 0 0 12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp .rk :is(th,td).c-fund{width:calc(var(--band-x) + var(--c1) + var(--cg) + var(--c2));padding-left:var(--band-x);text-align:left}
 .fp .rk :is(th,td):last-child{padding-right:var(--band-x)}
-/* the return sits at the start of the plot, the others share what is left */
+/* the ranked lists: the return sits at the start of the plot, the others share what is left */
 .fp .rk :is(th,td).c-ret{width:13%;padding-left:var(--cg)}
 
-/* header: the chart's axis strip, labels on its foot, the S&P 500 figure on top of the return heading */
-.fp .rk thead th{position:relative;height:42px;vertical-align:bottom;padding-bottom:7px;box-shadow:0 1px 0 var(--line2);font:400 11px/14px var(--f-sans);color:var(--ink3)}
+/* header: the chart's axis strip, labels on its foot, the S&P 500 figure on top of the return heading; its
+   hairline spans the module, not the band's reach past it, as the axis's does */
+.fp .rk thead{position:relative}
+.fp .rk thead::after{content:"";position:absolute;left:var(--band-x);right:var(--band-x);bottom:0;height:1px;background:var(--line2);pointer-events:none}
+.fp .rk thead th{position:relative;height:var(--head);vertical-align:bottom;padding-bottom:7px;font:400 11px/14px var(--f-sans);color:var(--ink3)}
 .fp .rk thead th.c-fund{padding-left:calc(var(--band-x) + var(--c1) + var(--cg))}
 .fp .rk .rk-spx{position:absolute;top:2px;right:0;font:600 11px/14px var(--f-sans);color:var(--ink);white-space:nowrap}
-.fp .rk th .sort{display:inline-flex;align-items:center;gap:3px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;white-space:nowrap}
+.fp .rk th .sort{display:inline-flex;align-items:center;gap:3px;max-width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;white-space:nowrap}
 .fp .rk th .sort:hover{color:var(--ink)}
 .fp .rk th[aria-sort] .sort{color:var(--ink);font-weight:600}
-.fp .rk th .sort .ico{width:11px;height:11px;stroke-width:2;order:-1}
-.fp .rk th.c-fund .sort .ico{order:1}
+.fp .rk th .sort .ico{flex:none;width:11px;height:11px;stroke-width:2;order:-1}
+.fp .rk th:is(.c-fund,.l) .sort .ico{order:1}
 .fp .rk th .sort .alt{padding:1px 6px;border-radius:9px;background:color-mix(in srgb,var(--ink) 9%,var(--page));color:var(--ink);font-size:10.5px;font-weight:600}
 .fp .rk th .sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:2px}
+
+/* the window: the page colour behind the rows makes the box opaque, so Chrome scrolls it on the compositor; the
+   fraction of a pixel the eased glide leaves is a translate on the rows (useEasedScroll "rows") */
+.fp .rk.scrolls tbody{overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;background:var(--page)}
+.fp .rk tbody.sub>tr{transform:translateY(var(--sub))}
+.fp .rk .fade{position:absolute;left:0;right:0;height:24px;z-index:6;pointer-events:none;opacity:0}
+.fp .rk .fade.t{top:var(--head);background:linear-gradient(var(--page),transparent)}
+.fp .rk .fade.b{bottom:0;background:linear-gradient(transparent,var(--page))}
+.fp .rk .fade.on{opacity:1}
 
 /* rows: the chart's height, band and type; no lines */
 .fp .rk tbody tr{cursor:pointer}
@@ -29,34 +47,54 @@
 .fp .rk tbody td:first-child{border-radius:6px 0 0 6px}
 .fp .rk tbody td:last-child{border-radius:0 6px 6px 0}
 .fp .rk tbody tr:hover .fc-face{filter:none}
-.fp .rk td.c-ret{font-weight:600;font-size:12.5px;color:var(--ink)}
+/* the figure a list is ranked by: the chart's bar label type */
+.fp .rk td:is(.c-ret,.key){font-weight:600;font-size:12.5px;color:var(--ink)}
 .fp .rk-fund{display:flex;align-items:center;gap:var(--cg);min-width:0}
 .fp .rk-fund .fc-face{flex:none}
 .fp .rk .who{display:flex;flex-direction:column;gap:1px;min-width:0}
-.fp .rk .who .nm{font:600 14px/18px var(--f-sans);color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp .rk .who .nm{min-width:0;font:600 14px/18px var(--f-sans);color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fp .rk .who .nm:hover{text-decoration:underline;text-underline-offset:3px}
 .fp .rk .who .mg{font-size:12.5px;line-height:16px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* the foot as the chart's: the caption on the left, page buttons on the right, 10px under the rows */
-.fp .rk-foot{margin-top:10px}
+/* a chart row's first line: the name, a dot, the AUM (Conviction moves, Best & worst calls) */
+.fp .rk .l1{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap}
+.fp .rk .l1 .am{flex:none;font-size:13px;line-height:18px;color:var(--ink3)}
+/* a stock: ticker over the company, on the fund's type scale */
+.fp .rk .stk2{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;color:var(--ink);text-decoration:none}
+.fp .rk .stk2 .tk{max-width:100%;font:600 13px/18px var(--f-mono);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp .rk .stk2 .co{max-width:100%;font-size:12.5px;line-height:16px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp .rk a.stk2:hover .tk{text-decoration:underline;text-underline-offset:3px}
+.fp .rk :is(th,td).c-stk{width:176px;padding-left:var(--cg);text-align:left}
+.fp .rk :is(th,td).c-q{width:96px}
+.fp .rk :is(th,td).c-w{width:120px}
+.fp .rk td.c-w .wcell{vertical-align:middle}
+/* the foot as the chart's (famousChart.css .fc-foot): the caption on the left, page buttons on the right */
 .fp .rk-foot .pager{padding:0;border:0}
+/* mid widths: the figures a row can spare go first */
+.fp .rk.narrow .opt{display:none}
 
-/* ---------- phone: the chart's phone grid (photo 28px, 8px gap, 48px rows) ---------- */
-.fp .rk.phone{--row:48px;--c1:28px;--cg:8px}
+/* ---------- phone: the chart's phone grid (photo 28px, 8px gap, 48px rows, 10 in view) ---------- */
+.fp .rk.phone{--row:48px;--c1:28px;--cg:8px;--head:0px}
 .fp .rk-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:36px;padding:0 0 4px calc(var(--c1) + var(--cg));box-shadow:0 1px 0 var(--line2);font-size:10.5px;line-height:13px;color:var(--ink3)}
 .fp .rk-head select{height:26px;max-width:58%;padding:0 22px 0 8px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:500 12px/1 var(--f-sans)}
 .fp .rk.phone thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.fp .rk.phone :is(table,tbody){display:block}
-.fp .rk.phone table{width:auto}
-/* a fund: photo, name and (under it) its figures, the return on the right; the figure columns are folded into
-   that second line (RankTable phoneLine), where the chart puts AUM and the person */
+/* a row: photo, name and (under it) its figures, one figure on the right; the other columns are folded into
+   that second line, where the chart puts AUM and the person */
 .fp .rk.phone tbody tr{display:flex;align-items:center;gap:8px;height:var(--row);padding:0 var(--band-x);border-radius:6px}
+.fp .rk.phone tbody tr:hover{background:color-mix(in srgb,var(--band) 60%,var(--page))}
 .fp .rk.phone tbody td{display:block;height:auto;padding:0;border:0;border-radius:0;background:none;overflow:visible}
-.fp .rk.phone td.c-fund{flex:1 1 0;min-width:0;width:auto}
-.fp .rk.phone td.c-ret{flex:none;width:auto;font-size:11.5px;line-height:18px;color:var(--ink)}
-.fp .rk.phone td:is(.c-aum,.c-pos,.c-dd,.c-sh){display:none}
+.fp .rk.phone td.ph-main{flex:1 1 0;min-width:0;width:auto}
+.fp .rk.phone td.ph-end{flex:none;width:auto;font-size:11.5px;line-height:18px;color:var(--ink)}
+.fp .rk.phone td:not(.ph-main):not(.ph-end){display:none}
 .fp .rk .l2{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;font-size:11px;line-height:14px;color:var(--ink3);white-space:nowrap}
 .fp .rk .l2>span{display:inline-flex;align-items:center;gap:5px}
 .fp .rk .sep{flex:none;width:3px;height:3px;border-radius:50%;background:var(--control)}
 .fp .rk.phone .who .nm{font-size:12.5px;line-height:16px;letter-spacing:-.005em}
 .fp .rk.phone .rk-fund .fc-face.init{font-size:10px}
+.fp .rk.phone .fade{height:20px}
+.fp .rk.phone tbody{overscroll-behavior:contain}
 .fp .rk.phone .rk-foot{margin-top:8px}
+.fp .rk.phone .rk-foot .fc-cap{font-size:12px;color:var(--ink2)}
+
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion="reduce"]) .fp .rk .fade{transition:opacity 200ms linear}
+}

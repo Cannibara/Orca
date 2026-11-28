@@ -289,11 +289,11 @@ for (const width of widths) {
       const section = page.locator("section.top-funds");
       await expect(section.locator(".fc-row")).toHaveCount(80);
       await expect(section.locator(".fc.scrolls .fc-win")).toBeVisible();
-      await expect(section.locator(".fc-cap")).toHaveText(width < 560 ? "Showing 1–10 of 200 · one scale for this page" : "Showing 1–20 of 200 · one scale for this page");
+      await expect(section.locator(".fc-cap")).toHaveText(width < 560 ? "Showing 1–10 of 200 funds · one scale for this page" : "Showing 1–20 of 200 funds · one scale for this page");
       // the page buttons sit under the window, and the summary they carry is for screen readers only
       await expect(section.locator(".fc-foot .pager-sum")).toHaveCSS("position", "absolute");
       await section.getByRole("button", { name: "Next" }).click();
-      await expect(section.locator(".fc-cap")).toHaveText(/^Showing 81–\d+ of 200 /);
+      await expect(section.locator(".fc-cap")).toHaveText(/^Showing 81–\d+ of 200 funds /);
       await expect(section.getByText("Page 2 of 3")).toBeVisible();
       // the window is the Famous chart's: page colour behind it, thin scrollbar
       expect(await section.locator(".fc-win").evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
@@ -332,7 +332,7 @@ for (const width of widths) {
       const rows = page.locator("section.famous .fc-row");
       await expect(rows).toHaveCount(50); // retries until the list has rendered
       const cap = page.locator("section.famous .fc-cap");
-      await expect(cap).toHaveText(/^Showing 1–\d+ of 50 /);
+      await expect(cap).toHaveText(/^Showing 1–\d+ of 50 funds /);
 
       // the best funds all gained: the scale starts at zero, so the zero line sits on the plot's left edge
       const { zl, plot } = await page.evaluate(() => ({
@@ -342,11 +342,72 @@ for (const width of widths) {
       expect(Math.abs(zl - plot)).toBeLessThanOrEqual(2);
 
       await win.evaluate((el) => (el.scrollTop = el.scrollHeight));
-      await expect(cap).toHaveText(/^Showing \d+–50 of 50 /);
+      await expect(cap).toHaveText(/^Showing \d+–50 of 50 funds /);
       await expect(cap).not.toHaveText(/^Showing 1–/);
 
       const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("Chart | Table moves nothing: the header strip, the window and its rows, the foot and the funds in view stay put", async ({ page }) => {
+      await page.route("**/home/top_5y.json", (route) => route.fulfill({ status: 200, contentType: "application/json", body: FAMOUS_5Y }));
+      const errors = await open(page, "/");
+      await page.getByRole("button", { name: periodName(width, "5 years"), exact: true }).click();
+      const section = page.locator("section.famous");
+      const win = section.locator(".fc.scrolls .fc-win");
+      await expect(win).toBeVisible();
+      const row = width < 560 ? 48 : 46;
+      await win.evaluate((el, top) => (el.scrollTop = top), 12 * row);
+      const cap = section.locator(".fc-cap");
+      await expect(cap).toHaveText(/^Showing 13–/);
+      // the boxes that frame the list, and the fund at the top of the window
+      const frame = (head: string, body: string, rowSel: string) =>
+        section.evaluate(
+          (el, [head, body, rowSel]) => {
+            const r = (s: string) => {
+              const b = el.querySelector(s)!.getBoundingClientRect();
+              return [Math.round(b.top), Math.round(b.height), Math.round(b.left), Math.round(b.width)];
+            };
+            const box = el.querySelector(body)!.getBoundingClientRect();
+            const hit = document.elementFromPoint(box.left + 60, box.top + 12)!.closest(rowSel)!;
+            // the caption's width follows its words
+            // the caption's width follows its words; the table's header reaches the band's 8px past each side
+            // (its hairline does not), so only its top and height are the axis's
+            return { head: r(head).slice(0, 2), body: r(body), cap: r(".fc-cap").slice(0, 3), src: r(".fam-src"), top: hit.querySelector(".nm")!.textContent };
+          },
+          [head, body, rowSel],
+        );
+      const chart = await frame(".fc-axis", ".fc-win", ".fc-row");
+      const capChart = (await cap.textContent())!;
+      await page.getByRole("group", { name: "View" }).getByRole("button", { name: "Table" }).click();
+      await expect(section.locator(".rk tbody")).toBeVisible();
+      const table = await frame(width < 560 ? ".rk-head" : ".rk thead", ".rk tbody", "tr");
+      expect(table).toEqual(chart);
+      // the same words under it, less the chart's note on its scale
+      expect(await cap.textContent()).toBe(capChart.replace(" · one scale for the whole list", ""));
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      expect(errors).toEqual([]);
+    });
+
+    test("Conviction moves and Best & worst calls are drawn as Famous funds' table: no card, its header strip and rows, no sideways scroll", async ({ page }) => {
+      const errors = await open(page, "/");
+      for (const tab of ["Conviction moves", "Best & worst calls"]) {
+        await page.getByRole("tab", { name: tab }).click();
+        const section = page.locator("section.ranked").filter({ has: page.getByRole("heading", { level: 2, name: tab }) });
+        await expect(section.locator(".rk tbody tr").first()).toBeVisible();
+        await expect(section.locator(".panel")).toHaveCount(0);
+        const sizes = await section.evaluate((el) => ({
+          head: (el.querySelector(".rk-head") ?? el.querySelector(".rk thead"))!.getBoundingClientRect().height,
+          row: el.querySelector(".rk tbody tr")!.getBoundingClientRect().height,
+          face: el.querySelector(".rk tbody .fc-face")!.getBoundingClientRect().width,
+        }));
+        expect(sizes).toEqual(width < 560 ? { head: 36, row: 48, face: 28 } : { head: 42, row: 46, face: 32 });
+        await expect(section.locator(".fc-cap")).toHaveText(/^Showing /);
+        const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+        expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      }
       expect(errors).toEqual([]);
     });
 

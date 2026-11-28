@@ -54,7 +54,7 @@
 /* ---------- the toolbar: the period from the left edge, Chart | Table in the last track ---------- */
 .fp .ranked .fam-opts{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;min-width:0;max-width:100%}
 .fp .ranked .fam-opts.on-grid{display:grid;column-gap:24px}
-.fp .ranked .fo-per,.fp .ranked .fo-view{display:flex;min-width:0}
+.fp .ranked :is(.fo-per,.fo-view,.fo-mode){display:flex;min-width:0}
 /* on the grid each control fills its tracks with equal buttons; both are the .seg's 32px */
 .fp .ranked .fam-opts.on-grid .seg{display:flex;width:100%}
 .fp .ranked .fam-opts.on-grid .seg button{flex:1 1 0;min-width:0;justify-content:center}
@@ -150,7 +150,7 @@
 .fp .ranked.phone .fo-per{flex:1 1 auto}
 .fp .ranked.phone .fo-per .seg{display:flex;width:100%}
 .fp .ranked.phone .fo-per .seg button{flex:1 1 0;min-width:0;padding:0 4px;justify-content:center}
-.fp .ranked.phone .fo-view{flex:none}
+.fp .ranked.phone :is(.fo-view,.fo-mode){flex:none}
 /* 44px touch targets: 38px buttons in the 44px control */
 .fp .ranked.phone .seg button{height:38px;font-size:13px}
 /* Chart | Table: icon-only buttons (the word stays as each button's name) */

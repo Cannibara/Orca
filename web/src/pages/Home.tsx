@@ -33,29 +33,31 @@ import type {
   TopRow,
   WinLossRow,
 } from "../data/types";
-import {
-  count,
-  DASH,
-  HOME_TITLE,
-  pct,
-  printsZero,
-  qLabel,
-  tidyName,
-} from "../lib/format";
-import { qShort } from "../fund/fmt";
+import { count, HOME_TITLE, qLabel, tidyName } from "../lib/format";
 import { useWidth } from "../fund/hooks";
 import { bestFirst, FALLBACK_W, FamousChart, PHONE_BELOW } from "../home/FamousChart";
 import { sourceLine } from "../home/famousChart";
 import { ListIndex } from "../home/ListIndex";
 import { ROOT as LANDSCAPE_ROOT, aum } from "../home/landscape";
 import { LandscapeMap } from "../home/LandscapeMap";
-import { BEST_RETURN, MOST_POPULAR, RankTable } from "../home/RankTable";
+import { BEST_RETURN, RankTable } from "../home/RankTable";
+import {
+  CALL_SORTS,
+  CONVICTION_SORTS,
+  MOST_UNUSUAL,
+  callColumns,
+  change,
+  convictionColumns,
+  type Call,
+  type ListLookup,
+} from "../home/moveTables";
+import { ScrollTable } from "../home/ScrollTable";
 import { indexMode, layoutFor, type IndexItem } from "../home/listIndex";
 import { photoOf } from "../lib/people";
 import { useSortedRows, type Col } from "../lib/sort";
 import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
-import { fAum, fBook, fPrice, fWeight } from "./homeFmt";
+import { fBook, fWeight } from "./homeFmt";
 import "./home.css";
 import { FAMOUS_GROUPS } from "../data/famousGroups";
 
@@ -86,19 +88,16 @@ function Status({ state }: { state: Load<unknown> }) {
   );
 }
 
-/** What most lists need to turn ids into names and to compute figures from today's close. */
-type Lookup = {
-  stocks: Map<number, Stock>;
-  prices: Map<number, number>;
-  /** Fund id -> reported book, the muted line under a fund's name. Empty when the fund index did not load. */
-  books: Map<number, number>;
-};
+/** What most lists need to turn ids into names, to compute figures from today's close, and to show the person
+ * behind a famous fund (`people`, from Famous funds' rows, which the default tab has already loaded). */
+type Lookup = ListLookup;
 
 async function loadLookup(): Promise<Lookup> {
-  const [sec, lp, funds] = await Promise.all([
+  const [sec, lp, funds, top] = await Promise.all([
     loadSecurities(),
     loadLatestPrices(),
     loadFunds().catch(() => null),
+    loadHome("top_3y").catch(() => null),
   ]);
   // SEC names come in capitals with legal suffixes; the lists print them tidied, as the fund page does.
   const stocks = new Map(
@@ -107,6 +106,8 @@ async function loadLookup(): Promise<Lookup> {
       { ...s, name: tidyName(s.name) },
     ]),
   );
+  const people = new Map<number, string>();
+  for (const f of top?.famous ?? []) if (f.manager) people.set(f.fund_id, f.manager);
   return {
     stocks,
     prices: priceMap(lp),
@@ -115,15 +116,11 @@ async function loadLookup(): Promise<Lookup> {
         ? funds.id.map((id, i): [number, number] => [id, funds.book[i]])
         : [],
     ),
+    people,
   };
 }
 
 // ---- cells --------------------------------------------------------------------
-
-/** Price move from `base` to `price`; null when either is missing. */
-function change(price: number | undefined, base: number): number | null {
-  return price === undefined || !(base > 0) ? null : price / base - 1;
-}
 
 /**
  * Widths of the name columns when a list lays out fixed: the name's cap (home.css: --nm-w for funds,
@@ -174,17 +171,6 @@ function StockLink({
     <Link className="tick stk" to={`/fund/${fundId}/stock/${stockId}`}>
       <StockLabel stock={lookup.stocks.get(stockId)} stockId={stockId} />
     </Link>
-  );
-}
-
-/** A price move since a buy, in a box tinted by direction (nothing but the dash when there is no price). */
-function SinceBox({ v }: { v: number | null }) {
-  if (v === null) return <>{DASH}</>;
-  const text = pct(v, 0);
-  return (
-    <span className={"lc" + (printsZero(text) ? "" : v > 0 ? " add" : " trim")}>
-      <b>{text}</b>
-    </span>
   );
 }
 
@@ -338,11 +324,6 @@ function mostSearched(rows: TopRow[], rank: Map<number, number>): TopRow[] {
 }
 
 
-/** Rows a page in a famous list's table view. */
-const FAMOUS_PAGE = 10;
-/** A phone's Famous table: 30 rows a page (owner, 2026-11-22), so it pages less on a small screen. */
-const FAMOUS_PAGE_PHONE = 30;
-
 /** The famous rows by style, in FAMOUS_GROUPS order; styles with no fund for the period are left out. A row
  * without a group (none should come) goes to a list named "Other", last. */
 function byGroup(
@@ -399,9 +380,15 @@ const INDEX_FACES = 5;
 
 type FamousList = { name: string; about?: string; rows: TopRow[] };
 
+/** The row at the top of the last view (chart or table) of a list, period and page (`key`), so switching Chart |
+ * Table keeps the same funds in view. The table reports 0 once sorted by anything but return. */
+type Carry = { key: string; top: number };
+const startAt = (c: Carry, key: string) => (c.key === key ? c.top : 0);
+const isBest = (s: SortState) => s.key === BEST_RETURN.key && s.dir === BEST_RETURN.dir;
+
 /**
  * Famous funds: one list at a time (Most searched, then the styles), as a chart of returns best first
- * or as today's table in popularity order. The list, the view and the period live in Home.
+ * or as a table of the same funds in the same order and window. The list, the view and the period live in Home.
  */
 function FamousFunds({
   period,
@@ -457,6 +444,10 @@ function FamousFunds({
     setRun({ n: run.n + 1, rows, name: shown?.name, view });
 
   const spx = data?.spx?.ann_return ?? null;
+  // The table holds the chart's rows in the chart's order, and each view opens at the funds the other showed.
+  const ranked = useMemo(() => [...(shown?.rows ?? [])].sort(bestFirst), [shown]);
+  const viewKey = `${shown?.name}|${period}`;
+  const carry = useRef<Carry>({ key: "", top: 0 });
   const section = useRef<HTMLElement>(null);
   const width = useWidth(section, 280, FALLBACK_W);
   const phone = width < PHONE_BELOW;
@@ -506,17 +497,19 @@ function FamousFunds({
             spx={spx}
             period={period}
             run={run.n}
+            start={startAt(carry.current, viewKey)}
+            onView={(top) => (carry.current = { key: viewKey, top })}
           />
         ) : (
           <RankTable
-            key={shown.name} // each list opens most popular first, on its first page
+            key={shown.name} // each list opens in the chart's order
             label={shown.name}
-            rows={shown.rows}
-            initial={MOST_POPULAR}
-            pageSize={phone ? FAMOUS_PAGE_PHONE : FAMOUS_PAGE}
+            rows={ranked}
             spx={spx}
             phone={phone}
             rank={rank}
+            start={startAt(carry.current, viewKey)}
+            onView={(top, sort) => (carry.current = { key: viewKey, top: isBest(sort) ? top : 0 })}
           />
         )}
         <SourceNote spx={data?.spx} />
@@ -628,6 +621,8 @@ function TopFunds({
     setRun({ n: run.n + 1, rows, page, view });
 
   const spx = data?.spx?.ann_return ?? null;
+  const viewKey = `${period}|${page}`;
+  const carry = useRef<Carry>({ key: "", top: 0 });
   const section = useRef<HTMLElement>(null);
   const phone = useWidth(section, 280, FALLBACK_W) < PHONE_BELOW;
   const h2 = useId();
@@ -656,7 +651,9 @@ function TopFunds({
             period={period}
             run={run.n}
             offset={page * TOP_PAGE}
-            total={rows.length}
+            total={rows.length > TOP_PAGE ? rows.length : undefined}
+            start={startAt(carry.current, viewKey)}
+            onView={(top) => (carry.current = { key: viewKey, top })}
             foot={
               rows.length > TOP_PAGE && (
                 <Pager page={page} pageSize={TOP_PAGE} total={rows.length} onPage={setPage} noun="funds" />
@@ -664,7 +661,17 @@ function TopFunds({
             }
           />
         ) : (
-          <RankTable label="Top funds" rows={rows} initial={BEST_RETURN} pageSize={TOP_PAGE} spx={spx} phone={phone} />
+          <RankTable
+            label="Top funds"
+            rows={rows}
+            pageSize={TOP_PAGE}
+            page={page}
+            onPage={setPage}
+            spx={spx}
+            phone={phone}
+            start={startAt(carry.current, viewKey)}
+            onView={(top, sort) => (carry.current = { key: viewKey, top: isBest(sort) ? top : 0 })}
+          />
         )}
         <SourceNote rule={TOP_RULE} spx={data?.spx} />
       </div>
@@ -691,58 +698,6 @@ function TopFunds({
       </div>
       {body}
     </section>
-  );
-}
-
-/** A weight in percent: "<1%" under half a percent, else whole percent (the fund page's fW0). */
-const fW0 = (w: number) => (w > 0 && w < 0.5 ? "<1%" : Math.round(w) + "%");
-
-/** The weight before a move, in percent: after less the change (floating-point dust clamped to 0). */
-const weightBefore = (r: ConvictionRow) =>
-  Math.max(0, r.weight_after * 100 - r.change_pts);
-
-/**
- * A move's weight as the fund page's Positions table draws it: "was → now" over a bar of the weight before in
- * solid grey, then the change as a striped extension (blue past the old end for a bigger weight, orange back from
- * it for a smaller one). A new position starts from 0%, a sale of everything ends at 0%.
- */
-function WeightCell({ r, maxW }: { r: ConvictionRow; maxW: number }) {
-  const prev = weightBefore(r);
-  const now = r.move === "exit" ? 0 : r.weight_after * 100;
-  const pct = (v: number) => (v / maxW) * 100;
-  const solid = Math.min(now, prev);
-  const diff = Math.abs(now - prev);
-  return (
-    <span
-      className="wcell"
-      title={`Weight ${fW0(prev)} before, ${fW0(now)} after (${fAum(r.change_pts)} of the fund's AUM)`}
-    >
-      <span className="wn">{`${fW0(prev)} → ${fW0(now)}`}</span>
-      <span className="mbs">
-        {solid > 0 && (
-          <i
-            className="mb"
-            style={{ width: Math.max(2, pct(solid)).toFixed(1) + "%" }}
-          />
-        )}
-        {diff > 0 && (
-          <i
-            className={"mb mbx " + (now > prev ? "up" : "dn")}
-            style={{ width: Math.max(2, pct(diff)).toFixed(1) + "%" }}
-          />
-        )}
-      </span>
-    </span>
-  );
-}
-
-/** A call is a buy: "Bought" and the quarter, in the box tint of a purchase (the rows carry no weight change). */
-function BoughtBox({ q }: { q: number }) {
-  return (
-    <span className="lc add" role="img" aria-label={`Bought in ${qLabel(q)}`}>
-      <span className="lw">Bought</span>
-      <b>{qShort(q)}</b>
-    </span>
   );
 }
 
@@ -781,23 +736,84 @@ function stockCol<R>(
   };
 }
 
-/** The order of the file: the most unusual move for its fund first (no column sorts on it). */
-const MOST_UNUSUAL: SortState = { key: "score", dir: -1 };
-
 const MOVE_WINDOWS: ChoiceOption<CallWindow>[] = [
   { id: "q", label: "Last quarter" },
   { id: "y", label: "Last 4 quarters" },
 ];
-
 const CONVICTION_RULE =
   "Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before and at least half its largest holding. Funds ≥ $500M; no ETFs.";
+
+/** Rows a page in Conviction moves and Best & worst calls; 20 are in view (phone 10), then the window scrolls. */
+const MOVE_PAGE = 100;
+/** Below this width (px) a move or a call is a phone's row (fund, stock and move under it, one figure). */
+const MOVE_COMPACT_BELOW = 760;
+/** Below this width the prices go (they are in the stock's page a click away). */
+const MOVE_NARROW_BELOW = 1000;
+
+/**
+ * A home list laid out as Famous funds is (owner, 2026-11-28): no card, the switches on a toolbar, then the module
+ * (rule, the list's name, the table in the chart's window, the caption) and the rules and source under it.
+ * `children` gets the layout the measured width calls for.
+ */
+function ListSection({
+  title,
+  className,
+  controls,
+  load,
+  module,
+  children,
+}: {
+  /** The tab's name, the section's heading (for screen readers: the tab already shows it). */
+  title: string;
+  className: string;
+  controls: (phone: boolean) => ReactNode;
+  /** What the list waits for. */
+  load: Load<unknown>;
+  /** The module's name over the table, and the note under it. */
+  module?: { name: string; note: string };
+  children: (layout: { phone: boolean; compact: boolean; narrow: boolean }) => ReactNode;
+}) {
+  const section = useRef<HTMLElement>(null);
+  const width = useWidth(section, 280, FALLBACK_W);
+  const phone = width < PHONE_BELOW;
+  const compact = width < MOVE_COMPACT_BELOW;
+  const narrow = !compact && width < MOVE_NARROW_BELOW;
+  const h2 = useId();
+  return (
+    <section ref={section} className={`ranked ${className}` + (phone ? " phone" : "")} aria-labelledby={h2}>
+      <h2 id={h2} className="vh">
+        {title}
+      </h2>
+      <div className="fam-ctl">
+        <div className="fam-opts">{controls(phone)}</div>
+      </div>
+      {load.status !== "ready" || !module ? (
+        <Status state={load} />
+      ) : (
+        <div className="fam-mod">
+          <div className="fam-rule">
+            <div className="fam-h3">
+              <h3>{module.name}</h3>
+            </div>
+          </div>
+          {children({ phone, compact, narrow })}
+          <p className="fam-src">{module.note}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Both lists' window: "Q2 2026" or "the 4 quarters to Q2 2026". */
+const windowName = (win: CallWindow, latest: number) =>
+  win === "q" ? qLabel(latest) : `the 4 quarters to ${qLabel(latest)}`;
 
 function Conviction({
   lookup,
   win,
   onWin,
 }: {
-  lookup: Lookup;
+  lookup: Load<Lookup>;
   win: CallWindow;
   onWin: (w: CallWindow) => void;
 }) {
@@ -805,114 +821,86 @@ function Conviction({
     () => loadHome(win === "q" ? "conviction_q" : "conviction_y"),
     [win],
   );
-  const rows = list.status === "ready" ? list.data.rows : null;
-  const columns = useMemo<Col<ConvictionRow>[]>(() => {
-    // The longest bar (the biggest weight before or after) sets the scale, so bars compare across rows.
-    const maxW = Math.max(
-      1,
-      ...(rows ?? []).map((r) =>
-        Math.max(weightBefore(r), r.weight_after * 100),
-      ),
-    );
-    const now = (r: ConvictionRow) => lookup.prices.get(r.stock_id) ?? null;
-    const since = (r: ConvictionRow) =>
-      change(lookup.prices.get(r.stock_id), r.est_price);
-    const quarter: Col<ConvictionRow>[] =
-      win === "y"
-        ? [
-            {
-              header: "Quarter",
-              key: "q",
-              by: (r) => r.q,
-              cell: (r) => qLabel(r.q),
-            },
-          ]
-        : [];
-    return [
-      fundCol(
-        lookup,
-        (r) => r.fund_id,
-        (r) => r.name,
-      ),
-      stockCol(
-        lookup,
-        (r) => r.fund_id,
-        (r) => r.stock_id,
-      ),
-      ...quarter,
-      // Sorts by the signed change in the fund's AUM, so the biggest buys lead and sales trail (or the reverse).
-      {
-        header: "Weight",
-        key: "weight",
-        by: (r) => r.change_pts,
-        cell: (r) => <WeightCell r={r} maxW={maxW} />,
-      },
-      {
-        header: "$ bought / sold",
-        key: "usd",
-        by: (r) => r.usd,
-        cell: (r) => <Signed v={r.usd}>{fBook(r.usd, true)}</Signed>,
-      },
-      {
-        header: "Est. price",
-        key: "est",
-        by: (r) => r.est_price,
-        cell: (r) => fPrice(r.est_price),
-      },
-      { header: "Price now", key: "now", by: now, cell: (r) => fPrice(now(r)) },
-      {
-        header: "Since",
-        key: "since",
-        by: since,
-        cell: (r) => {
-          const s = since(r);
-          return <Signed v={s}>{pct(s, 0)}</Signed>;
-        },
-      },
-    ];
-  }, [lookup, win, rows]);
+  const look = lookup.status === "ready" ? lookup.data : null;
+  const file = list.status === "ready" ? list.data : null;
+  const load: Load<unknown> = lookup.status !== "ready" ? lookup : list;
   return (
-    <Panel
+    <ListSection
       title="Conviction moves"
-      subtitle={CONVICTION_RULE}
-      controls={
-        <Choice
-          label="Moves from"
-          options={MOVE_WINDOWS}
-          value={win}
-          onChange={onWin}
-        />
+      className="moves"
+      load={load}
+      controls={() => (
+        <div className="fo-per">
+          <Choice
+            label="Moves from"
+            options={MOVE_WINDOWS}
+            value={win}
+            onChange={onWin}
+          />
+        </div>
+      )}
+      module={
+        file
+          ? {
+              name: `Moves in ${win === "q" ? `${qLabel(file.latest_q)} filings` : windowName(win, file.latest_q)}`,
+              note: `${CONVICTION_RULE} The most unusual move for its fund comes first. "Since" = price change from the estimated trade price to today. Source: SEC 13F filings; Orca estimates.`,
+            }
+          : undefined
       }
     >
-      {list.status !== "ready" ? (
-        <Status state={list} />
-      ) : (
-        <>
-          <ListTable
+      {({ compact, narrow }) =>
+        look &&
+        file && (
+          <ConvictionTable
             key={win}
-            label="Conviction moves"
-            noun="moves"
-            columns={columns}
-            rows={list.data.rows}
-            initial={MOST_UNUSUAL}
-            rowKey={(r) => `${r.fund_id}-${r.stock_id}-${r.q}`}
-            empty={
-              win === "q"
-                ? "No conviction moves this quarter."
-                : "No conviction moves in the last 4 quarters."
-            }
-            paged
+            look={look}
+            rows={file.rows}
+            win={win}
+            compact={compact}
+            narrow={narrow}
           />
-          <p className="pf">
-            {win === "q"
-              ? `${qLabel(list.data.latest_q)} filings`
-              : `The 4 quarters to ${qLabel(list.data.latest_q)}`}
-            , the most unusual move for its fund first. "Since" = price change
-            from the estimated trade price to today.
-          </p>
-        </>
-      )}
-    </Panel>
+        )
+      }
+    </ListSection>
+  );
+}
+
+function ConvictionTable({
+  look,
+  rows,
+  win,
+  compact,
+  narrow,
+}: {
+  look: Lookup;
+  rows: ConvictionRow[];
+  win: CallWindow;
+  compact: boolean;
+  narrow: boolean;
+}) {
+  const columns = useMemo(
+    () => convictionColumns(look, win, rows, compact),
+    [look, win, rows, compact],
+  );
+  return (
+    <ScrollTable
+      rows={rows}
+      columns={columns}
+      initial={MOST_UNUSUAL}
+      label="Conviction moves"
+      noun={["move", "moves"]}
+      rowKey={(r) => `${r.fund_id}-${r.stock_id}-${r.q}`}
+      href={(r) => `/fund/${r.fund_id}/stock/${r.stock_id}`}
+      phone={compact}
+      sorts={CONVICTION_SORTS}
+      pageSize={MOVE_PAGE}
+      empty={
+        win === "q"
+          ? "No conviction moves this quarter."
+          : "No conviction moves in the last 4 quarters."
+      }
+      className={"moves" + (narrow ? " narrow" : "")}
+    />
   );
 }
 
@@ -1050,17 +1038,15 @@ const MODES: ChoiceOption<Mode>[] = [
   { id: "best", label: "Best calls" },
   { id: "worst", label: "Worst calls" },
 ];
-const WINDOWS: ChoiceOption<CallWindow>[] = [
-  { id: "q", label: "Last quarter's buys" },
-  { id: "y", label: "Last 4 quarters' buys" },
+/** A phone's switches share one row: the window, then best or worst. */
+const MODES_SHORT: ChoiceOption<Mode>[] = [
+  { id: "best", label: "Best" },
+  { id: "worst", label: "Worst" },
 ];
-
-type Call = {
-  row: CallRow;
-  price: number | undefined;
-  sinceBuy: number | null;
-  sinceFiled: number | null;
-};
+const MOVE_WINDOWS_SHORT: ChoiceOption<CallWindow>[] = [
+  { id: "q", label: "Last quarter" },
+  { id: "y", label: "Last 4 qtrs" },
+];
 
 /** Every row of the file with today's figures, best first (or worst first); rows without a price go last. */
 function rankCalls(
@@ -1100,7 +1086,7 @@ function Calls({
   win,
   onWin,
 }: {
-  lookup: Lookup;
+  lookup: Load<Lookup>;
   mode: Mode;
   onMode: (m: Mode) => void;
   win: CallWindow;
@@ -1110,102 +1096,93 @@ function Calls({
     () => loadHome(win === "q" ? "calls_q" : "calls_y"),
     [win],
   );
-  const ranked = useMemo(
-    () =>
-      list.status === "ready"
-        ? rankCalls(list.data.rows, lookup.prices, mode)
-        : [],
-    [list, lookup, mode],
-  );
-  const columns = useMemo<Col<Call>[]>(
-    () => [
-      stockCol(
-        lookup,
-        (c) => c.row.fund_id,
-        (c) => c.row.stock_id,
-      ),
-      fundCol(
-        lookup,
-        (c) => c.row.fund_id,
-        (c) => c.row.name,
-      ),
-      {
-        header: "Bought",
-        key: "q",
-        by: (c) => c.row.q,
-        cell: (c) => <BoughtBox q={c.row.q} />,
-      },
-      {
-        header: "Est. buy price",
-        key: "est",
-        by: (c) => c.row.est_price,
-        cell: (c) => fPrice(c.row.est_price),
-      },
-      {
-        header: "Price now",
-        key: "now",
-        by: (c) => c.price ?? null,
-        cell: (c) => fPrice(c.price ?? null),
-      },
-      {
-        header: "Since fund's buy",
-        key: "since",
-        by: (c) => c.sinceBuy,
-        cell: (c) => <SinceBox v={c.sinceBuy} />,
-      },
-      {
-        header: "Since 13F went public",
-        key: "filed",
-        by: (c) => c.sinceFiled,
-        cell: (c) => <Signed v={c.sinceFiled}>{pct(c.sinceFiled, 0)}</Signed>,
-      },
-    ],
-    [lookup],
-  );
+  const look = lookup.status === "ready" ? lookup.data : null;
+  const file = list.status === "ready" ? list.data : null;
+  const load: Load<unknown> = lookup.status !== "ready" ? lookup : list;
   return (
-    <Panel
+    <ListSection
       title="Best & worst calls"
-      subtitle={CALLS_RULE}
-      controls={
+      className="calls"
+      load={load}
+      controls={(phone) => (
         <>
-          <Choice
-            label="Best or worst"
-            options={MODES}
-            value={mode}
-            onChange={onMode}
-          />
-          <Choice
-            label="Buys from"
-            options={WINDOWS}
-            value={win}
-            onChange={onWin}
-          />
-        </>
-      }
-    >
-      {list.status !== "ready" ? (
-        <Status state={list} />
-      ) : (
-        <>
-          <ListTable
-            key={mode}
-            label={mode === "best" ? "Best calls" : "Worst calls"}
-            noun="buys"
-            columns={columns}
-            rows={ranked}
-            initial={{ key: "since", dir: mode === "best" ? -1 : 1 }}
-            rowKey={(c) => `${c.row.fund_id}-${c.row.stock_id}-${c.row.q}`}
-            empty="No buys in this window."
-          />
-          <p className="pf">
-            "Since 13F went public" starts on the day the 13F was filed: what a
-            copier could still have caught. Each list holds at most the 50 best
-            and 50 worst buys at the last data build; the order here uses
-            today's prices.
-          </p>
+          <div className="fo-per">
+            <Choice
+              label="Buys from"
+              options={phone ? MOVE_WINDOWS_SHORT : MOVE_WINDOWS}
+              value={win}
+              onChange={onWin}
+            />
+          </div>
+          <div className="fo-mode">
+            <Choice
+              label="Best or worst"
+              options={phone ? MODES_SHORT : MODES}
+              value={mode}
+              onChange={onMode}
+            />
+          </div>
         </>
       )}
-    </Panel>
+      module={
+        file
+          ? {
+              name: `Buys in ${win === "q" ? `${qLabel(file.latest_q)} filings` : windowName(win, file.latest_q)}`,
+              note: `${CALLS_RULE} "Since 13F went public" starts on the day the 13F was filed: what a copier could still have caught. Each list holds at most the 50 best and 50 worst buys at the last data build; the order here uses today's prices. Source: SEC 13F filings; Orca estimates.`,
+            }
+          : undefined
+      }
+    >
+      {({ compact, narrow }) =>
+        look &&
+        file && (
+          <CallsTable
+            key={`${mode}-${win}`}
+            look={look}
+            rows={file.rows}
+            mode={mode}
+            win={win}
+            compact={compact}
+            narrow={narrow}
+          />
+        )
+      }
+    </ListSection>
+  );
+}
+
+function CallsTable({
+  look,
+  rows,
+  mode,
+  win,
+  compact,
+  narrow,
+}: {
+  look: Lookup;
+  rows: CallRow[];
+  mode: Mode;
+  win: CallWindow;
+  compact: boolean;
+  narrow: boolean;
+}) {
+  const ranked = useMemo(() => rankCalls(rows, look.prices, mode), [rows, look, mode]);
+  const columns = useMemo(() => callColumns(look, win, compact), [look, win, compact]);
+  return (
+    <ScrollTable
+      rows={ranked}
+      columns={columns}
+      initial={{ key: "since", dir: mode === "best" ? -1 : 1 }}
+      label={mode === "best" ? "Best calls" : "Worst calls"}
+      noun={["buy", "buys"]}
+      rowKey={(c) => `${c.row.fund_id}-${c.row.stock_id}-${c.row.q}`}
+      href={(c) => `/fund/${c.row.fund_id}/stock/${c.row.stock_id}`}
+      phone={compact}
+      sorts={CALL_SORTS}
+      pageSize={MOVE_PAGE}
+      empty="No buys in this window."
+      className={"calls" + (narrow ? " narrow" : "")}
+    />
   );
 }
 
@@ -1322,6 +1299,18 @@ export default function Home() {
         onView={setFamousView}
       />
     );
+  else if (tab === "conviction")
+    panel = <Conviction lookup={lookup} win={moveWin} onWin={setMoveWin} />;
+  else if (tab === "calls")
+    panel = (
+      <Calls
+        lookup={lookup}
+        mode={mode}
+        onMode={setMode}
+        win={win}
+        onWin={setWin}
+      />
+    );
   else if (lookup.status !== "ready") {
     // Stocks, prices and fund sizes are what these lists are made of: the panel waits for them.
     panel = (
@@ -1329,22 +1318,8 @@ export default function Home() {
         <Status state={lookup} />
       </Panel>
     );
-  } else if (tab === "conviction")
-    panel = (
-      <Conviction lookup={lookup.data} win={moveWin} onWin={setMoveWin} />
-    );
-  else if (tab === "wins") panel = <WinsLosses lookup={lookup.data} />;
-  else if (tab === "crowded") panel = <Crowded lookup={lookup.data} />;
-  else
-    panel = (
-      <Calls
-        lookup={lookup.data}
-        mode={mode}
-        onMode={setMode}
-        win={win}
-        onWin={setWin}
-      />
-    );
+  } else if (tab === "wins") panel = <WinsLosses lookup={lookup.data} />;
+  else panel = <Crowded lookup={lookup.data} />;
 
   return (
     <div className="fp">

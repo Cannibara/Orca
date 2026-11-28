@@ -50,14 +50,14 @@ export const bestFirst = (a: TopRow, b: TopRow): number => b.ann_return - a.ann_
 
 /** The layout of each mode: rows in the window, row height, the plot's right inset (room for the end label),
  * the label room kept left of a loss (7.3), Page Up/Down rows, the fixed columns before the plot, the label gap. */
-const DESKTOP = { vis: 20, row: 46, inset: 56, room: 50, page: 19, cols: 32 + 14 + 252 + 14, gap: 6 };
-const PHONE = { vis: 10, row: 48, inset: 58, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
+export const DESKTOP = { vis: 20, row: 46, inset: 56, room: 50, page: 19, cols: 32 + 14 + 252 + 14, gap: 6 };
+export const PHONE = { vis: 10, row: 48, inset: 58, room: 48, page: 9, cols: 28 + 8 + 136 + 8, gap: 5 };
 type Mode = typeof DESKTOP;
 /** ms the grow-in takes at most (8): the last row starts at 450ms and its label fades in 450ms after that over
  * 300ms, so 1200ms, plus a margin. After it the animations are taken off, which makes each frame's restyle cheaper. */
 const GROW_MS = 1400;
 /** ms without a change before a screen reader hears the caption: a glide passes many rows. */
-const SETTLE_MS = 300;
+export const SETTLE_MS = 300;
 /** Below this width (px) the module lays out for a phone. */
 export const PHONE_BELOW = 560;
 /** The width assumed when it cannot be measured (jsdom): a desktop page. */
@@ -84,7 +84,7 @@ export function useDark(): boolean {
 }
 
 /** `value` once it has stopped changing for `ms` (what a polite live region should announce). */
-function useSettled<T>(value: T, ms: number): T {
+export function useSettled<T>(value: T, ms: number): T {
   const [settled, setSettled] = useState(value);
   useEffect(() => {
     const id = setTimeout(() => setSettled(value), ms);
@@ -302,6 +302,8 @@ export function FamousChart({
   offset = 0,
   total,
   foot,
+  start = 0,
+  onView,
 }: {
   /** The list's name (a new list, or a new page of one, starts at the top). */
   name: string;
@@ -317,6 +319,10 @@ export function FamousChart({
   total?: number;
   /** Shown beside the caption (Top funds' page buttons). */
   foot?: ReactNode;
+  /** The row to open at (its place in `rows`, best first): where the table was, so Table → Chart keeps the funds in view. */
+  start?: number;
+  /** Told the row at the top of the window whenever it changes. */
+  onView?: (top: number) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -359,10 +365,10 @@ export function FamousChart({
   }, [track]);
 
   // Position in rows from the top (fractional while gliding): kept out of React, painted straight to the DOM.
-  const pos = useRef(0);
+  const pos = useRef(start);
   const scene = useRef<Scene | null>(null);
   // React state is only the whole row at the top of the window.
-  const [view, setView] = useState(0);
+  const [view, setView] = useState(start);
   const onPos = useCallback((p: number) => {
     pos.current = p;
     const sc = scene.current;
@@ -386,6 +392,16 @@ export function FamousChart({
     if (scene.current) paint(scene.current, 0);
   }, [name, period, es]);
   useEffect(() => () => tip.hide(), [tip]);
+  // The window shows the whole row it is at: on opening at `start`, and when the row height changes (the first
+  // measured width can be a phone's), so the same funds stay in view.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !scrolls) return;
+    const top = Math.round(clamp(pos.current, 0, n - M.vis));
+    if (el.scrollTop !== top * M.row) el.scrollTop = top * M.row;
+    pos.current = top;
+    setView(top);
+  }, [M.row, M.vis, scrolls, n]);
 
   // After a render that can change the scale or the elements it moves: find them again and paint them all.
   useLayoutEffect(() => {
@@ -428,6 +444,11 @@ export function FamousChart({
   }, [grow.on, grow.run]);
 
   const top = scrolls ? clamp(view, 0, n - M.vis) : 0;
+  const told = useRef(onView);
+  told.current = onView;
+  useEffect(() => {
+    told.current?.(top);
+  }, [top]);
   const first = top + 1;
   const last = Math.min(n, top + M.vis);
   const all = total ?? n;

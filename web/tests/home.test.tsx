@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -15,10 +15,9 @@ import type {
   TopList,
   TopRow,
 } from "../src/data/types";
-import { initials, retLabel } from "../src/home/famousChart";
+import { aumLabel, initials, retLabel } from "../src/home/famousChart";
 import { shortNameOf } from "../src/lib/famousNames";
 import Home from "../src/pages/Home";
-import { fBook } from "../src/pages/homeFmt";
 
 // ---- fixtures: the demo JSON under public/demo-data, served through a mocked fetch ----
 
@@ -127,7 +126,9 @@ const fundOrder = () =>
   screen
     .getAllByRole("row")
     .slice(1)
-    .map((r) => within(r).getAllByRole("link")[1].textContent);
+    .map((r) => within(r).getAllByRole("link")[0].textContent);
+/** The ranked lists' order: best return first, ties by fund id (the chart's). */
+const byReturn = (a: TopRow, b: TopRow) => b.ann_return - a.ann_return || a.fund_id - b.fund_id;
 /** The famous lists' most popular order: the owner's rank, then the Google Trends score, then size. */
 const byPopularity = (a: TopRow, b: TopRow) =>
   (a.rank ?? Infinity) - (b.rank ?? Infinity) ||
@@ -395,15 +396,15 @@ describe("Home", () => {
           .getAllByRole("columnheader")
           .map((h) => h.querySelector(".sort")?.textContent),
       ).toEqual([
-        "Fund most popular",
+        "Fund",
         "Return / yr",
         "AUM",
         "Positions",
         "Max drawdown",
         "Sharpe",
       ]);
-      // a list opens with its most popular fund first: the owner's rank, Google Trends score, then size
-      const best = famous.filter((f) => f.group === group).sort(byPopularity);
+      // a list opens in the chart's order, best return first (owner, 2026-11-28: switching must look seamless)
+      const best = famous.filter((f) => f.group === group).sort(byReturn);
       const rows = within(table).getAllByRole("row").slice(1);
       expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
         best.map((f) => shortNameOf(f.fund_id, f.name)),
@@ -461,11 +462,8 @@ describe("Home", () => {
         .slice(1)
         .map((r) => within(r).getByRole("link").textContent);
     const fund = () => within(table).getByRole("button", { name: /^Fund/ });
-    expect(names()).toEqual(popular);
-    await user.click(
-      within(table).getByRole("button", { name: "Return / yr" }),
-    );
-    expect(names()).not.toEqual(popular);
+    // the chart's order first
+    expect(names()).toEqual(value.slice().sort(byReturn).map((f) => shortNameOf(f.fund_id, f.name)));
     await user.click(fund()); // from another column: A to Z first
     expect(names()).toEqual(byName);
     await user.click(fund());
@@ -502,17 +500,25 @@ describe("Home", () => {
         .getAllByRole("columnheader")
         .map((h) => h.querySelector(".sort")?.textContent),
     ).toEqual([
-      "Fund most popular",
+      "Fund",
       "Return / yr",
       "AUM",
       "Positions",
       "Max drawdown",
       "Sharpe",
     ]);
-    const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual(
-      read.map((r) => shortNameOf(r.fund_id, r.name)),
-    );
+    // the table holds Most searched's funds in the chart's order; the Fund heading brings back the popularity order
+    const rows = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => within(r).getByRole("link").textContent);
+    expect(rows()).toEqual(read.slice().sort(byReturn).map((r) => shortNameOf(r.fund_id, r.name)));
+    const fund = within(table).getByRole("button", { name: /^Fund/ });
+    await user.click(fund);
+    await user.click(fund);
+    await user.click(fund);
+    expect(rows()).toEqual(read.map((r) => shortNameOf(r.fund_id, r.name)));
     // the list's line is not shown; it describes the section for screen readers
     expect(
       screen.getByRole("heading", { level: 2, name: "Famous funds" }).closest("section"),
@@ -520,7 +526,7 @@ describe("Home", () => {
     expect(screen.queryByText(/Google Trends/)).toBeNull();
   });
 
-  it("a famous list's table pages on its own, 10 funds a page; a new list starts on page 1; the switches survive a tab change", async () => {
+  it("a famous list's table holds the whole list in the chart's window; a new list starts at the top; the switches survive a tab change", async () => {
     const t3 = demo<TopList>("home/top_3y.json");
     const row = (t3.famous ?? [])[0];
     expect(row.search).toBeNull(); // so these lists have no Most searched
@@ -552,15 +558,21 @@ describe("Home", () => {
         .getAllByRole("row")
         .slice(1)
         .map((r) => within(r).getByRole("link").textContent);
-    expect(names()).toHaveLength(10);
-    expect(screen.getByText("Showing 1–10 of 25 funds")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(names()[0]).toBe("Value 11");
+    expect(names()).toHaveLength(25);
+    expect(document.querySelector(".fc-cap")).toHaveTextContent(/^Showing 1–20 of 25 funds$/);
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    const body = () => document.querySelector<HTMLElement>(".rk tbody")!;
+    act(() => {
+      body().scrollTop = 5 * 46;
+      fireEvent.scroll(body());
+    });
+    expect(document.querySelector(".fc-cap")).toHaveTextContent(/^Showing 6–25 of 25 funds$/);
     await showList(user, "Macro");
-    expect(screen.getByText("Showing 1–10 of 12 funds")).toBeInTheDocument();
+    expect(document.querySelector(".fc-cap")).toHaveTextContent(/^Showing all 12 funds$/);
     expect(names()[0]).toBe("Macro 01");
     await showList(user, "Value");
-    expect(names()[0]).toBe("Value 01"); // back on page 1
+    expect(document.querySelector(".fc-cap")).toHaveTextContent(/^Showing 1–20 of 25 funds$/); // back at the top
+    expect(names()[0]).toBe("Value 01");
     // the one period switch: the 1-year file has no Macro
     await user.click(screen.getByRole("button", { name: "1 year" }));
     await waitFor(() =>
@@ -713,7 +725,7 @@ describe("Home", () => {
     expect(within(section).getByRole("heading", { level: 2, name: "Top funds" })).toBeInTheDocument();
     // no standfirst or fund count (owner, 2026-11-23): the axis says what the bars are
     expect(section).not.toHaveTextContent(/Estimated return a year over/);
-    expect(section).not.toHaveTextContent(`${t3.eligible.length} funds`);
+    expect(section.querySelector(".fam-rule")).not.toHaveTextContent(`${t3.eligible.length} funds`);
     expect(section.querySelector(".fc-axl")).toHaveTextContent("Estimated return a year");
     // no card: the same module as Famous funds, and Chart is the pressed view
     expect(section).toHaveClass("ranked");
@@ -757,7 +769,7 @@ describe("Home", () => {
     const rows = () => [...section.querySelectorAll<HTMLAnchorElement>(".fc a.fc-row")];
     expect(screen.getByRole("region", { name: "Funds 1 to 20 of 250, scrollable" })).toHaveStyle({ height: "920px" });
     expect(rows()).toHaveLength(80);
-    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 1–20 of 250 · one scale for this page");
+    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 1–20 of 250 funds · one scale for this page");
     expect(rows()[0].querySelector(".lab.lead")).not.toBeNull(); // the best of the whole list
     const pager = () => within(section).getByRole("navigation", { name: "Pages of funds" });
     expect(within(pager()).getByText("Page 1 of 4")).toBeInTheDocument();
@@ -769,18 +781,18 @@ describe("Home", () => {
     expect(rows()[0]).toHaveAttribute("href", "/fund/100080");
     expect(rows()[0].getAttribute("aria-label")).toMatch(/^81 of 250\. Fund 081, /);
     expect(rows()[0].querySelector(".lab.lead")).toBeNull(); // only the list's best has the lead label
-    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 81–100 of 250 · one scale for this page");
+    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 81–100 of 250 funds · one scale for this page");
 
     // the last page holds what is left, and fits without scrolling
     await user.click(within(pager()).getByRole("button", { name: "Next" }));
     await user.click(within(pager()).getByRole("button", { name: "Next" }));
     expect(rows()).toHaveLength(10);
-    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 241–250 of 250");
+    expect(section.querySelector(".fc-cap")).toHaveTextContent("Showing 241–250 of 250 funds");
     expect(within(pager()).getByRole("button", { name: "Next" })).toBeDisabled();
 
     // a new period starts again on page 1
     await user.click(screen.getByRole("button", { name: "5 years" }));
-    await waitFor(() => expect(section.querySelector(".fc-cap")).toHaveTextContent(/^Showing 1–\d+ of \d+$/));
+    await waitFor(() => expect(section.querySelector(".fc-cap")).toHaveTextContent(/^Showing all \d+ funds$/));
     await user.click(screen.getByRole("button", { name: "3 years" }));
     expect(await within(section).findByText("Page 1 of 4")).toBeInTheDocument();
   });
@@ -929,9 +941,8 @@ describe("Home", () => {
         "Best & worst calls",
         /New positions or adds ≥ 1% of the book, by funds that qualify for Top funds or concentrated active funds\./,
         [
-          "Stock",
           "Fund",
-          "Bought",
+          "Stock",
           "Est. buy price",
           "Price now",
           "Since fund's buy",
@@ -956,7 +967,8 @@ describe("Home", () => {
       expect(
         screen.queryAllByRole("columnheader", { name: /spy|s&p/i }),
       ).toHaveLength(0);
-      expect(document.querySelector(".home .ps")?.textContent).not.toMatch(
+      // the rule: a panel's subtitle, or the note under a list drawn as Famous funds is
+      expect(document.querySelector(".home :is(.ps, .fam-src)")?.textContent ?? "").not.toMatch(
         /spy|s&p/i,
       );
     }
@@ -1076,11 +1088,12 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     const row = (await screen.findAllByRole("row"))[1];
-    const link = within(row).getByRole("link", {
-      name: "Lanternfish Capital Management",
-    });
-    expect(link.parentElement).toHaveClass("stk");
-    expect(link.nextElementSibling).toHaveTextContent(fBook(lantern)); // the muted line, outside the link
+    // the chart's row: the short name (the legal one as its title), a dot, the AUM, outside the link
+    const link = within(row).getByRole("link", { name: "Lanternfish Capital" });
+    expect(link).toHaveAttribute("title", "Lanternfish Capital Management");
+    expect(link.parentElement).toHaveClass("l1");
+    expect(link.parentElement!.querySelector(".am")).toHaveTextContent(aumLabel(lantern));
+    expect(row.querySelector(".fc-face.init")).toHaveTextContent("LC");
   });
 
   it("shows no book line when the fund index could not be loaded, and the list still works", async () => {
@@ -1089,8 +1102,8 @@ describe("Home", () => {
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Best & worst calls" }));
     const row = (await screen.findAllByRole("row"))[1];
-    expect(within(row).getAllByRole("link")).toHaveLength(2); // stock and fund
-    expect(row.querySelector(".sub")).toBeNull();
+    expect(within(row).getAllByRole("link")).toHaveLength(2); // fund and stock
+    expect(row.querySelector(".am")).toBeNull();
   });
 
   it("shows skeleton rows with a status while a list loads, and keeps the period control", async () => {
@@ -1126,11 +1139,11 @@ describe("Home", () => {
     );
   });
 
-  it("conviction shows the same page bar in both views, even on a single page", async () => {
-    const row = (q: number): ConvictionRow => ({
+  it("conviction's foot is the chart's: the caption, and page buttons only when there is more than a page", async () => {
+    const row = (q: number, stock_id = 13): ConvictionRow => ({
       fund_id: 9100003,
       name: "Lanternfish Capital Management",
-      stock_id: 13,
+      stock_id,
       q,
       move: "new",
       usd: 60e6,
@@ -1142,29 +1155,32 @@ describe("Home", () => {
     stubData({
       "home/conviction_q.json": {
         latest_q: 53,
-        rows: [row(53), { ...row(53), stock_id: 5 }],
+        rows: [row(53), row(53, 5)],
       },
-      "home/conviction_y.json": { latest_q: 53, rows: [row(51)] },
+      "home/conviction_y.json": {
+        latest_q: 53,
+        rows: Array.from({ length: 130 }, (_, i) => ({ ...row(51 + (i % 3), 1000 + i), score: 200 - i })),
+      },
     });
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole("tab", { name: "Conviction moves" }));
     await screen.findByRole("table", { name: "Conviction moves" });
-    let bars = screen.getAllByRole("navigation", { name: "Pages of moves" });
-    expect(bars).toHaveLength(2); // above and below the table
-    expect(bars[0]).toHaveTextContent("Showing 1–2 of 2 moves");
-    expect(bars[0]).toHaveTextContent("Page 1 of 1");
-    expect(
-      within(bars[0]).getByRole("button", { name: "Previous" }),
-    ).toBeDisabled();
-    expect(
-      within(bars[0]).getByRole("button", { name: "Next" }),
-    ).toBeDisabled();
+    const cap = () => document.querySelector(".fc-cap");
+    expect(cap()).toHaveTextContent(/^Showing all 2 moves$/);
+    expect(screen.queryByRole("navigation", { name: "Pages of moves" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Last 4 quarters" }));
-    await screen.findByText(/The 4 quarters to Q2 2026/);
-    bars = screen.getAllByRole("navigation", { name: "Pages of moves" });
-    expect(bars).toHaveLength(2);
-    expect(bars[0]).toHaveTextContent("Showing 1–1 of 1 moves");
+    await screen.findByRole("heading", { level: 3, name: "Moves in the 4 quarters to Q2 2026" });
+    // 100 a page, 20 of them in the chart's window
+    const table = screen.getByRole("table", { name: "Conviction moves" });
+    expect(within(table).getAllByRole("row")).toHaveLength(101);
+    expect(table.querySelector("tbody")).toHaveStyle({ height: `${20 * 46}px` });
+    expect(cap()).toHaveTextContent(/^Showing 1–20 of 130 moves$/);
+    const bar = screen.getByRole("navigation", { name: "Pages of moves" });
+    expect(bar.closest(".fc-foot")).not.toBeNull(); // beside the caption, under the table
+    await user.click(within(bar).getByRole("button", { name: "Next" }));
+    expect(within(table).getAllByRole("row")).toHaveLength(31);
+    expect(cap()).toHaveTextContent(/^Showing 101–120 of 130 moves$/);
   });
 
   it("conviction sorts by any column", async () => {
@@ -1248,7 +1264,7 @@ describe("Home", () => {
     expect(
       screen.getByRole("button", { name: "Last 4 quarters" }),
     ).toHaveAttribute("aria-pressed", "true");
-    await screen.findByText(/The 4 quarters to Q2 2026/);
+    await screen.findByRole("heading", { level: 3, name: "Moves in the 4 quarters to Q2 2026" });
     expect(urls).toContain("/demo-data/home/conviction_y.json");
     const table = screen.getByRole("table", { name: "Conviction moves" });
     expect(
@@ -1292,16 +1308,16 @@ describe("Home", () => {
       "/fund/9100001/stock/16",
     ); // the name tidied, as on the fund page
     expect(
-      within(row).getByRole("link", { name: "Kelpwood Capital LP" }),
+      within(row).getByRole("link", { name: "Kelpwood Capital" }), // the chart's short name
     ).toHaveAttribute("href", "/fund/9100001");
-    // the quarter of the buy sits in a purchase box: the word "Bought" and "Q2 ’26"
-    const bought = within(row).getByRole("img", { name: "Bought in Q2 2026" });
-    expect(bought).toHaveClass("lc", "add");
-    expect(bought).toHaveTextContent("BoughtQ2 ’26");
+    // the window is the module's name; a last quarter's list has no quarter column
+    expect(screen.getByRole("heading", { level: 3, name: "Buys in Q2 2026 filings" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: /Quarter|Bought/ })).toBeNull();
     expect(within(row).getByText("$10.00")).toBeInTheDocument(); // est. buy price
     expect(within(row).getByText("$12.00")).toBeInTheDocument(); // price now
     expect(within(row).getByText("+20%")).toBeInTheDocument(); // 12 / 10 - 1
-    expect(within(row).getByText("+20%").closest(".lc")).toHaveClass("add"); // the fund's buy, in a blue-tinted box
+    expect(within(row).getByText("+20%")).toHaveClass("up"); // the list's figure: signed, blue
+    expect(within(row).getByText("+20%").closest("td")).toHaveClass("key");
     expect(within(row).getByText("+9%")).toBeInTheDocument(); // 12 / 11 - 1
   });
 
@@ -1363,10 +1379,10 @@ describe("Home", () => {
     expect(urls).toContain("/demo-data/home/calls_q.json");
     expect(urls).not.toContain("/demo-data/home/calls_y.json");
     expect(
-      screen.getByRole("button", { name: "Last quarter's buys" }),
+      screen.getByRole("button", { name: "Last quarter" }),
     ).toHaveAttribute("aria-pressed", "true");
     await user.click(
-      screen.getByRole("button", { name: "Last 4 quarters' buys" }),
+      screen.getByRole("button", { name: "Last 4 quarters" }),
     );
     await waitFor(() => expect(urls).toContain("/demo-data/home/calls_y.json"));
     await waitFor(() =>
@@ -1374,6 +1390,8 @@ describe("Home", () => {
         demo<RowsFile<CallRow>>("home/calls_y.json").rows.length + 1,
       ),
     );
+    // four quarters' buys say which quarter each was
+    expect(screen.getByRole("columnheader", { name: "Quarter" })).toBeInTheDocument();
   });
 
   it("a list that fails to load shows one error line, not a blank page", async () => {

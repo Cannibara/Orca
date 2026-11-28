@@ -135,16 +135,27 @@ export function sourceLine(spx: { ann_return: number | null; from_q: number; to_
 }
 
 /**
- * The line under the chart. `first`/`last` are places in the whole list; `total` is set when the chart shows one
- * page of a longer list (Top funds, 80 a page), whose scale is then the page's.
+ * The line under the chart, and under its table (`scale` false: a table has no scale to speak of, so switching
+ * Chart | Table changes nothing else in it). `first`/`last` are places in the whole list; `total` is set when the
+ * rows are one page of a longer list (Top funds, 80 a page), whose scale is then the page's. `noun` is singular,
+ * plural.
  */
-export function captionText(first: number, last: number, n: number, scrolls: boolean, total?: number): string {
+export function captionText(
+  first: number,
+  last: number,
+  n: number,
+  scrolls: boolean,
+  total?: number,
+  noun: readonly [string, string] = ["fund", "funds"],
+  scale = true,
+): string {
   if (total !== undefined) {
-    const of = `Showing ${count(first)}–${count(last)} of ${count(total)}`;
-    return scrolls ? `${of} · one scale for this page` : of;
+    const of = `Showing ${count(first)}–${count(last)} of ${count(total)} ${noun[1]}`;
+    return scrolls && scale ? `${of} · one scale for this page` : of;
   }
-  if (!scrolls) return n === 1 ? "Showing 1 fund" : `Showing all ${n} funds`;
-  return `Showing ${first}–${last} of ${n} · one scale for the whole list`;
+  if (!scrolls) return n === 1 ? `Showing 1 ${noun[0]}` : `Showing all ${count(n)} ${noun[1]}`;
+  const of = `Showing ${count(first)}–${count(last)} of ${count(n)} ${noun[1]}`;
+  return scale ? `${of} · one scale for the whole list` : of;
 }
 
 /**

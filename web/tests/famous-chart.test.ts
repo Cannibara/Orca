@@ -225,12 +225,15 @@ describe("copy", () => {
   });
 
   it("captionText", () => {
-    expect(captionText(1, 15, 50, true)).toBe("Showing 1–15 of 50 · one scale for the whole list");
+    expect(captionText(1, 15, 50, true)).toBe("Showing 1–15 of 50 funds · one scale for the whole list");
     expect(captionText(1, 12, 12, false)).toBe("Showing all 12 funds");
     expect(captionText(1, 1, 1, false)).toBe("Showing 1 fund");
-    // one page of a longer list (Top funds): places in the whole list, the page's own scale
-    expect(captionText(81, 100, 80, true, 1509)).toBe("Showing 81–100 of 1,509 · one scale for this page");
-    expect(captionText(1481, 1509, 29, false, 1509)).toBe("Showing 1,481–1,509 of 1,509");
+    expect(captionText(81, 100, 80, true, 1509)).toBe("Showing 81–100 of 1,509 funds · one scale for this page");
+    expect(captionText(1481, 1509, 29, false, 1509)).toBe("Showing 1,481–1,509 of 1,509 funds");
+    // the table's line: the same words without the scale, in its own noun
+    expect(captionText(1, 20, 59, true, undefined, ["move", "moves"], false)).toBe("Showing 1–20 of 59 moves");
+    expect(captionText(81, 100, 80, true, 1509, ["fund", "funds"], false)).toBe("Showing 81–100 of 1,509 funds");
+    expect(captionText(1, 1, 1, false, undefined, ["buy", "buys"], false)).toBe("Showing 1 buy");
   });
 
   it("rowLabel", () => {

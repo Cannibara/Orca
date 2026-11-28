@@ -112,7 +112,7 @@ describe("Famous funds chart", () => {
     expect(rows[0].querySelector(".lab")).toHaveTextContent(retLabel(want[0].ann_return));
     expect(screen.getByRole("heading", { level: 3, name: "Most searched" })).toBeInTheDocument();
     expect(screen.queryByText("50 funds")).toBeNull(); // no count beside the list's name (owner, 2026-11-23)
-    expect(caption()).toBe("Showing 1–20 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 1–20 of 50 funds · one scale for the whole list");
     await user.click(rows[0]);
     expect(await screen.findByText(`Fund page ${want[0].fund_id}`)).toBeInTheDocument();
   });
@@ -155,7 +155,7 @@ describe("Famous funds chart", () => {
       box().scrollTop = 30 * 46;
       fireEvent.scroll(box());
     });
-    expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 31–50 of 50 funds · one scale for the whole list");
     expect(box()).toHaveAccessibleName("Funds 31 to 50 of 50, scrollable");
     // the losses are in view, so zero has moved in from the left edge
     expect(parseFloat(zero.style.left)).toBeGreaterThan(20);
@@ -189,7 +189,7 @@ describe("Famous funds chart", () => {
     const said = () => document.querySelector(".fc-said")!;
     expect(said()).toHaveAttribute("aria-live", "polite");
     expect(document.querySelector(".fc-cap")).toHaveAttribute("aria-hidden", "true");
-    expect(said()).toHaveTextContent("Showing 1–20 of 50 · one scale for the whole list");
+    expect(said()).toHaveTextContent("Showing 1–20 of 50 funds · one scale for the whole list");
     vi.useFakeTimers();
     try {
       const heard: string[] = [];
@@ -203,12 +203,12 @@ describe("Famous funds chart", () => {
         });
         act(() => vi.advanceTimersByTime(100));
       }
-      expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list"); // the visible caption follows
-      expect(said()).toHaveTextContent("Showing 1–20 of 50 · one scale for the whole list");
+      expect(caption()).toBe("Showing 31–50 of 50 funds · one scale for the whole list"); // the visible caption follows
+      expect(said()).toHaveTextContent("Showing 1–20 of 50 funds · one scale for the whole list");
       act(() => vi.advanceTimersByTime(300));
       await Promise.resolve(); // the observer's callback
-      expect(said()).toHaveTextContent("Showing 31–50 of 50 · one scale for the whole list");
-      expect(heard).toEqual(["Showing 31–50 of 50 · one scale for the whole list"]);
+      expect(said()).toHaveTextContent("Showing 31–50 of 50 funds · one scale for the whole list");
+      expect(heard).toEqual(["Showing 31–50 of 50 funds · one scale for the whole list"]);
       mo.disconnect();
     } finally {
       vi.useRealTimers();
@@ -223,15 +223,15 @@ describe("Famous funds chart", () => {
     Object.defineProperty(el, "clientHeight", { configurable: true, value: 20 * 46 });
     el.focus();
     await user.keyboard("{ArrowDown}");
-    expect(caption()).toBe("Showing 2–21 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 2–21 of 50 funds · one scale for the whole list");
     await user.keyboard("{PageDown}");
-    expect(caption()).toBe("Showing 21–40 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 21–40 of 50 funds · one scale for the whole list");
     await user.keyboard("{End}");
-    expect(caption()).toBe("Showing 31–50 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 31–50 of 50 funds · one scale for the whole list");
     await user.keyboard("{ArrowUp}");
-    expect(caption()).toBe("Showing 30–49 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 30–49 of 50 funds · one scale for the whole list");
     await user.keyboard("{Home}");
-    expect(caption()).toBe("Showing 1–20 of 50 · one scale for the whole list");
+    expect(caption()).toBe("Showing 1–20 of 50 funds · one scale for the whole list");
   });
 
   it("has no S&P 500 line, label or sentence when the file has no S&P figure", async () => {
@@ -263,7 +263,7 @@ describe("Famous funds chart", () => {
     expect(want).toHaveLength(40);
     expect(screen.getByRole("heading", { level: 3, name: "Fundamental long/short" })).toBeInTheDocument();
     expect(box()).toHaveAccessibleName("Funds 1 to 20 of 40, scrollable");
-    expect(caption()).toBe("Showing 1–20 of 40 · one scale for the whole list");
+    expect(caption()).toBe("Showing 1–20 of 40 funds · one scale for the whole list");
     const rows = chartRows();
     expect(rows).toHaveLength(40);
     expect(rows[0].getAttribute("aria-label")).toMatch(new RegExp(`^1 of 40\\. ${esc(shortNameOf(want[0].fund_id, want[0].name))}`));
@@ -319,7 +319,7 @@ describe("Famous funds chart", () => {
     }
   });
 
-  it("on a phone the table shows 30 funds a page", async () => {
+  it("on a phone the table shows the chart's 10 funds in view, over the whole list", async () => {
     Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 400 });
     try {
       stubData({ "home/top_5y.json": FIXTURE });
@@ -329,8 +329,12 @@ describe("Famous funds chart", () => {
       await user.click(screen.getByRole("button", { name: "5y" }));
       await screen.findByRole("region", { name: "Funds 1 to 10 of 50, scrollable" });
       await user.click(within(screen.getByRole("group", { name: "View" })).getByRole("button", { name: "Table" }));
-      expect(screen.getByText("Showing 1–30 of 50 funds")).toBeInTheDocument();
-      expect(within(screen.getByRole("table", { name: "Most searched" })).getAllByRole("row")).toHaveLength(31);
+      expect(caption()).toBe("Showing 1–10 of 50 funds");
+      const table = screen.getByRole("table", { name: "Most searched" });
+      expect(within(table).getAllByRole("row")).toHaveLength(51);
+      // the chart's phone window: 10 rows of 48px
+      expect(table.querySelector("tbody")).toHaveStyle({ height: "480px" });
+      expect(screen.queryByRole("navigation", { name: "Pages of funds" })).toBeNull();
     } finally {
       delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
     }
@@ -357,25 +361,58 @@ describe("Famous funds chart", () => {
     expect(within(list()).queryByRole("button", { name: "Macro" })).toBeNull();
   });
 
-  it("Chart | Table switches to today's table for the same list, and back", async () => {
+  it("Chart | Table switches to a table of the same list in the chart's order and window, and back", async () => {
     const user = await openFixture();
     const view = () => screen.getByRole("group", { name: "View" });
     expect(within(view()).getByRole("button", { name: "Chart" })).toHaveAttribute("aria-pressed", "true");
     await user.click(within(view()).getByRole("button", { name: "Table" }));
     const table = screen.getByRole("table", { name: "Most searched" });
     expect(screen.queryByRole("region", { name: WINDOW })).toBeNull();
-    // the table keeps the popularity order, with the chart's short names (owner, 2026-11-23)
+    // the chart's order, best return first, with its short names (owner, 2026-11-28: switching must look seamless)
     const names = within(table)
       .getAllByRole("row")
       .slice(1)
       .map((r) => within(r).getByRole("link").textContent);
-    expect(names).toEqual(mostSearched(famous).slice(0, 10).map((r) => shortNameOf(r.fund_id, r.name)));
-    expect(screen.getByText("Showing 1–10 of 50 funds")).toBeInTheDocument();
+    expect(names).toEqual(mostSearched(famous).sort(bestFirst).map((r) => shortNameOf(r.fund_id, r.name)));
+    expect(within(table).getByRole("columnheader", { name: /Return \/ yr/ })).toHaveAttribute("aria-sort", "descending");
+    // the chart's window: 20 rows of 46px in view, the caption under them, no page buttons
+    expect(table.querySelector("tbody")).toHaveStyle({ height: `${20 * 46}px` });
+    expect(caption()).toBe("Showing 1–20 of 50 funds");
+    expect(screen.queryByRole("navigation", { name: "Pages of funds" })).toBeNull();
     // the source stays in both views
     expect(screen.getByText(/^Source: SEC 13F filings/)).toBeInTheDocument();
     await user.click(within(view()).getByRole("button", { name: "Chart" }));
     expect(screen.queryByRole("table")).toBeNull();
     expect(chartRows()).toHaveLength(50);
+  });
+
+  it("switching Chart | Table keeps the same funds in view, until the table is sorted another way", async () => {
+    const user = await openFixture();
+    const view = () => screen.getByRole("group", { name: "View" });
+    const body = () => document.querySelector<HTMLElement>(".rk tbody")!;
+    act(() => {
+      box().scrollTop = 25 * 46;
+      fireEvent.scroll(box());
+    });
+    expect(caption()).toBe("Showing 26–45 of 50 funds · one scale for the whole list");
+    await user.click(within(view()).getByRole("button", { name: "Table" }));
+    expect(body().scrollTop).toBe(25 * 46);
+    expect(caption()).toBe("Showing 26–45 of 50 funds");
+    act(() => {
+      body().scrollTop = 30 * 46;
+      fireEvent.scroll(body());
+    });
+    expect(caption()).toBe("Showing 31–50 of 50 funds");
+    await user.click(within(view()).getByRole("button", { name: "Chart" }));
+    expect(box().scrollTop).toBe(30 * 46);
+    expect(caption()).toBe("Showing 31–50 of 50 funds · one scale for the whole list");
+    // sorted by AUM, the table's rows are not the chart's: back on the chart, the window starts at the top
+    await user.click(within(view()).getByRole("button", { name: "Table" }));
+    await user.click(screen.getByRole("button", { name: "AUM" }));
+    expect(body().scrollTop).toBe(0);
+    expect(caption()).toBe("Showing 1–20 of 50 funds");
+    await user.click(within(view()).getByRole("button", { name: "Chart" }));
+    expect(caption()).toBe("Showing 1–20 of 50 funds · one scale for the whole list");
   });
 
   it("shows the initials of the fund on a grey disc when there is no photo and no manager", async () => {

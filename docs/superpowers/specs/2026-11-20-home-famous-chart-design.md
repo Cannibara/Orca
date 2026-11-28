@@ -57,7 +57,9 @@ search, fame, rank` (`rank` = the owner's hand order from `pipeline/orca/famous_
 
 ### 3.1 Lists
 - **Each list's chart is sorted by `ann_return`, best first** (owner, 2026-11-21: "sort by return of each
-  sublist"); the Table view keeps today's popularity order (§9).
+  sublist"); the Table view keeps today's popularity order (§9). **Superseded 2026-11-28 (owner):** the Table view
+  opens in the chart's order, in the chart's 20-row window, at the funds the chart showed; most popular is one click
+  away on the Fund heading (`web/src/home/ScrollTable.tsx`, DECISIONS 2026-11-28).
 - **Most searched** (first, default): exactly the funds today's site puts in it — reuse `mostSearched(rows, rank)`
   and `popularity(rows)` in `web/src/pages/Home.tsx`: rows with `search` set (not null; 0 is allowed for an
   owner-ranked fund with no Google score), one per `fund_id`, in **popularity order** (owner's `rank` ascending,
