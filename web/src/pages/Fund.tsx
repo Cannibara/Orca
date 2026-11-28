@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { useTooltip } from "../charts/Tooltip";
 import {
@@ -18,7 +18,7 @@ import type { Contrib, Exits, PositionRow, Summary } from "../data/types";
 import { fundTitle, tidyName } from "../lib/format";
 import { positionRows, profitablePct } from "../lib/live";
 import { parseId } from "../lib/routeId";
-import { useLoad } from "../lib/useLoad";
+import { useLoad, type Load } from "../lib/useLoad";
 import { useTitle } from "../lib/useTitle";
 import { AboutPanel } from "../fund/AboutPanel";
 import { AumPanel } from "../fund/AumPanel";
@@ -30,7 +30,8 @@ import { WeeklyStoreContext, useHoldingsState } from "../fund/usePositionData";
 import { WhatIfPanel } from "../fund/WhatIfPanel";
 import { ReturnsPanel } from "../fund/ReturnsPanel";
 import type { Tier } from "../fund/skill";
-import { SPECIALIZATION_HOLD, SpecializationTab, useSkillData } from "../fund/SkillPanels";
+import { loadSkillData, SPECIALIZATION_HOLD, SpecializationTab, useSkillData, type SkillData } from "../fund/SkillPanels";
+import type { MapView } from "../fund/SkillMapPanel";
 import { buildSeries, defaultYearLabel, lastFullLabel, windowYears, type Range } from "../fund/series";
 import type { Span } from "../fund/span";
 import NotFound from "./NotFound";
@@ -76,6 +77,42 @@ async function loadFund(id: number): Promise<FundData | null> {
   };
 }
 
+// ---- opening a fund from another's map ---------------------------------------------------------------
+
+/**
+ * A click on a peer's dot on the Specialization map opens that fund in place (owner 2026-11-28): same tab, same
+ * level, same comparison, and its map where the last one was on screen; only the fund changes. The page stays as
+ * it is while the fund loads, then swaps in one frame. Both history entries carry this, so Back and Forward
+ * return to each fund the same way.
+ */
+type Hop = MapView & {
+  tier: Tier;
+  /** Where the map's chart sat in the viewport (px from its top); null when it was not on the page. */
+  anchor: number | null;
+};
+
+function hopOf(state: unknown): Hop | null {
+  const h = (state as { hop?: Hop } | null)?.hop;
+  return h && typeof h === "object" && (h.tier === 1 || h.tier === 2 || h.tier === 3) ? h : null;
+}
+
+/** Funds loaded for a hop (the one opened and the one left), so either opens without a Loading frame. */
+type Warm = { fund: FundData | null; skill: SkillData | null };
+const warm = new Map<number, Warm>();
+const WARM_MAX = 4;
+
+function keepWarm(id: number, w: Warm) {
+  warm.delete(id);
+  warm.set(id, w);
+  for (const k of warm.keys()) {
+    if (warm.size <= WARM_MAX) break;
+    warm.delete(k);
+  }
+}
+
+/** The map's chart, else its panel: the part of the page a hop holds still. */
+const mapAnchor = () => document.querySelector<Element>(".fp .mapp svg.viz") ?? document.querySelector<Element>(".fp .mapp");
+
 /** The tab the URL's hash picks, and a way to open another (it replaces the hash: a tab is not a page to go back to). */
 function useFundTab(): [FundTab, (t: FundTab) => void] {
   const { hash } = useLocation();
@@ -104,10 +141,13 @@ function useFundTab(): [FundTab, (t: FundTab) => void] {
   return [tab, open];
 }
 
-function FundView({ data }: { data: FundData }) {
+function FundView({ data, ready, hop }: { data: FundData; ready?: SkillData | null; hop: Hop | null }) {
   const { summary, contrib, positions, stocks, prices, asof } = data;
   useTitle(fundTitle(summary.name));
   const [tab, openTab] = useFundTab();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const tip = useTooltip();
   // The Holdings tab's period and weekly files live here, so a visit to another tab keeps them.
   const holdings = useHoldingsState(summary, positions, prices, asof);
   const series = useMemo(() => buildSeries(summary), [summary]);
@@ -119,8 +159,8 @@ function FundView({ data }: { data: FundData }) {
   const [cr, setCr] = useState<Span | null>(null);
   const win = useMemo(() => windowYears(series, range), [series, range]);
   // Specialization: the sector file (loaded when the tab first opens) and the level choices are judged at (R9).
-  const skill = useSkillData(summary.id, tab === "specialization" && !SPECIALIZATION_HOLD);
-  const [tier, setTier] = useState<Tier>(2);
+  const skill = useSkillData(summary.id, tab === "specialization" && !SPECIALIZATION_HOLD, ready);
+  const [tier, setTier] = useState<Tier>(hop?.tier ?? 2);
   // SEC names come in capitals with legal suffixes; the new panels print them tidied.
   const names = useMemo(() => new Map([...stocks].map(([id, s]) => [id, { ...s, name: tidyName(s.name) }])), [stocks]);
 
@@ -134,6 +174,35 @@ function FundView({ data }: { data: FundData }) {
     setSel(label);
     setCr({ a: label, b: label });
   };
+
+  // A peer's dot: load that fund (its page and sector file), then open it in this place. A later click, another
+  // tab, another level or leaving the page drops a hop still loading.
+  const hops = useRef(0);
+  useEffect(() => () => void (hops.current += 1), [tab, tier]);
+  const openPeer = (to: number, view: MapView) => {
+    const n = ++hops.current;
+    Promise.all([loadFund(to), loadSkillData(to)]).then(
+      ([fund, sk]) => keepWarm(to, { fund, skill: sk }),
+      () => undefined, // its page loads again and says what failed
+    ).then(() => {
+      if (n !== hops.current) return;
+      tip.hide();
+      const el = mapAnchor();
+      const at: Hop = { ...view, tier, anchor: el ? el.getBoundingClientRect().top : null };
+      // this fund too, as it is now, for Back
+      if (skill?.status === "ready") keepWarm(summary.id, { fund: data, skill: skill.data });
+      navigate(location, { replace: true, state: { hop: at } });
+      navigate(`/fund/${to}#specialization`, { state: { hop: at } });
+    });
+  };
+
+  // Opened by a hop: put the map back where it was on screen (before the first paint, so nothing jumps).
+  useLayoutEffect(() => {
+    const el = hop?.anchor != null ? mapAnchor() : null;
+    if (!el || hop?.anchor == null || typeof window.scrollTo !== "function") return;
+    window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - hop.anchor, behavior: "instant" });
+    // once, on opening
+  }, []);
 
   return (
     <WeeklyStoreContext.Provider value={holdings.store}>
@@ -161,7 +230,18 @@ function FundView({ data }: { data: FundData }) {
                 <WhatIfPanel fundId={summary.id} positions={positions} exits={data.exits} prices={prices} stocks={names} asof={asof} summary={summary} />
               </>
             )}
-            {tab === "specialization" && <SpecializationTab state={skill} tier={tier} onTier={setTier} fundId={summary.id} name={summary.name} stocks={names} />}
+            {tab === "specialization" && (
+              <SpecializationTab
+                state={skill}
+                tier={tier}
+                onTier={setTier}
+                fundId={summary.id}
+                name={summary.name}
+                stocks={names}
+                view={hop ?? undefined}
+                onPeer={openPeer}
+              />
+            )}
             {tab === "about" && <AboutPanel summary={summary} />}
           </div>
           <p className="fp-foot">
@@ -175,8 +255,12 @@ function FundView({ data }: { data: FundData }) {
 }
 
 function FundLoader({ id }: { id: number }) {
+  const hop = hopOf(useLocation().state);
+  // A fund a hop loaded ahead opens on its first frame, so the page swaps funds without a Loading frame.
+  const [warmed] = useState(() => (hop ? warm.get(id) : undefined));
   // The page is keyed by fund id, so `id` never changes within one instance.
-  const state = useLoad(() => loadFund(id), [id]);
+  const loaded = useLoad(() => (warmed ? Promise.resolve(warmed.fund) : loadFund(id)), [id]);
+  const state: Load<FundData | null> = warmed ? { status: "ready", data: warmed.fund } : loaded;
   if (state.status === "loading") {
     return (
       <p className="cap" role="status">
@@ -193,7 +277,7 @@ function FundLoader({ id }: { id: number }) {
       </p>
     );
   }
-  return state.data === null ? <NotFound /> : <FundView data={state.data} />;
+  return state.data === null ? <NotFound /> : <FundView data={state.data} ready={warmed?.skill} hop={hop} />;
 }
 
 export default function Fund() {

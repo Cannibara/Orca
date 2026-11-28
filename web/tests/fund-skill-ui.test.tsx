@@ -136,6 +136,35 @@ describe("the Specialization tab", () => {
     expect(within(p).getByText(/of their money went to/)).toBeTruthy();
   });
 
+  it("a peer's dot opens that fund in place: same tab, same level, no Loading frame", async () => {
+    stubData();
+    const scrollTo = vi.fn(); // jsdom has no layout: the real placement is checked in e2e/smoke.spec.ts
+    vi.stubGlobal("scrollTo", scrollTo);
+    renderTab();
+    await ready();
+    const before = screen.getByRole("heading", { level: 1 }).textContent;
+    const map = panel("What kind of investor?");
+    fireEvent.click(within(map).getByRole("button", { name: "Sub-industry" }));
+    const dot = within(panel("What kind of investor?")).getAllByRole("link", { name: /Open its page$/ })[0];
+    const to = Number(/^\/fund\/(\d+)#specialization$/.exec(dot.getAttribute("href") ?? "")?.[1]);
+    const funds = demo<{ id: number[]; name: string[] }>("funds.json");
+    const name = funds.name[funds.id.indexOf(to)];
+    expect(name).toBeTruthy();
+    // a Cmd-click is left to the browser (a new tab)
+    expect(fireEvent.click(dot, { metaKey: true })).toBe(true);
+    expect(fireEvent.click(dot)).toBe(false);
+    // the page stays as it is while the fund loads
+    expect(dot).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(before);
+    await screen.findByRole("heading", { level: 1, name });
+    // and swaps in one frame: no Loading line or skeleton
+    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Which decisions made the gap" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Specialization" })).toHaveAttribute("aria-selected", "true");
+    expect(within(panel("What kind of investor?")).getByRole("button", { name: "Sub-industry" })).toHaveAttribute("aria-pressed", "true");
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+  });
+
   it("the map says too early to tell for a fund with too few picks", async () => {
     const s = demo<Skill>(`fund/${FUND}/skill.json`);
     for (const t of ["1", "2", "3"] as const) s.tiers[t].n = 5;
