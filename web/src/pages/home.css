@@ -52,7 +52,7 @@
   .home .duo .tbl-wrap{--nm-w:9em}
   .home .duo .stk{max-width:9em}
 }
-.home .foot{padding:0 2px}
+.home .foot{padding:0}
 
 /* ---------- loading: skeleton rows (the artifact's shimmer) ---------- */
 .home .skl{padding:4px var(--ppad) 12px}

@@ -27,6 +27,7 @@ import { axisPct } from "../fund/fmt";
 import { stepFor } from "../fund/geometry";
 import { useWidth } from "../fund/hooks";
 import { managerLine, phoneNameOf, shortNameOf } from "../lib/famousNames";
+import { qLabel } from "../lib/format";
 import { photoOf } from "../lib/people";
 import { currentTheme } from "../lib/theme";
 import {
@@ -172,7 +173,13 @@ const Row = memo(function Row({
               <span className="sep" />
               <span className="am">{aumLabel(m.r.book)}</span>
             </span>
-            {m.manager && <span className="mg">{m.manager}</span>}
+            {(m.manager || m.r.until_q != null) && (
+              <span className="mg">
+                {m.manager}
+                {m.manager && m.r.until_q != null && <i className="sep" />}
+                {m.r.until_q != null && `filed until ${qLabel(m.r.until_q)}`}
+              </span>
+            )}
           </>
         )}
       </span>

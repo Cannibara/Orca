@@ -198,21 +198,29 @@ export function ScrollTable<R>({
         <div className="rk-head">
           <span>{phoneHead}</span>
           {sorts && (
-            <select
-              aria-label="Sort by"
-              value={sortId(sort)}
-              onChange={(e) => {
-                const o = sorts.find((x) => sortId(x.sort) === e.target.value);
-                if (o) reorder(() => setSort(o.sort));
-              }}
-            >
-              {!sorts.some((o) => sortId(o.sort) === sortId(sort)) && <option value={sortId(sort)}>—</option>}
-              {sorts.map((o) => (
-                <option key={sortId(o.sort)} value={sortId(o.sort)}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <span className="rk-sort">
+              <span className="v" aria-hidden="true">
+                {sorts.find((o) => sortId(o.sort) === sortId(sort))?.label ?? "—"}
+              </span>
+              <svg className="ico" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 6.25 8 10.25l4-4" />
+              </svg>
+              <select
+                aria-label="Sort by"
+                value={sortId(sort)}
+                onChange={(e) => {
+                  const o = sorts.find((x) => sortId(x.sort) === e.target.value);
+                  if (o) reorder(() => setSort(o.sort));
+                }}
+              >
+                {!sorts.some((o) => sortId(o.sort) === sortId(sort)) && <option value={sortId(sort)}>—</option>}
+                {sorts.map((o) => (
+                  <option key={sortId(o.sort)} value={sortId(o.sort)}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </span>
           )}
         </div>
       )}

@@ -829,11 +829,11 @@ function Conviction({
       title="Conviction moves"
       className="moves"
       load={load}
-      controls={() => (
+      controls={(phone) => (
         <div className="fo-per">
           <Choice
             label="Moves from"
-            options={MOVE_WINDOWS}
+            options={phone ? MOVE_WINDOWS_SHORT : MOVE_WINDOWS}
             value={win}
             onChange={onWin}
           />
@@ -1043,9 +1043,10 @@ const MODES_SHORT: ChoiceOption<Mode>[] = [
   { id: "best", label: "Best" },
   { id: "worst", label: "Worst" },
 ];
+/** A phone's window switch, on both lists (a phone's periods read 1y … Max the same way). */
 const MOVE_WINDOWS_SHORT: ChoiceOption<CallWindow>[] = [
-  { id: "q", label: "Last quarter" },
-  { id: "y", label: "Last 4 qtrs" },
+  { id: "q", label: "1 quarter" },
+  { id: "y", label: "4 quarters" },
 ];
 
 /** Every row of the file with today's figures, best first (or worst first); rows without a price go last. */

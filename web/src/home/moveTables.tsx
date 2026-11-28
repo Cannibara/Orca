@@ -2,6 +2,7 @@
 // (home/ScrollTable.tsx; owner, 2026-11-28: the same look as Famous funds' Table view). A fund is the chart's row:
 // the person's photo (or initials), the short name and its AUM, the person under it; a stock is its ticker over the
 // company. On a phone a row is the fund with the stock and the move under it, and one figure on the right.
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { SortState } from "../components/DataTable";
 import { Signed } from "../components/Signed";
@@ -45,7 +46,7 @@ function ListFund({
   id: number;
   name: string;
   phone: boolean;
-  line2: string[];
+  line2: ReactNode[];
 }) {
   const short = shortNameOf(id, name);
   const manager = look.people.get(id);
@@ -100,9 +101,10 @@ function StockCell({ stock, stockId, fundId }: { stock: Stock | undefined; stock
   );
 }
 
-const ticker = (look: ListLookup, id: number) => look.stocks.get(id)?.ticker ?? `#${id}`;
+/** A phone's second line starts with the ticker, in the tickers' face. */
+const ticker = (look: ListLookup, id: number) => <span className="tk2">{look.stocks.get(id)?.ticker ?? `#${id}`}</span>;
 
-function fundCol<R>(look: ListLookup, phone: boolean, id: (r: R) => number, name: (r: R) => string, line2: (r: R) => string[]): TCol<R> {
+function fundCol<R>(look: ListLookup, phone: boolean, id: (r: R) => number, name: (r: R) => string, line2: (r: R) => ReactNode[]): TCol<R> {
   return {
     cls: "c-fund",
     ph: "main",
@@ -169,8 +171,16 @@ export function convictionColumns(look: ListLookup, win: "q" | "y", rows: Convic
     ...(win === "y" ? [qLabel(r.q)] : []),
     `${fW0(weightBefore(r))} → ${fW0(weightNow(r))}`,
   ];
+  // The list opens most unusual first (the file's order); the Fund heading steps through A–Z, Z–A and back to it,
+  // as Famous funds' steps to most popular, and says so beside it.
+  const fund: TCol<ConvictionRow> = {
+    ...fundCol(look, phone, (r) => r.fund_id, (r) => r.name, line2),
+    orders: { score: () => 0 },
+    cycle: [{ key: "fund", dir: 1 }, { key: "fund", dir: -1 }, MOST_UNUSUAL],
+    alt: { score: "most unusual" },
+  };
   return [
-    fundCol(look, phone, (r) => r.fund_id, (r) => r.name, line2),
+    fund,
     stockCol(look, (r) => r.fund_id, (r) => r.stock_id),
     ...(win === "y" ? [{ cls: "c-q", header: "Quarter", key: "q", by: (r: ConvictionRow) => r.q, cell: (r: ConvictionRow) => qLabel(r.q) }] : []),
     // Sorts by the signed change in the fund's AUM, so the biggest buys lead and sales trail (or the reverse).

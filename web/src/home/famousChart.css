@@ -77,9 +77,11 @@
 /* axis header: the S&P label over a notch on top, tick labels below. Ticks fading out are parked up to 8%
    past the plot's ends; clipping the header keeps them from widening the page (shown labels sit well inside) */
 /* 42px: the S&P label just clears the tick labels; the list's name sits close above (owner, 2026-11-23) */
-.fp .fc-axis{height:42px;box-shadow:0 1px 0 var(--line2);overflow-x:clip}
+/* the hairline is drawn inside the strip: a shadow below it was painted over by the window (positioned, opaque) */
+.fp .fc-axis{position:relative;height:42px;overflow-x:clip}
+.fp .fc-axis::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line2);pointer-events:none}
 .fp .fc-axis .plot{height:100%}
-.fp .fc .fc-axl{align-self:end;padding-bottom:7px;font-size:10.5px;line-height:13px;color:var(--ink3)}
+.fp .fc .fc-axl{align-self:end;padding-bottom:7px;font-size:11px;line-height:14px;color:var(--ink3)}
 .fp .fc .tick{position:absolute;bottom:9px;transform:translateX(-50%);font:400 11px/14px var(--f-sans);color:var(--ink3);white-space:nowrap}
 .fp .fc .spx{position:absolute;top:2px;transform:translateX(-50%);font:600 11px/14px var(--f-sans);color:var(--ink);white-space:nowrap}
 .fp .fc .spx-m{position:absolute;bottom:0;width:0;height:0;margin-left:-5px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--ink)}
@@ -119,6 +121,8 @@
 .fp .fc .sep{flex:none;width:3px;height:3px;border-radius:50%;background:var(--control)}
 .fp .fc .am{flex:none;font-size:13px;line-height:18px;color:var(--ink3);white-space:nowrap}
 .fp .fc .mg{min-width:0;font-size:12.5px;line-height:16px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a second line of several parts ("David Einhorn · filed until Q4 2023"): the drawn dot, as between name and AUM */
+.fp :is(.fc,.rk) .mg .sep{display:inline-block;vertical-align:middle;margin:0 7px}
 
 /* the bar: square on the zero line, rounded at the tip; positions come from the scale every frame (no transitions) */
 .fp .fc .bar{position:absolute;top:calc((var(--row) - 18px) / 2);height:18px;min-width:2px}
@@ -163,6 +167,7 @@
 .fp .ranked.phone .fam-src{margin-top:8px;padding-top:8px;font-size:11px;line-height:15px}
 .fp .fc.phone{--row:48px;--c1:28px;--c2:136px;--cg:8px;--inset:58px}
 .fp .fc.phone .fc-axis{height:36px}
+.fp .fc.phone .fc-axl{font-size:10.5px;line-height:13px}
 .fp .fc.phone .tick{bottom:7px;font-size:10.5px;line-height:13px}
 .fp .fc.phone .spx{top:1px;font-size:10.5px;line-height:13px}
 .fp .fc.phone .spx-m{margin-left:-4px;border-left-width:4px;border-right-width:4px;border-top-width:5px}

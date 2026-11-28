@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { Link } from "react-router";
 import type { SortState } from "../components/DataTable";
 import type { TopRow } from "../data/types";
@@ -26,7 +26,9 @@ const phoneLine = (r: TopRow) => [aumLabel(r.book), `${count(r.n_positions)} pos
 /** The fund as the chart shows it: photo (or initials), short name (the filer's name on hover), the person. */
 function RankFund({ r, phone }: { r: TopRow; phone: boolean }) {
   const short = shortNameOf(r.fund_id, r.name);
-  const sub = [managerLine(r.manager, short), r.until_q != null && `filed until ${qLabel(r.until_q)}`].filter(Boolean).join(" · ");
+  const sub = [managerLine(r.manager, short), r.until_q != null && `filed until ${qLabel(r.until_q)}`].filter(
+    (s): s is string => !!s,
+  );
   return (
     <span className="rk-fund">
       <Photo manager={r.manager} who={managerLine(r.manager, short) ?? short} />
@@ -44,7 +46,16 @@ function RankFund({ r, phone }: { r: TopRow; phone: boolean }) {
             ))}
           </span>
         ) : (
-          sub && <span className="mg">{sub}</span>
+          sub.length > 0 && (
+            <span className="mg">
+              {sub.map((s, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <i className="sep" aria-hidden="true" />}
+                  {s}
+                </Fragment>
+              ))}
+            </span>
+          )
         )}
       </span>
     </span>

@@ -67,6 +67,9 @@
 .fp .rk :is(th,td).c-q{width:96px}
 .fp .rk :is(th,td).c-w{width:120px}
 .fp .rk td.c-w .wcell{vertical-align:middle}
+/* the heading starts where the weights do (each is a 76px block, "was → now" over its bar) */
+.fp .rk th.c-w .sort{width:76px;justify-content:flex-start}
+.fp .rk th.c-w .sort .ico{order:1}
 /* the foot as the chart's (famousChart.css .fc-foot): the caption on the left, page buttons on the right */
 .fp .rk-foot .pager{padding:0;border:0}
 /* mid widths: the figures a row can spare go first */
@@ -74,8 +77,15 @@
 
 /* ---------- phone: the chart's phone grid (photo 28px, 8px gap, 48px rows, 10 in view) ---------- */
 .fp .rk.phone{--row:48px;--c1:28px;--cg:8px;--head:0px}
-.fp .rk-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:36px;padding:0 0 4px calc(var(--c1) + var(--cg));box-shadow:0 1px 0 var(--line2);font-size:10.5px;line-height:13px;color:var(--ink3)}
-.fp .rk-head select{height:26px;max-width:58%;padding:0 22px 0 8px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:500 12px/1 var(--f-sans)}
+.fp .rk-head{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:36px;padding:0 0 4px calc(var(--c1) + var(--cg));font-size:10.5px;line-height:13px;color:var(--ink3)}
+.fp .rk-head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line2);pointer-events:none}
+/* the sort menu: a small chip showing the order, over the device's own picker (16px, so iOS does not zoom; a
+   44px tall target) as Famous funds' "All 16" does */
+.fp .rk-sort{position:relative;display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:62%;height:26px;padding:0 6px 0 8px;border:1px solid var(--line2);border-radius:var(--r-2);background:var(--surface);color:var(--ink);font:500 12px/1 var(--f-sans);white-space:nowrap}
+.fp .rk-sort .v{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fp .rk-sort .ico{flex:none;width:12px;height:12px;color:var(--ink2)}
+.fp .rk-sort select{position:absolute;inset:-9px 0;width:100%;height:auto;margin:0;border:0;opacity:0;font-size:16px;cursor:pointer;appearance:none;-webkit-appearance:none}
+.fp .rk-sort:focus-within{outline:2px solid var(--focus);outline-offset:2px}
 .fp .rk.phone thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* a row: photo, name and (under it) its figures, one figure on the right; the other columns are folded into
    that second line, where the chart puts AUM and the person */
@@ -88,6 +98,7 @@
 .fp .rk .l2{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;font-size:11px;line-height:14px;color:var(--ink3);white-space:nowrap}
 .fp .rk .l2>span{display:inline-flex;align-items:center;gap:5px}
 .fp .rk .sep{flex:none;width:3px;height:3px;border-radius:50%;background:var(--control)}
+.fp .rk .l2 .tk2{font:600 11px/14px var(--f-mono);letter-spacing:-.01em;color:var(--ink2)}
 .fp .rk.phone .who .nm{font-size:12.5px;line-height:16px;letter-spacing:-.005em}
 .fp .rk.phone .rk-fund .fc-face.init{font-size:10px}
 .fp .rk.phone .fade{height:20px}

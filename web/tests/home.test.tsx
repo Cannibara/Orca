@@ -423,11 +423,11 @@ describe("Home", () => {
     }
     // a fund that stopped filing is listed, with its last quarter by its manager
     await showList(user, "Value");
-    expect(
-      within(within(panel).getByRole("table", { name: "Value" })).getByText(
-        "Mara Cobble · filed until Q4 2023",
-      ),
-    ).toBeInTheDocument();
+    // the person and the last quarter, set apart by the chart's dot
+    const cobble = within(within(panel).getByRole("table", { name: "Value" })).getByText(
+      (_, el) => el?.classList.contains("mg") === true && el.textContent === "Mara Cobblefiled until Q4 2023",
+    );
+    expect(cobble.querySelector(".sep")).not.toBeNull();
     await showList(user, order[0]);
     const first = within(
       within(panel).getByRole("table", { name: order[0] }),
@@ -918,7 +918,7 @@ describe("Home", () => {
         "Conviction moves",
         /Moves of ≥ 3% of a fund's AUM that are at least twice its biggest single-stock move of the 4 quarters before/,
         [
-          "Fund",
+          "Fund most unusual", // the order it opens in, which the Fund heading steps back to
           "Stock",
           "Weight",
           "$ bought / sold",
@@ -1235,6 +1235,14 @@ describe("Home", () => {
     expect(moves()).toEqual(["0% → 5%", "1% → 5%", "13% → 0%"]);
     await user.click(within(table).getByRole("button", { name: "Weight" }));
     expect(moves()).toEqual(["13% → 0%", "1% → 5%", "0% → 5%"]);
+    // the Fund heading steps through A–Z, Z–A and back to the order the list opened in
+    const fund = () => within(table).getByRole("button", { name: /^Fund/ });
+    expect(fund()).not.toHaveTextContent("most unusual");
+    await user.click(fund());
+    await user.click(fund());
+    await user.click(fund());
+    expect(fund()).toHaveTextContent("most unusual");
+    expect(dollars()).toEqual(["+$40m", "−$80m", "+$60m"]); // the file's order again
   });
 
   it("conviction's last 4 quarters view loads its own file and shows each move's quarter", async () => {
