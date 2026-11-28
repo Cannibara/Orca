@@ -5,6 +5,15 @@ Last verified: 2026-11-28
 Reverse-chronological. Tags: (chat) = said in a working session, (code) = checked in the code,
 (git) = from commit history. "PR #n" = github.com/Cannibara/Orca/pull/n. Append new entries at the top.
 
+## 2026-11-28 — Run 57: opportunity-cost scores live; the map says "too close to call" and names every dot (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 57 (`sectors_only`, `main` 7025667, PR #89): 18 min (was ~70; no IRR solving), 15,544 funds scored, dropped positions 596,360 → 193,372, median coverage 64.6%, 3,276 funds on the map. Berkshire at industry level: stock choice −0.13 pts a year (IRR −0.66), industry choice −0.33 (IRR +0.03); top Adds Apple +0.65, American Express +0.32, Kraft Heinz −0.44, Occidental −0.22; Adds sum to the scores | The rebuild, checked on the live site | (run) |
+| A fund inside the grey cross both ways now reads "too close to call either way" (Berkshire read "Neither, so far" while its dot sat in the band) | Owner: "Yes" (fix both map issues) | `web/src/fund/skill.ts` (`quadrant` → "close"), `SkillMapPanel.tsx` |
+| Every dot on the map is named: this fund's name above its own dot, each peer's name right, left, above or below its dot, clear of every name, dot, corner label and axis number; where none fits, a number beside the dot and a key under the map (Berkshire: all 6 peers named on desktop, Markel keyed on a phone) | Two of Berkshire's peers had no name, and Berkshire's name sat beside another fund's dot | `web/src/fund/skill.ts` (`placeMapLabels`), `SkillMapPanel.tsx`, `skill.css` |
+| Checks: 3 new tests; web suite green (1,211), typecheck clean, Specialization e2e green (12); checked on Berkshire's live data at 1280 and 400 px | | |
+
 ## 2026-11-28 — Sector choice vs stock choice rebuilt as an opportunity cost, no IRR (owner)
 
 | What changed | Why | Files |

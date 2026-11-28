@@ -7,7 +7,7 @@ import { qShort } from "./fmt";
 import { textW } from "./geometry";
 import { useWidth } from "./hooks";
 import { Seg } from "./Seg";
-import { isEligible, peersFor, pts, quadrant, rollingPath, tierOf, tierWords, TIERS, type Corner, type Peer, type Tier, type TierWords } from "./skill";
+import { isEligible, peersFor, placeMapLabels, pts, quadrant, rollingPath, tierOf, tierWords, TIERS, type Corner, type Peer, type Tier, type TierWords } from "./skill";
 import "./skill.css";
 import { SkTable, ViewButton } from "./StackedPanel";
 
@@ -24,7 +24,7 @@ export type MapProps = {
   funds: FundsIndex | null;
 };
 
-const cornerName = (c: Corner, w: TierWords) => ({ both: "Both", stock: "Stock picker", sector: w.picker, neither: "Neither, so far" })[c];
+const cornerName = (c: Exclude<Corner, "close">, w: TierWords) => ({ both: "Both", stock: "Stock picker", sector: w.picker, neither: "Neither, so far" })[c];
 
 /** "beat their industries by +2.3 pts" or "trailed their industries by 1.2 pts". */
 function beat(what: string, v: number) {
@@ -127,8 +127,20 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
     <section className="panel skp mapp" aria-labelledby="mapTitle">
       {header}
       <p className="say">
-        {among}, {me} is in the <b>{cornerName(corner, w)}</b> corner: its stocks {beat("their " + w.plural, pick)} a year and its {w.plural}{" "}
-        {beat("the market", alloc)}. {same === 0 ? "No other made it there." : same === 1 ? "1 other made it there." : `${same} others made it there.`}
+        {among}, {me} is {corner === "close" ? <><b>too close to call</b> either way</> : <>in the <b>{cornerName(corner, w)}</b> corner</>}: its stocks{" "}
+        {beat("their " + w.plural, pick)} a year and its {w.plural} {beat("the market", alloc)}
+        {corner === "close" ? ", gaps that small are often chance" : ""}.{" "}
+        {corner === "close"
+          ? same === 0
+            ? "No other is that close."
+            : same === 1
+              ? "1 other is that close too."
+              : `${same} others are that close too.`
+          : same === 0
+            ? "No other made it there."
+            : same === 1
+              ? "1 other made it there."
+              : `${same} others made it there.`}
       </p>
       {tier === 3 && <p className="note">Some sub-industries have few stocks, so their index leans on one or two companies.</p>}
       <div className="pb">
@@ -173,29 +185,28 @@ function MapChart({ me, peers, w, path, table }: { me: Dot; peers: Peer[]; w: Ti
       { label: "Picks", value: String(d.n) },
     ],
   });
-  // peer names beside their dots, biggest first, dropped where they would touch another name or this fund's
-  const meBox = { x0: x(me.pick) - 12 - textW(me.name, 13.5), x1: x(me.pick) + 12, y0: y(me.alloc) - 26, y1: y(me.alloc) + 12 };
   const corner = (x0: number, yb: number, t: string, right: boolean) => {
     const tw = textW(t, 14);
     return { x0: right ? x0 - tw : x0, x1: right ? x0 : x0 + tw, y0: yb - 14, y1: yb + 3 };
   };
-  // peer names stay clear of this fund's name and of the corner labels
-  const placed = [
-    meBox,
-    corner(L + 10, top + 20, w.picker, false),
-    corner(R - 10, top + 20, "Both", true),
-    corner(L + 10, bot - 12, "Neither, so far", false),
-    corner(R - 10, bot - 12, "Stock picker", true),
-  ];
-  const named = new Set<number>();
-  for (const p of [...peers].sort((a, b) => b.n - a.n)) {
-    const r = 4 + Math.sqrt(p.n) / 2.4;
-    const bx = { x0: x(p.pick) + r + 2, x1: x(p.pick) + r + 6 + textW(p.name, 11.5), y0: y(p.alloc) - 8, y1: y(p.alloc) + 6 };
-    if (bx.x1 > W - 2 || placed.some((q) => bx.x0 < q.x1 && bx.x1 > q.x0 && bx.y0 < q.y1 && bx.y1 > q.y0)) continue;
-    placed.push(bx);
-    named.add(p.fund_id);
-  }
-  const meRight = x(me.pick) - 16 - textW(me.name, 13.5) < L + 4;
+  // every dot gets a name clear of the others, of every dot and of the corner labels (a number and a key below
+  // the map where none fits)
+  const rOf = (n: number) => 4 + Math.sqrt(n) / 2.4;
+  const labels = placeMapLabels(
+    { id: 0, cx: x(me.pick), cy: y(me.alloc), r: 10, name: me.name, n: me.n },
+    peers.map((p) => ({ id: p.fund_id, cx: x(p.pick), cy: y(p.alloc), r: rOf(p.n), name: p.name, n: p.n })),
+    [
+      corner(L + 10, top + 20, w.picker, false),
+      corner(R - 10, top + 20, "Both", true),
+      corner(L + 10, bot - 12, "Neither, so far", false),
+      corner(R - 10, bot - 12, "Stock picker", true),
+      ...ticks.map((t) => ({ x0: 0, x1: L - 2, y0: y(t) - 9, y1: y(t) + 6 })), // the axis numbers on the left
+      { x0: 0, x1: W, y0: bot + 2, y1: H }, // and below
+    ],
+    W,
+    H,
+  );
+  const keyed = peers.filter((p) => labels.peers.get(p.fund_id)?.key != null).sort((a, b) => labels.peers.get(a.fund_id)!.key! - labels.peers.get(b.fund_id)!.key!);
   return (
     <div className="chart" ref={host}>
       <ChartSlot table={table}>
@@ -233,13 +244,14 @@ function MapChart({ me, peers, w, path, table }: { me: Dot; peers: Peer[]; w: Ti
             Stock picker
           </text>
           {peers.map((p) => {
-            const r = 4 + Math.sqrt(p.n) / 2.4;
+            const r = rOf(p.n);
+            const lab = labels.peers.get(p.fund_id);
             return (
               <g key={p.fund_id} className="pt-g" tabIndex={0} role="img" aria-label={`${p.name}: stock choice ${pts(p.pick)} a year, ${w.choice.toLowerCase()} ${pts(p.alloc)} a year, ${p.n} picks`} {...tipHandlers(tip, () => dotTip(p, false))}>
                 <circle className="peer" cx={x(p.pick)} cy={y(p.alloc)} r={r} />
-                {named.has(p.fund_id) && (
-                  <text className="pname" x={x(p.pick) + r + 4} y={y(p.alloc) + 4}>
-                    {p.name}
+                {lab && (
+                  <text className="pname" x={lab.x} y={lab.y} textAnchor={lab.anchor}>
+                    {lab.key ?? p.name}
                   </text>
                 )}
               </g>
@@ -262,11 +274,21 @@ function MapChart({ me, peers, w, path, table }: { me: Dot; peers: Peer[]; w: Ti
           )}
           <g tabIndex={0} role="img" aria-label={`${me.name}, this fund: stock choice ${pts(me.pick)} a year, ${w.choice.toLowerCase()} ${pts(me.alloc)} a year`} {...tipHandlers(tip, () => dotTip(me, true))}>
             <circle className="me" cx={x(me.pick)} cy={y(me.alloc)} r={10} />
-            <text className="mename" x={meRight ? x(me.pick) + 16 : x(me.pick) - 16} y={y(me.alloc) - 14} textAnchor={meRight ? "start" : "end"}>
+            <text className="mename" x={labels.me.x} y={labels.me.y} textAnchor={labels.me.anchor}>
               {me.name}
             </text>
           </g>
         </svg>
+        {keyed.length > 0 && (
+          <p className="mapkey">
+            {keyed.map((p, i) => (
+              <span key={p.fund_id}>
+                {i > 0 && " · "}
+                <b>{labels.peers.get(p.fund_id)!.key}</b> {p.name}
+              </span>
+            ))}
+          </p>
+        )}
       </ChartSlot>
       {table && (
         <SkTable
