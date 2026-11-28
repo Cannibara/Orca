@@ -405,12 +405,11 @@ export type Skill = {
 export type SkillQuarters = {
   q: number[];
   bought: number[];
+  /** The dollars at work over the quarter (0 when none): every return below is on this same money. */
+  cap: number[];
   fund: (number | null)[];
   mkt: (number | null)[];
   spy: (number | null)[];
-  v_fund: (number | null)[];
-  v_mkt: (number | null)[];
-  v_spy: (number | null)[];
 };
 
 /** One entry per calendar year, labelled as summary.json years ("2025", "2026 H1"). */
@@ -421,22 +420,25 @@ export type SkillYears = {
   spy: (number | null)[];
 };
 
-/** One tier: 1 sector, 2 industry, 3 vertical (shown as "sub-industry"). IRRs are fractions a year. */
+/**
+ * One tier: 1 sector, 2 industry, 3 vertical (shown as "sub-industry"). ret_* are what the fund's own money made
+ * each way ÷ the dollar-years it was at work: fractions a year, no IRR (contract.md, Sector files).
+ */
 export type SkillTier = {
-  irr_fund: number | null;
-  irr_label: number | null;
-  irr_mkt: number | null;
-  irr_spy: number | null;
+  ret_fund: number | null;
+  ret_label: number | null;
+  ret_mkt: number | null;
+  ret_spy: number | null;
   picking: number | null;
   allocation: number | null;
   coverage: number | null;
   n: number | null;
-  quarters: { label: (number | null)[]; v_label: (number | null)[]; v_never: (number | null)[] | null };
+  quarters: { label: (number | null)[] };
   years: { label: (number | null)[] };
-  /** The 30 biggest positions by dollars bought, then one row (stock_id null) for the rest. */
-  picks: { stock_id: (number | null)[]; label: (string | null)[]; bought: number[]; irr_own: (number | null)[]; irr_label: (number | null)[] };
-  /** Every label bought, most money first (tier 1: every sector, unbought ones with bought 0). */
-  bets: { label: string[]; bought: number[]; irr: (number | null)[]; irr_mkt: (number | null)[]; mkt_share: (number | null)[] };
+  /** The 30 biggest positions by dollars bought, then one row (stock_id null) for the rest; adds sum to picking. */
+  picks: { stock_id: (number | null)[]; label: (string | null)[]; bought: number[]; ret_own: (number | null)[]; ret_label: (number | null)[]; adds: (number | null)[] };
+  /** Every label bought, most money first (tier 1: every sector, unbought ones with bought 0); adds sum to allocation. */
+  bets: { label: string[]; bought: number[]; ret: (number | null)[]; ret_mkt: (number | null)[]; adds: (number | null)[]; mkt_share: (number | null)[] };
 };
 
 /** The book by vertical path ("A > B > C"; groupings in parentheses); share[i] runs over q. */

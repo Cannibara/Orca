@@ -2,14 +2,15 @@
 // docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md §5, §7.3), from fund/{id}/skill.json and
 // sectors/scores.json. Returns are fractions here; panels print them with pct / pts.
 //
-// A fund's trades are replayed in its stocks (the fund), in its labels' indices ("their sectors") and in the
-// whole market. Sector choice = labels − market, stock choice = fund − labels, so every year
-// market + sector choice + stock choice = fund.
+// Every figure is on the fund's own money: each quarter, the dollars it held in each stock, put in the stock (the
+// fund), in its label's index ("their sectors") and in the whole market. Sector choice = labels − market, stock
+// choice = fund − labels, so every year market + sector choice + stock choice = fund.
 
 import type { FundsIndex, SectorScores, Skill, SkillTier, TopRow } from "../data/types";
 import { FAMOUS_GROUPS } from "../data/famousGroups";
 import { shortNameOf } from "../lib/famousNames";
 import { pp, qOfYear } from "../lib/format";
+import { textW, type Box } from "./geometry";
 
 export type Tier = 1 | 2 | 3;
 export const TIERS: Tier[] = [1, 2, 3];
@@ -148,13 +149,69 @@ export function stackParts(o: Pick<YearRow, "m" | "alloc" | "pick" | "f">): Stac
 
 // ---- the map ------------------------------------------------------------------------------------------
 
-export type Corner = "both" | "stock" | "sector" | "neither";
+export type Corner = "both" | "stock" | "sector" | "neither" | "close";
 
-/** Which corner of the map a fund is in; inside the "too close to call" band counts as not positive. */
+/**
+ * Which corner of the map a fund is in; inside the "too close to call" band counts as not positive. Inside the
+ * band on both axes (the middle square of the grey cross) is "close": too close to call either way.
+ */
 export function quadrant(pick: number, alloc: number, band = 0.008): Corner {
+  if (Math.abs(pick) <= band && Math.abs(alloc) <= band) return "close";
   const p = pick > band;
   const a = alloc > band;
   return p && a ? "both" : p ? "stock" : a ? "sector" : "neither";
+}
+
+/** A name on the map: where its text goes, or (`key` set) a number beside the dot, named in a key under the map. */
+export type MapLabel = { x: number; y: number; anchor: "start" | "middle" | "end"; key?: number };
+export type MapDot = { id: number; cx: number; cy: number; r: number; name: string; n: number };
+
+const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+const dotBox = (d: { cx: number; cy: number; r: number }): Box => ({ x0: d.cx - d.r, x1: d.cx + d.r, y0: d.cy - d.r, y1: d.cy + d.r });
+
+/** Right, left, above and below a dot of radius r, for text `tw` wide and `px` tall. */
+function spots(cx: number, cy: number, r: number, tw: number, px: number, gap: number): { label: MapLabel; box: Box }[] {
+  const half = px * 0.36; // from the baseline to the middle of a line of text
+  return [
+    { label: { x: cx + r + gap, y: cy + half, anchor: "start" }, box: { x0: cx + r + gap - 1, x1: cx + r + gap + tw + 1, y0: cy - px / 2 - 1, y1: cy + px / 2 + 1 } },
+    { label: { x: cx - r - gap, y: cy + half, anchor: "end" }, box: { x0: cx - r - gap - tw - 1, x1: cx - r - gap + 1, y0: cy - px / 2 - 1, y1: cy + px / 2 + 1 } },
+    { label: { x: cx, y: cy - r - gap, anchor: "middle" }, box: { x0: cx - tw / 2 - 1, x1: cx + tw / 2 + 1, y0: cy - r - gap - px, y1: cy - r - gap + 2 } },
+    { label: { x: cx, y: cy + r + gap + px * 0.8, anchor: "middle" }, box: { x0: cx - tw / 2 - 1, x1: cx + tw / 2 + 1, y0: cy + r + gap - 1, y1: cy + r + gap + px } },
+  ];
+}
+
+/**
+ * Names for every dot on the map, none touching another name, another dot or `fixed` (the corner labels): this
+ * fund's first (above its dot, else right, left, below), then the peers biggest first (right, left, above,
+ * below). A peer whose name fits nowhere gets a number beside its dot instead, named in a key under the map,
+ * so no dot is left nameless.
+ */
+export function placeMapLabels(me: MapDot, peers: MapDot[], fixed: Box[], W: number, H: number): { me: MapLabel; peers: Map<number, MapLabel> } {
+  const dots = [me, ...peers];
+  const inside = (b: Box) => b.x0 >= 2 && b.x1 <= W - 2 && b.y0 >= 0 && b.y1 <= H;
+  const placed: Box[] = [...fixed];
+  const free = (b: Box, own: MapDot) => inside(b) && !placed.some((q) => overlaps(b, q)) && !dots.some((d) => d !== own && overlaps(b, dotBox(d)));
+  const meSpots = spots(me.cx, me.cy, me.r, textW(me.name, 13.5), 14, 6);
+  const meSpot = [meSpots[2], meSpots[0], meSpots[1], meSpots[3]].find((c) => free(c.box, me)) ?? meSpots[2];
+  placed.push(meSpot.box);
+  const out = new Map<number, MapLabel>();
+  const later: MapDot[] = [];
+  for (const p of [...peers].sort((a, b) => b.n - a.n || a.id - b.id)) {
+    const spot = spots(p.cx, p.cy, p.r, textW(p.name, 11.5), 12, 4).find((c) => free(c.box, p));
+    if (!spot) {
+      later.push(p);
+      continue;
+    }
+    placed.push(spot.box);
+    out.set(p.id, spot.label);
+  }
+  later.forEach((p, i) => {
+    const all = spots(p.cx, p.cy, p.r, textW(String(i + 1), 11.5), 12, 3);
+    const spot = all.find((c) => free(c.box, p)) ?? all[0];
+    placed.push(spot.box);
+    out.set(p.id, { ...spot.label, key: i + 1 });
+  });
+  return { me: meSpot.label, peers: out };
 }
 
 export type ScoreRow = { fund_id: number; tier: number; picking: number; allocation: number; n: number; coverage: number; span_q: number };
@@ -218,11 +275,11 @@ export function peersFor(fundId: number, t: Tier, famous: TopRow[] | undefined, 
 /** A 3-year window of the map's path: its scores over the 12 quarters to q (fractions a year). */
 export type PathPoint = { q: number; pick: number; alloc: number };
 
-const ann3 = (rs: number[]): number => Math.pow(rs.reduce((a, r) => a * (1 + r), 1), 1 / 3) - 1;
-
 /**
- * Rolling 3-year windows ending each Q4 and the latest quarter: stock choice = ann(fund) − ann(label), sector
- * choice = ann(label) − ann(market), ann = (Π(1 + r))^(1/3) − 1. A window with a missing quarter is skipped.
+ * Rolling 3-year windows ending each Q4 and the latest quarter, scored as the map is (contract.md, Sector files):
+ * stock choice = Σ cap × (fund − label) ÷ the window's dollar-years, sector choice = Σ cap × (label − market) ÷
+ * the same, where cap is the dollars at work in a quarter (a quarter is a quarter of a year). A window with a
+ * quarter nothing was at work in is skipped.
  */
 export function rollingPath(skill: Skill, t: Tier): PathPoint[] {
   const Q = skill.quarters;
@@ -232,26 +289,24 @@ export function rollingPath(skill: Skill, t: Tier): PathPoint[] {
   for (let i = 11; i < n; i++) {
     const q = Q.q[i];
     if (qOfYear(q) !== 3 && i !== n - 1) continue;
-    const f: number[] = [];
-    const l: number[] = [];
-    const m: number[] = [];
+    let pick = 0;
+    let alloc = 0;
+    let years = 0;
     let ok = true;
     for (let j = i - 11; j <= i; j++) {
       const a = Q.fund[j];
       const b = lab[j];
       const c = Q.mkt[j];
-      if (a == null || b == null || c == null) {
+      const cap = Q.cap[j];
+      if (a == null || b == null || c == null || !(cap > 0)) {
         ok = false;
         break;
       }
-      f.push(a);
-      l.push(b);
-      m.push(c);
+      pick += cap * (a - b);
+      alloc += cap * (b - c);
+      years += cap / 4;
     }
-    if (!ok) continue;
-    const af = ann3(f);
-    const al = ann3(l);
-    out.push({ q, pick: af - al, alloc: al - ann3(m) });
+    if (ok) out.push({ q, pick: pick / years, alloc: alloc / years });
   }
   return out;
 }

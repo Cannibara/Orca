@@ -147,10 +147,24 @@ export type LinesLayout = {
   q: number[];
 };
 
-/** Quarter-end values of every replay, all drawn at once. */
+/**
+ * Dollars made since the first quarter, each way, on the fund's own money: Σ over quarters of the dollars at work
+ * (`cap`) × that way's return. A quarter with nothing at work adds nothing.
+ */
+export function madeSoFar(cap: number[], ret: (number | null)[]): number[] {
+  let sum = 0;
+  return cap.map((c, i) => (sum += c * (ret[i] ?? 0)));
+}
+
+/** The dollars each way made so far, every quarter end, all drawn at once. */
 export function linesLayout(skill: Skill, t: Tier, W: number, w: TierWords): LinesLayout {
   const Q = skill.quarters;
-  const values: Record<LineKey, (number | null)[]> = { fund: Q.v_fund, label: tierOf(skill, t).quarters.v_label, mkt: Q.v_mkt, spy: Q.v_spy };
+  const values: Record<LineKey, (number | null)[]> = {
+    fund: madeSoFar(Q.cap, Q.fund),
+    label: madeSoFar(Q.cap, tierOf(skill, t).quarters.label),
+    mkt: madeSoFar(Q.cap, Q.mkt),
+    spy: madeSoFar(Q.cap, Q.spy),
+  };
   const names: Record<LineKey, string> = { fund: "Their stocks", label: w.their, mkt: "Whole market", spy: "S&P 500" };
   const H = W < 520 ? 300 : 360;
   const narrow = W < 520;
@@ -161,10 +175,17 @@ export function linesLayout(skill: Skill, t: Tier, W: number, w: TierWords): Lin
   const n = Q.q.length;
   const xs = Q.q.map((_, i) => +(ml + (n > 1 ? i / (n - 1) : 0.5) * (W - ml - mr)).toFixed(1));
   let vmax = 0;
-  for (const k of Object.keys(values) as LineKey[]) for (const v of values[k]) if (v != null && v > vmax) vmax = v;
-  const tv = niceTicks(0, vmax || 1, 4);
+  let vmin = 0; // a fund that lost money goes below $0
+  for (const k of Object.keys(values) as LineKey[])
+    for (const v of values[k])
+      if (v != null) {
+        vmax = Math.max(vmax, v);
+        vmin = Math.min(vmin, v);
+      }
+  const tv = niceTicks(vmin, vmax || (vmin < 0 ? 0 : 1), 4);
   const top = tv[tv.length - 1];
-  const Y = (v: number) => mt + (1 - v / top) * (H - mt - mb);
+  const bottom = tv[0];
+  const Y = (v: number) => mt + ((top - v) / (top - bottom || 1)) * (H - mt - mb);
   const lines: Line[] = (["fund", "label", "mkt", "spy"] as LineKey[]).map((k) => {
     let d = "";
     let pen = false;

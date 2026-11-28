@@ -29,6 +29,24 @@ Reverse-chronological. Tags: (chat) = said in a working session, (code) = checke
 | Checks: pipeline suite green (1,121 + new tests for types, landscape and the share guard); web suite green (1,220); Playwright smoke incl. a new Landscape test at 1280/400 px, light and dark; build and prerender green. Screenshots on real published data looked right | | `pipeline/tests/test_investors.py`, `test_landscape.py`, `web/tests/landscape.test.ts`, `web/tests/home.test.tsx`, `web/e2e/smoke.spec.ts` |
 | To go live: merge, then Actions > Pipeline > Run workflow with `home_only` (publishes `home/landscape.json`, ~5 min); the next ordinary run removes Perigee's rows. Until then the tab says the landscape arrives with the next data update | | — |
 
+## 2026-11-28 — Run 57: opportunity-cost scores live; the map says "too close to call" and names every dot (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 57 (`sectors_only`, `main` 7025667, PR #89): 18 min (was ~70; no IRR solving), 15,544 funds scored, dropped positions 596,360 → 193,372, median coverage 64.6%, 3,276 funds on the map. Berkshire at industry level: stock choice −0.13 pts a year (IRR −0.66), industry choice −0.33 (IRR +0.03); top Adds Apple +0.65, American Express +0.32, Kraft Heinz −0.44, Occidental −0.22; Adds sum to the scores | The rebuild, checked on the live site | (run) |
+| A fund inside the grey cross both ways now reads "too close to call either way" (Berkshire read "Neither, so far" while its dot sat in the band) | Owner: "Yes" (fix both map issues) | `web/src/fund/skill.ts` (`quadrant` → "close"), `SkillMapPanel.tsx` |
+| Every dot on the map is named: this fund's name above its own dot, each peer's name right, left, above or below its dot, clear of every name, dot, corner label and axis number; where none fits, a number beside the dot and a key under the map (Berkshire: all 6 peers named on desktop, Markel keyed on a phone) | Two of Berkshire's peers had no name, and Berkshire's name sat beside another fund's dot | `web/src/fund/skill.ts` (`placeMapLabels`), `SkillMapPanel.tsx`, `skill.css` |
+| Checks: 3 new tests; web suite green (1,211), typecheck clean, Specialization e2e green (12); checked on Berkshire's live data at 1280 and 400 px | | |
+
+## 2026-11-28 — Sector choice vs stock choice rebuilt as an opportunity cost, no IRR (owner)
+
+| What changed | Why | Files |
+|---|---|---|
+| Run 56 (`sectors_only`, `main` 0a323d3, PR #86, flat start): Berkshire's coverage 77% → 94% (142 picks), its map shows; median coverage 61.5% → 64.7%, dropped positions 792,655 → 596,360 | The flat start scores positions held from 1998 Q4 | (run) |
+| Scores rebuilt: each half quarter, the fund's dollars in each stock are put in the stock, its label's index, the market and SPY; picking and allocation = dollars beaten ÷ dollar-years at work. Years = what the money made ÷ its average in the year; Lines = dollars made so far; the map's path, the decisions' Adds (now exact: they sum to the scores) all use the same sums | Owner: "ensure that we are not using IRR, but rather an opportunity cost framework … given the same bet size and timing" | `pipeline/orca/engine/skill.py`, `skill_detail.py`, `run/sectors_step.py`, `contract.md`, `web/src/fund/{skill,stacked,decisions}.ts`, `StackedPanel.tsx`, `DecisionsPanel.tsx`, `SkillMapPanel.tsx`, `data/{types,api}.ts` |
+| `skill.json`: `irr_*` → `ret_*`, `cap` and `adds` added, `v_*` dropped. The site treats an older file as not scored until the sector step rewrites it | One measure, named for what it is | `pipeline/contract.md`, `web/src/data/api.ts` |
+| Checks: pipeline suite green (1,117), web suite green (1,209), typecheck clean, Specialization e2e green (12); demo data regenerated. Takes effect with the next `sectors_only` run | | |
+
 ## 2026-11-26 — The map names low coverage instead of "Too early to tell" (owner)
 
 | What changed | Why | Files |

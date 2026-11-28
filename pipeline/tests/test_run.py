@@ -603,9 +603,12 @@ def test_demo_cli_writes_twelve_funds(tmp_path, fixtures):
     # the sector step's files, for every demo fund (contract.md, Sector files)
     skill = json.loads((out / "fund" / str(funds["id"][0]) / "skill.json").read_text())
     assert set(skill) == {"last_q", "first_q", "quarters", "years", "tiers", "mix"} and set(skill["tiers"]) == {"1", "2", "3"}
-    assert set(skill["tiers"]["2"]) == {"irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation", "coverage", "n",
+    assert set(skill["tiers"]["2"]) == {"ret_fund", "ret_label", "ret_mkt", "ret_spy", "picking", "allocation", "coverage", "n",
                                         "quarters", "years", "picks", "bets"}  # fmt: skip
-    assert len(skill["quarters"]["q"]) == len(skill["quarters"]["v_fund"]) == len(skill["tiers"]["3"]["quarters"]["label"])
+    assert len(skill["quarters"]["q"]) == len(skill["quarters"]["cap"]) == len(skill["tiers"]["3"]["quarters"]["label"])
+    t2 = skill["tiers"]["2"]  # the rows of the decisions panel add up to the scores
+    assert sum(x for x in t2["picks"]["adds"] if x is not None) == pytest.approx(t2["picking"], abs=1e-5)
+    assert sum(x for x in t2["bets"]["adds"] if x is not None) == pytest.approx(t2["allocation"], abs=1e-5)
     assert len(skill["tiers"]["1"]["bets"]["label"]) == len(json.loads((out / "sectors" / "labels.json").read_text())["tier"]) - sum(
         t > 1 for t in json.loads((out / "sectors" / "labels.json").read_text())["tier"])  # fmt: skip
     scores = json.loads((out / "sectors" / "scores.json").read_text())

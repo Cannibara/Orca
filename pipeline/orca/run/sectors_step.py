@@ -451,6 +451,7 @@ class ScoreInputs:
     nosector: set[str]
     spy: int | None
     series: pl.DataFrame
+    halves: pl.DataFrame  # skill.half_returns(series), computed once
 
 
 SECTOR_SCHEMA = pl.Schema({"label": pl.String, "tier": pl.Int8, "q": pl.Int32, "level_avg": pl.Float64, "level_end": pl.Float64})
@@ -475,7 +476,7 @@ def score_inputs(lake: Lake, sector: pl.DataFrame) -> ScoreInputs:
     spy = stock_of(read_table(lake, "cusip_map", CUSIP_MAP_SCHEMA)).get(BENCHMARK_CUSIP)
     nosector = {n.path for n in h.nosector}
     series = pl.concat([skill.own_series(sq), skill.label_series(sector)])
-    return ScoreInputs(sector, sq, paths, etfs, nosector, spy, series)
+    return ScoreInputs(sector, sq, paths, etfs, nosector, spy, series, skill.half_returns(series))
 
 
 def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
@@ -486,16 +487,16 @@ def score_funds(lake: Lake, last_q: int, flags: list) -> dict:
     if sector.is_empty() or flows.is_empty():
         return {"funds": 0}
     i = score_inputs(lake, sector)
-    sq, paths, etfs, nosector, spy, series = i.sq, i.paths, i.etfs, i.nosector, i.spy, i.series
+    sq, paths, etfs, nosector, spy, series, halves = i.sq, i.paths, i.etfs, i.nosector, i.spy, i.series, i.halves
     counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
     scores, ranks, dropped = [], [], 0
     for n, chunk in enumerate(trade_chunks(counts)):
         part = flows.filter(pl.col("cik").is_in(chunk))
-        got, bad = skill.fund_scores(part, sq, sector, paths, etfs, nosector, spy, last_q, series=series)
+        got, bad = skill.fund_scores(part, sq, sector, paths, etfs, nosector, spy, last_q, series=series, halves=halves)
         if n % 10 == 0:
             log.info("skill: chunk %d, %d funds, %d trades, peak %d MB", n, len(chunk), part.height, peak_mb())
         scores.append(got)
-        ranks.append(skill.etf_ranks(part, sector, etfs, last_q))
+        ranks.append(skill.etf_ranks(part, sector, etfs, last_q, series, halves))
         dropped += bad.height
     scores, ranks = pl.concat(scores), pl.concat(ranks)
     lake.write("fund_skill", scores)
@@ -535,27 +536,15 @@ def skill_docs(d: skill_detail.Detail, mix: pl.DataFrame, last_q: int) -> dict[i
         if cik not in first:
             continue
         qs = list(range(first[cik], last_q + 1))
-        qrows = quarters.get(cik, pl.DataFrame(schema=d.quarters.schema))
-        series = {(t, v): {q: (val, r) for q, val, r in g.select("q", "v", "r").iter_rows()}
-                  for (t, v), g in qrows.partition_by("tier", "variant", as_dict=True).items()}  # fmt: skip
-        yrows = years.get(cik, pl.DataFrame(schema=d.years.schema))
-        ys = {(t, v): {yr: ret for yr, ret in g.select("year", "ret").iter_rows()}
-              for (t, v), g in yrows.partition_by("tier", "variant", as_dict=True).items()}  # fmt: skip
-        names = yrows.filter(pl.col("tier") == 1).select("year", "name").unique().sort("year")
-        year_ids, year_names = names["year"].to_list(), names["name"].to_list()
+        qrows = {r["q"]: r for r in quarters.get(cik, pl.DataFrame(schema=d.quarters.schema)).iter_rows(named=True)}
+        yrows = years.get(cik, pl.DataFrame(schema=d.years.schema)).sort("year")
         buy = dict(bought[cik].select("q", "bought").iter_rows()) if cik in bought else {}
 
-        def ret(t: int, v: str) -> list:
-            s = series.get((t, v), {})
-            return [_r(s.get(q, (None, None))[1]) for q in qs]
+        def ret(way: str) -> list:
+            return [_r(qrows[q][way]) if q in qrows else None for q in qs]
 
-        def val(t: int, v: str) -> list:
-            s = series.get((t, v), {})
-            return [_dollars(s.get(q, (None, None))[0]) if (t, v) in series else None for q in qs]
-
-        def yret(t: int, v: str) -> list:
-            s = ys.get((t, v), {})
-            return [_r(s.get(y)) for y in year_ids]
+        def yret(way: str) -> list:
+            return [_r(x) for x in yrows[way].to_list()]
 
         tiers = {}
         for row in sc.iter_rows(named=True):
@@ -563,18 +552,18 @@ def skill_docs(d: skill_detail.Detail, mix: pl.DataFrame, last_q: int) -> dict[i
             pk = picks[cik].filter(pl.col("tier") == t) if cik in picks else pl.DataFrame(schema=d.picks.schema)
             bt = bets[cik].filter(pl.col("tier") == t) if cik in bets else pl.DataFrame(schema=d.bets.schema)
             tiers[str(t)] = {
-                **{k: _r(row[k]) for k in ("irr_fund", "irr_label", "irr_mkt", "irr_spy", "picking", "allocation")},
+                **{k: _r(row[k]) for k in ("ret_fund", "ret_label", "ret_mkt", "ret_spy", "picking", "allocation")},
                 "coverage": _r(row["coverage"], 4), "n": row["n"],
-                "quarters": {"label": ret(t, "label"), "v_label": val(t, "label"), "v_never": None},
-                "years": {"label": yret(t, "label")},
+                "quarters": {"label": ret(f"l{t}")},
+                "years": {"label": yret(f"l{t}")},
                 "picks": {
                     "stock_id": [None if s == skill_detail.OTHERS else s for s in pk["stock_id"].to_list()],
                     "label": pk["label"].to_list(), "bought": [_dollars(x) for x in pk["bought"].to_list()],
-                    "irr_own": [_r(x) for x in pk["irr_own"].to_list()], "irr_label": [_r(x) for x in pk["irr_label"].to_list()],
+                    **{k: [_r(x) for x in pk[k].to_list()] for k in ("ret_own", "ret_label", "adds")},
                 },
                 "bets": {
                     "label": bt["label"].to_list(), "bought": [_dollars(x) for x in bt["bought"].to_list()],
-                    "irr": [_r(x) for x in bt["irr"].to_list()], "irr_mkt": [_r(x) for x in bt["irr_mkt"].to_list()],
+                    **{k: [_r(x) for x in bt[k].to_list()] for k in ("ret", "ret_mkt", "adds")},
                     "mkt_share": [_r(x, 4) for x in bt["mkt_share"].to_list()],
                 },
             }  # fmt: skip
@@ -594,9 +583,9 @@ def skill_docs(d: skill_detail.Detail, mix: pl.DataFrame, last_q: int) -> dict[i
         docs[cik] = {
             "last_q": last_q, "first_q": first[cik],
             "quarters": {"q": qs, "bought": [_dollars(buy.get(q, 0.0)) for q in qs],
-                         "fund": ret(1, "fund"), "mkt": ret(1, "mkt"), "spy": ret(1, "spy"),
-                         "v_fund": val(1, "fund"), "v_mkt": val(1, "mkt"), "v_spy": val(1, "spy")},
-            "years": {"name": year_names, "fund": yret(1, "fund"), "mkt": yret(1, "mkt"), "spy": yret(1, "spy")},
+                         "cap": [_dollars(qrows[q]["cap"]) if q in qrows else 0.0 for q in qs],
+                         "fund": ret("fund"), "mkt": ret("mkt"), "spy": ret("spy")},
+            "years": {"name": yrows["name"].to_list(), "fund": yret("fund"), "mkt": yret("mkt"), "spy": yret("spy")},
             "tiers": tiers, "mix": mq,
         }  # fmt: skip
     return docs
@@ -627,7 +616,7 @@ def publish_sectors(lake: Lake, out_root: Path, last_q: int, flags: list, compre
     counts = dict(flows.group_by("cik").len().sort("cik").iter_rows())
     for n, chunk in enumerate(trade_chunks(counts)):
         part = flows.filter(pl.col("cik").is_in(chunk))
-        d = skill_detail.fund_detail(part, sector, i.paths, i.etfs, i.nosector, i.spy, last_q, i.series)
+        d = skill_detail.fund_detail(part, sector, i.paths, i.etfs, i.nosector, i.spy, last_q, i.series, i.halves)
         mix = skill_detail.fund_mix(part, i.sq, paths, last_q)
         for cik, doc in skill_docs(d, mix, last_q).items():
             rel = f"fund/{cik}/skill.json"

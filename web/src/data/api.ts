@@ -90,7 +90,8 @@ export const loadSectorLabels = () => getJson<SectorLabels>("sectors/labels.json
 export async function loadSkill(id: number): Promise<Skill | null> {
   try {
     const s = await getJson<Skill>(`fund/${id}/skill.json`);
-    return s && typeof s === "object" && s.tiers ? s : null;
+    // A file from before the opportunity-cost scores (2026-11-28) has no `quarters.cap`: none until it is rewritten
+    return s && typeof s === "object" && s.tiers && Array.isArray(s.quarters?.cap) ? s : null;
   } catch (err) {
     if (err instanceof NotFoundError || err instanceof SyntaxError) return null;
     throw err;
