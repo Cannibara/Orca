@@ -135,8 +135,10 @@ export function SkillMapPanel({ fundId, name, skill, tier, onTier, scores, famou
         <MapChart me={{ name: me, pick, alloc, n: T.n ?? 0 }} peers={shown} w={w} path={path ? rollingPath(skill, tier) : []} table={table} />
       </div>
       <p className="pf">
-        Units. "pts a year" means percentage points of yearly return: +2 pts = 2% a year more, e.g. 12% a year instead of 10%. Measured on every
-        dollar they put in since {firstYear}. Across: how much its stocks beat their own {w.plural}. Up: how much its {w.plural} beat the whole market.
+        Units. "pts a year" means percentage points of yearly return: +2 pts = 2% a year more, e.g. 12% a year instead of 10%. Measured on their own
+        money since {firstYear}: each quarter, the dollars they held in each stock, against the same dollars in that stock's {w.noun} and in the whole
+        market. Across: the dollars its stocks beat their own {w.plural} by. Up: the dollars its {w.plural} beat the whole market by. Both ÷ the
+        dollar-years at work.
         The grey cross near zero is "too close to call": a gap that small is often chance. Dot size = number of picks.
       </p>
     </section>

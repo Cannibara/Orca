@@ -151,7 +151,7 @@ function StackedChart({ rows, w, grow, table }: { rows: YearRow[]; w: TierWords;
   );
 }
 
-/** Lines: what the money they put in would be worth in each replay, every quarter end, all drawn at once. */
+/** Lines: the dollars their money made so far each way, every quarter end, all drawn at once. */
 function LinesChart({ skill, tier, w, table }: { skill: Skill; tier: Tier; w: TierWords; table: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -194,7 +194,7 @@ function LinesChart({ skill, tier, w, table }: { skill: Skill; tier: Tier; w: Ti
   return (
     <div className="chart" ref={host}>
       <ChartSlot table={table}>
-        <svg ref={svg} className="viz draw" viewBox={`0 0 ${L.W} ${L.H}`} width={L.W} height={L.H} role="group" aria-label="What the money they put in would be worth in each version, each quarter end.">
+        <svg ref={svg} className="viz draw" viewBox={`0 0 ${L.W} ${L.H}`} width={L.W} height={L.H} role="group" aria-label="The dollars their money made so far in each version, each quarter end.">
           {L.ticks.map((t) => (
             <g key={t.v}>
               <line className={t.v === 0 ? "zero" : "grid"} x1={L.ml} x2={L.W - L.mr} y1={t.y} y2={t.y} />
@@ -241,7 +241,7 @@ function LinesChart({ skill, tier, w, table }: { skill: Skill; tier: Tier; w: Ti
       </ChartSlot>
       {table && (
         <SkTable
-          caption="What the money they put in would be worth, each year end"
+          caption="The dollars their money made so far, each year end"
           head={["Quarter end", "Their stocks", w.their, "Whole market", "S&P 500"]}
           rows={qs.map(({ q, i }) => [qShort(q), money(L.values.fund[i]), money(L.values.label[i]), money(L.values.mkt[i]), money(L.values.spy[i])])}
         />
@@ -331,7 +331,7 @@ export function StackedPanel({ skill, tier }: { skill: Skill; tier: Tier }) {
       <div className="stats" aria-live="polite">
         <div className="stat">
           <span>Whole market, {span}</span>
-          <b>{ret1(T.irr_mkt)} a year</b>
+          <b>{ret1(T.ret_mkt)} a year</b>
         </div>
         <div className="stat">
           <span>
@@ -396,8 +396,8 @@ export function StackedPanel({ skill, tier }: { skill: Skill; tier: Tier }) {
       </div>
       <p className="pf">
         {lines
-          ? "What the money they put in would be worth, with the same buys and sells on the same dates. Whole market = Orca's index of every US stock it prices. S&P 500 for reference only. Estimates."
-          : `Each bar is one calendar year. Light = what the whole market returned, hatched = what their ${w.noun} choices added, solid = what their stock choices added; a dashed box is a choice that went the other way. pts = percentage points: 15% when the market made 12% is +3 pts. The three figures above count all the money they put in, so they differ a little from the yearly bars. Estimates.`}
+          ? "The dollars made so far: their stocks, and the same money in the same quarters put in their " + w.plural + ", the whole market (Orca's index of every US stock it prices) or the S&P 500 (for reference). Estimates."
+          : `Each bar is one calendar year. Light = what the whole market returned, hatched = what their ${w.noun} choices added, solid = what their stock choices added; a dashed box is a choice that went the other way. pts = percentage points: 15% when the market made 12% is +3 pts. Every figure is on their own money: each quarter, the dollars they held, put in their stocks, their ${w.plural} or the whole market. The three figures above are the yearly bars averaged by the money at work in each year. Estimates.`}
       </p>
     </section>
   );

@@ -1,15 +1,13 @@
-"""What the fund page draws from the sector-choice / stock-choice replays (spec
+"""What the fund page draws from the opportunity-cost attribution (`skill.attribute`; spec
 `docs/superpowers/specs/2026-11-21-sector-stock-choice-design.md` §6).
 
-`skill.fund_scores` keeps one IRR per fund, tier and replay. The fund page also needs each replay's value at every
-quarter end (the Lines chart), its quarterly and yearly returns (the stacked bars), the IRRs of the biggest
-positions (stocks vs their label) and of each label the fund bought (labels vs the market), and the fund's mix of
-labels over time. Same replays (`skill.replay`), same dropped positions, so the figures agree with the scores.
-
-Quarterly returns are time-weighted with the trade at the quarter's average level, the level `replay` trades at:
-r = (value just before the trades ÷ value at the last quarter end) × (value at the quarter end ÷ value just after
-the trades) − 1. Money going in or out then never moves the return, even a sell-out, and the three replays share the
-same quarters, so each year market + (label − market) + (fund − label) = fund exactly.
+Every figure is money × return on the same money: each half quarter, the dollars the fund had in each stock, put
+in the stock, its label's index, the market and SPY. Per fund and quarter, `cap` is the dollars at work over the
+quarter and each way's quarterly return is what it made ÷ `cap`. A calendar year's return is what it made ÷ the
+average `cap` of its quarters, so each year market + (label − market) + (fund − label) = fund exactly, and the
+scores (dollars made ÷ dollar-years) are the years averaged by the money at work in them. The fund page also
+lists the biggest positions (stock vs its label on its own money, and what that adds to the fund's score) and
+each label bought (label vs the market), whose `adds` sum to the fund's picking and allocation exactly.
 """
 
 from __future__ import annotations
@@ -23,84 +21,51 @@ from orca.engine.fund import _year_label
 from orca.engine.sectors import MARKET, SEP
 
 PICKS = 30  # positions listed one by one; the rest are one row
-OTHERS = -1  # stock_id of that row until publish (irr_by's join would drop a null key)
-IRR_STEPS = 64  # bisection steps: a double's precision (the web's 200 change nothing past ~60)
+OTHERS = -1  # stock_id of that row until publish
 MIX_MIN = 0.002  # a vertical that never reaches 0.2% of the book joins its sector's "(Smaller holdings)"
 NOT_CLASSIFIED = SEP.join(["(Not classified)"] * 3)
 ETFS = "(ETFs)"
 SMALLER = "(Smaller holdings)"
-KEYS = ["cik", "tier", "variant"]
+WAYS = ("fund", "mkt", "spy", "l1", "l2", "l3")  # the stock itself, the market, SPY, the label at tiers 1–3
 
 
 @dataclass(frozen=True)
 class Detail:
-    quarters: pl.DataFrame  # cik, tier, variant, q, v, r  (tier 1: fund, label, mkt, spy; tiers 2–3: label)
-    years: pl.DataFrame  # cik, tier, variant, year, name, ret
+    quarters: pl.DataFrame  # cik, q, cap, fund, mkt, spy, l1, l2, l3 (quarterly returns on the same money)
+    years: pl.DataFrame  # cik, year, name, fund, mkt, spy, l1, l2, l3
     bought: pl.DataFrame  # cik, q, bought
     first_q: pl.DataFrame  # cik, first_q
-    scores: pl.DataFrame  # cik, tier, irr_fund, irr_label, irr_mkt, irr_spy, picking, allocation, coverage, n
-    picks: pl.DataFrame  # cik, tier, rank, stock_id (OTHERS for the rest), label, bought, irr_own, irr_label
-    bets: pl.DataFrame  # cik, tier, label, bought, irr, irr_mkt, mkt_share
+    scores: pl.DataFrame  # skill.score_table
+    picks: pl.DataFrame  # cik, tier, rank, stock_id (OTHERS for the rest), label, bought, ret_own, ret_label, adds
+    bets: pl.DataFrame  # cik, tier, label, bought, ret, ret_mkt, adds, mkt_share
 
 
-def quarter_values(units: pl.DataFrame, series: pl.DataFrame, last_q: int) -> pl.DataFrame:
-    """Per (cik, tier, variant, q): `v` the replay's value at the quarter end, `pre` / `post` its value at the
-    quarter's average level just before / after the quarter's trades.
-
-    `units` is `replay(..., units=True)`'s third frame. A position holds u after a trade until its next trade (0
-    once sold out). A key with no level in a quarter (a halted or delisted stock) keeps its last level end, at
-    which it also trades: so it neither gains nor loses while it has no price."""
-    g = [c for c in units.columns if c not in ("q", "u_prev", "u")]
-    d = units.sort(*g, "q").with_columns(q_next=pl.col("q").shift(-1).over(g).fill_null(last_q + 1))
-    trade_rows = d.select(*g, "q", pl.col("u_prev").alias("u0"), pl.col("u").alias("u1"))
-    hold = (
-        d.filter((pl.col("u") > 0) & (pl.col("q_next") > pl.col("q") + 1))
-        .with_columns(qq=pl.int_ranges(pl.col("q") + 1, pl.col("q_next"), dtype=pl.Int32))
-        .explode("qq")
-        .select(*g, pl.col("qq").alias("q"), pl.col("u").alias("u0"), pl.col("u").alias("u1"))
-    )
-    rows = pl.concat([trade_rows, hold]).group_by("cik", "tier", "variant", "key", "q").agg(pl.col("u0").sum(), pl.col("u1").sum())
-    lev = series.filter(pl.col("q") <= last_q).select("key", "q", pl.col("q").alias("q_at"), "level_avg", "level_end").sort("q")
-    rows = rows.sort("q").join_asof(lev, on="q", by="key", strategy="backward", check_sortedness=False)  # both sorted by q
-    avg = pl.when(pl.col("q_at") == pl.col("q")).then(pl.col("level_avg")).otherwise(pl.col("level_end"))
-    return (
-        rows.filter(pl.col("level_end").is_not_null())
-        .group_by("cik", "tier", "variant", "q")
-        .agg((pl.col("u1") * pl.col("level_end")).sum().alias("v"), (pl.col("u0") * avg).sum().alias("pre"), (pl.col("u1") * avg).sum().alias("post"))
-    )
+def quarter_table(rows: pl.DataFrame, first_q: pl.DataFrame, last_q: int) -> pl.DataFrame:
+    """Every quarter from each fund's `first_q` to `last_q`: `cap` (the dollars at work over it, 0 when none) and
+    `g_<way>` what that money made each way."""
+    q = rows.group_by("cik", "q").agg(pl.col("b").sum().alias("cap"), *[pl.col(f"g_{w}").sum() for w in WAYS])
+    grid = first_q.with_columns(q=pl.int_ranges(pl.col("first_q"), last_q + 1, dtype=pl.Int32)).explode("q").drop("first_q")
+    return grid.join(q, on=["cik", "q"], how="left").with_columns(pl.col("cap", *[f"g_{w}" for w in WAYS]).fill_null(0.0)).sort("cik", "q")
 
 
-def quarter_returns(values: pl.DataFrame, first_q: pl.DataFrame, last_q: int) -> pl.DataFrame:
-    """Every quarter from the fund's `first_q` to `last_q` with the value `v` and the time-weighted return `r`
-    (module docstring); null where the replay held nothing in the quarter."""
-    grid = (
-        values.select(KEYS).unique().join(first_q, on="cik")
-        .with_columns(q=pl.int_ranges(pl.col("first_q"), last_q + 1, dtype=pl.Int32)).explode("q").drop("first_q")
-    )  # fmt: skip
-    d = grid.join(values, on=[*KEYS, "q"], how="left").with_columns(pl.col("v", "pre", "post").fill_null(0.0)).sort(*KEYS, "q")
-    d = d.with_columns(v_prev=pl.col("v").shift(1, fill_value=0.0).over(KEYS))
-    before, after = pl.col("pre") / pl.col("v_prev"), pl.col("v") / pl.col("post")
-    has_prev, has_post = pl.col("v_prev") > 0, pl.col("post") > 0
-    r = (
-        pl.when(has_prev & has_post).then(before * after - 1)
-        .when(has_prev).then(before - 1)
-        .when(has_post).then(after - 1)
-    )  # fmt: skip
-    return d.select(*KEYS, "q", "v", r.alias("r"))
+def quarter_returns(qt: pl.DataFrame) -> pl.DataFrame:
+    """`quarter_table` as returns: what each way made ÷ `cap`; null where nothing was at work."""
+    return qt.select("cik", "q", "cap", *[pl.when(pl.col("cap") > 0).then(pl.col(f"g_{w}") / pl.col("cap")).alias(w) for w in WAYS])
 
 
-def year_returns(quarters: pl.DataFrame) -> pl.DataFrame:
-    """Calendar years of `quarter_returns` rows: the label `summary.json` gives the quarters, and the chained
-    return of the quarters with one (null when none)."""
-    y = quarters.with_columns(year=(pl.col("q") // 4 + 2013).cast(pl.Int32), qn=(pl.col("q") % 4 + 1).cast(pl.Int32))
-    out = y.group_by(*KEYS, "year").agg(
-        pl.col("qn").sort().alias("qns"),
-        pl.when(pl.col("r").is_not_null().any()).then((1 + pl.col("r")).product() - 1).alias("ret"),
+def year_returns(qt: pl.DataFrame) -> pl.DataFrame:
+    """Calendar years of `quarter_table`: the label `summary.json` gives the quarters, and what each way made in the
+    year ÷ the average `cap` of the year's quarters with money at work (null when none)."""
+    y = qt.with_columns(year=(pl.col("q") // 4 + 2013).cast(pl.Int32), qn=(pl.col("q") % 4 + 1).cast(pl.Int32))
+    out = y.group_by("cik", "year").agg(
+        pl.col("qn").sort().alias("qns"), pl.col("cap").filter(pl.col("cap") > 0).mean().alias("avg"), *[pl.col(f"g_{w}").sum() for w in WAYS]
     )
     names = {(yr, tuple(qns)): _year_label(yr, list(qns)) for yr, qns in out.select("year", "qns").unique().iter_rows()}
-    return out.with_columns(
-        name=pl.struct("year", "qns").map_elements(lambda s: names[(s["year"], tuple(s["qns"]))], return_dtype=pl.String)
-    ).select(*KEYS, "year", "name", "ret").sort(*KEYS, "year")
+    return out.select(
+        "cik", "year",
+        pl.struct("year", "qns").map_elements(lambda s: names[(s["year"], tuple(s["qns"]))], return_dtype=pl.String).alias("name"),
+        *[pl.when(pl.col("avg") > 0).then(pl.col(f"g_{w}") / pl.col("avg")).alias(w) for w in WAYS],
+    ).sort("cik", "year")  # fmt: skip
 
 
 def fund_detail(
@@ -112,85 +77,56 @@ def fund_detail(
     spy_id: int | None,
     last_q: int,
     series: pl.DataFrame,
+    halves: pl.DataFrame | None = None,
 ) -> Detail:
     """The fund-page detail of every fund in `trades` (one chunk of `fund_flows`). `sector_returns` needs its
     `cap` column (the label's market value at the quarter's start); `series` is own + label series."""
     trades = trades.filter(pl.col("q") <= last_q)
-    spy_key = f"s{spy_id}" if spy_id is not None else MARKET
+    if halves is None:
+        halves = skill.half_returns(series)
+    rows, _ = skill.attribute(trades, series, halves, skill.benches(stock_paths, etfs, nosector, spy_id), last_q)
+    kept = skill.kept_positions(rows)
     buys = trades.filter(pl.col("delta") > 0).with_columns(dollars=pl.col("delta") * pl.col("px"))
+    kept_buys = buys.join(kept, on=["cik", "stock_id"])
+    first_q = trades.join(kept, on=["cik", "stock_id"]).group_by("cik").agg(pl.col("q").min().alias("first_q"))
+    qt = quarter_table(rows, first_q, last_q)
+    dy = rows.group_by("cik").agg((pl.col("b").sum() / 4).alias("dy"))
+    pos = rows.group_by("cik", "stock_id").agg(pl.col("b").sum(), *[pl.col(f"g_{w}").sum() for w in WAYS])
     caps = sector_returns.select("label", "q", "cap")
     w = caps.join(caps.filter(pl.col("label") == MARKET).select("q", pl.col("cap").alias("cap_m")), on="q").select(
         "label", "q", (pl.col("cap") / pl.col("cap_m")).alias("w")
     )
-    parts: dict[str, list[pl.DataFrame]] = {k: [] for k in ("values", "scores", "picks", "bets", "kept")}
+    spy_key = f"s{spy_id}" if spy_id is not None else MARKET
+    picks_out, bets_out = [], []
     for tier in skill.TIERS:
-        key = skill.tier_labels(stock_paths, etfs, nosector, spy_key, tier)
         group = skill.tier_labels(stock_paths, etfs, set(), spy_key, tier)  # a conglomerate's bet is its own label
-        lab = pl.DataFrame(
-            {"stock_id": list(key), "_key": list(key.values()), "_label": [group[s] for s in key]},
-            schema={"stock_id": pl.Int32, "_key": pl.String, "_label": pl.String},
-        )
-        picks = trades.join(lab, on="stock_id").with_columns(tier=pl.lit(tier, pl.Int8))
-        variants = [("fund", "s" + pl.col("stock_id").cast(pl.String)), ("label", pl.col("_key")), ("mkt", pl.lit(MARKET))]
-        if tier == 1 and spy_id is not None:
-            variants.append(("spy", pl.lit(spy_key)))
-        keyed = pl.concat([picks.with_columns(key=k, variant=pl.lit(v)) for v, k in variants]).drop("_key")
-        flows, dropped, units = skill.replay(keyed, series, last_q, by=("tier", "variant", "_label"), units=True)
-        # as fund_scores: a position any scored replay cannot trade leaves every replay; SPY's own gaps only its own
-        bad = dropped.filter(pl.col("variant") != "spy").select("cik", "stock_id", "tier").unique()
-        flows = flows.join(bad, on=["cik", "stock_id", "tier"], how="anti")
-        units = units.join(bad, on=["cik", "stock_id", "tier"], how="anti")
-        kept = flows.filter(pl.col("variant") == "fund").select("cik", "stock_id").unique()
-        parts["kept"].append(kept.with_columns(tier=pl.lit(tier, pl.Int8)))
-        wanted = units if tier == 1 else units.filter(pl.col("variant") == "label")
-        parts["values"].append(quarter_values(wanted, series, last_q))
+        lab = pl.DataFrame({"stock_id": list(group), "_label": list(group.values())}, schema={"stock_id": pl.Int32, "_label": pl.String})
+        g_l = f"g_l{tier}"
 
-        irr = skill.irr_by(flows.select(*KEYS, "t", "cf"), KEYS, steps=IRR_STEPS)
-        irr = irr.pivot("variant", index=["cik", "tier"], values="irr")
-        for v in ("fund", "label", "mkt", "spy"):
-            if v not in irr.columns:
-                irr = irr.with_columns(pl.lit(None, pl.Float64).alias(v))
-        kept_buys = buys.join(kept, on=["cik", "stock_id"]).join(lab.select("stock_id", "_label"), on="stock_id")
-        covered = kept_buys.group_by("cik").agg(pl.col("dollars").sum().alias("covered"), pl.col("stock_id").n_unique().cast(pl.Int32).alias("n"))
-        total = buys.group_by("cik").agg(pl.col("dollars").sum().alias("all"))
-        parts["scores"].append(
-            irr.join(covered, on="cik", how="left").join(total, on="cik", how="left").select(
-                "cik", "tier", pl.col("fund").alias("irr_fund"), pl.col("label").alias("irr_label"), pl.col("mkt").alias("irr_mkt"),
-                pl.col("spy").alias("irr_spy"), (pl.col("fund") - pl.col("label")).alias("picking"),
-                (pl.col("label") - pl.col("mkt")).alias("allocation"), (pl.col("covered") / pl.col("all")).alias("coverage"), "n",
-            )
-        )  # fmt: skip
-
-        # stocks vs their label: the biggest positions by dollars bought, one by one
-        pos = (
-            kept_buys.group_by("cik", "stock_id").agg(pl.col("dollars").sum().alias("bought"), pl.col("_label").first())
+        # stocks vs their label, on each position's own money: the biggest by dollars bought, one by one
+        p = (
+            kept_buys.group_by("cik", "stock_id").agg(pl.col("dollars").sum().alias("bought")).join(lab, on="stock_id")
             .sort("cik", "bought", "stock_id", descending=[False, True, False])
             .with_columns(rank=pl.int_range(pl.len(), dtype=pl.Int32).over("cik"))
             .with_columns(pid=pl.when(pl.col("rank") < PICKS).then(pl.col("stock_id")).otherwise(pl.lit(OTHERS, pl.Int32)))
+            .join(pos, on=["cik", "stock_id"])
+            .group_by("cik", "pid").agg(
+                pl.col("bought").sum(), pl.col("_label").first(), pl.col("rank").min(), pl.col("b").sum(), pl.col("g_fund").sum(), pl.col(g_l).sum()
+            )
+            .join(dy, on="cik")
         )  # fmt: skip
-        pf = flows.filter(pl.col("variant").is_in(["fund", "label"])).join(pos.select("cik", "stock_id", "pid"), on=["cik", "stock_id"])
-        pirr = skill.irr_by(pf.select(*KEYS, "pid", "t", "cf"), [*KEYS, "pid"], steps=IRR_STEPS)
-        pirr = pirr.pivot("variant", index=["cik", "tier", "pid"], values="irr")
-        for v in ("fund", "label"):
-            if v not in pirr.columns:
-                pirr = pirr.with_columns(pl.lit(None, pl.Float64).alias(v))
-        prow = pos.group_by("cik", "pid").agg(pl.col("bought").sum(), pl.col("_label").first(), pl.col("rank").min())
-        parts["picks"].append(
-            prow.join(pirr, on=["cik", "pid"], how="left").select(
+        picks_out.append(
+            p.select(
                 "cik", pl.lit(tier, pl.Int8).alias("tier"), "rank", pl.col("pid").alias("stock_id"),
-                pl.when(pl.col("pid") == OTHERS).then(None).otherwise(pl.col("_label")).alias("label"),
-                "bought", pl.col("fund").alias("irr_own"), pl.col("label").alias("irr_label"),
+                pl.when(pl.col("pid") == OTHERS).then(None).otherwise(pl.col("_label")).alias("label"), "bought",
+                (pl.col("g_fund") / (pl.col("b") / 4)).alias("ret_own"), (pl.col(g_l) / (pl.col("b") / 4)).alias("ret_label"),
+                ((pl.col("g_fund") - pl.col(g_l)) / pl.col("dy")).alias("adds"),
             )
         )  # fmt: skip
 
-        # labels vs the market: every label bought, its trades replayed in its index and in the market
-        bf = flows.filter(pl.col("variant").is_in(["label", "mkt"]))
-        birr = skill.irr_by(bf.select(*KEYS, "_label", "t", "cf"), [*KEYS, "_label"], steps=IRR_STEPS)
-        birr = birr.pivot("variant", index=["cik", "tier", "_label"], values="irr")
-        for v in ("label", "mkt"):
-            if v not in birr.columns:
-                birr = birr.with_columns(pl.lit(None, pl.Float64).alias(v))
-        bq = kept_buys.group_by("cik", "_label", "q").agg(pl.col("dollars").sum())
+        # labels vs the market: every label bought, on the money the fund had in it
+        bg = pos.join(lab, on="stock_id").group_by("cik", "_label").agg(pl.col("b").sum(), pl.col(g_l).sum(), pl.col("g_mkt").sum()).join(dy, on="cik")
+        bq = kept_buys.join(lab, on="stock_id").group_by("cik", "_label", "q").agg(pl.col("dollars").sum())
         share = (
             bq.join(w, left_on=["_label", "q"], right_on=["label", "q"], how="left")
             .group_by("cik", "_label").agg(
@@ -198,9 +134,10 @@ def fund_detail(
                 ((pl.col("dollars") * pl.col("w")).sum() / pl.col("dollars").filter(pl.col("w").is_not_null()).sum()).alias("mkt_share"),
             )
         )  # fmt: skip
-        bets = share.join(birr, on=["cik", "_label"], how="left").select(
+        bets = share.join(bg, on=["cik", "_label"], how="left").select(
             "cik", pl.lit(tier, pl.Int8).alias("tier"), pl.col("_label").alias("label"), "bought",
-            pl.col("label").alias("irr"), pl.col("mkt").alias("irr_mkt"), "mkt_share",
+            (pl.col(g_l) / (pl.col("b") / 4)).alias("ret"), (pl.col("g_mkt") / (pl.col("b") / 4)).alias("ret_mkt"),
+            ((pl.col(g_l) - pl.col("g_mkt")) / pl.col("dy")).alias("adds"), "mkt_share",
         )  # fmt: skip
         if tier == 1:  # every sector, so a reader sees what they left out
             sectors = sector_returns.filter(pl.col("tier") == 1).select("label").unique()
@@ -211,29 +148,21 @@ def fund_detail(
                     ((pl.col("dollars") * pl.col("w").fill_null(0.0)).sum() / pl.col("dollars").sum()).alias("mkt_share")
                 )
                 .join(bets.select("cik", "label"), on=["cik", "label"], how="anti")
-                .select("cik", pl.lit(1, pl.Int8).alias("tier"), "label", pl.lit(0.0).alias("bought"),
-                        pl.lit(None, pl.Float64).alias("irr"), pl.lit(None, pl.Float64).alias("irr_mkt"), "mkt_share")
+                .select("cik", pl.lit(1, pl.Int8).alias("tier"), "label", pl.lit(0.0).alias("bought"), pl.lit(None, pl.Float64).alias("ret"),
+                        pl.lit(None, pl.Float64).alias("ret_mkt"), pl.lit(None, pl.Float64).alias("adds"), "mkt_share")
             )  # fmt: skip
             bets = pl.concat([bets, unbought])
-        parts["bets"].append(bets)
+        bets_out.append(bets)
 
-    kept1 = parts["kept"][0].drop("tier")
-    first_q = trades.join(kept1, on=["cik", "stock_id"]).group_by("cik").agg(pl.col("q").min().alias("first_q"))
-    values = pl.concat(parts["values"])
-    quarters = quarter_returns(values, first_q, last_q)
-    bought = (
-        buys.join(kept1, on=["cik", "stock_id"]).group_by("cik", "q").agg(pl.col("dollars").sum().alias("bought"))
-    )  # fmt: skip
+    bought = kept_buys.group_by("cik", "q").agg(pl.col("dollars").sum().alias("bought"))
     return Detail(
-        quarters=quarters,
-        years=year_returns(quarters),
+        quarters=quarter_returns(qt),
+        years=year_returns(qt),
         bought=bought,
         first_q=first_q,
-        scores=pl.concat(parts["scores"]).sort("cik", "tier").with_columns(  # SPY is replayed once, at tier 1
-            irr_spy=pl.col("irr_spy").filter(pl.col("tier") == 1).first().over("cik")
-        ),
-        picks=pl.concat(parts["picks"]).sort("cik", "tier", "rank"),
-        bets=pl.concat(parts["bets"]).sort(["cik", "tier", "bought", "label"], descending=[False, False, True, False]),
+        scores=skill.score_table(rows, trades),
+        picks=pl.concat(picks_out).sort("cik", "tier", "rank"),
+        bets=pl.concat(bets_out).sort(["cik", "tier", "bought", "label"], descending=[False, False, True, False]),
     )
 
 

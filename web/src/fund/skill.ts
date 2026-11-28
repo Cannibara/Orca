@@ -218,11 +218,11 @@ export function peersFor(fundId: number, t: Tier, famous: TopRow[] | undefined, 
 /** A 3-year window of the map's path: its scores over the 12 quarters to q (fractions a year). */
 export type PathPoint = { q: number; pick: number; alloc: number };
 
-const ann3 = (rs: number[]): number => Math.pow(rs.reduce((a, r) => a * (1 + r), 1), 1 / 3) - 1;
-
 /**
- * Rolling 3-year windows ending each Q4 and the latest quarter: stock choice = ann(fund) − ann(label), sector
- * choice = ann(label) − ann(market), ann = (Π(1 + r))^(1/3) − 1. A window with a missing quarter is skipped.
+ * Rolling 3-year windows ending each Q4 and the latest quarter, scored as the map is (contract.md, Sector files):
+ * stock choice = Σ cap × (fund − label) ÷ the window's dollar-years, sector choice = Σ cap × (label − market) ÷
+ * the same, where cap is the dollars at work in a quarter (a quarter is a quarter of a year). A window with a
+ * quarter nothing was at work in is skipped.
  */
 export function rollingPath(skill: Skill, t: Tier): PathPoint[] {
   const Q = skill.quarters;
@@ -232,26 +232,24 @@ export function rollingPath(skill: Skill, t: Tier): PathPoint[] {
   for (let i = 11; i < n; i++) {
     const q = Q.q[i];
     if (qOfYear(q) !== 3 && i !== n - 1) continue;
-    const f: number[] = [];
-    const l: number[] = [];
-    const m: number[] = [];
+    let pick = 0;
+    let alloc = 0;
+    let years = 0;
     let ok = true;
     for (let j = i - 11; j <= i; j++) {
       const a = Q.fund[j];
       const b = lab[j];
       const c = Q.mkt[j];
-      if (a == null || b == null || c == null) {
+      const cap = Q.cap[j];
+      if (a == null || b == null || c == null || !(cap > 0)) {
         ok = false;
         break;
       }
-      f.push(a);
-      l.push(b);
-      m.push(c);
+      pick += cap * (a - b);
+      alloc += cap * (b - c);
+      years += cap / 4;
     }
-    if (!ok) continue;
-    const af = ann3(f);
-    const al = ann3(l);
-    out.push({ q, pick: af - al, alloc: al - ann3(m) });
+    if (ok) out.push({ q, pick: pick / years, alloc: alloc / years });
   }
   return out;
 }
